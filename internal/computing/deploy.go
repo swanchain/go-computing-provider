@@ -581,12 +581,16 @@ func getHardwareDetail(description string) (string, models.Resource) {
 		hardwareResource.Gpu.Quantity = 0
 		hardwareResource.Gpu.Unit = ""
 		taskType = "CPU"
+		hardwareResource.Storage.Quantity = 5
 	} else {
 		taskType = "GPU"
 		hardwareResource.Gpu.Quantity = 1
 		oldName := strings.TrimSpace(confSplits[0])
 		hardwareResource.Gpu.Unit = strings.ReplaceAll(oldName, "Nvidia", "NVIDIA")
+
+		hardwareResource.Storage.Quantity = 20
 	}
+	hardwareResource.Storage.Unit = "Gi"
 
 	cpuSplits := strings.Split(confSplits[1], " ")
 	cores, _ := strconv.ParseInt(cpuSplits[1], 10, 64)
@@ -598,7 +602,5 @@ func getHardwareDetail(description string) (string, models.Resource) {
 	hardwareResource.Memory.Quantity = mem
 	hardwareResource.Memory.Unit = strings.ReplaceAll(memSplits[2], "B", "")
 
-	hardwareResource.Storage.Quantity = 30
-	hardwareResource.Storage.Unit = "Gi"
 	return taskType, hardwareResource
 }

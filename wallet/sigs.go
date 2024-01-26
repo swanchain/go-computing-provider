@@ -25,22 +25,15 @@ func Sign(privatekey string, msg []byte) ([]byte, error) {
 
 // Verify verifies signatures
 func Verify(addr string, signature, dataHash []byte) (bool, error) {
-	privateKey, err := crypto.HexToECDSA(addr)
+	sigPublicKeyECDSA, err := crypto.SigToPub(dataHash, signature)
 	if err != nil {
 		return false, err
 	}
-
-	publicKey := privateKey.Public()
-	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
-	if !ok {
-		return false, fmt.Errorf("cannot assert type: publicKey is not of type *ecdsa.PublicKey")
+	pub := crypto.PubkeyToAddress(*sigPublicKeyECDSA).Hex()
+	if addr != pub {
+		return false, err
 	}
-	publicKeyBytes := crypto.FromECDSAPub(publicKeyECDSA)
-
-	signatureNoRecoverID := signature[:len(signature)-1]
-	verified := crypto.VerifySignature(publicKeyBytes, dataHash, signatureNoRecoverID)
-
-	return verified, nil
+	return true, nil
 }
 
 // ToPublic converts private key to public key

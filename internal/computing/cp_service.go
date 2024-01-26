@@ -84,7 +84,8 @@ func ReceiveJob(c *gin.Context) {
 	}
 
 	if !available {
-		c.JSON(http.StatusOK, util.CreateErrorResponse(util.CheckAvailableResources))
+		logs.GetLogger().Warnf(" task id: %s, name: %s, not found a resources available", jobData.TaskUUID, jobData.Name)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckAvailableResources))
 	}
 
 	var hostName string
@@ -1496,13 +1497,19 @@ func RetrieveUbiTaskMetadata(key string) (*models.CacheUbiTaskDetail, error) {
 }
 
 func verifySignature(pubKStr, data, signature string) (bool, error) {
-	hash := crypto.Keccak256Hash([]byte(data))
-	decode, err := hexutil.Decode(signature)
+	sb, err := hexutil.Decode(signature)
 	if err != nil {
 		return false, err
 	}
-	signatureNoRecoverID := decode[:len(decode)-1]
-	crypto.VerifySignature([]byte(pubKStr), hash.Bytes(), signatureNoRecoverID)
+	hash := crypto.Keccak256Hash([]byte(data))
+	sigPublicKeyECDSA, err := crypto.SigToPub(hash.Bytes(), sb)
+	if err != nil {
+		return false, err
+	}
+	pub := crypto.PubkeyToAddress(*sigPublicKeyECDSA).Hex()
+	if pubKStr != pub {
+		return false, err
+	}
 	return true, nil
 }
 
