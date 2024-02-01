@@ -603,19 +603,6 @@ func DoUbiTask(c *gin.Context) {
 	ubiTaskToRedis.CreateTime = time.Now().Format("2006-01-02 15:04:05")
 	SaveUbiTaskMetadata(ubiTaskToRedis)
 
-	cpPath, _ := os.LookupEnv("CP_PATH")
-	ubiParamDir := filepath.Join(cpPath, "zk-pool", ubiTask.ZkType, ubiTask.Name)
-	if _, err := os.Stat(ubiParamDir); os.IsNotExist(err) {
-		_ = os.MkdirAll(ubiParamDir, os.ModePerm)
-	}
-
-	ubiParamJsonFileName := filepath.Join(ubiParamDir, ubiTask.Name+".json")
-	err = util.SaveMcsFileByUrlToFile(ubiParamJsonFileName, ubiTask.InputParam)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.UbiTaskParamError, "the value of task_type is 0 or 1"))
-		return
-	}
-
 	var envFilePath string
 	envFilePath = filepath.Join(os.Getenv("CP_PATH"), "fil-c2.env")
 	envVars, err := godotenv.Read(envFilePath)
@@ -640,6 +627,7 @@ func DoUbiTask(c *gin.Context) {
 		SaveUbiTaskMetadata(ubiTaskToRedis)
 		logs.GetLogger().Warnf("ubi task id: %d, type: %s, not found a resources available", ubiTask.ID, ubiTaskToRedis.TaskType)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckAvailableResources))
+		return
 	}
 
 	mem := strings.Split(strings.TrimSpace(ubiTask.Resource.Memory), " ")[1]
@@ -713,7 +701,6 @@ func DoUbiTask(c *gin.Context) {
 				ubiTaskRun.Status = constants.UBI_TASK_FAILED_STATUS
 				k8sService := NewK8sService()
 				k8sService.k8sClient.CoreV1().Namespaces().Delete(context.TODO(), namespace, metaV1.DeleteOptions{})
-				os.Remove(ubiParamDir)
 			}
 			SaveUbiTaskMetadata(ubiTaskRun)
 		}()
@@ -775,8 +762,8 @@ func DoUbiTask(c *gin.Context) {
 				Value: namespace,
 			},
 			v1.EnvVar{
-				Name:  "PARAM_PATH",
-				Value: ubiParamDir,
+				Name:  "PARAM_URL",
+				Value: ubiTask.InputParam,
 			},
 		)
 
@@ -796,10 +783,6 @@ func DoUbiTask(c *gin.Context) {
 								Env:   useEnvVars,
 								VolumeMounts: []v1.VolumeMount{
 									{
-										Name:      "fil-c2-input-volume",
-										MountPath: "/var/tmp/fil-c2-param",
-									},
-									{
 										Name:      "proof-params",
 										MountPath: "/var/tmp/filecoin-proof-parameters",
 									},
@@ -814,14 +797,6 @@ func DoUbiTask(c *gin.Context) {
 								VolumeSource: v1.VolumeSource{
 									HostPath: &v1.HostPathVolumeSource{
 										Path: filC2Param,
-									},
-								},
-							},
-							{
-								Name: "fil-c2-input-volume",
-								VolumeSource: v1.VolumeSource{
-									HostPath: &v1.HostPathVolumeSource{
-										Path: ubiParamDir,
 									},
 								},
 							},
@@ -853,7 +828,6 @@ func ReceiveUbiProof(c *gin.Context) {
 		Proof     string `json:"proof"`
 		ZkType    string `json:"zk_type"`
 		NameSpace string `json:"name_space"`
-		ParmPath  string `json:"parm_path"`
 	}
 
 	var submitUBIProofTx string
@@ -872,7 +846,6 @@ func ReceiveUbiProof(c *gin.Context) {
 			k8sService := NewK8sService()
 			k8sService.k8sClient.CoreV1().Namespaces().Delete(context.TODO(), c2Proof.NameSpace, metaV1.DeleteOptions{})
 		}
-		os.Remove(c2Proof.ParmPath)
 	}()
 
 	if err := c.ShouldBindJSON(&c2Proof); err != nil {
