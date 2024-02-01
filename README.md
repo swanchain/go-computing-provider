@@ -302,7 +302,7 @@ systemctl start redis-server.service
 ```bash
 git clone https://github.com/lagrangedao/go-computing-provider.git
 cd go-computing-provider
-git checkout v0.3.0
+git checkout v0.4.2
 ```
 
 Then build the Computing provider follow the below steps:
@@ -343,7 +343,7 @@ KeyFile = "/YOUR_DOMAIN_NAME_KEY_PATH/server.key"   # Your domain name SSL .key 
 ServerUrl = "https://orchestrator-api.swanchain.io"     # The Orchestrator's API address
 AccessToken = ""                                    # The Orchestrator's access token, Acquired from "https://orchestrator.swanchain.io" 
 WalletAddress = ""                                  # The cp‘s wallet address
-BalanceThreshold= 50                                # The cp’s collateral balance threshold
+BalanceThreshold= 1                                # The cp’s collateral balance threshold
 
 [MCS]
 ApiKey = ""                                   # Acquired from "https://www.multichain.storage" -> setting -> Create API Key
