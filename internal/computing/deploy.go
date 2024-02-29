@@ -41,6 +41,7 @@ type Deploy struct {
 	DeployName        string
 	hardwareDesc      string
 	taskUuid          string
+	gpuProductName    string
 }
 
 func NewDeploy(jobUuid, hostName, walletAddress, hardwareDesc string, duration int64, taskUuid string) *Deploy {
@@ -61,6 +62,11 @@ func NewDeploy(jobUuid, hostName, walletAddress, hardwareDesc string, duration i
 func (d *Deploy) WithSpaceInfo(spaceUuid, spaceName string) *Deploy {
 	d.spaceUuid = spaceUuid
 	d.spaceName = spaceName
+	return d
+}
+
+func (d *Deploy) WithGpuProductName(gpuProductName string) *Deploy {
+	d.gpuProductName = gpuProductName
 	return d
 }
 
@@ -286,7 +292,7 @@ func (d *Deploy) YamlToK8s() {
 						Namespace: d.k8sNameSpace,
 					},
 					Spec: coreV1.PodSpec{
-						NodeSelector: generateLabel(d.hardwareResource.Gpu.Unit),
+						NodeSelector: generateLabel(d.gpuProductName),
 						Containers:   containers,
 						Volumes:      volumes,
 					},

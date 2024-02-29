@@ -599,9 +599,8 @@ func readLog(req *rest.Request) (*strings.Builder, error) {
 
 func generateLabel(name string) map[string]string {
 	if name != "" {
-		key := strings.ReplaceAll(name, " ", "-")
 		return map[string]string{
-			key: "true",
+			name: "true",
 		}
 	} else {
 		return map[string]string{}
