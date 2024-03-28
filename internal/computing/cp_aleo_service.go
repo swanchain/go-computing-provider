@@ -3,6 +3,7 @@ package computing
 import (
 	"context"
 	"fmt"
+
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/gin-gonic/gin"
@@ -102,11 +103,11 @@ func Aleo_Prover_DoUbiTask(c *gin.Context, ubiTask models.UBITaskReq) {
 
 	var ubiTaskImage string
 	if architecture == constants.CPU_AMD {
-		ubiTaskImage = build.UBITaskAleoProverImageAmdGpu
+		ubiTaskImage = build.UBITaskAleoProofImageAmdGpu
 	} else if architecture == constants.CPU_INTEL {
-		ubiTaskImage = build.UBITaskAleoProverImageAmdGpu
+		ubiTaskImage = build.UBITaskAleoProofImageAmdGpu
 	}
-	ubiTaskImage = build.UBITaskAleoProverImageAmdGpu
+	ubiTaskImage = build.UBITaskAleoProofImageAmdGpu
 
 	mem := strings.Split(strings.TrimSpace(ubiTask.Resource.Memory), " ")[1]
 	memUnit := strings.ReplaceAll(mem, "B", "")
@@ -164,8 +165,8 @@ func Aleo_Prover_DoUbiTask(c *gin.Context, ubiTask models.UBITaskReq) {
 		var err error
 		defer func() {
 			key := constants.REDIS_UBI_ALEO_PERFIX + strconv.Itoa(ubiTask.ID)
-			ubiTaskRun, err := RetrieveUbiTaskMetadata(key)
-			if err != nil {
+			ubiTaskRun, err2 := RetrieveUbiTaskMetadata(key)
+			if err2 != nil {
 				logs.GetLogger().Errorf("RetrieveUbiTaskMetadata failed, error: %+v: %s", err, key)
 				return
 			}
@@ -206,7 +207,7 @@ func Aleo_Prover_DoUbiTask(c *gin.Context, ubiTask models.UBITaskReq) {
 		receiveUrl := fmt.Sprintf("%s:%d/api/v1/computing/cp/receive/ubi", k8sService.GetAPIServerEndpoint(), conf.GetConfig().API.Port)
 		logs.GetLogger().Infof("receiveUrl: %s", receiveUrl)
 		// todo
-		execCommand := []string{"aleo-prover", "c2"}
+		execCommand := []string{"/mnt/init/cmd", "-p https://api.sotertech.io/api/privnet"}
 		JobName := strings.ToLower(ubiTask.ZkType) + "-" + strconv.Itoa(ubiTask.ID)
 
 		// filC2Param := envVars["FIL_PROOFS_PARAMETER_CACHE"]
@@ -261,30 +262,14 @@ func Aleo_Prover_DoUbiTask(c *gin.Context, ubiTask models.UBITaskReq) {
 						NodeName: nodeName,
 						Containers: []v1.Container{
 							{
-								Name:  JobName + generateString(5),
-								Image: ubiTaskImage,
-								Env:   useEnvVars,
-								// VolumeMounts: []v1.VolumeMount{
-								// 	{
-								// 		Name:      "proof-params",
-								// 		MountPath: "/var/tmp/filecoin-proof-parameters",
-								// 	},
-								// },
+								Name:            JobName + generateString(5),
+								Image:           ubiTaskImage,
+								Env:             useEnvVars,
 								Command:         execCommand,
 								Resources:       resourceRequirements,
 								ImagePullPolicy: coreV1.PullIfNotPresent,
 							},
 						},
-						// Volumes: []v1.Volume{
-						// 	{
-						// 		Name: "proof-params",
-						// 		VolumeSource: v1.VolumeSource{
-						// 			HostPath: &v1.HostPathVolumeSource{
-						// 				Path: filC2Param,
-						// 			},
-						// 		},
-						// 	},
-						// },
 						RestartPolicy: "Never",
 					},
 				},

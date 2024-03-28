@@ -45,7 +45,7 @@ func GetUBIType(zktype string) (UBI_TYPE) {
 		}
 	}
 
-    ubi_type_aleo_prover := []string{ "aleo-prover-ubuntu"};
+    ubi_type_aleo_prover := []string{ "aleo-prover-ubuntu", "aleo-proof"};
 	for _, s := range ubi_type_aleo_prover {
 		if zktype == s {
 			return ALEO_PROVER
