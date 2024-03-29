@@ -5,14 +5,17 @@ import (
 	"encoding/json"
 	stErr "errors"
 	"fmt"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+
 	// "github.com/ethereum/go-ethereum/ethclient"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/gin-gonic/gin"
 	"github.com/gomodule/redigo/redis"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+
 	// "github.com/joho/godotenv"
 	// "github.com/swanchain/go-computing-provider/account"
 	"github.com/swanchain/go-computing-provider/build"
@@ -20,15 +23,17 @@ import (
 	"github.com/swanchain/go-computing-provider/constants"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"github.com/swanchain/go-computing-provider/util"
+
 	// "github.com/swanchain/go-computing-provider/wallet"
 	"io"
+
 	batchv1 "k8s.io/api/batch/v1"
+
 	// coreV1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+
 	// "k8s.io/apimachinery/pkg/api/resource"
-	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"math/rand"
 	"net/http"
 	"os"
@@ -38,6 +43,9 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 func GetCpInfo(c *gin.Context) {
@@ -598,8 +606,8 @@ func DoUbiTask(c *gin.Context) {
 
 	if constants.GetUBIType(ubiTask.ZkType) == constants.FIL_C2 {
 		Fil_C2_DoUbiTask(c, ubiTask)
-	} else if constants.GetUBIType(ubiTask.ZkType) == constants.ALEO_PROVER {
-		Aleo_Prover_DoUbiTask(c, ubiTask)
+	} else if constants.GetUBIType(ubiTask.ZkType) == constants.ALEO_PROOF {
+		Aleo_Proof_DoUbiTask(c, ubiTask)
 	}
 }
 
@@ -613,8 +621,8 @@ func ReceiveUbiProof(c *gin.Context) {
 
 	if constants.GetUBIType(c2Proof.ZkType) == constants.FIL_C2 {
 		Fil_C2_ReceiveUbiProof(c, c2Proof)
-	} else if constants.GetUBIType(c2Proof.ZkType) == constants.ALEO_PROVER {
-		Aleo_Prover_ReceiveUbiProof(c, c2Proof)
+	} else if constants.GetUBIType(c2Proof.ZkType) == constants.ALEO_PROOF {
+		Aleo_Proof_ReceiveUbiProof(c, c2Proof)
 	}
 
 }
@@ -1146,7 +1154,7 @@ func SaveUbiTaskMetadata(ubiTask *models.CacheUbiTaskDetail) {
 		perfix = constants.REDIS_UBI_C2_PERFIX
 	}
 
-	if constants.GetUBIType(ubiTask.ZkType) == constants.ALEO_PROVER {
+	if constants.GetUBIType(ubiTask.ZkType) == constants.ALEO_PROOF {
 		perfix = constants.REDIS_UBI_ALEO_PERFIX
 	}
 

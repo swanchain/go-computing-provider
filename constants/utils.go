@@ -21,7 +21,7 @@ const K8S_DEPLOY_NAME_PREFIX = "deploy-"
 
 const REDIS_SPACE_PREFIX = "FULL:"
 const REDIS_UBI_C2_PERFIX = "UBI-C2:"
-const REDIS_UBI_ALEO_PERFIX = "UBI-ALEO:"
+const REDIS_UBI_ALEO_PERFIX = "UBI-ALEO-PROOF:"
 
 const UBI_TASK_RECEIVED_STATUS = "received"
 const UBI_TASK_RUNNING_STATUS = "running"
@@ -32,29 +32,30 @@ const CPU_AMD = "AMD"
 const CPU_INTEL = "INTEL"
 
 type UBI_TYPE int
+
 const (
-    FIL_C2 UBI_TYPE = iota
-    ALEO_PROVER
+	FIL_C2 UBI_TYPE = iota
+	ALEO_PROOF
 )
 
-func GetUBIType(zktype string) (UBI_TYPE) {
-    ubi_type_fil_c2 := []string{ "fil-c2-512M", "fil-c2-32G","fil-c2-64G"};
+func GetUBIType(zktype string) UBI_TYPE {
+	ubi_type_fil_c2 := []string{"fil-c2-512M", "fil-c2-32G", "fil-c2-64G"}
 	for _, s := range ubi_type_fil_c2 {
 		if zktype == s {
 			return FIL_C2
 		}
 	}
 
-    ubi_type_aleo_prover := []string{ "aleo-prover-ubuntu", "aleo-proof"};
-	for _, s := range ubi_type_aleo_prover {
+	ubi_type_aleo_proof := []string{"aleo-proof"}
+	for _, s := range ubi_type_aleo_proof {
 		if zktype == s {
-			return ALEO_PROVER
+			return ALEO_PROOF
 		}
 	}
 
 	return FIL_C2
 }
 
-func GetRedisUBIPerfix() ([]string) {
+func GetRedisUBIPerfix() []string {
 	return []string{REDIS_UBI_ALEO_PERFIX + "*", REDIS_UBI_C2_PERFIX + "*"}
 }

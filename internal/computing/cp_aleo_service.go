@@ -34,7 +34,7 @@ import (
 	"time"
 )
 
-func Aleo_Prover_DoUbiTask(c *gin.Context, ubiTask models.UBITaskReq) {
+func Aleo_Proof_DoUbiTask(c *gin.Context, ubiTask models.UBITaskReq) {
 	if strings.TrimSpace(ubiTask.InputParam) == "" {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: input_param"))
 		return
@@ -75,7 +75,7 @@ func Aleo_Prover_DoUbiTask(c *gin.Context, ubiTask models.UBITaskReq) {
 	SaveUbiTaskMetadata(ubiTaskToRedis)
 
 	var envFilePath string
-	envFilePath = filepath.Join(os.Getenv("CP_PATH"), "aleo_prover.env")
+	envFilePath = filepath.Join(os.Getenv("CP_PATH"), "aleo_proof.env")
 	envVars, err := godotenv.Read(envFilePath)
 	if err != nil {
 		logs.GetLogger().Errorf("reading fil-c2-env.env failed, error: %v", err)
@@ -290,7 +290,7 @@ func Aleo_Prover_DoUbiTask(c *gin.Context, ubiTask models.UBITaskReq) {
 	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
 }
 
-func Aleo_Prover_ReceiveUbiProof(c *gin.Context, c2Proof models.ReceiveProof) {
+func Aleo_Proof_ReceiveUbiProof(c *gin.Context, c2Proof models.ReceiveProof) {
 	var submitUBIProofTx string
 	var err error
 	defer func() {
