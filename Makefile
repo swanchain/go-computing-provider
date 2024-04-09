@@ -17,7 +17,7 @@ computing-provider:
 	$(GOCC) build $(GOFLAGS) -o computing-provider ./cmd/computing-provider
 .PHONY: computing-provider
 
-install: computing-provider
+install:
 	sudo install -C computing-provider /usr/local/bin/computing-provider
 
 clean:
