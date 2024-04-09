@@ -10,7 +10,7 @@ const UBITaskImageAmdCpu = "filswan/ubi-worker-cpu-amd:v2.0"
 const UBITaskImageAmdGpu = "filswan/ubi-worker-gpu-amd:v2.0"
 
 // aleo image
-const UBITaskAleoProofImageAmdGpu = "storswift/soter-proof:0.0.8"
+const UBITaskAleoProofImageAmdGpu = "martian123/swan-aleo-proof:0.0.5"
 
 func UserVersion() string {
 	return BuildVersion + CurrentCommit

@@ -19,7 +19,6 @@ computing-provider:
 
 install: computing-provider
 	sudo install -C computing-provider /usr/local/bin/computing-provider
-	export CP_PATH=".swan_node"
 
 clean:
 	sudo rm -rf /usr/local/bin/computing-provider

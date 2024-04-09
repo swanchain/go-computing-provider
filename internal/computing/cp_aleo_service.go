@@ -204,10 +204,10 @@ func Aleo_Proof_DoUbiTask(c *gin.Context, ubiTask models.UBITaskReq) {
 			}
 		}
 
-		receiveUrl := fmt.Sprintf("%s:%d/api/v1/computing/cp/receive/ubi", k8sService.GetAPIServerEndpoint(), conf.GetConfig().API.Port)
+		receiveUrl := fmt.Sprintf("%s:%d/api/v1/computing/cp/receive/ubi", "https://zulu.daosso.xyz", conf.GetConfig().API.Port)
 		logs.GetLogger().Infof("receiveUrl: %s", receiveUrl)
 		// todo
-		execCommand := []string{"/mnt/init/cmd", "-p https://api.sotertech.io/api/privnet"}
+		execCommand := []string{"/mnt/init/cmd", "--prover"}
 		JobName := strings.ToLower(ubiTask.ZkType) + "-" + strconv.Itoa(ubiTask.ID)
 
 		// filC2Param := envVars["FIL_PROOFS_PARAMETER_CACHE"]
@@ -271,6 +271,12 @@ func Aleo_Proof_DoUbiTask(c *gin.Context, ubiTask models.UBITaskReq) {
 							},
 						},
 						RestartPolicy: "Never",
+						HostAliases: []v1.HostAlias{
+							{
+								IP:        "192.168.11.152",
+								Hostnames: []string{"zulu.daosso.xyz"},
+							},
+						},
 					},
 				},
 				BackoffLimit:            new(int32),
@@ -299,7 +305,9 @@ func Aleo_Proof_ReceiveUbiProof(c *gin.Context, c2Proof models.ReceiveProof) {
 		if err == nil {
 			ubiTask.Status = constants.UBI_TASK_SUCCESS_STATUS
 		} else {
-			ubiTask.Status = constants.UBI_TASK_FAILED_STATUS
+			if ubiTask.Status != constants.UBI_TASK_SUCCESS_STATUS {
+				ubiTask.Status = constants.UBI_TASK_FAILED_STATUS
+			}
 		}
 		ubiTask.Tx = submitUBIProofTx
 		SaveUbiTaskMetadata(ubiTask)
