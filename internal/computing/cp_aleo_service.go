@@ -45,6 +45,7 @@ func Aleo_Proof_DoUbiTask(c *gin.Context, ubiTask models.UBITaskReq) {
 		return
 	}
 
+	// todo: verify signature, need ubitask from UbiEngine
 	// cpRepoPath, _ := os.LookupEnv("CP_PATH")
 	// nodeID := GetNodeId(cpRepoPath)
 
@@ -204,26 +205,13 @@ func Aleo_Proof_DoUbiTask(c *gin.Context, ubiTask models.UBITaskReq) {
 			}
 		}
 
-		receiveUrl := fmt.Sprintf("%s:%d/api/v1/computing/cp/receive/ubi", "https://zulu.daosso.xyz", conf.GetConfig().API.Port)
-		logs.GetLogger().Infof("receiveUrl: %s", receiveUrl)
-		// todo
+		receiveUrl := fmt.Sprintf("https://%s:%d/api/v1/computing/cp/receive/ubi", conf.GetConfig().API.Domain, conf.GetConfig().API.Port)
+		// logs.GetLogger().Infof("receiveUrl: %s", receiveUrl)
+
 		execCommand := []string{"/mnt/init/cmd", "--prover"}
 		JobName := strings.ToLower(ubiTask.ZkType) + "-" + strconv.Itoa(ubiTask.ID)
 
-		// filC2Param := envVars["FIL_PROOFS_PARAMETER_CACHE"]
-		// if gpuFlag == "0" {
-		// 	delete(envVars, "RUST_GPU_TOOLS_CUSTOM_GPU")
-		// 	envVars["BELLMAN_NO_GPU"] = "1"
-		// }
-
-		// delete(envVars, "FIL_PROOFS_PARAMETER_CACHE")
 		var useEnvVars []v1.EnvVar
-		// for k, v := range envVars {
-		// 	useEnvVars = append(useEnvVars, v1.EnvVar{
-		// 		Name:  k,
-		// 		Value: v,
-		// 	})
-		// }
 
 		useEnvVars = append(useEnvVars, v1.EnvVar{
 			Name:  "RECEIVE_PROOF_URL",
