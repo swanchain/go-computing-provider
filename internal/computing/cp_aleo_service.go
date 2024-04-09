@@ -208,7 +208,7 @@ func Aleo_Proof_DoUbiTask(c *gin.Context, ubiTask models.UBITaskReq) {
 		receiveUrl := fmt.Sprintf("https://%s:%d/api/v1/computing/cp/receive/ubi", conf.GetConfig().API.Domain, conf.GetConfig().API.Port)
 		// logs.GetLogger().Infof("receiveUrl: %s", receiveUrl)
 
-		execCommand := []string{"/mnt/init/cmd", "--prover"}
+		execCommand := []string{"/mnt/init/cmd", "start", "--prover"}
 		JobName := strings.ToLower(ubiTask.ZkType) + "-" + strconv.Itoa(ubiTask.ID)
 
 		var useEnvVars []v1.EnvVar
