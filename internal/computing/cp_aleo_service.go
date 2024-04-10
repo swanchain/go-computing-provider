@@ -205,14 +205,18 @@ func Aleo_Proof_DoUbiTask(c *gin.Context, ubiTask models.UBITaskReq) {
 			}
 		}
 
+		domain := conf.GetConfig().API.Domain
+		if strings.HasPrefix(domain, ".") {
+			domain = domain[1:]
+		}
+
 		localIp, err := getLocalIp()
 		if err != nil {
 			logs.GetLogger().Errorf("check resource failed, error: %v", err)
 			return
 		}
 
-		receiveUrl := fmt.Sprintf("http://%s:%d/api/v1/computing/cp/receive/ubi", localIp, conf.GetConfig().API.Port)
-		// logs.GetLogger().Infof("receiveUrl: %s", receiveUrl)
+		receiveUrl := fmt.Sprintf("https://%s:%d/api/v1/computing/cp/receive/ubi", domain, conf.GetConfig().API.Port)
 
 		execCommand := []string{"/mnt/init/cmd", "start", "--prover"}
 		JobName := strings.ToLower(ubiTask.ZkType) + "-" + strconv.Itoa(ubiTask.ID)
@@ -265,6 +269,12 @@ func Aleo_Proof_DoUbiTask(c *gin.Context, ubiTask models.UBITaskReq) {
 							},
 						},
 						RestartPolicy: "Never",
+						HostAliases: []coreV1.HostAlias{
+							{
+								IP:        localIp,
+								Hostnames: []string{domain},
+							},
+						},
 					},
 				},
 				BackoffLimit:            new(int32),
