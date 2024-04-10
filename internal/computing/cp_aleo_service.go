@@ -210,6 +210,8 @@ func Aleo_Proof_DoUbiTask(c *gin.Context, ubiTask models.UBITaskReq) {
 			domain = domain[1:]
 		}
 
+		domain = "ubi-aleo." + domain
+
 		localIp, err := getLocalIp()
 		if err != nil {
 			logs.GetLogger().Errorf("check resource failed, error: %v", err)
