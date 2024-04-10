@@ -205,7 +205,13 @@ func Aleo_Proof_DoUbiTask(c *gin.Context, ubiTask models.UBITaskReq) {
 			}
 		}
 
-		receiveUrl := fmt.Sprintf("https://%s:%d/api/v1/computing/cp/receive/ubi", k8sService.GetAPIServerEndpoint(), conf.GetConfig().API.Port)
+		localIp, err := getLocalIp()
+		if err != nil {
+			logs.GetLogger().Errorf("check resource failed, error: %v", err)
+			return
+		}
+
+		receiveUrl := fmt.Sprintf("http://%s:%d/api/v1/computing/cp/receive/ubi", localIp, conf.GetConfig().API.Port)
 		// logs.GetLogger().Infof("receiveUrl: %s", receiveUrl)
 
 		execCommand := []string{"/mnt/init/cmd", "start", "--prover"}

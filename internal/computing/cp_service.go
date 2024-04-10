@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	stErr "errors"
 	"fmt"
+	"net"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -1294,4 +1295,28 @@ func convertGpuName(name string) string {
 		}
 	}
 	return name
+}
+
+func getLocalIp() (string, error) {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return "", err
+	}
+
+	for _, iface := range interfaces {
+		if iface.Flags&net.FlagLoopback == 0 && iface.Flags&net.FlagUp != 0 {
+			addrs, err := iface.Addrs()
+			if err != nil {
+				return "", err
+			}
+
+			for _, addr := range addrs {
+				ipNet, ok := addr.(*net.IPNet)
+				if ok && !ipNet.IP.IsLoopback() && ipNet.IP.To4() != nil {
+					return ipNet.IP.String(), nil
+				}
+			}
+		}
+	}
+	return "", fmt.Errorf("not found local ip")
 }
