@@ -259,12 +259,6 @@ func Aleo_Proof_DoUbiTask(c *gin.Context, ubiTask models.UBITaskReq) {
 							},
 						},
 						RestartPolicy: "Never",
-						HostAliases: []v1.HostAlias{
-							{
-								IP:        "192.168.11.152",
-								Hostnames: []string{"zulu.daosso.xyz"},
-							},
-						},
 					},
 				},
 				BackoffLimit:            new(int32),
