@@ -49,65 +49,68 @@ var ubiTaskList = &cli.Command{
 
 		nodeID := computing.GetNodeId(cpPath)
 
-		conn := computing.GetRedisClient()
-		prefix := constants.REDIS_UBI_C2_PERFIX + "*"
-		keys, err := redis.Strings(conn.Do("KEYS", prefix))
-		if err != nil {
-			return fmt.Errorf("failed get redis %s prefix, error: %+v", prefix, err)
-		}
-
 		var taskData [][]string
 		var rowColorList []RowColor
-		var taskList models.TaskList
 
-		if showFailed {
-			for _, key := range keys {
-				ubiTask, err := computing.RetrieveUbiTaskMetadata(key)
-				if err != nil {
-					return fmt.Errorf("failed get ubi task: %s, error: %+v", key, err)
-				}
-				taskList = append(taskList, *ubiTask)
-			}
-		} else {
-			for _, key := range keys {
-				ubiTask, err := computing.RetrieveUbiTaskMetadata(key)
-				if err != nil {
-					return fmt.Errorf("failed get ubi task: %s, error: %+v", key, err)
-				}
-				if ubiTask.Status == constants.UBI_TASK_FAILED_STATUS {
-					continue
-				}
-				taskList = append(taskList, *ubiTask)
-			}
-		}
-
-		sort.Sort(taskList)
-		for i, task := range taskList {
-
-			reward, err := getReward(nodeID, task.TaskId)
+		conn := computing.GetRedisClient()
+		prefixs := constants.GetRedisUBIPerfix()
+		for _, prefix := range prefixs {
+			var taskList models.TaskList
+			keys, err := redis.Strings(conn.Do("KEYS", prefix))
 			if err != nil {
-				logs.GetLogger().Errorf("get task id: %s, reward failed, error: %v", task.TaskId, err)
+				return fmt.Errorf("failed get redis %s prefix, error: %+v", prefix, err)
 			}
 
-			taskData = append(taskData,
-				[]string{task.TaskId, task.TaskType, task.ZkType, task.Tx, task.Status, reward, task.CreateTime})
-
-			var rowColor []tablewriter.Colors
-			if task.Status == constants.UBI_TASK_RECEIVED_STATUS {
-				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgWhiteColor}}
-			} else if task.Status == constants.UBI_TASK_RUNNING_STATUS {
-				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgCyanColor}}
-			} else if task.Status == constants.UBI_TASK_SUCCESS_STATUS {
-				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
-			} else if task.Status == constants.UBI_TASK_FAILED_STATUS {
-				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
+			if showFailed {
+				for _, key := range keys {
+					ubiTask, err := computing.RetrieveUbiTaskMetadata(key)
+					if err != nil {
+						return fmt.Errorf("failed get ubi task: %s, error: %+v", key, err)
+					}
+					taskList = append(taskList, *ubiTask)
+				}
+			} else {
+				for _, key := range keys {
+					ubiTask, err := computing.RetrieveUbiTaskMetadata(key)
+					if err != nil {
+						return fmt.Errorf("failed get ubi task: %s, error: %+v", key, err)
+					}
+					if ubiTask.Status == constants.UBI_TASK_FAILED_STATUS {
+						continue
+					}
+					taskList = append(taskList, *ubiTask)
+				}
 			}
 
-			rowColorList = append(rowColorList, RowColor{
-				row:    i,
-				column: []int{4},
-				color:  rowColor,
-			})
+			sort.Sort(taskList)
+			row := len(rowColorList)
+			for i, task := range taskList {
+
+				reward, err := getReward(nodeID, task.TaskId)
+				if err != nil {
+					logs.GetLogger().Errorf("get task id: %s, reward failed, error: %v", task.TaskId, err)
+				}
+
+				taskData = append(taskData,
+					[]string{task.TaskId, task.TaskType, task.ZkType, task.Tx, task.Status, reward, task.CreateTime})
+
+				var rowColor []tablewriter.Colors
+				if task.Status == constants.UBI_TASK_RECEIVED_STATUS {
+					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgWhiteColor}}
+				} else if task.Status == constants.UBI_TASK_RUNNING_STATUS {
+					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgCyanColor}}
+				} else if task.Status == constants.UBI_TASK_SUCCESS_STATUS {
+					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
+				} else if task.Status == constants.UBI_TASK_FAILED_STATUS {
+					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
+				}
+
+				rowColorList = append(rowColorList, RowColor{
+					row:    row + i,
+					column: []int{4},
+					color:  rowColor,
+				})
+			}
 		}
 
 		header := []string{"TASK ID", "TASK TYPE", "ZK TYPE", "TRANSACTION HASH", "STATUS", "REWARD", "CREATE TIME"}

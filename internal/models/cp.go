@@ -175,3 +175,11 @@ func (t TaskList) Less(i, j int) bool {
 func (t TaskList) Swap(i, j int) {
 	t[i], t[j] = t[j], t[i]
 }
+
+type ReceiveProof struct {
+	TaskId    string `json:"task_id"`
+	TaskType  string `json:"task_type"`
+	Proof     string `json:"proof"`
+	ZkType    string `json:"zk_type"`
+	NameSpace string `json:"name_space"`
+}
