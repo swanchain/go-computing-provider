@@ -52,10 +52,9 @@ var ubiTaskList = &cli.Command{
 		var taskData [][]string
 		var rowColorList []RowColor
 
+		var taskList models.TaskList
 		conn := computing.GetRedisClient()
-		prefixs := constants.GetRedisUBIPerfix()
-		for _, prefix := range prefixs {
-			var taskList models.TaskList
+		for _, prefix := range constants.GetRedisUBIPerfix() {
 			keys, err := redis.Strings(conn.Do("KEYS", prefix))
 			if err != nil {
 				return fmt.Errorf("failed get redis %s prefix, error: %+v", prefix, err)
@@ -81,36 +80,35 @@ var ubiTaskList = &cli.Command{
 					taskList = append(taskList, *ubiTask)
 				}
 			}
+		}
 
-			sort.Sort(taskList)
-			row := len(rowColorList)
-			for i, task := range taskList {
-
-				reward, err := getReward(nodeID, task.TaskId)
-				if err != nil {
-					logs.GetLogger().Errorf("get task id: %s, reward failed, error: %v", task.TaskId, err)
-				}
-
-				taskData = append(taskData,
-					[]string{task.TaskId, task.TaskType, task.ZkType, task.Tx, task.Status, reward, task.CreateTime})
-
-				var rowColor []tablewriter.Colors
-				if task.Status == constants.UBI_TASK_RECEIVED_STATUS {
-					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgWhiteColor}}
-				} else if task.Status == constants.UBI_TASK_RUNNING_STATUS {
-					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgCyanColor}}
-				} else if task.Status == constants.UBI_TASK_SUCCESS_STATUS {
-					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
-				} else if task.Status == constants.UBI_TASK_FAILED_STATUS {
-					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
-				}
-
-				rowColorList = append(rowColorList, RowColor{
-					row:    row + i,
-					column: []int{4},
-					color:  rowColor,
-				})
+		sort.Sort(taskList)
+		row := len(rowColorList)
+		for i, task := range taskList {
+			reward, err := getReward(nodeID, task.TaskId)
+			if err != nil {
+				logs.GetLogger().Errorf("get task id: %s, reward failed, error: %v", task.TaskId, err)
 			}
+
+			taskData = append(taskData,
+				[]string{task.TaskId, task.TaskType, task.ZkType, task.Tx, task.Status, reward, task.CreateTime})
+
+			var rowColor []tablewriter.Colors
+			if task.Status == constants.UBI_TASK_RECEIVED_STATUS {
+				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgWhiteColor}}
+			} else if task.Status == constants.UBI_TASK_RUNNING_STATUS {
+				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgCyanColor}}
+			} else if task.Status == constants.UBI_TASK_SUCCESS_STATUS {
+				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
+			} else if task.Status == constants.UBI_TASK_FAILED_STATUS {
+				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
+			}
+
+			rowColorList = append(rowColorList, RowColor{
+				row:    row + i,
+				column: []int{4},
+				color:  rowColor,
+			})
 		}
 
 		header := []string{"TASK ID", "TASK TYPE", "ZK TYPE", "TRANSACTION HASH", "STATUS", "REWARD", "CREATE TIME"}

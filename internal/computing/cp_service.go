@@ -620,11 +620,35 @@ func ReceiveUbiProof(c *gin.Context) {
 	}
 	logs.GetLogger().Infof("task_id: %s, C2 proof out received: %+v", c2Proof.TaskId, c2Proof)
 
-	if constants.GetUBIType(c2Proof.ZkType) == constants.FIL_C2 {
-		Fil_C2_ReceiveUbiProof(c, c2Proof)
-	} else if constants.GetUBIType(c2Proof.ZkType) == constants.ALEO_PROOF {
-		Aleo_Proof_ReceiveUbiProof(c, c2Proof)
+	Fil_C2_ReceiveUbiProof(c, c2Proof)
+
+	var submitUBIProofTx string
+	var err error
+	defer func() {
+		key := constants.REDIS_UBI_ALEO_PERFIX + c2Proof.TaskId
+		ubiTask, _ := RetrieveUbiTaskMetadata(key)
+		if err == nil {
+			ubiTask.Status = constants.UBI_TASK_SUCCESS_STATUS
+		} else {
+			ubiTask.Status = constants.UBI_TASK_FAILED_STATUS
+		}
+		ubiTask.Tx = submitUBIProofTx
+		SaveUbiTaskMetadata(ubiTask)
+		if strings.TrimSpace(c2Proof.NameSpace) != "" {
+			k8sService := NewK8sService()
+			k8sService.k8sClient.CoreV1().Namespaces().Delete(context.TODO(), c2Proof.NameSpace, metaV1.DeleteOptions{})
+		}
+	}()
+
+	retries := 3
+	for i := 0; i < retries; i++ {
+		submitUBIProofTx, err = SubmitUBIProof(c2Proof)
+		if err == nil {
+			break
+		}
+		time.Sleep(time.Second * 2)
 	}
+	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
 
 }
 

@@ -3,20 +3,19 @@ package computing
 import (
 	"context"
 	"fmt"
-
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/swanchain/go-computing-provider/account"
+	"github.com/swanchain/go-computing-provider/wallet"
+
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/gin-gonic/gin"
 
 	"github.com/joho/godotenv"
-	"github.com/swanchain/go-computing-provider/account"
 	"github.com/swanchain/go-computing-provider/build"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/constants"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"github.com/swanchain/go-computing-provider/util"
-	"github.com/swanchain/go-computing-provider/wallet"
-
 	batchv1 "k8s.io/api/batch/v1"
 	coreV1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
@@ -296,81 +295,58 @@ func Aleo_Proof_DoUbiTask(c *gin.Context, ubiTask models.UBITaskReq) {
 	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
 }
 
-func Aleo_Proof_ReceiveUbiProof(c *gin.Context, c2Proof models.ReceiveProof) {
-	var submitUBIProofTx string
-	var err error
-	defer func() {
-		key := constants.REDIS_UBI_ALEO_PERFIX + c2Proof.TaskId
-		ubiTask, _ := RetrieveUbiTaskMetadata(key)
-		if err == nil {
-			ubiTask.Status = constants.UBI_TASK_SUCCESS_STATUS
-		} else {
-			if ubiTask.Status != constants.UBI_TASK_SUCCESS_STATUS {
-				ubiTask.Status = constants.UBI_TASK_FAILED_STATUS
-			}
-		}
-		ubiTask.Tx = submitUBIProofTx
-		SaveUbiTaskMetadata(ubiTask)
-		if strings.TrimSpace(c2Proof.NameSpace) != "" {
-			k8sService := NewK8sService()
-			k8sService.k8sClient.CoreV1().Namespaces().Delete(context.TODO(), c2Proof.NameSpace, metaV1.DeleteOptions{})
-		}
-	}()
-
+func SubmitUBIProof(c2Proof models.ReceiveProof) (string, error) {
 	chainUrl, err := conf.GetRpcByName(conf.DefaultRpc)
 	if err != nil {
 		logs.GetLogger().Errorf("get rpc url failed, error: %v,", err)
-		return
+		return "", err
 	}
-	logs.GetLogger().Infof("chainUrl: %s", chainUrl)
 	client, err := ethclient.Dial(chainUrl)
 	if err != nil {
 		logs.GetLogger().Errorf("dial rpc connect failed, error: %v,", err)
-		return
+		return "", err
 	}
-	defer client.Close()
+	client.Close()
 
 	cpStub, err := account.NewAccountStub(client)
 	if err != nil {
 		logs.GetLogger().Errorf("create ubi task client failed, error: %v,", err)
-		return
+		return "", err
 	}
 	cpAccount, err := cpStub.GetCpAccountInfo()
 	if err != nil {
 		logs.GetLogger().Errorf("get account info failed, error: %v,", err)
-		return
+		return "", err
 	}
 
 	localWallet, err := wallet.SetupWallet(wallet.WalletRepo)
 	if err != nil {
 		logs.GetLogger().Errorf("setup wallet failed, error: %v,", err)
-		return
+		return "", err
 	}
 
 	ki, err := localWallet.FindKey(cpAccount.OwnerAddress)
 	if err != nil || ki == nil {
 		logs.GetLogger().Errorf("the address: %s, private key %v,", cpAccount.OwnerAddress, wallet.ErrKeyInfoNotFound)
-		return
+		return "", err
 	}
 
 	accountStub, err := account.NewAccountStub(client, account.WithCpPrivateKey(ki.PrivateKey))
 	if err != nil {
 		logs.GetLogger().Errorf("create ubi task client failed, error: %v,", err)
-		return
+		return "", err
 	}
 
 	taskType, err := strconv.ParseUint(c2Proof.TaskType, 10, 8)
 	if err != nil {
 		logs.GetLogger().Errorf("conversion to uint8 error: %v", err)
-		return
+		return "", err
 	}
 
-	submitUBIProofTx, err = accountStub.SubmitUBIProof(c2Proof.TaskId, uint8(taskType), c2Proof.ZkType, c2Proof.Proof)
+	submitUBIProofTx, err := accountStub.SubmitUBIProof(c2Proof.TaskId, uint8(taskType), c2Proof.ZkType, c2Proof.Proof)
 	if err != nil {
 		logs.GetLogger().Errorf("submit ubi proof tx failed, error: %v,", err)
-		return
+		return "", err
 	}
-
-	fmt.Printf("submitUBIProofTx: %s\n", submitUBIProofTx)
-	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
+	return submitUBIProofTx, nil
 }

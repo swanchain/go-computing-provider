@@ -165,7 +165,6 @@ func (task *CronTask) setFailedUbiTaskStatus() {
 				SaveUbiTaskMetadata(ubiTask)
 			}
 		}
-
 	})
 	c.Start()
 }
