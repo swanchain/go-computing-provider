@@ -35,10 +35,10 @@ func (aleo *AleoTask) TaskType() string {
 
 func (aleo *AleoTask) DoTask(ubiTask models.UBITaskReq, resourceRequirements coreV1.ResourceRequirements, imageName, namespace, nodeName string, useGpu bool) {
 	var envFilePath string
-	envFilePath = filepath.Join(os.Getenv("CP_PATH"), "aleo_proof.env")
+	envFilePath = filepath.Join(os.Getenv("CP_PATH"), AleoConfigFile)
 	envVars, err := godotenv.Read(envFilePath)
 	if err != nil {
-		logs.GetLogger().Errorf("reading aleo_proof.env failed, error: %v", err)
+		logs.GetLogger().Errorf("reading %s failed, error: %v", AleoConfigFile, err)
 		return
 	}
 
@@ -52,7 +52,7 @@ func (aleo *AleoTask) DoTask(ubiTask models.UBITaskReq, resourceRequirements cor
 	go func() {
 		var err error
 		defer func() {
-			key := constants.REDIS_UBI_C2_PERFIX + strconv.Itoa(ubiTask.ID)
+			key := constants.REDIS_UBI_ALEO_PERFIX + strconv.Itoa(ubiTask.ID)
 			ubiTaskRun, _ := computing.RetrieveUbiTaskMetadata(key)
 			if ubiTaskRun.TaskId == "" {
 				ubiTaskRun = new(models.CacheUbiTaskDetail)
