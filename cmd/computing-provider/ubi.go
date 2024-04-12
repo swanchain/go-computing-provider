@@ -54,7 +54,7 @@ var ubiTaskList = &cli.Command{
 
 		var taskList models.TaskList
 		conn := computing.GetRedisClient()
-		for _, prefix := range constants.GetRedisUBIPerfix() {
+		for _, prefix := range constants.GetRedisUBIPrefix() {
 			keys, err := redis.Strings(conn.Do("KEYS", prefix))
 			if err != nil {
 				return fmt.Errorf("failed get redis %s prefix, error: %+v", prefix, err)

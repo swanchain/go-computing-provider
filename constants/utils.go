@@ -1,5 +1,7 @@
 package constants
 
+import "strings"
+
 const StatusActive = "Active"
 const StatusOffline = "Offline"
 
@@ -38,24 +40,17 @@ const (
 	ALEO_PROOF
 )
 
-func GetUBIType(zktype string) UBI_TYPE {
-	ubi_type_fil_c2 := []string{"fil-c2-512M", "fil-c2-32G", "fil-c2-64G"}
-	for _, s := range ubi_type_fil_c2 {
-		if zktype == s {
-			return FIL_C2
-		}
+func GetRedisKeyByZkType(zkType string) string {
+	if strings.HasPrefix(zkType, "fil-c2") {
+		return REDIS_UBI_C2_PERFIX
 	}
 
-	ubi_type_aleo_proof := []string{"aleo-proof"}
-	for _, s := range ubi_type_aleo_proof {
-		if zktype == s {
-			return ALEO_PROOF
-		}
+	if strings.HasPrefix(zkType, "aleo-proof") {
+		return REDIS_UBI_ALEO_PERFIX
 	}
-
-	return FIL_C2
+	return ""
 }
 
-func GetRedisUBIPerfix() []string {
+func GetRedisUBIPrefix() []string {
 	return []string{REDIS_UBI_ALEO_PERFIX + "*", REDIS_UBI_C2_PERFIX + "*"}
 }

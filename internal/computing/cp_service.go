@@ -1027,16 +1027,7 @@ func SaveUbiTaskMetadata(ubiTask *models.CacheUbiTaskDetail) {
 	redisConn := redisPool.Get()
 	defer redisConn.Close()
 
-	var perfix string
-	if constants.GetUBIType(ubiTask.ZkType) == constants.FIL_C2 {
-		perfix = constants.REDIS_UBI_C2_PERFIX
-	}
-
-	if constants.GetUBIType(ubiTask.ZkType) == constants.ALEO_PROOF {
-		perfix = constants.REDIS_UBI_ALEO_PERFIX
-	}
-
-	key := perfix + ubiTask.TaskId
+	key := constants.GetRedisKeyByZkType(ubiTask.ZkType) + ubiTask.TaskId
 	redisConn.Do("DEL", redis.Args{}.AddFlat(key)...)
 
 	fullArgs := []interface{}{key}
