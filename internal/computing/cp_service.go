@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	stErr "errors"
 	"fmt"
-	"net"
-
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 
@@ -519,7 +517,7 @@ func DoProof(c *gin.Context) {
 	*job.Spec.BackoffLimit = 1
 	*job.Spec.TTLSecondsAfterFinished = 30
 
-	createdJob, err := k8sService.k8sClient.BatchV1().Jobs(metaV1.NamespaceDefault).Create(context.TODO(), job, metaV1.CreateOptions{})
+	createdJob, err := k8sService.Client.BatchV1().Jobs(metaV1.NamespaceDefault).Create(context.TODO(), job, metaV1.CreateOptions{})
 	if err != nil {
 		logs.GetLogger().Errorf("Failed creating Pod: %v", err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ProofError))
@@ -527,7 +525,7 @@ func DoProof(c *gin.Context) {
 	}
 
 	err = wait.PollImmediate(time.Second*3, time.Minute*5, func() (bool, error) {
-		job, err := k8sService.k8sClient.BatchV1().Jobs(metaV1.NamespaceDefault).Get(context.Background(), createdJob.Name, metaV1.GetOptions{})
+		job, err := k8sService.Client.BatchV1().Jobs(metaV1.NamespaceDefault).Get(context.Background(), createdJob.Name, metaV1.GetOptions{})
 		if err != nil {
 			logs.GetLogger().Errorf("Failed getting Job status: %v\n", err)
 			return false, err
@@ -545,7 +543,7 @@ func DoProof(c *gin.Context) {
 		return
 	}
 
-	podList, err := k8sService.k8sClient.CoreV1().Pods(metaV1.NamespaceDefault).List(context.Background(), metaV1.ListOptions{
+	podList, err := k8sService.Client.CoreV1().Pods(metaV1.NamespaceDefault).List(context.Background(), metaV1.ListOptions{
 		LabelSelector: fmt.Sprintf("job-name=%s", createdJob.Name),
 	})
 	if err != nil {
@@ -561,7 +559,7 @@ func DoProof(c *gin.Context) {
 	}
 
 	podName := podList.Items[0].Name
-	podLog, err := k8sService.k8sClient.CoreV1().Pods(metaV1.NamespaceDefault).GetLogs(podName, &v1.PodLogOptions{}).Stream(context.Background())
+	podLog, err := k8sService.Client.CoreV1().Pods(metaV1.NamespaceDefault).GetLogs(podName, &v1.PodLogOptions{}).Stream(context.Background())
 	if err != nil {
 		logs.GetLogger().Errorf("Failed gettingPod logs: %v", err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ProofReadLogError))
@@ -576,80 +574,6 @@ func DoProof(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, util.CreateSuccessResponse(string(bytes)))
-}
-
-func DoUbiTask(c *gin.Context) {
-
-	var ubiTask models.UBITaskReq
-	if err := c.ShouldBindJSON(&ubiTask); err != nil {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
-		return
-	}
-	logs.GetLogger().Infof("receive ubi task received: %+v", ubiTask)
-
-	if ubiTask.ID == 0 {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: id"))
-		return
-	}
-	if strings.TrimSpace(ubiTask.Name) == "" {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: name"))
-		return
-	}
-
-	if ubiTask.Type != 0 && ubiTask.Type != 1 {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "the value of task_type is 0 or 1"))
-		return
-	}
-	if strings.TrimSpace(ubiTask.ZkType) == "" {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: zk_type"))
-		return
-	}
-
-	if constants.GetUBIType(ubiTask.ZkType) == constants.FIL_C2 {
-		Fil_C2_DoUbiTask(c, ubiTask)
-	} else if constants.GetUBIType(ubiTask.ZkType) == constants.ALEO_PROOF {
-		Aleo_Proof_DoUbiTask(c, ubiTask)
-	}
-}
-
-func ReceiveUbiProof(c *gin.Context) {
-	var c2Proof models.ReceiveProof
-	if err := c.ShouldBindJSON(&c2Proof); err != nil {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
-		return
-	}
-	logs.GetLogger().Infof("task_id: %s, C2 proof out received: %+v", c2Proof.TaskId, c2Proof)
-
-	Fil_C2_ReceiveUbiProof(c, c2Proof)
-
-	var submitUBIProofTx string
-	var err error
-	defer func() {
-		key := constants.REDIS_UBI_ALEO_PERFIX + c2Proof.TaskId
-		ubiTask, _ := RetrieveUbiTaskMetadata(key)
-		if err == nil {
-			ubiTask.Status = constants.UBI_TASK_SUCCESS_STATUS
-		} else {
-			ubiTask.Status = constants.UBI_TASK_FAILED_STATUS
-		}
-		ubiTask.Tx = submitUBIProofTx
-		SaveUbiTaskMetadata(ubiTask)
-		if strings.TrimSpace(c2Proof.NameSpace) != "" {
-			k8sService := NewK8sService()
-			k8sService.k8sClient.CoreV1().Namespaces().Delete(context.TODO(), c2Proof.NameSpace, metaV1.DeleteOptions{})
-		}
-	}()
-
-	retries := 3
-	for i := 0; i < retries; i++ {
-		submitUBIProofTx, err = SubmitUBIProof(c2Proof)
-		if err == nil {
-			break
-		}
-		time.Sleep(time.Second * 2)
-	}
-	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
-
 }
 
 func handleConnection(conn *websocket.Conn, spaceDetail models.CacheSpaceDetail, logType string) {
@@ -668,7 +592,7 @@ func handleConnection(conn *websocket.Conn, spaceDetail models.CacheSpaceDetail,
 		k8sNameSpace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(spaceDetail.WalletAddress)
 
 		k8sService := NewK8sService()
-		pods, err := k8sService.k8sClient.CoreV1().Pods(k8sNameSpace).List(context.TODO(), metaV1.ListOptions{
+		pods, err := k8sService.Client.CoreV1().Pods(k8sNameSpace).List(context.TODO(), metaV1.ListOptions{
 			LabelSelector: fmt.Sprintf("lad_app=%s", spaceDetail.SpaceUuid),
 		})
 		if err != nil {
@@ -680,7 +604,7 @@ func handleConnection(conn *websocket.Conn, spaceDetail models.CacheSpaceDetail,
 			line := int64(1000)
 			containerStatuses := pods.Items[0].Status.ContainerStatuses
 			lastIndex := len(containerStatuses) - 1
-			req := k8sService.k8sClient.CoreV1().Pods(k8sNameSpace).GetLogs(pods.Items[0].Name, &v1.PodLogOptions{
+			req := k8sService.Client.CoreV1().Pods(k8sNameSpace).GetLogs(pods.Items[0].Name, &v1.PodLogOptions{
 				Container:  containerStatuses[lastIndex].Name,
 				Follow:     true,
 				Timestamps: true,
@@ -914,7 +838,7 @@ func checkResourceAvailableForSpace(jobSourceURI string) (bool, string, error) {
 		return false, "", err
 	}
 
-	nodes, err := k8sService.k8sClient.CoreV1().Nodes().List(context.TODO(), metaV1.ListOptions{})
+	nodes, err := k8sService.Client.CoreV1().Nodes().List(context.TODO(), metaV1.ListOptions{})
 	if err != nil {
 		return false, "", err
 	}
@@ -965,77 +889,6 @@ func checkResourceAvailableForSpace(jobSourceURI string) (bool, string, error) {
 		}
 	}
 	return false, "", nil
-}
-
-func checkResourceAvailableForUbi(taskType int, gpuName string, resource *models.TaskResource) (string, string, int64, int64, int64, error) {
-	k8sService := NewK8sService()
-	activePods, err := k8sService.GetAllActivePod(context.TODO())
-	if err != nil {
-		return "", "", 0, 0, 0, err
-	}
-
-	nodes, err := k8sService.k8sClient.CoreV1().Nodes().List(context.TODO(), metaV1.ListOptions{})
-	if err != nil {
-		return "", "", 0, 0, 0, err
-	}
-
-	nodeGpuSummary, err := k8sService.GetNodeGpuSummary(context.TODO())
-	if err != nil {
-		logs.GetLogger().Errorf("Failed collect k8s gpu, error: %+v", err)
-		return "", "", 0, 0, 0, err
-	}
-
-	needCpu, _ := strconv.ParseInt(resource.CPU, 10, 64)
-	var needMemory, needStorage float64
-	if len(strings.Split(strings.TrimSpace(resource.Memory), " ")) > 0 {
-		needMemory, err = strconv.ParseFloat(strings.Split(strings.TrimSpace(resource.Memory), " ")[0], 64)
-
-	}
-	if len(strings.Split(strings.TrimSpace(resource.Storage), " ")) > 0 {
-		needStorage, err = strconv.ParseFloat(strings.Split(strings.TrimSpace(resource.Storage), " ")[0], 64)
-	}
-
-	var nodeName, architecture string
-	for _, node := range nodes.Items {
-		if _, ok := node.Labels[constants.CPU_INTEL]; ok {
-			architecture = constants.CPU_INTEL
-		}
-		if _, ok := node.Labels[constants.CPU_AMD]; ok {
-			architecture = constants.CPU_AMD
-		}
-
-		nodeGpu, remainderResource, _ := GetNodeResource(activePods, &node)
-		remainderCpu := remainderResource[ResourceCpu]
-		remainderMemory := float64(remainderResource[ResourceMem] / 1024 / 1024 / 1024)
-		remainderStorage := float64(remainderResource[ResourceStorage] / 1024 / 1024 / 1024)
-
-		logs.GetLogger().Infof("checkResourceAvailableForUbi: needCpu: %d, needMemory: %.2f, needStorage: %.2f", needCpu, needMemory, needStorage)
-		logs.GetLogger().Infof("checkResourceAvailableForUbi: remainingCpu: %d, remainingMemory: %.2f, remainingStorage: %.2f", remainderCpu, remainderMemory, remainderStorage)
-		if needCpu <= remainderCpu && needMemory <= remainderMemory && needStorage <= remainderStorage {
-			nodeName = node.Name
-			if taskType == 0 {
-				return nodeName, architecture, needCpu, int64(needMemory), int64(needStorage), nil
-			} else if taskType == 1 {
-				if gpuName == "" {
-					nodeName = ""
-					continue
-				}
-				gpuName = strings.ReplaceAll(gpuName, " ", "-")
-				logs.GetLogger().Infof("gpuName: %s, nodeGpu: %+v, nodeGpuSummary: %+v", gpuName, nodeGpu, nodeGpuSummary)
-				usedCount, ok := nodeGpu[gpuName]
-				if !ok {
-					usedCount = 0
-				}
-
-				if usedCount+1 <= nodeGpuSummary[node.Name][gpuName] {
-					return nodeName, architecture, needCpu, int64(needMemory), int64(needStorage), nil
-				}
-				nodeName = ""
-				continue
-			}
-		}
-	}
-	return nodeName, architecture, needCpu, int64(needMemory), int64(needStorage), nil
 }
 
 func generateString(length int) string {
@@ -1259,23 +1112,6 @@ func RetrieveUbiTaskMetadata(key string) (*models.CacheUbiTaskDetail, error) {
 	}, nil
 }
 
-func verifySignature(pubKStr, data, signature string) (bool, error) {
-	sb, err := hexutil.Decode(signature)
-	if err != nil {
-		return false, err
-	}
-	hash := crypto.Keccak256Hash([]byte(data))
-	sigPublicKeyECDSA, err := crypto.SigToPub(hash.Bytes(), sb)
-	if err != nil {
-		return false, err
-	}
-	pub := crypto.PubkeyToAddress(*sigPublicKeyECDSA).Hex()
-	if pubKStr != pub {
-		return false, err
-	}
-	return true, nil
-}
-
 func verifySignatureForHub(pubKStr string, message string, signedMessage string) (bool, error) {
 	hashedMessage := []byte("\x19Ethereum Signed Message:\n" + strconv.Itoa(len(message)) + message)
 	hash := crypto.Keccak256Hash(hashedMessage)
@@ -1295,52 +1131,4 @@ func verifySignatureForHub(pubKStr string, message string, signedMessage string)
 	}
 
 	return pubKStr == crypto.PubkeyToAddress(*sigPublicKeyECDSA).String(), nil
-}
-
-func convertGpuName(name string) string {
-	if strings.TrimSpace(name) == "" {
-		return ""
-	} else {
-		name = strings.Split(name, ":")[0]
-	}
-	if strings.Contains(name, "NVIDIA") {
-		if strings.Contains(name, "Tesla") {
-			return strings.Replace(name, "Tesla ", "", 1)
-		}
-
-		if strings.Contains(name, "GeForce") {
-			name = strings.Replace(name, "GeForce ", "", 1)
-		}
-		return strings.Replace(name, "RTX ", "", 1)
-	} else {
-		if strings.Contains(name, "GeForce") {
-			cpName := strings.Replace(name, "GeForce ", "NVIDIA", 1)
-			return strings.Replace(cpName, "RTX", "", 1)
-		}
-	}
-	return name
-}
-
-func getLocalIp() (string, error) {
-	interfaces, err := net.Interfaces()
-	if err != nil {
-		return "", err
-	}
-
-	for _, iface := range interfaces {
-		if iface.Flags&net.FlagLoopback == 0 && iface.Flags&net.FlagUp != 0 {
-			addrs, err := iface.Addrs()
-			if err != nil {
-				return "", err
-			}
-
-			for _, addr := range addrs {
-				ipNet, ok := addr.(*net.IPNet)
-				if ok && !ipNet.IP.IsLoopback() && ipNet.IP.To4() != nil {
-					return ipNet.IP.String(), nil
-				}
-			}
-		}
-	}
-	return "", fmt.Errorf("not found local ip")
 }

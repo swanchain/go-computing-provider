@@ -21,6 +21,7 @@ import (
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/computing"
 	"github.com/swanchain/go-computing-provider/internal/initializer"
+	"github.com/swanchain/go-computing-provider/internal/task/ubi"
 	"github.com/swanchain/go-computing-provider/util"
 	"github.com/swanchain/go-computing-provider/wallet"
 	"github.com/swanchain/go-computing-provider/wallet/contract/collateral"
@@ -55,6 +56,7 @@ var runCmd = &cli.Command{
 			ValidateHeaders: false,
 		}))
 		pprof.Register(r)
+		ubi.RegisterUbiTaskHandles(ubi.NewFilC2Task(), ubi.NewAleoTask())
 
 		v1 := r.Group("/api/v1")
 		cpManager(v1.Group("/computing"))
@@ -86,8 +88,8 @@ func cpManager(router *gin.RouterGroup) {
 
 	router.GET("/cp", computing.StatisticalSources)
 	router.GET("/cp/info", computing.GetCpInfo)
-	router.POST("/cp/ubi", computing.DoUbiTask)
-	router.POST("/cp/receive/ubi", computing.ReceiveUbiProof)
+	router.POST("/cp/ubi", ubi.DoUbiTask)
+	router.POST("/cp/receive/ubi", ubi.ReceiveUbiProof)
 
 }
 

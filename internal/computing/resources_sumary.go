@@ -161,12 +161,12 @@ func checkClusterProviderStatus() (string, error) {
 	}
 
 	service := NewK8sService()
-	activePods, err := allActivePods(service.k8sClient)
+	activePods, err := allActivePods(service.Client)
 	if err != nil {
 		return "", err
 	}
 
-	nodes, err := service.k8sClient.CoreV1().Nodes().List(context.TODO(), metaV1.ListOptions{})
+	nodes, err := service.Client.CoreV1().Nodes().List(context.TODO(), metaV1.ListOptions{})
 	if err != nil {
 		return "", err
 	}

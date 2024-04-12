@@ -101,7 +101,7 @@ func (task *CronTask) cleanAbnormalDeployment() {
 
 		for _, namespace := range namespaces {
 			if strings.HasPrefix(namespace, constants.K8S_NAMESPACE_NAME_PREFIX) {
-				deployments, err := k8sService.k8sClient.AppsV1().Deployments(namespace).List(context.TODO(), metav1.ListOptions{})
+				deployments, err := k8sService.Client.AppsV1().Deployments(namespace).List(context.TODO(), metav1.ListOptions{})
 				if err != nil {
 					logs.GetLogger().Errorf("Error getting deployments in namespace %s: %v\n", namespace, err)
 					continue
@@ -113,7 +113,7 @@ func (task *CronTask) cleanAbnormalDeployment() {
 					age := currentTime.Sub(creationTimestamp)
 					if (deployment.Status.AvailableReplicas == 0 && age.Hours() >= 2) || age.Hours() > 24*15 {
 						logs.GetLogger().Infof("Cleaning up deployment %s in namespace %s", deployment.Name, namespace)
-						err := k8sService.k8sClient.AppsV1().Deployments(namespace).Delete(context.TODO(), deployment.Name, metav1.DeleteOptions{})
+						err := k8sService.Client.AppsV1().Deployments(namespace).Delete(context.TODO(), deployment.Name, metav1.DeleteOptions{})
 						if err != nil {
 							if errors.IsNotFound(err) {
 								logs.GetLogger().Errorf("Deployment %s not found. Ignoring", deployment.Name)
@@ -158,7 +158,7 @@ func (task *CronTask) setFailedUbiTaskStatus() {
 			k8sNameSpace := "ubi-task-" + ubiTask.TaskId
 
 			service := NewK8sService()
-			if _, err = service.k8sClient.BatchV1().Jobs(k8sNameSpace).Get(context.TODO(), JobName, metav1.GetOptions{}); err != nil && errors.IsNotFound(err) {
+			if _, err = service.Client.BatchV1().Jobs(k8sNameSpace).Get(context.TODO(), JobName, metav1.GetOptions{}); err != nil && errors.IsNotFound(err) {
 				if ubiTask.Status != constants.UBI_TASK_SUCCESS_STATUS && ubiTask.Status != constants.UBI_TASK_FAILED_STATUS {
 					ubiTask.Status = constants.UBI_TASK_FAILED_STATUS
 				}

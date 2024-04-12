@@ -122,7 +122,7 @@ func reportJobStatus(jobUuid string, jobStatus models2.JobStatus) {
 func RunSyncTask(nodeId string) {
 	go func() {
 		k8sService := NewK8sService()
-		nodes, err := k8sService.k8sClient.CoreV1().Nodes().List(context.TODO(), metaV1.ListOptions{})
+		nodes, err := k8sService.Client.CoreV1().Nodes().List(context.TODO(), metaV1.ListOptions{})
 		if err != nil {
 			logs.GetLogger().Error(err)
 			return
@@ -276,7 +276,7 @@ func watchExpiredTask() {
 					k8sNameSpace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(jobMetadata.WalletAddress)
 					deployName := constants.K8S_DEPLOY_NAME_PREFIX + jobMetadata.SpaceUuid
 					service := NewK8sService()
-					if _, err = service.k8sClient.AppsV1().Deployments(k8sNameSpace).Get(context.TODO(), deployName, metaV1.GetOptions{}); err != nil && errors.IsNotFound(err) {
+					if _, err = service.Client.AppsV1().Deployments(k8sNameSpace).Get(context.TODO(), deployName, metaV1.GetOptions{}); err != nil && errors.IsNotFound(err) {
 						deleteKey = append(deleteKey, key)
 						continue
 					}
@@ -387,7 +387,7 @@ func monitorDaemonSetPods() {
 
 		var errorCount = make(map[string]int)
 		wait.Until(func() {
-			pods, err := service.k8sClient.CoreV1().Pods(namespace).List(context.TODO(), metaV1.ListOptions{
+			pods, err := service.Client.CoreV1().Pods(namespace).List(context.TODO(), metaV1.ListOptions{
 				LabelSelector: "app=resource-exporter",
 			})
 			if err != nil {
@@ -397,7 +397,7 @@ func monitorDaemonSetPods() {
 
 			for _, pod := range pods.Items {
 				if pod.Status.Phase != corev1.PodRunning {
-					service.k8sClient.CoreV1().Pods(namespace).Delete(context.TODO(), pod.Name, metaV1.DeleteOptions{})
+					service.Client.CoreV1().Pods(namespace).Delete(context.TODO(), pod.Name, metaV1.DeleteOptions{})
 					continue
 				}
 				podLog, err := service.GetPodLogByPodName(namespace, pod.Name, &podLogOptions)
@@ -407,7 +407,7 @@ func monitorDaemonSetPods() {
 				}
 				if strings.Contains(podLog, "ERROR::") {
 					if errorCount[pod.Name] > 2 {
-						service.k8sClient.CoreV1().Pods(namespace).Delete(context.TODO(), pod.Name, metaV1.DeleteOptions{})
+						service.Client.CoreV1().Pods(namespace).Delete(context.TODO(), pod.Name, metaV1.DeleteOptions{})
 						delete(errorCount, pod.Name)
 						continue
 					}

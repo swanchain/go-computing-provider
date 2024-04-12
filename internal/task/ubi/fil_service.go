@@ -20,34 +20,36 @@ import (
 	"time"
 )
 
-const AleoConfigFile = "aleo_proof.env"
+const FilConfigFile = "fil-c2.env"
 
-type AleoTask struct {
+type FilC2Task struct {
 }
 
-func NewAleoTask() *AleoTask {
-	return &AleoTask{}
+func NewFilC2Task() *FilC2Task {
+	return &FilC2Task{}
 }
 
-func (aleo *AleoTask) TaskType() string {
-	return TASK_ZK_TYPE_ALEO
+func (fil *FilC2Task) TaskType() string {
+	return TASK_ZK_TYPE_FIL_C2
 }
 
-func (aleo *AleoTask) DoTask(ubiTask models.UBITaskReq, resourceRequirements coreV1.ResourceRequirements, imageName, namespace, nodeName string, useGpu bool) {
+func (fil *FilC2Task) DoTask(ubiTask models.UBITaskReq, resourceRequirements coreV1.ResourceRequirements, imageName, namespace, nodeName string, useGpu bool) {
 	var envFilePath string
-	envFilePath = filepath.Join(os.Getenv("CP_PATH"), "aleo_proof.env")
+	envFilePath = filepath.Join(os.Getenv("CP_PATH"), FilConfigFile)
 	envVars, err := godotenv.Read(envFilePath)
 	if err != nil {
-		logs.GetLogger().Errorf("reading aleo_proof.env failed, error: %v", err)
+		logs.GetLogger().Errorf("reading %s failed, error: %v", FilConfigFile, err)
 		return
 	}
 
 	var taskType = "CPU"
+	filC2Param := envVars["FIL_PROOFS_PARAMETER_CACHE"]
 	if useGpu {
 		delete(envVars, "RUST_GPU_TOOLS_CUSTOM_GPU")
 		envVars["BELLMAN_NO_GPU"] = "1"
 		taskType = "GPU"
 	}
+	delete(envVars, "FIL_PROOFS_PARAMETER_CACHE")
 
 	go func() {
 		var err error
@@ -72,19 +74,9 @@ func (aleo *AleoTask) DoTask(ubiTask models.UBITaskReq, resourceRequirements cor
 			computing.SaveUbiTaskMetadata(ubiTaskRun)
 		}()
 
-		domain := conf.GetConfig().API.Domain
-		if strings.HasPrefix(domain, ".") {
-			domain = domain[1:]
-		}
-		domain = "ubi-aleo." + domain
-		localIp, err := getLocalIp()
-		if err != nil {
-			logs.GetLogger().Errorf("check resource failed, error: %v", err)
-			return
-		}
-
-		receiveUrl := fmt.Sprintf("https://%s:%d/api/v1/computing/cp/receive/ubi", domain, conf.GetConfig().API.Port)
-		execCommand := []string{"/mnt/init/cmd", "start", "--prover"}
+		k8sService := computing.NewK8sService()
+		receiveUrl := fmt.Sprintf("%s:%d/api/v1/computing/cp/receive/ubi", k8sService.GetAPIServerEndpoint(), conf.GetConfig().API.Port)
+		execCommand := []string{"ubi-bench", "c2"}
 		JobName := strings.ToLower(ubiTask.ZkType) + "-" + strconv.Itoa(ubiTask.ID)
 
 		var useEnvVars []coreV1.EnvVar
@@ -95,11 +87,10 @@ func (aleo *AleoTask) DoTask(ubiTask models.UBITaskReq, resourceRequirements cor
 			})
 		}
 
-		useEnvVars = append(useEnvVars,
-			coreV1.EnvVar{
-				Name:  "RECEIVE_PROOF_URL",
-				Value: receiveUrl,
-			},
+		useEnvVars = append(useEnvVars, coreV1.EnvVar{
+			Name:  "RECEIVE_PROOF_URL",
+			Value: receiveUrl,
+		},
 			coreV1.EnvVar{
 				Name:  "TASKID",
 				Value: strconv.Itoa(ubiTask.ID),
@@ -133,21 +124,31 @@ func (aleo *AleoTask) DoTask(ubiTask models.UBITaskReq, resourceRequirements cor
 						NodeName: nodeName,
 						Containers: []coreV1.Container{
 							{
-								Name:            JobName + generateString(5),
-								Image:           imageName,
-								Env:             useEnvVars,
+								Name:  JobName + generateString(5),
+								Image: imageName,
+								Env:   useEnvVars,
+								VolumeMounts: []coreV1.VolumeMount{
+									{
+										Name:      "proof-params",
+										MountPath: "/var/tmp/filecoin-proof-parameters",
+									},
+								},
 								Command:         execCommand,
 								Resources:       resourceRequirements,
 								ImagePullPolicy: coreV1.PullIfNotPresent,
 							},
 						},
-						RestartPolicy: "Never",
-						HostAliases: []coreV1.HostAlias{
+						Volumes: []coreV1.Volume{
 							{
-								IP:        localIp,
-								Hostnames: []string{domain},
+								Name: "proof-params",
+								VolumeSource: coreV1.VolumeSource{
+									HostPath: &coreV1.HostPathVolumeSource{
+										Path: filC2Param,
+									},
+								},
 							},
 						},
+						RestartPolicy: "Never",
 					},
 				},
 				BackoffLimit:            new(int32),
@@ -158,7 +159,6 @@ func (aleo *AleoTask) DoTask(ubiTask models.UBITaskReq, resourceRequirements cor
 		*job.Spec.BackoffLimit = 1
 		*job.Spec.TTLSecondsAfterFinished = 120
 
-		k8sService := computing.NewK8sService()
 		if _, err = k8sService.Client.BatchV1().Jobs(namespace).Create(context.TODO(), job, metaV1.CreateOptions{}); err != nil {
 			logs.GetLogger().Errorf("Failed creating FIL-C2 ubi task job: %v", err)
 			return
@@ -166,11 +166,11 @@ func (aleo *AleoTask) DoTask(ubiTask models.UBITaskReq, resourceRequirements cor
 	}()
 }
 
-func (aleo *AleoTask) ReceiveUbiProof(c2Proof models.ReceiveProof) {
+func (fil *FilC2Task) ReceiveUbiProof(c2Proof models.ReceiveProof) {
 	var submitUBIProofTx string
 	var err error
 	defer func() {
-		key := constants.REDIS_UBI_ALEO_PERFIX + c2Proof.TaskId
+		key := constants.REDIS_UBI_C2_PERFIX + c2Proof.TaskId
 		ubiTask, _ := computing.RetrieveUbiTaskMetadata(key)
 		if err == nil {
 			ubiTask.Status = constants.UBI_TASK_SUCCESS_STATUS
@@ -194,12 +194,12 @@ func (aleo *AleoTask) ReceiveUbiProof(c2Proof models.ReceiveProof) {
 	}
 }
 
-func (aleo *AleoTask) GetConfGpuName() string {
+func (fil *FilC2Task) GetConfGpuName() string {
 	var envFilePath string
-	envFilePath = filepath.Join(os.Getenv("CP_PATH"), AleoConfigFile)
+	envFilePath = filepath.Join(os.Getenv("CP_PATH"), FilConfigFile)
 	envVars, err := godotenv.Read(envFilePath)
 	if err != nil {
-		logs.GetLogger().Errorf("reading %s failed, error: %v", AleoConfigFile, err)
+		logs.GetLogger().Errorf("reading %s failed, error: %v", FilConfigFile, err)
 		return ""
 	}
 
@@ -208,13 +208,18 @@ func (aleo *AleoTask) GetConfGpuName() string {
 }
 
 // GetImageName architecture: AMD or INTEL
-func (aleo *AleoTask) GetImageName(architecture string, useGpu bool) string {
+func (fil *FilC2Task) GetImageName(architecture string, useGpu bool) string {
 	var ubiTaskImage string
 	if architecture == constants.CPU_AMD {
-		ubiTaskImage = build.UBITaskAleoProofImageAmdGpu
+		ubiTaskImage = build.UBITaskImageAmdCpu
+		if useGpu {
+			ubiTaskImage = build.UBITaskImageAmdGpu
+		}
 	} else if architecture == constants.CPU_INTEL {
-		ubiTaskImage = build.UBITaskAleoProofImageAmdGpu
+		ubiTaskImage = build.UBITaskImageIntelCpu
+		if useGpu {
+			ubiTaskImage = build.UBITaskImageIntelGpu
+		}
 	}
-	ubiTaskImage = build.UBITaskAleoProofImageAmdGpu
 	return ubiTaskImage
 }
