@@ -1043,6 +1043,7 @@ func SaveUbiTaskMetadata(ubiTask *models.CacheUbiTaskDetail) {
 	for k, val := range fields {
 		fullArgs = append(fullArgs, k, val)
 	}
+	fmt.Printf("key: %s", key)
 	_, _ = redisConn.Do("HSET", fullArgs...)
 }
 
