@@ -7,7 +7,7 @@ At the current stage, ECP supports the generation of **ZK-Snark proof of Filecoi
 ## Prerequisites
  - Running the `setup.sh`
 ```bash
-curl -fsSL https://raw.githubusercontent.com/swanchain/go-computing-provider/blob/releases/ubi/setup.sh | bash
+curl -fsSL https://raw.githubusercontent.com/swanchain/go-computing-provider/releases/ubi/setup.sh | bash
 ```
 
  - Download the parameters for `zk-fil`:
@@ -15,10 +15,10 @@ curl -fsSL https://raw.githubusercontent.com/swanchain/go-computing-provider/blo
 export PARENT_PATH="<YOUR_ZK-FIL_PARAMS_PATH>"
 
 # 512MiB parameters
-curl -fsSL https://raw.githubusercontent.com/swanchain/go-computing-provider/blob/releases/ubi/fetch-param-512.sh | bash
+curl -fsSL https://raw.githubusercontent.com/swanchain/go-computing-provider/releases/ubi/fetch-param-512.sh | bash
 
 # 32GiB parameters
-curl -fsSL https://raw.githubusercontent.com/swanchain/go-computing-provider/blob/releases/ubi/fetch-param-32.sh | bash
+curl -fsSL https://raw.githubusercontent.com/swanchain/go-computing-provider/releases/ubi/fetch-param-32.sh | bash
 
 ```
 ## Install ECP and Init CP Account
