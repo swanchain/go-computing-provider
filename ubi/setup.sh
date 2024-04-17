@@ -55,8 +55,8 @@ else
                                 ;;
 
                             "22.04")
-                                sudo -- sh -c 'apt-get update; apt-get upgrade -y; apt-get autoremove -y; apt-get autoclean -y'
-                                sudo -- sh -c 'apt-get update; apt-get upgrade -y; apt-get autoremove -y; apt-get autoclean -y'
+                                sudo -- sh -c 'apt-get update; apt-get remove needrestart -y; apt-get upgrade -y; apt-get autoremove -y; apt-get autoclean -y'
+                                sudo -- sh -c 'apt-get update; apt-get remove needrestart -y; apt-get upgrade -y; apt-get autoremove -y; apt-get autoclean -y'
                                 sudo apt install linux-headers-$(uname -r) -y
                                 sudo apt del 7fa2af80 || true
                                 sudo apt remove 7fa2af80 || true
