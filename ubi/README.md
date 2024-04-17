@@ -45,10 +45,10 @@ Output:
 ## Start ECP service
 ```bash
 #!/bin/bash
-export FIL_PROOFS_PARAMETER_CACHE="<YOUR_ZK-FIL_PARAMS_PATH>"
+export FIL_PROOFS_PARAMETER_CACHE=$PARENT_PATH
 export RUST_GPU_TOOLS_CUSTOM_GPU="GeForce RTX 4090:16384"   
         
-nohup ./computing-provider ubi-task daemon \
+nohup ./computing-provider ubi daemon \
 	--multi-address=/ip4/<YOUR_PUBLIC_IP>/tcp/<YOUR_PORT> \
 	--node-name=<YOUR_NODE_NAME> >> cp.log 2>&1 &
 ```
