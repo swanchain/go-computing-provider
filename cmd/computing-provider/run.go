@@ -45,7 +45,7 @@ var runCmd = &cli.Command{
 		os.Setenv("CP_PATH", cpRepoPath)
 		initializer.ProjectInit(cpRepoPath)
 
-		r := gin.Default()
+		r := gin.New()
 		r.Use(pkg.LoggerMiddleware(), cors.Middleware(cors.Config{
 			Origins:         "*",
 			Methods:         "GET, PUT, POST, DELETE",
@@ -53,7 +53,7 @@ var runCmd = &cli.Command{
 			ExposedHeaders:  "",
 			MaxAge:          50 * time.Second,
 			ValidateHeaders: false,
-		}))
+		}), gin.Recovery())
 		pprof.Register(r)
 
 		v1 := r.Group("/api/v1")
