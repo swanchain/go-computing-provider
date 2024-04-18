@@ -46,7 +46,7 @@ var runCmd = &cli.Command{
 		initializer.ProjectInit(cpRepoPath)
 
 		r := gin.Default()
-		r.Use(cors.Middleware(cors.Config{
+		r.Use(pkg.LoggerMiddleware(), cors.Middleware(cors.Config{
 			Origins:         "*",
 			Methods:         "GET, PUT, POST, DELETE",
 			RequestHeaders:  "Origin, Authorization, Content-Type",

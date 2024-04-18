@@ -3,11 +3,15 @@ package pkg
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
+	"github.com/gin-gonic/gin"
 	"github.com/swanchain/go-computing-provider/conf"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -75,4 +79,36 @@ func ServeHttp(h http.Handler, name string, addr string) (StopFunc, error) {
 	}()
 
 	return srv.Shutdown, nil
+}
+
+func LoggerMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Next()
+		fmt.Fprintf(gin.DefaultWriter, "[GIN] %s - %s \"%s %s %s\" %d %s\n",
+			c.Request.RemoteAddr,
+			GetRealIP(c.Request),
+			c.Request.Method,
+			c.Request.URL.Path,
+			c.Request.Proto,
+			c.Writer.Status(),
+			c.Errors.String(),
+		)
+	}
+}
+
+func GetRealIP(r *http.Request) string {
+	ipAddress := r.RemoteAddr
+	if colonIndex := strings.LastIndex(ipAddress, ":"); colonIndex != -1 {
+		ipAddress = ipAddress[:colonIndex]
+	}
+
+	if forwardedFor := r.Header.Get("X-Forwarded-For"); forwardedFor != "" {
+		ipAddress = strings.TrimSpace(strings.Split(forwardedFor, ",")[0])
+	}
+
+	realIP := net.ParseIP(ipAddress)
+	if realIP == nil {
+		return "not found client ip"
+	}
+	return realIP.String()
 }
