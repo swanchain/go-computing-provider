@@ -1,4 +1,4 @@
-package main
+package pkg
 
 import (
 	"github.com/olekukonko/tablewriter"
@@ -12,9 +12,9 @@ type VisualTable struct {
 }
 
 type RowColor struct {
-	row    int
-	column []int
-	color  []tablewriter.Colors
+	Row    int
+	Column []int
+	Color  []tablewriter.Colors
 }
 
 func NewVisualTable(header []string, data [][]string, rowColor []RowColor) *VisualTable {
@@ -32,12 +32,12 @@ func (v *VisualTable) Generate(formatHeaders bool) {
 	for index, datum := range v.Data {
 		var rowColors []tablewriter.Colors
 		for _, rowColor := range v.RowColor {
-			if index == rowColor.row {
+			if index == rowColor.Row {
 				for dIndex := range datum {
 					var defaultFlag = true
-					for n, colIndex := range rowColor.column {
+					for n, colIndex := range rowColor.Column {
 						if dIndex == colIndex {
-							rowColors = append(rowColors, rowColor.color[n])
+							rowColors = append(rowColors, rowColor.Color[n])
 							defaultFlag = false
 						}
 					}

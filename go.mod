@@ -17,6 +17,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/google/wire v0.6.0
 	github.com/gorilla/websocket v1.5.0
+	github.com/ipfs/go-log/v2 v2.5.1
 	github.com/itsjamie/gin-cors v0.0.0-20220228161158-ef28d3d2a0a8
 	github.com/joho/godotenv v1.3.0
 	github.com/olekukonko/tablewriter v0.0.5
@@ -129,6 +130,9 @@ require (
 	github.com/ugorji/go/codec v1.2.11 // indirect
 	github.com/whyrusleeping/tar-utils v0.0.0-20180509141711-8c6c8ba81d5c // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
+	go.uber.org/atomic v1.10.0 // indirect
+	go.uber.org/multierr v1.8.0 // indirect
+	go.uber.org/zap v1.24.0 // indirect
 	golang.org/x/arch v0.3.0 // indirect
 	golang.org/x/crypto v0.18.0 // indirect
 	golang.org/x/net v0.20.0 // indirect

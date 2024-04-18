@@ -6,8 +6,9 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/olekukonko/tablewriter"
 	"github.com/swanchain/go-computing-provider/conf"
-	"github.com/swanchain/go-computing-provider/constants"
-	"github.com/swanchain/go-computing-provider/internal/computing"
+	"github.com/swanchain/go-computing-provider/internal"
+	"github.com/swanchain/go-computing-provider/internal/pkg"
+	"github.com/swanchain/go-computing-provider/internal/v1/service"
 	"github.com/urfave/cli/v2"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"os"
@@ -47,23 +48,23 @@ var taskList = &cli.Command{
 			return fmt.Errorf("load config file failed, error: %+v", err)
 		}
 
-		conn := computing.GetRedisClient()
-		prefix := constants.REDIS_SPACE_PREFIX + "*"
+		conn := pkg.GetRedisClient()
+		prefix := internal.REDIS_SPACE_PREFIX + "*"
 		keys, err := redis.Strings(conn.Do("KEYS", prefix))
 		if err != nil {
 			return fmt.Errorf("failed get redis %s prefix, error: %+v", prefix, err)
 		}
 
 		var taskData [][]string
-		var rowColorList []RowColor
+		var rowColorList []pkg.RowColor
 		var number int
 		for _, key := range keys {
-			jobDetail, err := computing.RetrieveJobMetadata(key)
+			jobDetail, err := service.RetrieveJobMetadata(key)
 			if err != nil {
 				return fmt.Errorf("failed get job detail: %s, error: %+v", key, err)
 			}
 
-			k8sService := computing.NewK8sService()
+			k8sService := pkg.NewK8sService()
 			status, err := k8sService.GetDeploymentStatus(jobDetail.WalletAddress, jobDetail.SpaceUuid)
 			if err != nil {
 				return fmt.Errorf("failed get job status: %s, error: %+v", jobDetail.JobUuid, err)
@@ -106,17 +107,17 @@ var taskList = &cli.Command{
 				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
 			}
 
-			rowColorList = append(rowColorList, RowColor{
-				row:    number,
-				column: []int{5},
-				color:  rowColor,
+			rowColorList = append(rowColorList, pkg.RowColor{
+				Row:    number,
+				Column: []int{5},
+				Color:  rowColor,
 			})
 
 			number++
 		}
 
 		header := []string{"TASK UUID", "TASK TYPE", "WALLET ADDRESS", "SPACE UUID", "SPACE NAME", "STATUS"}
-		NewVisualTable(header, taskData, rowColorList).Generate(true)
+		pkg.NewVisualTable(header, taskData, rowColorList).Generate(true)
 
 		return nil
 
@@ -139,15 +140,15 @@ var taskDetail = &cli.Command{
 		if err := conf.InitConfig(cpPath); err != nil {
 			return fmt.Errorf("load config file failed, error: %+v", err)
 		}
-		computing.GetRedisClient()
+		pkg.GetRedisClient()
 
-		spaceUuid := constants.REDIS_SPACE_PREFIX + cctx.Args().First()
-		jobDetail, err := computing.RetrieveJobMetadata(spaceUuid)
+		spaceUuid := internal.REDIS_SPACE_PREFIX + cctx.Args().First()
+		jobDetail, err := service.RetrieveJobMetadata(spaceUuid)
 		if err != nil {
 			return fmt.Errorf("failed get job detail: %s, error: %+v", spaceUuid, err)
 		}
 
-		k8sService := computing.NewK8sService()
+		k8sService := pkg.NewK8sService()
 		status, err := k8sService.GetDeploymentStatus(jobDetail.WalletAddress, jobDetail.SpaceUuid)
 		if err != nil {
 			return fmt.Errorf("failed get job status: %s, error: %+v", jobDetail.JobUuid, err)
@@ -172,13 +173,13 @@ var taskDetail = &cli.Command{
 
 		header := []string{"TASK UUID:", jobDetail.TaskUuid}
 
-		var rowColorList []RowColor
-		rowColorList = append(rowColorList, RowColor{
-			row:    6,
-			column: []int{1},
-			color:  rowColor,
+		var rowColorList []pkg.RowColor
+		rowColorList = append(rowColorList, pkg.RowColor{
+			Row:    6,
+			Column: []int{1},
+			Color:  rowColor,
 		})
-		NewVisualTable(header, taskData, rowColorList).Generate(false)
+		pkg.NewVisualTable(header, taskData, rowColorList).Generate(false)
 		return nil
 	},
 }
@@ -199,17 +200,17 @@ var taskDelete = &cli.Command{
 		if err := conf.InitConfig(cpPath); err != nil {
 			return fmt.Errorf("load config file failed, error: %+v", err)
 		}
-		computing.GetRedisClient()
+		pkg.GetRedisClient()
 
 		spaceUuid := strings.ToLower(cctx.Args().First())
-		jobDetail, err := computing.RetrieveJobMetadata(constants.REDIS_SPACE_PREFIX + spaceUuid)
+		jobDetail, err := service.RetrieveJobMetadata(internal.REDIS_SPACE_PREFIX + spaceUuid)
 		if err != nil {
 			return fmt.Errorf("failed get job detail: %s, error: %+v", spaceUuid, err)
 		}
 
-		deployName := constants.K8S_DEPLOY_NAME_PREFIX + spaceUuid
-		namespace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(jobDetail.WalletAddress)
-		k8sService := computing.NewK8sService()
+		deployName := internal.K8S_DEPLOY_NAME_PREFIX + spaceUuid
+		namespace := internal.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(jobDetail.WalletAddress)
+		k8sService := pkg.NewK8sService()
 		if err := k8sService.DeleteDeployment(context.TODO(), namespace, deployName); err != nil && !errors.IsNotFound(err) {
 			return err
 		}
@@ -219,8 +220,8 @@ var taskDelete = &cli.Command{
 			return err
 		}
 
-		conn := computing.GetRedisClient()
-		conn.Do("DEL", redis.Args{}.AddFlat(constants.REDIS_SPACE_PREFIX+spaceUuid)...)
+		conn := pkg.GetRedisClient()
+		conn.Do("DEL", redis.Args{}.AddFlat(internal.REDIS_SPACE_PREFIX+spaceUuid)...)
 
 		return nil
 	},

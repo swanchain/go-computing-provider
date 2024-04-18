@@ -1,14 +1,13 @@
-package computing
+package service
 
 import (
 	"errors"
 	"fmt"
-	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/swanchain/go-computing-provider/conf"
-	"github.com/swanchain/go-computing-provider/internal/models"
+	"github.com/swanchain/go-computing-provider/internal/pkg"
+	"github.com/swanchain/go-computing-provider/internal/v1/models"
 	"io"
 	"io/fs"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -28,7 +27,7 @@ func BuildSpaceTaskImage(spaceUuid string, files []models.SpaceFile) (bool, stri
 				return false, "", "", "", err
 			}
 			if err = downloadFile(filepath.Join(buildFolder, file.Name), file.URL); err != nil {
-				return false, "", "", "", fmt.Errorf("error downloading file: %w", err)
+				return false, "", "", "", fmt.Errorf("downloading file failed: %w", err)
 			}
 		}
 
@@ -52,7 +51,7 @@ func BuildSpaceTaskImage(spaceUuid string, files []models.SpaceFile) (bool, stri
 		}
 		return containsYaml, yamlPath, imagePath, modelsSetting, nil
 	} else {
-		logs.GetLogger().Warnf("Space %s is not found.", spaceUuid)
+		srvlog.Warnf("Space %s is not found.", spaceUuid)
 	}
 	return false, "", "", "", NotFoundError
 }
@@ -72,18 +71,18 @@ func BuildImagesByDockerfile(jobUuid, spaceUuid, spaceName, imagePath string) (s
 	}
 	imageName = strings.ToLower(imageName)
 	dockerfilePath := filepath.Join(imagePath, "Dockerfile")
-	log.Printf("Image path: %s", imagePath)
+	srvlog.Infoln("Image path: %s", imagePath)
 
-	dockerService := NewDockerService()
+	dockerService := pkg.NewDockerService()
 	if err := dockerService.BuildImage(imagePath, imageName); err != nil {
-		logs.GetLogger().Errorf("Error building Docker image: %v", err)
+		srvlog.Errorf("building Docker image failed, error: %v", err)
 		return "", ""
 	}
 
 	if conf.GetConfig().Registry.ServerAddress != "" {
 		updateJobStatus(jobUuid, models.JobPushImage)
 		if err := dockerService.PushImage(imageName); err != nil {
-			logs.GetLogger().Errorf("Error Docker push image: %v", err)
+			srvlog.Errorf("docker push image failed, error: %v", err)
 			return "", ""
 		}
 	}

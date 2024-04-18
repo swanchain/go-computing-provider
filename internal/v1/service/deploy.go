@@ -1,15 +1,14 @@
-package computing
+package service
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/gomodule/redigo/redis"
-	"github.com/swanchain/go-computing-provider/constants"
-	"github.com/swanchain/go-computing-provider/internal/models"
+	"github.com/swanchain/go-computing-provider/internal"
+	"github.com/swanchain/go-computing-provider/internal/pkg"
+	"github.com/swanchain/go-computing-provider/internal/v1/models"
 	"github.com/swanchain/go-computing-provider/internal/yaml"
-	"github.com/swanchain/go-computing-provider/util"
 	appV1 "k8s.io/api/apps/v1"
 	coreV1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -53,7 +52,7 @@ func NewDeploy(jobUuid, hostName, walletAddress, hardwareDesc string, duration i
 		duration:         duration,
 		hardwareResource: hardwareDetail,
 		TaskType:         taskType,
-		k8sNameSpace:     constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(walletAddress),
+		k8sNameSpace:     internal.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(walletAddress),
 		hardwareDesc:     hardwareDesc,
 		taskUuid:         taskUuid,
 	}
@@ -92,32 +91,32 @@ func (d *Deploy) WithModelSettingFile(modelsSettingFile string) *Deploy {
 }
 
 func (d *Deploy) DockerfileToK8s() {
-	exposedPort, err := ExtractExposedPort(d.dockerfilePath)
+	exposedPort, err := pkg.ExtractExposedPort(d.dockerfilePath)
 	if err != nil {
-		logs.GetLogger().Infof("Failed to extract exposed port: %v", err)
+		srvlog.Infof("Failed to extract exposed port: %v", err)
 		return
 	}
 	containerPort, err := strconv.ParseInt(exposedPort, 10, 64)
 	if err != nil {
-		logs.GetLogger().Errorf("Failed to convert exposed port: %v", err)
+		srvlog.Errorf("Failed to convert exposed port: %v", err)
 		return
 	}
 
 	deleteJob(d.k8sNameSpace, d.spaceUuid)
 
 	if err := d.deployNamespace(); err != nil {
-		logs.GetLogger().Error(err)
+		srvlog.Error(err)
 		return
 	}
 
-	k8sService := NewK8sService()
+	k8sService := pkg.NewK8sService()
 	deployment := &appV1.Deployment{
 		TypeMeta: metaV1.TypeMeta{
 			Kind:       "Deployment",
 			APIVersion: "apps/v1",
 		},
 		ObjectMeta: metaV1.ObjectMeta{
-			Name:      constants.K8S_DEPLOY_NAME_PREFIX + d.spaceUuid,
+			Name:      internal.K8S_DEPLOY_NAME_PREFIX + d.spaceUuid,
 			Namespace: d.k8sNameSpace,
 		},
 		Spec: appV1.DeploymentSpec{
@@ -132,9 +131,9 @@ func (d *Deploy) DockerfileToK8s() {
 				},
 
 				Spec: coreV1.PodSpec{
-					NodeSelector: generateLabel(d.gpuProductName),
+					NodeSelector: pkg.GenerateLabel(d.gpuProductName),
 					Containers: []coreV1.Container{{
-						Name:            constants.K8S_CONTAINER_NAME_PREFIX + d.spaceUuid,
+						Name:            internal.K8S_CONTAINER_NAME_PREFIX + d.spaceUuid,
 						Image:           d.image,
 						ImagePullPolicy: coreV1.PullIfNotPresent,
 						Ports: []coreV1.ContainerPort{{
@@ -148,15 +147,15 @@ func (d *Deploy) DockerfileToK8s() {
 		}}
 	createDeployment, err := k8sService.CreateDeployment(context.TODO(), d.k8sNameSpace, deployment)
 	if err != nil {
-		logs.GetLogger().Error(err)
+		srvlog.Error(err)
 		return
 	}
 	d.DeployName = createDeployment.GetName()
 	updateJobStatus(d.jobUuid, models.JobPullImage)
-	logs.GetLogger().Infof("Created deployment: %s", createDeployment.GetName())
+	srvlog.Infof("Created deployment: %s", createDeployment.GetName())
 
 	if _, err := d.deployK8sResource(int32(containerPort)); err != nil {
-		logs.GetLogger().Error(err)
+		srvlog.Error(err)
 		return
 	}
 	updateJobStatus(d.jobUuid, models.JobDeployToK8s, "https://"+d.hostName)
@@ -168,18 +167,18 @@ func (d *Deploy) DockerfileToK8s() {
 func (d *Deploy) YamlToK8s() {
 	containerResources, err := yaml.HandlerYaml(d.yamlPath)
 	if err != nil {
-		logs.GetLogger().Error(err)
+		srvlog.Error(err)
 		return
 	}
 
 	deleteJob(d.k8sNameSpace, d.spaceUuid)
 
 	if err := d.deployNamespace(); err != nil {
-		logs.GetLogger().Error(err)
+		srvlog.Error(err)
 		return
 	}
 
-	k8sService := NewK8sService()
+	k8sService := pkg.NewK8sService()
 	for _, cr := range containerResources {
 		for i, envVar := range cr.Env {
 			if strings.Contains(envVar.Name, "NEXTAUTH_URL") {
@@ -194,7 +193,7 @@ func (d *Deploy) YamlToK8s() {
 			fileNameWithoutExt := filepath.Base(cr.VolumeMounts.Name[:len(cr.VolumeMounts.Name)-len(filepath.Ext(cr.VolumeMounts.Name))])
 			configMap, err := k8sService.CreateConfigMap(context.TODO(), d.k8sNameSpace, d.spaceUuid, filepath.Dir(d.yamlPath), cr.VolumeMounts.Name)
 			if err != nil {
-				logs.GetLogger().Error(err)
+				srvlog.Error(err)
 				return
 			}
 			configName := configMap.GetName()
@@ -278,7 +277,7 @@ func (d *Deploy) YamlToK8s() {
 				APIVersion: "apps/v1",
 			},
 			ObjectMeta: metaV1.ObjectMeta{
-				Name:      constants.K8S_DEPLOY_NAME_PREFIX + d.spaceUuid,
+				Name:      internal.K8S_DEPLOY_NAME_PREFIX + d.spaceUuid,
 				Namespace: d.k8sNameSpace,
 			},
 
@@ -292,7 +291,7 @@ func (d *Deploy) YamlToK8s() {
 						Namespace: d.k8sNameSpace,
 					},
 					Spec: coreV1.PodSpec{
-						NodeSelector: generateLabel(d.gpuProductName),
+						NodeSelector: pkg.GenerateLabel(d.gpuProductName),
 						Containers:   containers,
 						Volumes:      volumes,
 					},
@@ -301,16 +300,16 @@ func (d *Deploy) YamlToK8s() {
 
 		createDeployment, err := k8sService.CreateDeployment(context.TODO(), d.k8sNameSpace, deployment)
 		if err != nil {
-			logs.GetLogger().Error(err)
+			srvlog.Error(err)
 			return
 		}
 		d.DeployName = createDeployment.GetName()
 		updateJobStatus(d.jobUuid, models.JobPullImage)
-		logs.GetLogger().Infof("Created deployment: %s", createDeployment.GetObjectMeta().GetName())
+		srvlog.Infof("Created deployment: %s", createDeployment.GetObjectMeta().GetName())
 
 		serviceHost, err := d.deployK8sResource(cr.Ports[0].ContainerPort)
 		if err != nil {
-			logs.GetLogger().Error(err)
+			srvlog.Error(err)
 			return
 		}
 
@@ -334,16 +333,16 @@ func (d *Deploy) ModelInferenceToK8s() error {
 	modelData, _ := os.ReadFile(d.modelsSettingFile)
 	err := json.Unmarshal(modelData, &modelSetting)
 	if err != nil {
-		logs.GetLogger().Errorf("convert model_id out to json failed, error: %+v", err)
+		srvlog.Errorf("convert model_id out to json failed, error: %+v", err)
 		return err
 	}
 
 	cpPath, _ := os.LookupEnv("CP_PATH")
 	basePath := filepath.Join(cpPath, "inference-model")
 
-	modelInfoOut, err := util.RunPythonScript(filepath.Join(basePath, "/scripts/hf_client.py"), "model_info", modelSetting.ModelId)
+	modelInfoOut, err := pkg.RunPythonScript(filepath.Join(basePath, "/scripts/hf_client.py"), "model_info", modelSetting.ModelId)
 	if err != nil {
-		logs.GetLogger().Errorf("exec model_info cmd failed, error: %+v", err)
+		srvlog.Errorf("exec model_info cmd failed, error: %+v", err)
 		return err
 	}
 
@@ -354,21 +353,21 @@ func (d *Deploy) ModelInferenceToK8s() error {
 	}
 	err = json.Unmarshal([]byte(modelInfoOut), &modelInfo)
 	if err != nil {
-		logs.GetLogger().Errorf("convert model_info out to json failed, error: %+v", err)
+		srvlog.Errorf("convert model_info out to json failed, error: %+v", err)
 		return err
 	}
 
 	deleteJob(d.k8sNameSpace, d.spaceUuid)
 	imageName := "lagrange/" + modelInfo.Framework + ":v1.0"
 
-	logFile := filepath.Join(d.SpacePath, BuildFileName)
+	logFile := filepath.Join(d.SpacePath, pkg.BuildFileName)
 	if _, err = os.Create(logFile); err != nil {
 		return err
 	}
 
 	var wg sync.WaitGroup
 	wg.Add(1)
-	util.StreamPythonScriptOutput(&wg, filepath.Join(basePath, "build_docker.py"), basePath, modelInfo.Framework, imageName, logFile)
+	pkg.StreamPythonScriptOutput(&wg, filepath.Join(basePath, "build_docker.py"), basePath, modelInfo.Framework, imageName, logFile)
 	wg.Wait()
 
 	modelEnvs := []coreV1.EnvVar{
@@ -385,18 +384,18 @@ func (d *Deploy) ModelInferenceToK8s() error {
 	d.image = imageName
 
 	if err := d.deployNamespace(); err != nil {
-		logs.GetLogger().Error(err)
+		srvlog.Error(err)
 		return err
 	}
 
-	k8sService := NewK8sService()
+	k8sService := pkg.NewK8sService()
 	deployment := &appV1.Deployment{
 		TypeMeta: metaV1.TypeMeta{
 			Kind:       "Deployment",
 			APIVersion: "apps/v1",
 		},
 		ObjectMeta: metaV1.ObjectMeta{
-			Name:      constants.K8S_DEPLOY_NAME_PREFIX + d.spaceUuid,
+			Name:      internal.K8S_DEPLOY_NAME_PREFIX + d.spaceUuid,
 			Namespace: d.k8sNameSpace,
 		},
 		Spec: appV1.DeploymentSpec{
@@ -411,9 +410,9 @@ func (d *Deploy) ModelInferenceToK8s() error {
 				},
 
 				Spec: coreV1.PodSpec{
-					NodeSelector: generateLabel(d.gpuProductName),
+					NodeSelector: pkg.GenerateLabel(d.gpuProductName),
 					Containers: []coreV1.Container{{
-						Name:            constants.K8S_CONTAINER_NAME_PREFIX + d.spaceUuid,
+						Name:            internal.K8S_CONTAINER_NAME_PREFIX + d.spaceUuid,
 						Image:           d.image,
 						ImagePullPolicy: coreV1.PullIfNotPresent,
 						Ports: []coreV1.ContainerPort{{
@@ -427,15 +426,15 @@ func (d *Deploy) ModelInferenceToK8s() error {
 		}}
 	createDeployment, err := k8sService.CreateDeployment(context.TODO(), d.k8sNameSpace, deployment)
 	if err != nil {
-		logs.GetLogger().Error(err)
+		srvlog.Error(err)
 		return err
 	}
 	d.DeployName = createDeployment.GetName()
 	updateJobStatus(d.jobUuid, models.JobPullImage)
-	logs.GetLogger().Infof("Created deployment: %s", createDeployment.GetObjectMeta().GetName())
+	srvlog.Infof("Created deployment: %s", createDeployment.GetObjectMeta().GetName())
 
 	if _, err := d.deployK8sResource(int32(80)); err != nil {
-		logs.GetLogger().Error(err)
+		srvlog.Error(err)
 		return err
 	}
 	updateJobStatus(d.jobUuid, models.JobDeployToK8s)
@@ -444,7 +443,7 @@ func (d *Deploy) ModelInferenceToK8s() error {
 }
 
 func (d *Deploy) deployNamespace() error {
-	k8sService := NewK8sService()
+	k8sService := pkg.NewK8sService()
 	// create namespace
 	if _, err := k8sService.GetNameSpace(context.TODO(), d.k8sNameSpace, metaV1.GetOptions{}); err != nil {
 		if errors.IsNotFound(err) {
@@ -460,13 +459,13 @@ func (d *Deploy) deployNamespace() error {
 			if err != nil {
 				return fmt.Errorf("failed create namespace, error: %w", err)
 			}
-			logs.GetLogger().Infof("create namespace successfully, namespace: %s", createdNamespace.Name)
+			srvlog.Infof("create namespace successfully, namespace: %s", createdNamespace.Name)
 
 			//networkPolicy, err := k8sService.CreateNetworkPolicy(context.TODO(), k8sNameSpace)
 			//if err != nil {
 			//	return fmt.Errorf("failed create networkPolicy, error: %w", err)
 			//}
-			//logs.GetLogger().Infof("create networkPolicy successfully, networkPolicyName: %s", networkPolicy.Name)
+			//srvlog.Infof("create networkPolicy successfully, networkPolicyName: %s", networkPolicy.Name)
 		} else {
 			return err
 		}
@@ -502,13 +501,13 @@ func (d *Deploy) createResources() coreV1.ResourceRequirements {
 
 	memQuantity, err := resource.ParseQuantity(fmt.Sprintf("%d%s", d.hardwareResource.Memory.Quantity, d.hardwareResource.Memory.Unit))
 	if err != nil {
-		logs.GetLogger().Error("get memory failed, error: %+v", err)
+		srvlog.Error("get memory failed, error: %+v", err)
 		return coreV1.ResourceRequirements{}
 	}
 
 	storageQuantity, err := resource.ParseQuantity(fmt.Sprintf("%d%s", d.hardwareResource.Storage.Quantity, d.hardwareResource.Storage.Unit))
 	if err != nil {
-		logs.GetLogger().Error("get storage failed, error: %+v", err)
+		srvlog.Error("get storage failed, error: %+v", err)
 		return coreV1.ResourceRequirements{}
 	}
 
@@ -529,13 +528,13 @@ func (d *Deploy) createResources() coreV1.ResourceRequirements {
 }
 
 func (d *Deploy) deployK8sResource(containerPort int32) (string, error) {
-	k8sService := NewK8sService()
+	k8sService := pkg.NewK8sService()
 
 	createService, err := k8sService.CreateService(context.TODO(), d.k8sNameSpace, d.spaceUuid, containerPort)
 	if err != nil {
 		return "", fmt.Errorf("failed creata service, error: %w", err)
 	}
-	logs.GetLogger().Infof("Created service successfully: %s", createService.GetObjectMeta().GetName())
+	srvlog.Infof("Created service successfully: %s", createService.GetObjectMeta().GetName())
 
 	serviceHost := fmt.Sprintf("http://%s:%d", createService.Spec.ClusterIP, createService.Spec.Ports[0].Port)
 
@@ -543,19 +542,19 @@ func (d *Deploy) deployK8sResource(containerPort int32) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed creata ingress, error: %w", err)
 	}
-	logs.GetLogger().Infof("Created Ingress successfully: %s", createIngress.GetObjectMeta().GetName())
+	srvlog.Infof("Created Ingress successfully: %s", createIngress.GetObjectMeta().GetName())
 	return serviceHost, nil
 }
 
 func (d *Deploy) watchContainerRunningTime() {
-	conn := redisPool.Get()
+	conn := pkg.RedisPool.Get()
 	_, err := conn.Do("SET", d.spaceUuid, "wait-delete", "EX", d.duration)
 	if err != nil {
-		logs.GetLogger().Errorf("Failed set redis key and expire time, key: %s, error: %+v", d.jobUuid, err)
+		srvlog.Errorf("Failed set redis key and expire time, key: %s, error: %+v", d.jobUuid, err)
 		return
 	}
 
-	key := constants.REDIS_SPACE_PREFIX + d.spaceUuid
+	key := internal.REDIS_SPACE_PREFIX + d.spaceUuid
 	conn.Do("DEL", redis.Args{}.AddFlat(key)...)
 
 	fullArgs := []interface{}{key}

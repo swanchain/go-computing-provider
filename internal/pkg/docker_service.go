@@ -1,4 +1,4 @@
-package computing
+package pkg
 
 import (
 	"archive/tar"
@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/docker/docker/api/types/filters"
-	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"io"
 	"log"
 	"os"
@@ -295,7 +294,7 @@ func (ds *DockerService) RemoveImage(imageId string) error {
 func (ds *DockerService) CleanResource() {
 	images, err := ds.c.ImageList(context.Background(), types.ImageListOptions{})
 	if err != nil {
-		logs.GetLogger().Errorf("Failed get image list, error: %+v", err)
+		ulog.Errorf("Failed get image list, error: %+v", err)
 		return
 	}
 
@@ -318,12 +317,12 @@ func (ds *DockerService) CleanResource() {
 	danglingFilters.Add("dangling", "true")
 	_, err = ds.c.ImagesPrune(ctx, danglingFilters)
 	if err != nil {
-		logs.GetLogger().Errorf("Failed delete dangling image, error: %+v", err)
+		ulog.Errorf("Failed delete dangling image, error: %+v", err)
 		return
 	}
 
 	if _, err = ds.c.ContainersPrune(ctx, filters.NewArgs()); err != nil {
-		logs.GetLogger().Errorf("Failed delete unused container, error: %+v", err)
+		ulog.Errorf("Failed delete unused container, error: %+v", err)
 		return
 	}
 }

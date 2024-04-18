@@ -1,11 +1,10 @@
-package computing
+package pkg
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
-	"github.com/swanchain/go-computing-provider/internal/models"
+	"github.com/swanchain/go-computing-provider/internal/v1/models"
 	corev1 "k8s.io/api/core/v1"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -145,7 +144,7 @@ func gpuInPod(pod *corev1.Pod) (gpuName string, gpuCount int64) {
 	return gpuName, gpuCount
 }
 
-func checkClusterProviderStatus() {
+func CheckClusterProviderStatus() {
 	var policy models.ResourcePolicy
 	cpPath, _ := os.LookupEnv("CP_PATH")
 	resourcePolicy := filepath.Join(cpPath, "resource_policy.json")
@@ -154,35 +153,35 @@ func checkClusterProviderStatus() {
 		policy = defaultResourcePolicy()
 	} else {
 		if err = json.Unmarshal(bytes, &policy); err != nil {
-			logs.GetLogger().Errorf("parse json failed, error: %v", err)
+			ulog.Errorf("parse json failed, error: %v", err)
 			return
 		}
 	}
 	service := NewK8sService()
-	activePods, err := allActivePods(service.k8sClient)
+	activePods, err := allActivePods(service.ClientSet)
 	if err != nil {
-		logs.GetLogger().Errorf("get all active pod failed, error: %v", err)
+		ulog.Errorf("get all active pod failed, error: %v", err)
 		return
 	}
 
-	nodes, err := service.k8sClient.CoreV1().Nodes().List(context.TODO(), metaV1.ListOptions{})
+	nodes, err := service.ClientSet.CoreV1().Nodes().List(context.TODO(), metaV1.ListOptions{})
 	if err != nil {
-		logs.GetLogger().Errorf("get all node failed, error: %v", err)
+		ulog.Errorf("get all node failed, error: %v", err)
 		return
 	}
 
 	for _, node := range nodes.Items {
 		_, remainderResource, nodeResource := GetNodeResource(activePods, &node)
 		if remainderResource[ResourceCpu] < policy.Cpu.Quota {
-			logs.GetLogger().Warningf("Insufficient cpu resources, current cpu resource: %s less than %d", nodeResource.Cpu.Free, policy.Cpu.Quota)
+			ulog.Warnf("Insufficient cpu resources, current cpu resource: %s less than %d", nodeResource.Cpu.Free, policy.Cpu.Quota)
 			return
 		}
 		if remainderResource[ResourceMem] < policy.Memory.Quota {
-			logs.GetLogger().Warningf("Insufficient memory resources, current memory resource: %s less than %d %s", nodeResource.Memory.Free, policy.Memory.Quota, policy.Memory.Unit)
+			ulog.Warnf("Insufficient memory resources, current memory resource: %s less than %d %s", nodeResource.Memory.Free, policy.Memory.Quota, policy.Memory.Unit)
 			return
 		}
 		if remainderResource[ResourceStorage] < policy.Storage.Quota {
-			logs.GetLogger().Warningf("Insufficient storage resources, current storage resource: %s less than %d %s", nodeResource.Storage.Free, policy.Storage.Quota, policy.Storage.Unit)
+			ulog.Warnf("Insufficient storage resources, current storage resource: %s less than %d %s", nodeResource.Storage.Free, policy.Storage.Quota, policy.Storage.Unit)
 			return
 		}
 	}

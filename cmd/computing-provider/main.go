@@ -1,6 +1,7 @@
 package main
 
 import (
+	logging "github.com/ipfs/go-log/v2"
 	"github.com/swanchain/go-computing-provider/build"
 	"github.com/urfave/cli/v2"
 	"os"
@@ -10,7 +11,10 @@ const (
 	FlagCpRepo = "repo"
 )
 
+var mlog = logging.Logger("main")
+
 func main() {
+	logging.SetLogLevel("*", "INFO")
 	app := &cli.App{
 		Name:                 "computing-provider",
 		Usage:                "Swanchain decentralized computing network client",

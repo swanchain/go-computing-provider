@@ -3,7 +3,7 @@ package db
 import (
 	_ "embed"
 	"github.com/filswan/go-swan-lib/logs"
-	"github.com/swanchain/go-computing-provider/internal/models"
+	models2 "github.com/swanchain/go-computing-provider/internal/v1/models"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"os"
@@ -27,8 +27,8 @@ func init() {
 	}
 
 	DB.AutoMigrate(
-		&models.ZkTaskEntity{},
-		&models.JobEntity{})
+		&models2.ZkTaskEntity{},
+		&models2.JobEntity{})
 }
 
 func NewDbService() *gorm.DB {

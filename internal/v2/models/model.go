@@ -1,6 +1,6 @@
 package models
 
-type Job struct {
+type CreateJobReq struct {
 	UUID       string  `json:"uuid" binding:"required"`
 	Name       string  `json:"name" binding:"required"`
 	Duration   int     `json:"duration" binding:"required"`

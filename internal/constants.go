@@ -1,4 +1,4 @@
-package constants
+package internal
 
 const StatusActive = "Active"
 const StatusOffline = "Offline"

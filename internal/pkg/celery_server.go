@@ -1,18 +1,16 @@
-package computing
+package pkg
 
 import (
 	"sync"
 	"time"
 
-	"github.com/swanchain/go-computing-provider/conf"
-
-	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/gocelery/gocelery"
 	"github.com/gomodule/redigo/redis"
+	"github.com/swanchain/go-computing-provider/conf"
 )
 
-var redisPool *redis.Pool
-var celeryService *CeleryService
+var RedisPool *redis.Pool
+var CeleryServ *CeleryService
 var celeryOnce sync.Once
 
 type CeleryService struct {
@@ -20,7 +18,7 @@ type CeleryService struct {
 }
 
 func newRedisPool(url string, password string) *redis.Pool {
-	redisPool = &redis.Pool{
+	RedisPool = &redis.Pool{
 		MaxIdle:     5,                 // maximum number of idle connections in the pool
 		MaxActive:   0,                 // maximum number of connections allocated by the pool at a given time
 		IdleTimeout: 240 * time.Second, // close connections after remaining idle for this duration
@@ -42,31 +40,31 @@ func newRedisPool(url string, password string) *redis.Pool {
 			return err
 		},
 	}
-	return redisPool
+	return RedisPool
 }
 
 func GetRedisClient() redis.Conn {
 	newRedisPool(conf.GetConfig().API.RedisUrl, conf.GetConfig().API.RedisPassword)
-	return redisPool.Get()
+	return RedisPool.Get()
 }
 
 func NewCeleryService() *CeleryService {
 	celeryOnce.Do(
 		func() {
-			redisPool := newRedisPool(conf.GetConfig().API.RedisUrl, conf.GetConfig().API.RedisPassword)
+			RedisPool := newRedisPool(conf.GetConfig().API.RedisUrl, conf.GetConfig().API.RedisPassword)
 			celeryClient, err := gocelery.NewCeleryClient(
-				gocelery.NewRedisBroker(redisPool),
-				gocelery.NewRedisBackend(redisPool),
+				gocelery.NewRedisBroker(RedisPool),
+				gocelery.NewRedisBackend(RedisPool),
 				10)
 			if err != nil {
-				logs.GetLogger().Fatalf("Failed init celery service, error: %+v", err)
+				ulog.Fatalf("Failed init celery service, error: %+v", err)
 			}
-			celeryService = &CeleryService{
+			CeleryServ = &CeleryService{
 				cli: celeryClient,
 			}
 		})
 
-	return celeryService
+	return CeleryServ
 }
 
 func (s *CeleryService) RegisterTask(taskName string, task interface{}) {

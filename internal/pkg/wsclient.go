@@ -1,4 +1,4 @@
-package computing
+package pkg
 
 import (
 	"bufio"
@@ -14,7 +14,7 @@ const (
 	PingPeriod = 3 * time.Second
 )
 
-var upgrade = websocket.Upgrader{
+var Upgrade = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {

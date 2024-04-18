@@ -1,4 +1,4 @@
-package computing
+package service
 
 import (
 	"context"
@@ -8,18 +8,18 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/gin-gonic/gin"
 	"github.com/gomodule/redigo/redis"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	logging "github.com/ipfs/go-log/v2"
 	"github.com/joho/godotenv"
-	"github.com/swanchain/go-computing-provider/account"
 	"github.com/swanchain/go-computing-provider/build"
 	"github.com/swanchain/go-computing-provider/conf"
-	"github.com/swanchain/go-computing-provider/constants"
-	"github.com/swanchain/go-computing-provider/internal/models"
-	"github.com/swanchain/go-computing-provider/util"
+	"github.com/swanchain/go-computing-provider/internal"
+	"github.com/swanchain/go-computing-provider/internal/account"
+	"github.com/swanchain/go-computing-provider/internal/pkg"
+	models2 "github.com/swanchain/go-computing-provider/internal/v1/models"
 	"github.com/swanchain/go-computing-provider/wallet"
 	"io"
 	batchv1 "k8s.io/api/batch/v1"
@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"math/rand"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -39,6 +38,8 @@ import (
 	"syscall"
 	"time"
 )
+
+var srvlog = logging.Logger("service")
 
 func GetCpInfo(c *gin.Context) {
 	var info struct {
@@ -52,70 +53,70 @@ func GetCpInfo(c *gin.Context) {
 		return
 	}
 
-	info.NodeId = GetNodeId(cpPath)
+	info.NodeId = pkg.GetNodeId(cpPath)
 	info.MultiAddress = conf.GetConfig().API.MultiAddress
 	info.UbiTask = 0
 	if conf.GetConfig().UBI.UbiTask {
 		info.UbiTask = 1
 	}
-	c.JSON(http.StatusOK, util.CreateSuccessResponse(info))
+	c.JSON(http.StatusOK, pkg.CreateSuccessResponse(info))
 }
 
 func GetServiceProviderInfo(c *gin.Context) {
-	info := new(models.HostInfo)
+	info := new(models2.HostInfo)
 	info.SwanProviderVersion = build.UserVersion()
 	info.OperatingSystem = runtime.GOOS
 	info.Architecture = runtime.GOARCH
 	info.CPUCores = runtime.NumCPU()
-	c.JSON(http.StatusOK, util.CreateSuccessResponse(info))
+	c.JSON(http.StatusOK, pkg.CreateSuccessResponse(info))
 }
 
 func ReceiveJob(c *gin.Context) {
-	var jobData models.JobData
+	var jobData models2.JobData
 	if err := c.ShouldBindJSON(&jobData); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	logs.GetLogger().Infof("Job received Data: %+v", jobData)
+	srvlog.Infof("Job received Data: %+v", jobData)
 
 	if conf.GetConfig().HUB.VerifySign {
 		if len(jobData.NodeIdJobSourceUriSignature) == 0 {
-			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SpaceSignatureError, "missing node_id_job_source_uri_signature field"))
+			c.JSON(http.StatusBadRequest, pkg.CreateErrorResponse(pkg.SpaceSignatureError, "missing node_id_job_source_uri_signature field"))
 			return
 		}
 		cpRepoPath, _ := os.LookupEnv("CP_PATH")
-		nodeID := GetNodeId(cpRepoPath)
+		nodeID := pkg.GetNodeId(cpRepoPath)
 
 		signature, err := verifySignatureForHub(conf.GetConfig().HUB.OrchestratorPk, fmt.Sprintf("%s%s", nodeID, jobData.JobSourceURI), jobData.NodeIdJobSourceUriSignature)
 		if err != nil {
-			logs.GetLogger().Errorf("verifySignature for space job failed, error: %+v", err)
-			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ServerError, "verify sign data failed"))
+			srvlog.Errorf("verifySignature for space job failed, error: %+v", err)
+			c.JSON(http.StatusInternalServerError, pkg.CreateErrorResponse(pkg.ServerError, "verify sign data failed"))
 			return
 		}
 
-		logs.GetLogger().Infof("space job sign verifing, task_id: %s,  verify: %v", jobData.TaskUUID, signature)
+		srvlog.Infof("space job sign verifing, task_id: %s,  verify: %v", jobData.TaskUUID, signature)
 		if !signature {
-			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SpaceSignatureError, "signature verify failed"))
+			c.JSON(http.StatusInternalServerError, pkg.CreateErrorResponse(pkg.SpaceSignatureError, "signature verify failed"))
 			return
 		}
 	}
 
 	available, gpuProductName, err := checkResourceAvailableForSpace(jobData.JobSourceURI)
 	if err != nil {
-		logs.GetLogger().Errorf("check job resource failed, error: %+v", err)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
+		srvlog.Errorf("check job resource failed, error: %+v", err)
+		c.JSON(http.StatusInternalServerError, pkg.CreateErrorResponse(pkg.CheckResourcesError))
 		return
 	}
 
 	if !available {
-		logs.GetLogger().Warnf(" task id: %s, name: %s, not found a resources available", jobData.TaskUUID, jobData.Name)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckAvailableResources))
+		srvlog.Warnf(" task id: %s, name: %s, not found a resources available", jobData.TaskUUID, jobData.Name)
+		c.JSON(http.StatusInternalServerError, pkg.CreateErrorResponse(pkg.CheckAvailableResources))
 		return
 	}
 
 	var hostName string
 	var logHost string
-	prefixStr := generateString(10)
+	prefixStr := pkg.GenerateString(10)
 	if strings.HasPrefix(conf.GetConfig().API.Domain, ".") {
 		hostName = prefixStr + conf.GetConfig().API.Domain
 		logHost = "log" + conf.GetConfig().API.Domain
@@ -124,8 +125,8 @@ func ReceiveJob(c *gin.Context) {
 		logHost = "log." + conf.GetConfig().API.Domain
 	}
 
-	if _, err = celeryService.DelayTask(constants.TASK_DEPLOY, jobData.JobSourceURI, hostName, jobData.Duration, jobData.UUID, jobData.TaskUUID, gpuProductName); err != nil {
-		logs.GetLogger().Errorf("Failed sync delpoy task, error: %v", err)
+	if _, err = pkg.CeleryServ.DelayTask(internal.TASK_DEPLOY, jobData.JobSourceURI, hostName, jobData.Duration, jobData.UUID, jobData.TaskUUID, gpuProductName); err != nil {
+		srvlog.Errorf("Failed sync delpoy task, error: %v", err)
 		return
 	}
 
@@ -141,12 +142,12 @@ func ReceiveJob(c *gin.Context) {
 	if err = submitJob(&jobData); err != nil {
 		jobData.JobResultURI = ""
 	}
-	logs.GetLogger().Infof("submit job detail: %+v", jobData)
+	srvlog.Infof("submit job detail: %+v", jobData)
 	c.JSON(http.StatusOK, jobData)
 }
 
-func submitJob(jobData *models.JobData) error {
-	logs.GetLogger().Printf("submitting job...")
+func submitJob(jobData *models2.JobData) error {
+	srvlog.Infoln("submitting job...")
 	oldMask := syscall.Umask(0)
 	defer syscall.Umask(oldMask)
 
@@ -156,29 +157,29 @@ func submitJob(jobData *models.JobData) error {
 	os.MkdirAll(filepath.Join(fileCachePath, folderPath), os.ModePerm)
 	taskDetailFilePath := filepath.Join(fileCachePath, jobDetailFile)
 
-	jobData.Status = constants.BiddingSubmitted
+	jobData.Status = internal.BiddingSubmitted
 	jobData.UpdatedAt = strconv.FormatInt(time.Now().Unix(), 10)
 	bytes, err := json.Marshal(jobData)
 	if err != nil {
-		logs.GetLogger().Errorf("Failed Marshal JobData, error: %v", err)
+		srvlog.Errorf("Failed Marshal JobData, error: %v", err)
 		return err
 	}
 	if err = os.WriteFile(taskDetailFilePath, bytes, os.ModePerm); err != nil {
-		logs.GetLogger().Errorf("Failed jobData write to file, error: %v", err)
+		srvlog.Errorf("Failed jobData write to file, error: %v", err)
 		return err
 	}
 
-	storageService := NewStorageService()
+	storageService := pkg.NewStorageService()
 	mcsOssFile, err := storageService.UploadFileToBucket(jobDetailFile, taskDetailFilePath, true)
 	if err != nil {
-		logs.GetLogger().Errorf("Failed upload file to bucket, error: %v", err)
+		srvlog.Errorf("Failed upload file to bucket, error: %v", err)
 		return err
 	}
-	logs.GetLogger().Infof("jobuuid: %s successfully submitted to IPFS", jobData.UUID)
+	srvlog.Infof("jobuuid: %s successfully submitted to IPFS", jobData.UUID)
 
 	gatewayUrl, err := storageService.GetGatewayUrl()
 	if err != nil {
-		logs.GetLogger().Errorf("Failed get mcs ipfs gatewayUrl, error: %v", err)
+		srvlog.Errorf("Failed get mcs ipfs gatewayUrl, error: %v", err)
 		return err
 	}
 	jobData.JobResultURI = *gatewayUrl + "/ipfs/" + mcsOssFile.PayloadCid
@@ -186,24 +187,24 @@ func submitJob(jobData *models.JobData) error {
 }
 
 func RedeployJob(c *gin.Context) {
-	var jobData models.JobData
+	var jobData models2.JobData
 
 	if err := c.ShouldBindJSON(&jobData); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	logs.GetLogger().Infof("redeploy Job received: %+v", jobData)
+	srvlog.Infof("redeploy Job received: %+v", jobData)
 
 	available, gpuProductName, err := checkResourceAvailableForSpace(jobData.JobSourceURI)
 	if err != nil {
-		logs.GetLogger().Errorf("check job resource failed, error: %+v", err)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
+		srvlog.Errorf("check job resource failed, error: %+v", err)
+		c.JSON(http.StatusInternalServerError, pkg.CreateErrorResponse(pkg.CheckResourcesError))
 		return
 	}
 
 	if !available {
-		logs.GetLogger().Warnf(" task id: %s, name: %s, not found a resources available", jobData.TaskUUID, jobData.Name)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckAvailableResources))
+		srvlog.Warnf(" task id: %s, name: %s, not found a resources available", jobData.TaskUUID, jobData.Name)
+		c.JSON(http.StatusInternalServerError, pkg.CreateErrorResponse(pkg.CheckAvailableResources))
 		return
 	}
 
@@ -211,19 +212,19 @@ func RedeployJob(c *gin.Context) {
 	if jobData.JobResultURI != "" {
 		resp, err := http.Get(jobData.JobResultURI)
 		if err != nil {
-			logs.GetLogger().Errorf("error making request to Space API: %+v", err)
+			srvlog.Errorf("error making request to Space API: %+v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		defer func(Body io.ReadCloser) {
 			err := Body.Close()
 			if err != nil {
-				logs.GetLogger().Errorf("error closed resp Space API: %+v", err)
+				srvlog.Errorf("error closed resp Space API: %+v", err)
 			}
 		}(resp.Body)
-		logs.GetLogger().Infof("Space API response received. Response: %d", resp.StatusCode)
+		srvlog.Infof("Space API response received. Response: %d", resp.StatusCode)
 		if resp.StatusCode != http.StatusOK {
-			logs.GetLogger().Errorf("space API response not OK. Status Code: %d", resp.StatusCode)
+			srvlog.Errorf("space API response not OK. Status Code: %d", resp.StatusCode)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		}
 
@@ -231,29 +232,29 @@ func RedeployJob(c *gin.Context) {
 			JobResultUri string `json:"job_result_uri"`
 		}
 		if err := json.NewDecoder(resp.Body).Decode(&hostInfo); err != nil {
-			logs.GetLogger().Errorf("error decoding Space API response JSON: %v", err)
+			srvlog.Errorf("error decoding Space API response JSON: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		hostName = strings.ReplaceAll(hostInfo.JobResultUri, "https://", "")
 	} else {
-		hostName = generateString(10) + conf.GetConfig().API.Domain
+		hostName = pkg.GenerateString(10) + conf.GetConfig().API.Domain
 	}
 
-	delayTask, err := celeryService.DelayTask(constants.TASK_DEPLOY, jobData.JobResultURI, hostName, jobData.Duration, jobData.UUID, jobData.TaskUUID, gpuProductName)
+	delayTask, err := pkg.CeleryServ.DelayTask(internal.TASK_DEPLOY, jobData.JobResultURI, hostName, jobData.Duration, jobData.UUID, jobData.TaskUUID, gpuProductName)
 	if err != nil {
-		logs.GetLogger().Errorf("Failed sync delpoy task, error: %v", err)
+		srvlog.Errorf("Failed sync delpoy task, error: %v", err)
 		return
 	}
-	logs.GetLogger().Infof("delayTask detail info: %+v", delayTask)
+	srvlog.Infof("delayTask detail info: %+v", delayTask)
 
 	go func() {
 		result, err := delayTask.Get(180 * time.Second)
 		if err != nil {
-			logs.GetLogger().Errorf("Failed get sync task result, error: %v", err)
+			srvlog.Errorf("Failed get sync task result, error: %v", err)
 			return
 		}
-		logs.GetLogger().Infof("Job: %s, service running successfully, job_result_url: %s", jobData.JobResultURI, result.(string))
+		srvlog.Infof("Job: %s, service running successfully, job_result_url: %s", jobData.JobResultURI, result.(string))
 	}()
 
 	jobData.JobResultURI = fmt.Sprintf("https://%s", hostName)
@@ -273,7 +274,7 @@ func ReNewJob(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	logs.GetLogger().Infof("renew Job received: %+v", jobData)
+	srvlog.Infof("renew Job received: %+v", jobData)
 
 	if strings.TrimSpace(jobData.TaskUuid) == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "missing required field: task_uuid"})
@@ -285,19 +286,19 @@ func ReNewJob(c *gin.Context) {
 		return
 	}
 
-	conn := redisPool.Get()
-	prefix := constants.REDIS_SPACE_PREFIX + "*"
+	conn := pkg.RedisPool.Get()
+	prefix := internal.REDIS_SPACE_PREFIX + "*"
 	keys, err := redis.Strings(conn.Do("KEYS", prefix))
 	if err != nil {
-		logs.GetLogger().Errorf("Failed get redis %s prefix, error: %+v", prefix, err)
+		srvlog.Errorf("Failed get redis %s prefix, error: %+v", prefix, err)
 		return
 	}
 
-	var spaceDetail models.CacheSpaceDetail
+	var spaceDetail models2.CacheSpaceDetail
 	for _, key := range keys {
 		jobMetadata, err := RetrieveJobMetadata(key)
 		if err != nil {
-			logs.GetLogger().Errorf("Failed get redis key data, key: %s, error: %+v", key, err)
+			srvlog.Errorf("Failed get redis key data, key: %s, error: %+v", key, err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "query data failed"})
 			return
 		}
@@ -307,7 +308,7 @@ func ReNewJob(c *gin.Context) {
 		}
 	}
 
-	redisKey := constants.REDIS_SPACE_PREFIX + spaceDetail.SpaceUuid
+	redisKey := internal.REDIS_SPACE_PREFIX + spaceDetail.SpaceUuid
 	leftTime := spaceDetail.ExpireTime - time.Now().Unix()
 	if leftTime < 0 {
 		c.JSON(http.StatusOK, map[string]string{
@@ -331,13 +332,13 @@ func ReNewJob(c *gin.Context) {
 		for key, val := range fields {
 			fullArgs = append(fullArgs, key, val)
 		}
-		redisConn := redisPool.Get()
+		redisConn := pkg.RedisPool.Get()
 		defer redisConn.Close()
 
 		redisConn.Do("HSET", fullArgs...)
 		redisConn.Do("SET", spaceDetail.SpaceUuid, "wait-delete", "EX", int(leftTime)+jobData.Duration)
 	}
-	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
+	c.JSON(http.StatusOK, pkg.CreateSuccessResponse("success"))
 }
 
 func CancelJob(c *gin.Context) {
@@ -347,19 +348,19 @@ func CancelJob(c *gin.Context) {
 		return
 	}
 
-	conn := redisPool.Get()
-	prefix := constants.REDIS_SPACE_PREFIX + "*"
+	conn := pkg.RedisPool.Get()
+	prefix := internal.REDIS_SPACE_PREFIX + "*"
 	keys, err := redis.Strings(conn.Do("KEYS", prefix))
 	if err != nil {
-		logs.GetLogger().Errorf("Failed get redis %s prefix, error: %+v", prefix, err)
+		srvlog.Errorf("Failed get redis %s prefix, error: %+v", prefix, err)
 		return
 	}
 
-	var jobDetail models.CacheSpaceDetail
+	var jobDetail models2.CacheSpaceDetail
 	for _, key := range keys {
 		jobMetadata, err := RetrieveJobMetadata(key)
 		if err != nil {
-			logs.GetLogger().Errorf("Failed get redis key data for , key: %s, error: %+v", key, err)
+			srvlog.Errorf("Failed get redis key data for , key: %s, error: %+v", key, err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "query data failed"})
 			return
 		}
@@ -370,39 +371,39 @@ func CancelJob(c *gin.Context) {
 	}
 
 	if jobDetail.WalletAddress == "" {
-		c.JSON(http.StatusOK, util.CreateSuccessResponse("deleted success"))
+		c.JSON(http.StatusOK, pkg.CreateSuccessResponse("deleted success"))
 		return
 	}
 	go func() {
 		defer func() {
 			if err := recover(); err != nil {
-				logs.GetLogger().Errorf("task_uuid: %s, delete space request failed, error: %+v", taskUuid, err)
+				srvlog.Errorf("task_uuid: %s, delete space request failed, error: %+v", taskUuid, err)
 				return
 			}
 		}()
-		k8sNameSpace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(jobDetail.WalletAddress)
+		k8sNameSpace := internal.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(jobDetail.WalletAddress)
 		deleteJob(k8sNameSpace, jobDetail.SpaceUuid)
 	}()
 
-	c.JSON(http.StatusOK, util.CreateSuccessResponse("deleted success"))
+	c.JSON(http.StatusOK, pkg.CreateSuccessResponse("deleted success"))
 }
 
 func StatisticalSources(c *gin.Context) {
-	location, err := getLocation()
+	location, err := pkg.GetLocation()
 	if err != nil {
-		logs.GetLogger().Error(err)
+		srvlog.Error(err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed get location info"})
 		return
 	}
 
-	k8sService := NewK8sService()
+	k8sService := pkg.NewK8sService()
 	statisticalSources, err := k8sService.StatisticalSources(context.TODO())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, models.ClusterResource{
+	c.JSON(http.StatusOK, models2.ClusterResource{
 		Region:      location,
 		ClusterInfo: statisticalSources,
 	})
@@ -412,34 +413,34 @@ func GetSpaceLog(c *gin.Context) {
 	spaceUuid := c.Query("space_id")
 	logType := c.Query("type")
 	if strings.TrimSpace(spaceUuid) == "" {
-		logs.GetLogger().Errorf("get space log failed, space_id is empty: %s", spaceUuid)
+		srvlog.Errorf("get space log failed, space_id is empty: %s", spaceUuid)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "missing required field: space_id"})
 		return
 	}
 
 	if strings.TrimSpace(logType) == "" {
-		logs.GetLogger().Errorf("get space log failed, type is empty: %s", logType)
+		srvlog.Errorf("get space log failed, type is empty: %s", logType)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "missing required field: type"})
 		return
 	}
 
 	if strings.TrimSpace(logType) != "build" && strings.TrimSpace(logType) != "container" {
-		logs.GetLogger().Errorf("get space log failed, type is build or container, type:: %s", logType)
+		srvlog.Errorf("get space log failed, type is build or container, type:: %s", logType)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "missing required field: type"})
 		return
 	}
 
-	redisKey := constants.REDIS_SPACE_PREFIX + spaceUuid
+	redisKey := internal.REDIS_SPACE_PREFIX + spaceUuid
 	spaceDetail, err := RetrieveJobMetadata(redisKey)
 	if err != nil {
-		logs.GetLogger().Error(err)
+		srvlog.Error(err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "query data failed"})
 		return
 	}
 
-	conn, err := upgrade.Upgrade(c.Writer, c.Request, nil)
+	conn, err := pkg.Upgrade.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
-		logs.GetLogger().Errorf("upgrading connection failed, error: %+v", err)
+		srvlog.Errorf("upgrading connection failed, error: %+v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "upgrading connection failed"})
 		return
 	}
@@ -453,35 +454,35 @@ func DoProof(c *gin.Context) {
 		Exp       int64  `json:"exp"`
 	}
 	if err := c.ShouldBindJSON(&proofTask); err != nil {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
+		c.JSON(http.StatusBadRequest, pkg.CreateErrorResponse(pkg.JsonError))
 		return
 	}
-	logs.GetLogger().Infof("do proof task received: %+v", proofTask)
+	srvlog.Infof("do proof task received: %+v", proofTask)
 
 	if strings.TrimSpace(proofTask.Method) == "" {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.ProofParamError, "missing required field: method"))
+		c.JSON(http.StatusBadRequest, pkg.CreateErrorResponse(pkg.ProofParamError, "missing required field: method"))
 		return
 	}
 	if proofTask.Method != "mine" {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.ProofParamError, "method must be mine"))
+		c.JSON(http.StatusBadRequest, pkg.CreateErrorResponse(pkg.ProofParamError, "method must be mine"))
 		return
 	}
 	if proofTask.Exp < 0 || proofTask.Exp > 250 {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.ProofParamError, "exp range is [0~250]"))
+		c.JSON(http.StatusBadRequest, pkg.CreateErrorResponse(pkg.ProofParamError, "exp range is [0~250]"))
 		return
 	}
 
-	k8sService := NewK8sService()
+	k8sService := pkg.NewK8sService()
 	job := &batchv1.Job{
 		ObjectMeta: metaV1.ObjectMeta{
-			Name: "proof-job-" + generateString(5),
+			Name: "proof-job-" + pkg.GenerateString(5),
 		},
 		Spec: batchv1.JobSpec{
 			Template: v1.PodTemplateSpec{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:  "worker-container-" + generateString(5),
+							Name:  "worker-container-" + pkg.GenerateString(5),
 							Image: "filswan/worker-proof:v1.0",
 							Env: []v1.EnvVar{
 								{
@@ -510,17 +511,17 @@ func DoProof(c *gin.Context) {
 	*job.Spec.BackoffLimit = 1
 	*job.Spec.TTLSecondsAfterFinished = 30
 
-	createdJob, err := k8sService.k8sClient.BatchV1().Jobs(metaV1.NamespaceDefault).Create(context.TODO(), job, metaV1.CreateOptions{})
+	createdJob, err := k8sService.ClientSet.BatchV1().Jobs(metaV1.NamespaceDefault).Create(context.TODO(), job, metaV1.CreateOptions{})
 	if err != nil {
-		logs.GetLogger().Errorf("Failed creating Pod: %v", err)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ProofError))
+		srvlog.Errorf("Failed creating Pod: %v", err)
+		c.JSON(http.StatusInternalServerError, pkg.CreateErrorResponse(pkg.ProofError))
 		return
 	}
 
 	err = wait.PollImmediate(time.Second*3, time.Minute*5, func() (bool, error) {
-		job, err := k8sService.k8sClient.BatchV1().Jobs(metaV1.NamespaceDefault).Get(context.Background(), createdJob.Name, metaV1.GetOptions{})
+		job, err := k8sService.ClientSet.BatchV1().Jobs(metaV1.NamespaceDefault).Get(context.Background(), createdJob.Name, metaV1.GetOptions{})
 		if err != nil {
-			logs.GetLogger().Errorf("Failed getting Job status: %v\n", err)
+			srvlog.Errorf("Failed getting Job status: %v\n", err)
 			return false, err
 		}
 
@@ -531,106 +532,106 @@ func DoProof(c *gin.Context) {
 		return false, nil
 	})
 	if err != nil {
-		logs.GetLogger().Errorf("Failed waiting for Job completion: %v", err)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ProofError))
+		srvlog.Errorf("Failed waiting for Job completion: %v", err)
+		c.JSON(http.StatusInternalServerError, pkg.CreateErrorResponse(pkg.ProofError))
 		return
 	}
 
-	podList, err := k8sService.k8sClient.CoreV1().Pods(metaV1.NamespaceDefault).List(context.Background(), metaV1.ListOptions{
+	podList, err := k8sService.ClientSet.CoreV1().Pods(metaV1.NamespaceDefault).List(context.Background(), metaV1.ListOptions{
 		LabelSelector: fmt.Sprintf("job-name=%s", createdJob.Name),
 	})
 	if err != nil {
-		logs.GetLogger().Errorf("Error getting Pods for Job: %v\n", err)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ProofError))
+		srvlog.Errorf("Error getting Pods for Job: %v\n", err)
+		c.JSON(http.StatusInternalServerError, pkg.CreateErrorResponse(pkg.ProofError))
 		return
 	}
 
 	if len(podList.Items) == 0 {
-		logs.GetLogger().Errorf("No Pods found for Job.")
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ProofError))
+		srvlog.Errorf("No Pods found for Job.")
+		c.JSON(http.StatusInternalServerError, pkg.CreateErrorResponse(pkg.ProofError))
 		return
 	}
 
 	podName := podList.Items[0].Name
-	podLog, err := k8sService.k8sClient.CoreV1().Pods(metaV1.NamespaceDefault).GetLogs(podName, &v1.PodLogOptions{}).Stream(context.Background())
+	podLog, err := k8sService.ClientSet.CoreV1().Pods(metaV1.NamespaceDefault).GetLogs(podName, &v1.PodLogOptions{}).Stream(context.Background())
 	if err != nil {
-		logs.GetLogger().Errorf("Failed gettingPod logs: %v", err)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ProofReadLogError))
+		srvlog.Errorf("Failed gettingPod logs: %v", err)
+		c.JSON(http.StatusInternalServerError, pkg.CreateErrorResponse(pkg.ProofReadLogError))
 		return
 	}
 	defer podLog.Close()
 
 	bytes, err := io.ReadAll(podLog)
 	if err != nil {
-		logs.GetLogger().Errorf("Failed gettingPod logs: %v", err)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ProofReadLogError))
+		srvlog.Errorf("Failed gettingPod logs: %v", err)
+		c.JSON(http.StatusInternalServerError, pkg.CreateErrorResponse(pkg.ProofReadLogError))
 		return
 	}
-	c.JSON(http.StatusOK, util.CreateSuccessResponse(string(bytes)))
+	c.JSON(http.StatusOK, pkg.CreateSuccessResponse(string(bytes)))
 }
 
 func DoUbiTask(c *gin.Context) {
 
-	var ubiTask models.UBITaskReq
+	var ubiTask models2.UBITaskReq
 	if err := c.ShouldBindJSON(&ubiTask); err != nil {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
+		c.JSON(http.StatusBadRequest, pkg.CreateErrorResponse(pkg.JsonError))
 		return
 	}
-	logs.GetLogger().Infof("receive ubi task received: %+v", ubiTask)
+	srvlog.Infof("receive ubi task received: %+v", ubiTask)
 
 	if ubiTask.ID == 0 {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: id"))
+		c.JSON(http.StatusBadRequest, pkg.CreateErrorResponse(pkg.UbiTaskParamError, "missing required field: id"))
 		return
 	}
 	if strings.TrimSpace(ubiTask.Name) == "" {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: name"))
+		c.JSON(http.StatusBadRequest, pkg.CreateErrorResponse(pkg.UbiTaskParamError, "missing required field: name"))
 		return
 	}
 
 	if ubiTask.Type != 0 && ubiTask.Type != 1 {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "the value of task_type is 0 or 1"))
+		c.JSON(http.StatusBadRequest, pkg.CreateErrorResponse(pkg.UbiTaskParamError, "the value of task_type is 0 or 1"))
 		return
 	}
 	if strings.TrimSpace(ubiTask.ZkType) == "" {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: zk_type"))
+		c.JSON(http.StatusBadRequest, pkg.CreateErrorResponse(pkg.UbiTaskParamError, "missing required field: zk_type"))
 		return
 	}
 
 	if strings.TrimSpace(ubiTask.InputParam) == "" {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: input_param"))
+		c.JSON(http.StatusBadRequest, pkg.CreateErrorResponse(pkg.UbiTaskParamError, "missing required field: input_param"))
 		return
 	}
 
 	if strings.TrimSpace(ubiTask.Signature) == "" {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: signature"))
+		c.JSON(http.StatusBadRequest, pkg.CreateErrorResponse(pkg.UbiTaskParamError, "missing required field: signature"))
 		return
 	}
 
 	cpRepoPath, _ := os.LookupEnv("CP_PATH")
-	nodeID := GetNodeId(cpRepoPath)
+	nodeID := pkg.GetNodeId(cpRepoPath)
 
 	signature, err := verifySignature(conf.GetConfig().UBI.UbiEnginePk, fmt.Sprintf("%s%d", nodeID, ubiTask.ID), ubiTask.Signature)
 	if err != nil {
-		logs.GetLogger().Errorf("verifySignature for ubi task failed, error: %+v", err)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.UbiTaskParamError, "sign data failed"))
+		srvlog.Errorf("verifySignature for ubi task failed, error: %+v", err)
+		c.JSON(http.StatusInternalServerError, pkg.CreateErrorResponse(pkg.UbiTaskParamError, "sign data failed"))
 		return
 	}
 
-	logs.GetLogger().Infof("ubi task sign verifing, task_id: %d, type: %s, verify: %v", ubiTask.ID, ubiTask.ZkType, signature)
+	srvlog.Infof("ubi task sign verifing, task_id: %d, type: %s, verify: %v", ubiTask.ID, ubiTask.ZkType, signature)
 	if !signature {
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.UbiTaskParamError, "signature verify failed"))
+		c.JSON(http.StatusInternalServerError, pkg.CreateErrorResponse(pkg.UbiTaskParamError, "signature verify failed"))
 		return
 	}
 
 	var gpuFlag = "0"
-	var ubiTaskToRedis = new(models.CacheUbiTaskDetail)
+	var ubiTaskToRedis = new(models2.CacheUbiTaskDetail)
 	ubiTaskToRedis.TaskId = strconv.Itoa(ubiTask.ID)
 	ubiTaskToRedis.TaskType = "CPU"
 	if ubiTask.Type == 1 {
 		ubiTaskToRedis.TaskType = "GPU"
 		gpuFlag = "1"
 	}
-	ubiTaskToRedis.Status = constants.UBI_TASK_RECEIVED_STATUS
+	ubiTaskToRedis.Status = internal.UBI_TASK_RECEIVED_STATUS
 	ubiTaskToRedis.ZkType = ubiTask.ZkType
 	ubiTaskToRedis.CreateTime = time.Now().Format("2006-01-02 15:04:05")
 	SaveUbiTaskMetadata(ubiTaskToRedis)
@@ -639,7 +640,7 @@ func DoUbiTask(c *gin.Context) {
 	envFilePath = filepath.Join(os.Getenv("CP_PATH"), "fil-c2.env")
 	envVars, err := godotenv.Read(envFilePath)
 	if err != nil {
-		logs.GetLogger().Errorf("reading fil-c2-env.env failed, error: %v", err)
+		srvlog.Errorf("reading fil-c2-env.env failed, error: %v", err)
 		return
 	}
 
@@ -647,28 +648,28 @@ func DoUbiTask(c *gin.Context) {
 	c2GpuConfig = convertGpuName(strings.TrimSpace(c2GpuConfig))
 	nodeName, architecture, needCpu, needMemory, needStorage, err := checkResourceAvailableForUbi(ubiTask.Type, c2GpuConfig, ubiTask.Resource)
 	if err != nil {
-		ubiTaskToRedis.Status = constants.UBI_TASK_FAILED_STATUS
+		ubiTaskToRedis.Status = internal.UBI_TASK_FAILED_STATUS
 		SaveUbiTaskMetadata(ubiTaskToRedis)
-		logs.GetLogger().Errorf("check resource failed, error: %v", err)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
+		srvlog.Errorf("check resource failed, error: %v", err)
+		c.JSON(http.StatusInternalServerError, pkg.CreateErrorResponse(pkg.CheckResourcesError))
 		return
 	}
 
 	if nodeName == "" {
-		ubiTaskToRedis.Status = constants.UBI_TASK_FAILED_STATUS
+		ubiTaskToRedis.Status = internal.UBI_TASK_FAILED_STATUS
 		SaveUbiTaskMetadata(ubiTaskToRedis)
-		logs.GetLogger().Warnf("ubi task id: %d, type: %s, not found a resources available", ubiTask.ID, ubiTaskToRedis.TaskType)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckAvailableResources))
+		srvlog.Warnf("ubi task id: %d, type: %s, not found a resources available", ubiTask.ID, ubiTaskToRedis.TaskType)
+		c.JSON(http.StatusInternalServerError, pkg.CreateErrorResponse(pkg.CheckAvailableResources))
 		return
 	}
 
 	var ubiTaskImage string
-	if architecture == constants.CPU_AMD {
+	if architecture == internal.CPU_AMD {
 		ubiTaskImage = build.UBITaskImageAmdCpu
 		if gpuFlag == "1" {
 			ubiTaskImage = build.UBITaskImageAmdGpu
 		}
-	} else if architecture == constants.CPU_INTEL {
+	} else if architecture == internal.CPU_INTEL {
 		ubiTaskImage = build.UBITaskImageIntelCpu
 		if gpuFlag == "1" {
 			ubiTaskImage = build.UBITaskImageIntelGpu
@@ -681,33 +682,33 @@ func DoUbiTask(c *gin.Context) {
 	diskUnit := strings.ReplaceAll(disk, "B", "")
 	memQuantity, err := resource.ParseQuantity(fmt.Sprintf("%d%s", needMemory, memUnit))
 	if err != nil {
-		ubiTaskToRedis.Status = constants.UBI_TASK_FAILED_STATUS
+		ubiTaskToRedis.Status = internal.UBI_TASK_FAILED_STATUS
 		SaveUbiTaskMetadata(ubiTaskToRedis)
-		logs.GetLogger().Error("get memory failed, error: %+v", err)
+		srvlog.Error("get memory failed, error: %+v", err)
 		return
 	}
 
 	storageQuantity, err := resource.ParseQuantity(fmt.Sprintf("%d%s", needStorage, diskUnit))
 	if err != nil {
-		ubiTaskToRedis.Status = constants.UBI_TASK_FAILED_STATUS
+		ubiTaskToRedis.Status = internal.UBI_TASK_FAILED_STATUS
 		SaveUbiTaskMetadata(ubiTaskToRedis)
-		logs.GetLogger().Error("get storage failed, error: %+v", err)
+		srvlog.Error("get storage failed, error: %+v", err)
 		return
 	}
 
 	maxMemQuantity, err := resource.ParseQuantity(fmt.Sprintf("%d%s", needMemory*2, memUnit))
 	if err != nil {
-		ubiTaskToRedis.Status = constants.UBI_TASK_FAILED_STATUS
+		ubiTaskToRedis.Status = internal.UBI_TASK_FAILED_STATUS
 		SaveUbiTaskMetadata(ubiTaskToRedis)
-		logs.GetLogger().Error("get memory failed, error: %+v", err)
+		srvlog.Error("get memory failed, error: %+v", err)
 		return
 	}
 
 	maxStorageQuantity, err := resource.ParseQuantity(fmt.Sprintf("%d%s", needStorage*2, diskUnit))
 	if err != nil {
-		ubiTaskToRedis.Status = constants.UBI_TASK_FAILED_STATUS
+		ubiTaskToRedis.Status = internal.UBI_TASK_FAILED_STATUS
 		SaveUbiTaskMetadata(ubiTaskToRedis)
-		logs.GetLogger().Error("get storage failed, error: %+v", err)
+		srvlog.Error("get storage failed, error: %+v", err)
 		return
 	}
 
@@ -730,10 +731,10 @@ func DoUbiTask(c *gin.Context) {
 		var namespace = "ubi-task-" + strconv.Itoa(ubiTask.ID)
 		var err error
 		defer func() {
-			key := constants.REDIS_UBI_C2_PERFIX + strconv.Itoa(ubiTask.ID)
+			key := internal.REDIS_UBI_C2_PERFIX + strconv.Itoa(ubiTask.ID)
 			ubiTaskRun, _ := RetrieveUbiTaskMetadata(key)
 			if ubiTaskRun.TaskId == "" {
-				ubiTaskRun = new(models.CacheUbiTaskDetail)
+				ubiTaskRun = new(models2.CacheUbiTaskDetail)
 				ubiTaskRun.TaskId = ubiTaskToRedis.TaskId
 				ubiTaskRun.TaskType = ubiTaskToRedis.TaskType
 				ubiTaskRun.ZkType = ubiTask.ZkType
@@ -741,16 +742,16 @@ func DoUbiTask(c *gin.Context) {
 			}
 
 			if err == nil {
-				ubiTaskRun.Status = constants.UBI_TASK_RUNNING_STATUS
+				ubiTaskRun.Status = internal.UBI_TASK_RUNNING_STATUS
 			} else {
-				ubiTaskRun.Status = constants.UBI_TASK_FAILED_STATUS
-				k8sService := NewK8sService()
-				k8sService.k8sClient.CoreV1().Namespaces().Delete(context.TODO(), namespace, metaV1.DeleteOptions{})
+				ubiTaskRun.Status = internal.UBI_TASK_FAILED_STATUS
+				k8sService := pkg.NewK8sService()
+				k8sService.ClientSet.CoreV1().Namespaces().Delete(context.TODO(), namespace, metaV1.DeleteOptions{})
 			}
 			SaveUbiTaskMetadata(ubiTaskRun)
 		}()
 
-		k8sService := NewK8sService()
+		k8sService := pkg.NewK8sService()
 		if _, err = k8sService.GetNameSpace(context.TODO(), namespace, metaV1.GetOptions{}); err != nil {
 			if errors.IsNotFound(err) {
 				k8sNamespace := &v1.Namespace{
@@ -760,7 +761,7 @@ func DoUbiTask(c *gin.Context) {
 				}
 				_, err = k8sService.CreateNameSpace(context.TODO(), k8sNamespace, metaV1.CreateOptions{})
 				if err != nil {
-					logs.GetLogger().Errorf("create namespace failed, error: %v", err)
+					srvlog.Errorf("create namespace failed, error: %v", err)
 					return
 				}
 			}
@@ -822,7 +823,7 @@ func DoUbiTask(c *gin.Context) {
 						NodeName: nodeName,
 						Containers: []v1.Container{
 							{
-								Name:  JobName + generateString(5),
+								Name:  JobName + pkg.GenerateString(5),
 								Image: ubiTaskImage,
 								Env:   useEnvVars,
 								VolumeMounts: []v1.VolumeMount{
@@ -857,13 +858,13 @@ func DoUbiTask(c *gin.Context) {
 		*job.Spec.BackoffLimit = 1
 		*job.Spec.TTLSecondsAfterFinished = 120
 
-		if _, err = k8sService.k8sClient.BatchV1().Jobs(namespace).Create(context.TODO(), job, metaV1.CreateOptions{}); err != nil {
-			logs.GetLogger().Errorf("Failed creating ubi task job: %v", err)
+		if _, err = k8sService.ClientSet.BatchV1().Jobs(namespace).Create(context.TODO(), job, metaV1.CreateOptions{}); err != nil {
+			srvlog.Errorf("Failed creating ubi task job: %v", err)
 			return
 		}
 	}()
 
-	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
+	c.JSON(http.StatusOK, pkg.CreateSuccessResponse("success"))
 }
 
 func ReceiveUbiProof(c *gin.Context) {
@@ -878,90 +879,90 @@ func ReceiveUbiProof(c *gin.Context) {
 	var submitUBIProofTx string
 	var err error
 	defer func() {
-		key := constants.REDIS_UBI_C2_PERFIX + c2Proof.TaskId
+		key := internal.REDIS_UBI_C2_PERFIX + c2Proof.TaskId
 		ubiTask, _ := RetrieveUbiTaskMetadata(key)
 		if err == nil {
-			ubiTask.Status = constants.UBI_TASK_SUCCESS_STATUS
+			ubiTask.Status = internal.UBI_TASK_SUCCESS_STATUS
 		} else {
-			ubiTask.Status = constants.UBI_TASK_FAILED_STATUS
+			ubiTask.Status = internal.UBI_TASK_FAILED_STATUS
 		}
 		ubiTask.Tx = submitUBIProofTx
 		SaveUbiTaskMetadata(ubiTask)
 		if strings.TrimSpace(c2Proof.NameSpace) != "" {
-			k8sService := NewK8sService()
-			k8sService.k8sClient.CoreV1().Namespaces().Delete(context.TODO(), c2Proof.NameSpace, metaV1.DeleteOptions{})
+			k8sService := pkg.NewK8sService()
+			k8sService.ClientSet.CoreV1().Namespaces().Delete(context.TODO(), c2Proof.NameSpace, metaV1.DeleteOptions{})
 		}
 	}()
 
 	if err := c.ShouldBindJSON(&c2Proof); err != nil {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
+		c.JSON(http.StatusBadRequest, pkg.CreateErrorResponse(pkg.JsonError))
 		return
 	}
-	logs.GetLogger().Infof("task_id: %s, C2 proof out received: %+v", c2Proof.TaskId, c2Proof)
+	srvlog.Infof("task_id: %s, C2 proof out received: %+v", c2Proof.TaskId, c2Proof)
 
 	chainUrl, err := conf.GetRpcByName(conf.DefaultRpc)
 	if err != nil {
-		logs.GetLogger().Errorf("get rpc url failed, error: %v,", err)
+		srvlog.Errorf("get rpc url failed, error: %v,", err)
 		return
 	}
 
 	client, err := ethclient.Dial(chainUrl)
 	if err != nil {
-		logs.GetLogger().Errorf("dial rpc connect failed, error: %v,", err)
+		srvlog.Errorf("dial rpc connect failed, error: %v,", err)
 		return
 	}
 	defer client.Close()
 
 	cpStub, err := account.NewAccountStub(client)
 	if err != nil {
-		logs.GetLogger().Errorf("create ubi task client failed, error: %v,", err)
+		srvlog.Errorf("create ubi task client failed, error: %v,", err)
 		return
 	}
 	cpAccount, err := cpStub.GetCpAccountInfo()
 	if err != nil {
-		logs.GetLogger().Errorf("get account info failed, error: %v,", err)
+		srvlog.Errorf("get account info failed, error: %v,", err)
 		return
 	}
 
 	localWallet, err := wallet.SetupWallet(wallet.WalletRepo)
 	if err != nil {
-		logs.GetLogger().Errorf("setup wallet failed, error: %v,", err)
+		srvlog.Errorf("setup wallet failed, error: %v,", err)
 		return
 	}
 
 	ki, err := localWallet.FindKey(cpAccount.OwnerAddress)
 	if err != nil || ki == nil {
-		logs.GetLogger().Errorf("the address: %s, private key %v,", conf.GetConfig().HUB.WalletAddress, wallet.ErrKeyInfoNotFound)
+		srvlog.Errorf("the address: %s, private key %v,", conf.GetConfig().HUB.WalletAddress, wallet.ErrKeyInfoNotFound)
 		return
 	}
 
 	accountStub, err := account.NewAccountStub(client, account.WithCpPrivateKey(ki.PrivateKey))
 	if err != nil {
-		logs.GetLogger().Errorf("create ubi task client failed, error: %v,", err)
+		srvlog.Errorf("create ubi task client failed, error: %v,", err)
 		return
 	}
 
 	taskType, err := strconv.ParseUint(c2Proof.TaskType, 10, 8)
 	if err != nil {
-		logs.GetLogger().Errorf("conversion to uint8 error: %v", err)
+		srvlog.Errorf("conversion to uint8 error: %v", err)
 		return
 	}
 
 	submitUBIProofTx, err = accountStub.SubmitUBIProof(c2Proof.TaskId, uint8(taskType), c2Proof.ZkType, c2Proof.Proof)
 	if err != nil {
-		logs.GetLogger().Errorf("submit ubi proof tx failed, error: %v,", err)
+		srvlog.Errorf("submit ubi proof tx failed, error: %v,", err)
 		return
 	}
 
 	fmt.Printf("submitUBIProofTx: %s", submitUBIProofTx)
-	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
+	c.JSON(http.StatusOK, pkg.CreateSuccessResponse("success"))
 }
 
-func handleConnection(conn *websocket.Conn, spaceDetail models.CacheSpaceDetail, logType string) {
-	client := NewWsClient(conn)
+func handleConnection(conn *websocket.Conn, spaceDetail models2.CacheSpaceDetail, logType string) {
+	client := pkg.NewWsClient(conn)
 
 	if logType == "build" {
-		buildLogPath := filepath.Join("build", spaceDetail.WalletAddress, "spaces", spaceDetail.SpaceName, BuildFileName)
+		buildLogPath := filepath.Join("build", spaceDetail.WalletAddress, "spaces", spaceDetail.SpaceName, pkg.BuildFileName)
 		if _, err := os.Stat(buildLogPath); err != nil {
 			client.HandleLogs(strings.NewReader("This space is deployed starting from a image."))
 		} else {
@@ -970,14 +971,14 @@ func handleConnection(conn *websocket.Conn, spaceDetail models.CacheSpaceDetail,
 			client.HandleLogs(logFile)
 		}
 	} else if logType == "container" {
-		k8sNameSpace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(spaceDetail.WalletAddress)
+		k8sNameSpace := internal.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(spaceDetail.WalletAddress)
 
-		k8sService := NewK8sService()
-		pods, err := k8sService.k8sClient.CoreV1().Pods(k8sNameSpace).List(context.TODO(), metaV1.ListOptions{
+		k8sService := pkg.NewK8sService()
+		pods, err := k8sService.ClientSet.CoreV1().Pods(k8sNameSpace).List(context.TODO(), metaV1.ListOptions{
 			LabelSelector: fmt.Sprintf("lad_app=%s", spaceDetail.SpaceUuid),
 		})
 		if err != nil {
-			logs.GetLogger().Errorf("Error listing Pods: %v", err)
+			srvlog.Errorf("Error listing Pods: %v", err)
 			return
 		}
 
@@ -985,7 +986,7 @@ func handleConnection(conn *websocket.Conn, spaceDetail models.CacheSpaceDetail,
 			line := int64(1000)
 			containerStatuses := pods.Items[0].Status.ContainerStatuses
 			lastIndex := len(containerStatuses) - 1
-			req := k8sService.k8sClient.CoreV1().Pods(k8sNameSpace).GetLogs(pods.Items[0].Name, &v1.PodLogOptions{
+			req := k8sService.ClientSet.CoreV1().Pods(k8sNameSpace).GetLogs(pods.Items[0].Name, &v1.PodLogOptions{
 				Container:  containerStatuses[lastIndex].Name,
 				Follow:     true,
 				Timestamps: true,
@@ -994,7 +995,7 @@ func handleConnection(conn *websocket.Conn, spaceDetail models.CacheSpaceDetail,
 
 			podLogs, err := req.Stream(context.Background())
 			if err != nil {
-				logs.GetLogger().Errorf("Error opening log stream: %v", err)
+				srvlog.Errorf("Error opening log stream: %v", err)
 				return
 			}
 			defer podLogs.Close()
@@ -1005,26 +1006,26 @@ func handleConnection(conn *websocket.Conn, spaceDetail models.CacheSpaceDetail,
 }
 
 func DeploySpaceTask(jobSourceURI, hostName string, duration int, jobUuid string, taskUuid string, gpuProductName string) string {
-	updateJobStatus(jobUuid, models.JobUploadResult)
+	updateJobStatus(jobUuid, models2.JobUploadResult)
 
 	var success bool
 	var spaceUuid string
 	var walletAddress string
 	defer func() {
 		if !success {
-			k8sNameSpace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(walletAddress)
+			k8sNameSpace := internal.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(walletAddress)
 			deleteJob(k8sNameSpace, spaceUuid)
 		}
 
 		if err := recover(); err != nil {
-			logs.GetLogger().Errorf("deploy space task painc, error: %+v", err)
+			srvlog.Errorf("deploy space task painc, error: %+v", err)
 			return
 		}
 	}()
 
 	spaceDetail, err := getSpaceDetail(jobSourceURI)
 	if err != nil {
-		logs.GetLogger().Errorln(err)
+		srvlog.Errorln(err)
 		return ""
 	}
 
@@ -1033,8 +1034,8 @@ func DeploySpaceTask(jobSourceURI, hostName string, duration int, jobUuid string
 	spaceUuid = strings.ToLower(spaceDetail.Data.Space.Uuid)
 	spaceHardware := spaceDetail.Data.Space.ActiveOrder.Config
 
-	conn := redisPool.Get()
-	fullArgs := []interface{}{constants.REDIS_SPACE_PREFIX + spaceUuid}
+	conn := pkg.RedisPool.Get()
+	fullArgs := []interface{}{internal.REDIS_SPACE_PREFIX + spaceUuid}
 	fields := map[string]string{
 		"wallet_address": walletAddress,
 		"space_name":     spaceName,
@@ -1048,7 +1049,7 @@ func DeploySpaceTask(jobSourceURI, hostName string, duration int, jobUuid string
 	}
 	_, _ = conn.Do("HSET", fullArgs...)
 
-	logs.GetLogger().Infof("uuid: %s, spaceName: %s, hardwareName: %s", spaceUuid, spaceName, spaceHardware.Description)
+	srvlog.Infof("uuid: %s, spaceName: %s, hardwareName: %s", spaceUuid, spaceName, spaceHardware.Description)
 	if len(spaceHardware.Description) == 0 {
 		return ""
 	}
@@ -1059,10 +1060,10 @@ func DeploySpaceTask(jobSourceURI, hostName string, duration int, jobUuid string
 
 	spacePath := filepath.Join("build", walletAddress, "spaces", spaceName)
 	os.RemoveAll(spacePath)
-	updateJobStatus(jobUuid, models.JobDownloadSource)
+	updateJobStatus(jobUuid, models2.JobDownloadSource)
 	containsYaml, yamlPath, imagePath, modelsSettingFile, err := BuildSpaceTaskImage(spaceUuid, spaceDetail.Data.Files)
 	if err != nil {
-		logs.GetLogger().Error(err)
+		srvlog.Error(err)
 		return ""
 	}
 
@@ -1070,7 +1071,7 @@ func DeploySpaceTask(jobSourceURI, hostName string, duration int, jobUuid string
 	if len(modelsSettingFile) > 0 {
 		err := deploy.WithModelSettingFile(modelsSettingFile).ModelInferenceToK8s()
 		if err != nil {
-			logs.GetLogger().Error(err)
+			srvlog.Error(err)
 			return ""
 		}
 		return hostName
@@ -1088,26 +1089,26 @@ func DeploySpaceTask(jobSourceURI, hostName string, duration int, jobUuid string
 }
 
 func deleteJob(namespace, spaceUuid string) error {
-	deployName := constants.K8S_DEPLOY_NAME_PREFIX + spaceUuid
-	serviceName := constants.K8S_SERVICE_NAME_PREFIX + spaceUuid
-	ingressName := constants.K8S_INGRESS_NAME_PREFIX + spaceUuid
+	deployName := internal.K8S_DEPLOY_NAME_PREFIX + spaceUuid
+	serviceName := internal.K8S_SERVICE_NAME_PREFIX + spaceUuid
+	ingressName := internal.K8S_INGRESS_NAME_PREFIX + spaceUuid
 
-	logs.GetLogger().Infof("Start deleting space service, space_uuid: %s", spaceUuid)
-	k8sService := NewK8sService()
+	srvlog.Infof("Start deleting space service, space_uuid: %s", spaceUuid)
+	k8sService := pkg.NewK8sService()
 	if err := k8sService.DeleteIngress(context.TODO(), namespace, ingressName); err != nil && !errors.IsNotFound(err) {
-		logs.GetLogger().Errorf("Failed delete ingress, ingressName: %s, error: %+v", deployName, err)
+		srvlog.Errorf("Failed delete ingress, ingressName: %s, error: %+v", deployName, err)
 		return err
 	}
 
 	if err := k8sService.DeleteService(context.TODO(), namespace, serviceName); err != nil && !errors.IsNotFound(err) {
-		logs.GetLogger().Errorf("Failed delete service, serviceName: %s, error: %+v", serviceName, err)
+		srvlog.Errorf("Failed delete service, serviceName: %s, error: %+v", serviceName, err)
 		return err
 	}
 
-	dockerService := NewDockerService()
+	dockerService := pkg.NewDockerService()
 	deployImageIds, err := k8sService.GetDeploymentImages(context.TODO(), namespace, deployName)
 	if err != nil && !errors.IsNotFound(err) {
-		logs.GetLogger().Errorf("Failed get deploy imageIds, deployName: %s, error: %+v", deployName, err)
+		srvlog.Errorf("Failed get deploy imageIds, deployName: %s, error: %+v", deployName, err)
 		return err
 	}
 	for _, imageId := range deployImageIds {
@@ -1115,18 +1116,18 @@ func deleteJob(namespace, spaceUuid string) error {
 	}
 
 	if err := k8sService.DeleteDeployment(context.TODO(), namespace, deployName); err != nil && !errors.IsNotFound(err) {
-		logs.GetLogger().Errorf("Failed delete deployment, deployName: %s, error: %+v", deployName, err)
+		srvlog.Errorf("Failed delete deployment, deployName: %s, error: %+v", deployName, err)
 		return err
 	}
 	time.Sleep(6 * time.Second)
 
 	if err := k8sService.DeleteDeployRs(context.TODO(), namespace, spaceUuid); err != nil && !errors.IsNotFound(err) {
-		logs.GetLogger().Errorf("Failed delete ReplicaSetsController, spaceUuid: %s, error: %+v", spaceUuid, err)
+		srvlog.Errorf("Failed delete ReplicaSetsController, spaceUuid: %s, error: %+v", spaceUuid, err)
 		return err
 	}
 
 	if err := k8sService.DeletePod(context.TODO(), namespace, spaceUuid); err != nil && !errors.IsNotFound(err) {
-		logs.GetLogger().Errorf("Failed delete pods, spaceUuid: %s, error: %+v", spaceUuid, err)
+		srvlog.Errorf("Failed delete pods, spaceUuid: %s, error: %+v", spaceUuid, err)
 		return err
 	}
 
@@ -1141,7 +1142,7 @@ func deleteJob(namespace, spaceUuid string) error {
 		}
 		getPods, err := k8sService.GetPods(namespace, spaceUuid)
 		if err != nil && !errors.IsNotFound(err) {
-			logs.GetLogger().Errorf("Failed get pods form namespace, namepace: %s, error: %+v", namespace, err)
+			srvlog.Errorf("Failed get pods form namespace, namepace: %s, error: %+v", namespace, err)
 			continue
 		}
 		if !getPods {
@@ -1149,35 +1150,35 @@ func deleteJob(namespace, spaceUuid string) error {
 		}
 	}
 
-	logs.GetLogger().Infof("Deleted space service finished, space_uuid: %s", spaceUuid)
+	srvlog.Infof("Deleted space service finished, space_uuid: %s", spaceUuid)
 	return nil
 }
 
 func downloadModelUrl(namespace, spaceUuid, serviceIp string, podCmd []string) {
-	k8sService := NewK8sService()
+	k8sService := pkg.NewK8sService()
 	podName, err := k8sService.WaitForPodRunning(namespace, spaceUuid, serviceIp)
 	if err != nil {
-		logs.GetLogger().Error(err)
+		srvlog.Error(err)
 		return
 	}
 
 	if err = k8sService.PodDoCommand(namespace, podName, "", podCmd); err != nil {
-		logs.GetLogger().Error(err)
+		srvlog.Error(err)
 		return
 	}
 }
 
-func updateJobStatus(jobUuid string, jobStatus models.JobStatus, url ...string) {
+func updateJobStatus(jobUuid string, jobStatus models2.JobStatus, url ...string) {
 	go func() {
 		if len(url) > 0 {
-			deployingChan <- models.Job{
+			deployingChan <- models2.Job{
 				Uuid:   jobUuid,
 				Status: jobStatus,
 				Count:  0,
 				Url:    url[0],
 			}
 		} else {
-			deployingChan <- models.Job{
+			deployingChan <- models2.Job{
 				Uuid:   jobUuid,
 				Status: jobStatus,
 				Count:  0,
@@ -1187,19 +1188,19 @@ func updateJobStatus(jobUuid string, jobStatus models.JobStatus, url ...string) 
 	}()
 }
 
-func getSpaceDetail(jobSourceURI string) (models.SpaceJSON, error) {
+func getSpaceDetail(jobSourceURI string) (models2.SpaceJSON, error) {
 	resp, err := http.Get(jobSourceURI)
 	if err != nil {
-		return models.SpaceJSON{}, fmt.Errorf("error making request to Space API: %+v", err)
+		return models2.SpaceJSON{}, fmt.Errorf("error making request to Space API: %+v", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return models.SpaceJSON{}, fmt.Errorf("space API response not OK. Status Code: %d", resp.StatusCode)
+		return models2.SpaceJSON{}, fmt.Errorf("space API response not OK. Status Code: %d", resp.StatusCode)
 	}
 
-	var spaceJson models.SpaceJSON
+	var spaceJson models2.SpaceJSON
 	if err := json.NewDecoder(resp.Body).Decode(&spaceJson); err != nil {
-		return models.SpaceJSON{}, fmt.Errorf("error decoding Space API response JSON: %v", err)
+		return models2.SpaceJSON{}, fmt.Errorf("error decoding Space API response JSON: %v", err)
 	}
 	return spaceJson, nil
 }
@@ -1207,47 +1208,47 @@ func getSpaceDetail(jobSourceURI string) (models.SpaceJSON, error) {
 func checkResourceAvailableForSpace(jobSourceURI string) (bool, string, error) {
 	spaceDetail, err := getSpaceDetail(jobSourceURI)
 	if err != nil {
-		logs.GetLogger().Errorln(err)
+		srvlog.Errorln(err)
 		return false, "", err
 	}
 
 	taskType, hardwareDetail := getHardwareDetail(spaceDetail.Data.Space.ActiveOrder.Config.Description)
-	k8sService := NewK8sService()
+	k8sService := pkg.NewK8sService()
 
 	activePods, err := k8sService.GetAllActivePod(context.TODO())
 	if err != nil {
 		return false, "", err
 	}
 
-	nodes, err := k8sService.k8sClient.CoreV1().Nodes().List(context.TODO(), metaV1.ListOptions{})
+	nodes, err := k8sService.ClientSet.CoreV1().Nodes().List(context.TODO(), metaV1.ListOptions{})
 	if err != nil {
 		return false, "", err
 	}
 
 	nodeGpuSummary, err := k8sService.GetNodeGpuSummary(context.TODO())
 	if err != nil {
-		logs.GetLogger().Errorf("Failed collect k8s gpu, error: %+v", err)
+		srvlog.Errorf("Failed collect k8s gpu, error: %+v", err)
 		return false, "", err
 	}
 
 	for _, node := range nodes.Items {
-		nodeGpu, remainderResource, _ := GetNodeResource(activePods, &node)
-		remainderCpu := remainderResource[ResourceCpu]
-		remainderMemory := float64(remainderResource[ResourceMem] / 1024 / 1024 / 1024)
-		remainderStorage := float64(remainderResource[ResourceStorage] / 1024 / 1024 / 1024)
+		nodeGpu, remainderResource, _ := pkg.GetNodeResource(activePods, &node)
+		remainderCpu := remainderResource[pkg.ResourceCpu]
+		remainderMemory := float64(remainderResource[pkg.ResourceMem] / 1024 / 1024 / 1024)
+		remainderStorage := float64(remainderResource[pkg.ResourceStorage] / 1024 / 1024 / 1024)
 
 		needCpu := hardwareDetail.Cpu.Quantity
 		needMemory := float64(hardwareDetail.Memory.Quantity)
 		needStorage := float64(hardwareDetail.Storage.Quantity)
-		logs.GetLogger().Infof("checkResourceAvailableForSpace: needCpu: %d, needMemory: %.2f, needStorage: %.2f", needCpu, needMemory, needStorage)
-		logs.GetLogger().Infof("checkResourceAvailableForSpace: remainingCpu: %d, remainingMemory: %.2f, remainingStorage: %.2f", remainderCpu, remainderMemory, remainderStorage)
+		srvlog.Infof("checkResourceAvailableForSpace: needCpu: %d, needMemory: %.2f, needStorage: %.2f", needCpu, needMemory, needStorage)
+		srvlog.Infof("checkResourceAvailableForSpace: remainingCpu: %d, remainingMemory: %.2f, remainingStorage: %.2f", remainderCpu, remainderMemory, remainderStorage)
 		if needCpu <= remainderCpu && needMemory <= remainderMemory && needStorage <= remainderStorage {
 			if taskType == "CPU" {
 				return true, "", nil
 			} else if taskType == "GPU" {
 				var usedCount int64 = 0
 				gpuName := strings.ToUpper(strings.ReplaceAll(hardwareDetail.Gpu.Unit, " ", "-"))
-				logs.GetLogger().Infof("gpuName: %s, nodeGpu: %+v, nodeGpuSummary: %+v", gpuName, nodeGpu, nodeGpuSummary)
+				srvlog.Infof("gpuName: %s, nodeGpu: %+v, nodeGpuSummary: %+v", gpuName, nodeGpu, nodeGpuSummary)
 				var gpuProductName = ""
 				for name, count := range nodeGpu {
 					if strings.Contains(strings.ToUpper(name), gpuName) {
@@ -1272,21 +1273,21 @@ func checkResourceAvailableForSpace(jobSourceURI string) (bool, string, error) {
 	return false, "", nil
 }
 
-func checkResourceAvailableForUbi(taskType int, gpuName string, resource *models.TaskResource) (string, string, int64, int64, int64, error) {
-	k8sService := NewK8sService()
+func checkResourceAvailableForUbi(taskType int, gpuName string, resource *models2.TaskResource) (string, string, int64, int64, int64, error) {
+	k8sService := pkg.NewK8sService()
 	activePods, err := k8sService.GetAllActivePod(context.TODO())
 	if err != nil {
 		return "", "", 0, 0, 0, err
 	}
 
-	nodes, err := k8sService.k8sClient.CoreV1().Nodes().List(context.TODO(), metaV1.ListOptions{})
+	nodes, err := k8sService.ClientSet.CoreV1().Nodes().List(context.TODO(), metaV1.ListOptions{})
 	if err != nil {
 		return "", "", 0, 0, 0, err
 	}
 
 	nodeGpuSummary, err := k8sService.GetNodeGpuSummary(context.TODO())
 	if err != nil {
-		logs.GetLogger().Errorf("Failed collect k8s gpu, error: %+v", err)
+		srvlog.Errorf("Failed collect k8s gpu, error: %+v", err)
 		return "", "", 0, 0, 0, err
 	}
 
@@ -1302,20 +1303,20 @@ func checkResourceAvailableForUbi(taskType int, gpuName string, resource *models
 
 	var nodeName, architecture string
 	for _, node := range nodes.Items {
-		if _, ok := node.Labels[constants.CPU_INTEL]; ok {
-			architecture = constants.CPU_INTEL
+		if _, ok := node.Labels[internal.CPU_INTEL]; ok {
+			architecture = internal.CPU_INTEL
 		}
-		if _, ok := node.Labels[constants.CPU_AMD]; ok {
-			architecture = constants.CPU_AMD
+		if _, ok := node.Labels[internal.CPU_AMD]; ok {
+			architecture = internal.CPU_AMD
 		}
 
-		nodeGpu, remainderResource, _ := GetNodeResource(activePods, &node)
-		remainderCpu := remainderResource[ResourceCpu]
-		remainderMemory := float64(remainderResource[ResourceMem] / 1024 / 1024 / 1024)
-		remainderStorage := float64(remainderResource[ResourceStorage] / 1024 / 1024 / 1024)
+		nodeGpu, remainderResource, _ := pkg.GetNodeResource(activePods, &node)
+		remainderCpu := remainderResource[pkg.ResourceCpu]
+		remainderMemory := float64(remainderResource[pkg.ResourceMem] / 1024 / 1024 / 1024)
+		remainderStorage := float64(remainderResource[pkg.ResourceStorage] / 1024 / 1024 / 1024)
 
-		logs.GetLogger().Infof("checkResourceAvailableForUbi: needCpu: %d, needMemory: %.2f, needStorage: %.2f", needCpu, needMemory, needStorage)
-		logs.GetLogger().Infof("checkResourceAvailableForUbi: remainingCpu: %d, remainingMemory: %.2f, remainingStorage: %.2f", remainderCpu, remainderMemory, remainderStorage)
+		srvlog.Infof("checkResourceAvailableForUbi: needCpu: %d, needMemory: %.2f, needStorage: %.2f", needCpu, needMemory, needStorage)
+		srvlog.Infof("checkResourceAvailableForUbi: remainingCpu: %d, remainingMemory: %.2f, remainingStorage: %.2f", remainderCpu, remainderMemory, remainderStorage)
 		if needCpu <= remainderCpu && needMemory <= remainderMemory && needStorage <= remainderStorage {
 			nodeName = node.Name
 			if taskType == 0 {
@@ -1326,7 +1327,7 @@ func checkResourceAvailableForUbi(taskType int, gpuName string, resource *models
 					continue
 				}
 				gpuName = strings.ReplaceAll(gpuName, " ", "-")
-				logs.GetLogger().Infof("gpuName: %s, nodeGpu: %+v, nodeGpuSummary: %+v", gpuName, nodeGpu, nodeGpuSummary)
+				srvlog.Infof("gpuName: %s, nodeGpu: %+v, nodeGpuSummary: %+v", gpuName, nodeGpu, nodeGpuSummary)
 				usedCount, ok := nodeGpu[gpuName]
 				if !ok {
 					usedCount = 0
@@ -1343,91 +1344,26 @@ func checkResourceAvailableForUbi(taskType int, gpuName string, resource *models
 	return nodeName, architecture, needCpu, int64(needMemory), int64(needStorage), nil
 }
 
-func generateString(length int) string {
-	characters := "abcdefghijklmnopqrstuvwxyz"
-	numbers := "0123456789"
-	source := characters + numbers
-	result := make([]byte, length)
-	rand.Seed(time.Now().UnixNano())
-	for i := 0; i < length; i++ {
-		result[i] = source[rand.Intn(len(source))]
-	}
-	return string(result)
-}
-
-func getLocation() (string, error) {
-	publicIpAddress, err := getLocalIPAddress()
-	if err != nil {
-		return "", err
-	}
-	logs.GetLogger().Infof("publicIpAddress: %s", publicIpAddress)
-
-	resp, err := http.Get("http://ip-api.com/json/" + publicIpAddress)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	var ipInfo struct {
-		Country     string `json:"country"`
-		CountryCode string `json:"countryCode"`
-		City        string `json:"city"`
-		Region      string `json:"region"`
-		RegionName  string `json:"regionName"`
-	}
-	if err = json.Unmarshal(body, &ipInfo); err != nil {
-		return "", err
-	}
-
-	return strings.TrimSpace(ipInfo.RegionName) + "-" + ipInfo.CountryCode, nil
-}
-
-func getLocalIPAddress() (string, error) {
-	req, err := http.NewRequest("GET", "https://ipapi.co/ip", nil)
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36")
-
-	client := http.DefaultClient
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	ipBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(ipBytes)), nil
-}
-
 var NotFoundRedisKey = stErr.New("not found redis key")
 
-func RetrieveJobMetadata(key string) (models.CacheSpaceDetail, error) {
-	redisConn := redisPool.Get()
+func RetrieveJobMetadata(key string) (models2.CacheSpaceDetail, error) {
+	redisConn := pkg.RedisPool.Get()
 	defer redisConn.Close()
 
 	exist, err := redis.Int(redisConn.Do("EXISTS", key))
 	if err != nil {
-		return models.CacheSpaceDetail{}, err
+		return models2.CacheSpaceDetail{}, err
 	}
 	if exist == 0 {
-		return models.CacheSpaceDetail{}, NotFoundRedisKey
+		return models2.CacheSpaceDetail{}, NotFoundRedisKey
 	}
 
 	args := append([]interface{}{key}, "wallet_address", "space_name", "expire_time", "space_uuid", "job_uuid",
 		"task_type", "deploy_name", "hardware", "url", "task_uuid")
 	valuesStr, err := redis.Strings(redisConn.Do("HMGET", args...))
 	if err != nil {
-		logs.GetLogger().Errorf("Failed get redis key data, key: %s, error: %+v", key, err)
-		return models.CacheSpaceDetail{}, err
+		srvlog.Errorf("Failed get redis key data, key: %s, error: %+v", key, err)
+		return models2.CacheSpaceDetail{}, err
 	}
 
 	var (
@@ -1456,12 +1392,12 @@ func RetrieveJobMetadata(key string) (models.CacheSpaceDetail, error) {
 		taskUuid = valuesStr[9]
 		expireTime, err = strconv.ParseInt(strings.TrimSpace(expireTimeStr), 10, 64)
 		if err != nil {
-			logs.GetLogger().Errorf("Failed convert time str: [%s], error: %+v", expireTimeStr, err)
-			return models.CacheSpaceDetail{}, err
+			srvlog.Errorf("Failed convert time str: [%s], error: %+v", expireTimeStr, err)
+			return models2.CacheSpaceDetail{}, err
 		}
 	}
 
-	return models.CacheSpaceDetail{
+	return models2.CacheSpaceDetail{
 		WalletAddress: walletAddress,
 		SpaceName:     spaceName,
 		SpaceUuid:     spaceUuid,
@@ -1475,11 +1411,11 @@ func RetrieveJobMetadata(key string) (models.CacheSpaceDetail, error) {
 	}, nil
 }
 
-func SaveUbiTaskMetadata(ubiTask *models.CacheUbiTaskDetail) {
-	redisConn := redisPool.Get()
+func SaveUbiTaskMetadata(ubiTask *models2.CacheUbiTaskDetail) {
+	redisConn := pkg.RedisPool.Get()
 	defer redisConn.Close()
 
-	key := constants.REDIS_UBI_C2_PERFIX + ubiTask.TaskId
+	key := internal.REDIS_UBI_C2_PERFIX + ubiTask.TaskId
 	redisConn.Do("DEL", redis.Args{}.AddFlat(key)...)
 
 	fullArgs := []interface{}{key}
@@ -1498,8 +1434,8 @@ func SaveUbiTaskMetadata(ubiTask *models.CacheUbiTaskDetail) {
 	_, _ = redisConn.Do("HSET", fullArgs...)
 }
 
-func RetrieveUbiTaskMetadata(key string) (*models.CacheUbiTaskDetail, error) {
-	redisConn := redisPool.Get()
+func RetrieveUbiTaskMetadata(key string) (*models2.CacheUbiTaskDetail, error) {
+	redisConn := pkg.RedisPool.Get()
 	defer redisConn.Close()
 
 	exist, err := redis.Int(redisConn.Do("EXISTS", key))
@@ -1523,7 +1459,7 @@ func RetrieveUbiTaskMetadata(key string) (*models.CacheUbiTaskDetail, error) {
 	args := append([]interface{}{key}, "task_id", "task_type", "zk_type", "tx", "status", "create_time")
 	valuesStr, err := redis.Strings(redisConn.Do("HMGET", args...))
 	if err != nil {
-		logs.GetLogger().Errorf("Failed get redis key data, key: %s, error: %+v", key, err)
+		srvlog.Errorf("Failed get redis key data, key: %s, error: %+v", key, err)
 		return nil, err
 	}
 
@@ -1545,7 +1481,7 @@ func RetrieveUbiTaskMetadata(key string) (*models.CacheUbiTaskDetail, error) {
 		createTime = valuesStr[5]
 	}
 
-	return &models.CacheUbiTaskDetail{
+	return &models2.CacheUbiTaskDetail{
 		TaskId:     taskId,
 		TaskType:   taskType,
 		ZkType:     zkType,

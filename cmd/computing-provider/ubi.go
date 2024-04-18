@@ -7,9 +7,10 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/olekukonko/tablewriter"
 	"github.com/swanchain/go-computing-provider/conf"
-	"github.com/swanchain/go-computing-provider/constants"
-	"github.com/swanchain/go-computing-provider/internal/computing"
-	"github.com/swanchain/go-computing-provider/internal/models"
+	"github.com/swanchain/go-computing-provider/internal"
+	"github.com/swanchain/go-computing-provider/internal/pkg"
+	"github.com/swanchain/go-computing-provider/internal/v1/models"
+	"github.com/swanchain/go-computing-provider/internal/v1/service"
 	"github.com/urfave/cli/v2"
 	"io"
 	"net/http"
@@ -47,22 +48,22 @@ var ubiTaskList = &cli.Command{
 
 		showFailed := cctx.Bool("show-failed")
 
-		nodeID := computing.GetNodeId(cpPath)
+		nodeID := pkg.GetNodeId(cpPath)
 
-		conn := computing.GetRedisClient()
-		prefix := constants.REDIS_UBI_C2_PERFIX + "*"
+		conn := pkg.GetRedisClient()
+		prefix := internal.REDIS_UBI_C2_PERFIX + "*"
 		keys, err := redis.Strings(conn.Do("KEYS", prefix))
 		if err != nil {
 			return fmt.Errorf("failed get redis %s prefix, error: %+v", prefix, err)
 		}
 
 		var taskData [][]string
-		var rowColorList []RowColor
+		var rowColorList []pkg.RowColor
 		var taskList models.TaskList
 
 		if showFailed {
 			for _, key := range keys {
-				ubiTask, err := computing.RetrieveUbiTaskMetadata(key)
+				ubiTask, err := service.RetrieveUbiTaskMetadata(key)
 				if err != nil {
 					return fmt.Errorf("failed get ubi task: %s, error: %+v", key, err)
 				}
@@ -70,11 +71,11 @@ var ubiTaskList = &cli.Command{
 			}
 		} else {
 			for _, key := range keys {
-				ubiTask, err := computing.RetrieveUbiTaskMetadata(key)
+				ubiTask, err := service.RetrieveUbiTaskMetadata(key)
 				if err != nil {
 					return fmt.Errorf("failed get ubi task: %s, error: %+v", key, err)
 				}
-				if ubiTask.Status == constants.UBI_TASK_FAILED_STATUS {
+				if ubiTask.Status == internal.UBI_TASK_FAILED_STATUS {
 					continue
 				}
 				taskList = append(taskList, *ubiTask)
@@ -93,25 +94,25 @@ var ubiTaskList = &cli.Command{
 				[]string{task.TaskId, task.TaskType, task.ZkType, task.Tx, task.Status, reward, task.CreateTime})
 
 			var rowColor []tablewriter.Colors
-			if task.Status == constants.UBI_TASK_RECEIVED_STATUS {
+			if task.Status == internal.UBI_TASK_RECEIVED_STATUS {
 				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgWhiteColor}}
-			} else if task.Status == constants.UBI_TASK_RUNNING_STATUS {
+			} else if task.Status == internal.UBI_TASK_RUNNING_STATUS {
 				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgCyanColor}}
-			} else if task.Status == constants.UBI_TASK_SUCCESS_STATUS {
+			} else if task.Status == internal.UBI_TASK_SUCCESS_STATUS {
 				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
-			} else if task.Status == constants.UBI_TASK_FAILED_STATUS {
+			} else if task.Status == internal.UBI_TASK_FAILED_STATUS {
 				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
 			}
 
-			rowColorList = append(rowColorList, RowColor{
-				row:    i,
-				column: []int{4},
-				color:  rowColor,
+			rowColorList = append(rowColorList, pkg.RowColor{
+				Row:    i,
+				Column: []int{4},
+				Color:  rowColor,
 			})
 		}
 
 		header := []string{"TASK ID", "TASK TYPE", "ZK TYPE", "TRANSACTION HASH", "STATUS", "REWARD", "CREATE TIME"}
-		NewVisualTable(header, taskData, rowColorList).Generate(true)
+		pkg.NewVisualTable(header, taskData, rowColorList).Generate(true)
 
 		return nil
 

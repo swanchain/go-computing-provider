@@ -2,7 +2,9 @@ package initializer
 
 import (
 	"fmt"
-	"github.com/swanchain/go-computing-provider/internal/computing"
+	"github.com/swanchain/go-computing-provider/internal"
+	"github.com/swanchain/go-computing-provider/internal/pkg"
+	computing2 "github.com/swanchain/go-computing-provider/internal/v1/service"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -10,7 +12,6 @@ import (
 
 	"github.com/filswan/go-swan-lib/logs"
 	"github.com/swanchain/go-computing-provider/conf"
-	"github.com/swanchain/go-computing-provider/constants"
 )
 
 func sendHeartbeat(nodeId string) {
@@ -34,12 +35,12 @@ func sendHeartbeat(nodeId string) {
 	resp, err := client.Do(req)
 	if err != nil {
 		logs.GetLogger().Errorf("Error sending heartbeat, retrying to connect to the Swan Hub server: %v", err)
-		computing.Reconnect(nodeId)
+		pkg.Reconnect(nodeId)
 	} else {
 		_, err := ioutil.ReadAll(resp.Body)
 		if resp.StatusCode != http.StatusOK {
 			logs.GetLogger().Warningln("resp status: %d, retrying to connect to the Swan Hub server", resp.StatusCode)
-			computing.Reconnect(nodeId)
+			pkg.Reconnect(nodeId)
 		}
 		if err != nil {
 			fmt.Println(err)
@@ -58,16 +59,16 @@ func ProjectInit(cpRepoPath string) {
 	if err := conf.InitConfig(cpRepoPath); err != nil {
 		logs.GetLogger().Fatal(err)
 	}
-	nodeID := computing.InitComputingProvider(cpRepoPath)
+	nodeID := pkg.InitComputingProvider(cpRepoPath)
 	// Start sending heartbeats
 	go sendHeartbeats(nodeID)
 
-	go computing.NewScheduleTask().Run()
+	go computing2.NewScheduleTask().Run()
 
-	computing.NewCronTask().RunTask()
-	computing.RunSyncTask(nodeID)
-	celeryService := computing.NewCeleryService()
-	celeryService.RegisterTask(constants.TASK_DEPLOY, computing.DeploySpaceTask)
+	computing2.NewCronTask().RunTask()
+	computing2.RunSyncTask(nodeID)
+	celeryService := pkg.NewCeleryService()
+	celeryService.RegisterTask(internal.TASK_DEPLOY, computing2.DeploySpaceTask)
 	celeryService.Start()
 
 }

@@ -1,4 +1,4 @@
-package computing
+package pkg
 
 import (
 	"bytes"
@@ -7,7 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"github.com/swanchain/go-computing-provider/internal/models"
+	"github.com/swanchain/go-computing-provider/internal/v1/models"
 	"io"
 	"log"
 	"net/http"
