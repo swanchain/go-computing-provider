@@ -86,7 +86,7 @@ func LoggerMiddleware() gin.HandlerFunc {
 		start := time.Now()
 		c.Next()
 		fmt.Fprintf(gin.DefaultWriter, "[GIN] %v | %3d | %13v | %15s | %s %s %s \n",
-			time.Now().Format("2006/01/02 - 15:04:05"),
+			time.Now().Format("2006-01-02T15:04:05.000Z0700"),
 			c.Writer.Status(),
 			time.Now().Sub(start),
 			GetRealIP(c.Request),
