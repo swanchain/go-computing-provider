@@ -85,7 +85,7 @@ func LoggerMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		c.Next()
-		fmt.Fprintf(gin.DefaultWriter, "[GIN] %v | %3d | %13v | %15s |%s %s %s \n",
+		fmt.Fprintf(gin.DefaultWriter, "[GIN] %v | %3d | %13v | %15s | %s %s %s \n",
 			time.Now().Format("2006/01/02 - 15:04:05"),
 			c.Writer.Status(),
 			time.Now().Sub(start),
