@@ -13,13 +13,11 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 	"github.com/itsjamie/gin-cors"
 	"github.com/swanchain/go-computing-provider/conf"
-	account2 "github.com/swanchain/go-computing-provider/internal/account"
-	"github.com/swanchain/go-computing-provider/internal/initializer"
+	"github.com/swanchain/go-computing-provider/internal/account"
 	"github.com/swanchain/go-computing-provider/internal/pkg"
 	"github.com/swanchain/go-computing-provider/internal/v1/routers"
 	"github.com/swanchain/go-computing-provider/wallet"
@@ -39,11 +37,11 @@ var runCmd = &cli.Command{
 	Name:  "run",
 	Usage: "Start a cp process",
 	Action: func(cctx *cli.Context) error {
-		logs.GetLogger().Info("Start in computing provider mode.")
+		mlog.Info("Start in computing provider mode.")
 
 		cpRepoPath := cctx.String(FlagCpRepo)
 		os.Setenv("CP_PATH", cpRepoPath)
-		initializer.ProjectInit(cpRepoPath)
+		ProjectInit(cpRepoPath)
 
 		r := gin.New()
 		r.Use(pkg.LoggerMiddleware(), cors.Middleware(cors.Config{
@@ -62,7 +60,7 @@ var runCmd = &cli.Command{
 		shutdownChan := make(chan struct{})
 		httpStopper, err := pkg.ServeHttp(r, "cp-api", ":"+strconv.Itoa(conf.GetConfig().API.Port))
 		if err != nil {
-			logs.GetLogger().Fatal("failed to start cp-api endpoint: %s", err)
+			mlog.Fatal("failed to start cp-api endpoint: %s", err)
 		}
 
 		finishCh := pkg.MonitorShutdown(shutdownChan,
@@ -102,7 +100,7 @@ var initCmd = &cli.Command{
 		cpRepoPath := cctx.String(FlagCpRepo)
 		os.Setenv("CP_PATH", cpRepoPath)
 		if err := conf.InitConfig(cpRepoPath); err != nil {
-			logs.GetLogger().Fatal(err)
+			mlog.Fatal(err)
 		}
 
 		chainUrl, err := conf.GetRpcByName(conf.DefaultRpc)
@@ -167,7 +165,7 @@ var initCmd = &cli.Command{
 			ubiTaskFlag = 1
 		}
 
-		contractAddress, tx, _, err := account2.DeployAccount(auth, client, nodeID, []string{multiAddresses}, ubiTaskFlag, common.HexToAddress(beneficiaryAddress))
+		contractAddress, tx, _, err := account.DeployAccount(auth, client, nodeID, []string{multiAddresses}, ubiTaskFlag, common.HexToAddress(beneficiaryAddress))
 		if err != nil {
 			return fmt.Errorf("deploy cp account contract failed, error: %v", err)
 		}
@@ -246,7 +244,7 @@ var infoCmd = &cli.Command{
 		var balance, collateralBalance string
 		var contractAddress, ownerAddress, beneficiaryAddress, ubiFlag, chainNodeId string
 
-		cpStub, err := account2.NewAccountStub(client)
+		cpStub, err := account.NewAccountStub(client)
 		if err == nil {
 			cpAccount, err := cpStub.GetCpAccountInfo()
 			if err != nil {
@@ -309,13 +307,13 @@ func DoSend(contractAddr, height string) error {
 
 	jsonData, err := json.Marshal(contractReq)
 	if err != nil {
-		logs.GetLogger().Errorf("JSON encoding failed: %v", err)
+		mlog.Errorf("JSON encoding failed: %v", err)
 		return err
 	}
 
 	resp, err := http.Post(conf.GetConfig().UBI.UbiUrl+"/contracts", "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
-		logs.GetLogger().Errorf("POST request failed: %v", err)
+		mlog.Errorf("POST request failed: %v", err)
 		return err
 	}
 	defer resp.Body.Close()
@@ -327,12 +325,12 @@ func DoSend(contractAddr, height string) error {
 	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		logs.GetLogger().Errorf("read response failed: %v", err)
+		mlog.Errorf("read response failed: %v", err)
 		return err
 	}
 	err = json.Unmarshal(body, &resultResp)
 	if err != nil {
-		logs.GetLogger().Errorf("response convert to json failed: %v", err)
+		mlog.Errorf("response convert to json failed: %v", err)
 		return err
 	}
 

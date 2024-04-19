@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/gomodule/redigo/redis"
 	"github.com/olekukonko/tablewriter"
 	"github.com/swanchain/go-computing-provider/conf"
@@ -87,7 +86,7 @@ var ubiTaskList = &cli.Command{
 
 			reward, err := getReward(nodeID, task.TaskId)
 			if err != nil {
-				logs.GetLogger().Errorf("get task id: %s, reward failed, error: %v", task.TaskId, err)
+				mlog.Errorf("get task id: %s, reward failed, error: %v", task.TaskId, err)
 			}
 
 			taskData = append(taskData,

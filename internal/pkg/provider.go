@@ -15,7 +15,6 @@ import (
 	"path/filepath"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/swanchain/go-computing-provider/conf"
 )
 
@@ -45,14 +44,14 @@ func updateProviderInfo(nodeID, peerID, address string, status string) {
 
 	jsonData, err := json.Marshal(provider)
 	if err != nil {
-		logs.GetLogger().Errorf("Error marshaling provider data: %v", err)
+		ulog.Errorf("Error marshaling provider data: %v", err)
 		return
 	}
 
 	client := &http.Client{}
 	req, err := http.NewRequest("POST", updateURL, bytes.NewBuffer(jsonData))
 	if err != nil {
-		logs.GetLogger().Errorf("Error creating request: %v", err)
+		ulog.Errorf("Error creating request: %v", err)
 		return
 	}
 
@@ -62,16 +61,16 @@ func updateProviderInfo(nodeID, peerID, address string, status string) {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		logs.GetLogger().Errorf("Error updating provider info: %v", err)
+		ulog.Errorf("Error updating provider info: %v", err)
 	} else {
 		if resp.StatusCode == 400 {
 			respData, _ := io.ReadAll(resp.Body)
-			logs.GetLogger().Info(string(respData))
+			ulog.Info(string(respData))
 		}
 
 		err := resp.Body.Close()
 		if err != nil {
-			logs.GetLogger().Errorf(err.Error())
+			ulog.Errorf(err.Error())
 			return
 		}
 	}
@@ -80,7 +79,7 @@ func updateProviderInfo(nodeID, peerID, address string, status string) {
 func InitComputingProvider(cpRepoPath string) string {
 	nodeID, peerID, address := GenerateNodeID(cpRepoPath)
 
-	logs.GetLogger().Infof("Node ID :%s Peer ID:%s address:%s",
+	ulog.Infof("Node ID :%s Peer ID:%s address:%s",
 		nodeID,
 		peerID, address)
 	updateProviderInfo(nodeID, peerID, address, models.ActiveStatus)

@@ -1,23 +1,11 @@
 package service
 
 import (
-	"github.com/filswan/go-swan-lib/logs"
 	"github.com/gin-gonic/gin"
-	"github.com/swanchain/go-computing-provider/internal/v2/models"
-	"net/http"
 )
 
 func CreateJob(c *gin.Context) {
-	var job models.Job
-	if err := c.ShouldBindJSON(&job); err != nil {
-		c.JSON(http.StatusBadRequest, CreateFailedRespWithCode(ReqParseJsonCode))
-		return
-	}
 
-	logs.GetLogger().Infof("Job received Data: %+v", job)
-
-	service := NewJobService()
-	service.doJob(job)
 }
 
 func ExtendJob(c *gin.Context) {

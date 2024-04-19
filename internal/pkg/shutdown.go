@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/gin-gonic/gin"
 	"github.com/swanchain/go-computing-provider/conf"
 	"net"
@@ -30,23 +29,23 @@ func MonitorShutdown(triggerCh <-chan struct{}, handlers ...ShutdownHandler) <-c
 	go func() {
 		select {
 		case sig := <-sigCh:
-			logs.GetLogger().Warn("received shutdown", "signal", sig)
+			ulog.Warn("received shutdown", "signal", sig)
 		case <-triggerCh:
-			logs.GetLogger().Warn("received shutdown")
+			ulog.Warn("received shutdown")
 		}
 
-		logs.GetLogger().Warn("Shutting down...")
+		ulog.Warn("Shutting down...")
 
 		// Call all the handlers, logging on failure and success.
 		for _, h := range handlers {
 			if err := h.StopFunc(context.TODO()); err != nil {
-				logs.GetLogger().Errorf("shutting down %s failed: %s", h.Component, err)
+				ulog.Errorf("shutting down %s failed: %s", h.Component, err)
 				continue
 			}
-			logs.GetLogger().Infof("%s shut down successfully ", h.Component)
+			ulog.Infof("%s shut down successfully", h.Component)
 		}
 
-		logs.GetLogger().Warn("Graceful shutdown successful")
+		ulog.Warnf("Graceful shutdown successful")
 
 		close(out)
 	}()
@@ -68,12 +67,12 @@ func ServeHttp(h http.Handler, name string, addr string) (StopFunc, error) {
 		certFile := conf.GetConfig().LOG.CrtFile
 		keyFile := conf.GetConfig().LOG.KeyFile
 		if _, err := os.Stat(certFile); err != nil {
-			logs.GetLogger().Fatalf("need to manually generate the wss authentication certificate. error: %v", err)
+			ulog.Fatalf("need to manually generate the wss authentication certificate. error: %v", err)
 			return
 		}
 
 		if err := srv.ListenAndServeTLS(certFile, keyFile); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logs.GetLogger().Fatalf("service: %s, listen: %s\n", name, err)
+			ulog.Fatalf("service: %s, listen: %s\n", name, err)
 		}
 
 	}()

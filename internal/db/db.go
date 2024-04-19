@@ -2,7 +2,7 @@ package db
 
 import (
 	_ "embed"
-	"github.com/filswan/go-swan-lib/logs"
+	logging "github.com/ipfs/go-log/v2"
 	models2 "github.com/swanchain/go-computing-provider/internal/v1/models"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -13,12 +13,13 @@ import (
 const DealsDBName = "provider.db"
 
 var DB *gorm.DB
+var dblog = logging.Logger("db")
 
 func init() {
 	var err error
 	cpRepo, ok := os.LookupEnv("CP_PATH")
 	if !ok {
-		logs.GetLogger().Panicf("not found cp-repo, need to required")
+		dblog.Panicf("not found cp-repo, need to required")
 		return
 	}
 	DB, err = gorm.Open(sqlite.Open(path.Join(cpRepo, DealsDBName)), &gorm.Config{})

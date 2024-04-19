@@ -1,4 +1,4 @@
-package initializer
+package main
 
 import (
 	"fmt"
@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/filswan/go-swan-lib/logs"
 	"github.com/swanchain/go-computing-provider/conf"
 )
 
@@ -26,7 +25,7 @@ func sendHeartbeat(nodeId string) {
 	client := &http.Client{}
 	req, err := http.NewRequest("POST", heartbeatURL, payload)
 	if err != nil {
-		logs.GetLogger().Errorf("Error creating request: %v", err)
+		mlog.Errorf("Error creating request: %v", err)
 		return
 	}
 	// Set the API token in the request header (replace "your_api_token" with the actual token)
@@ -34,12 +33,12 @@ func sendHeartbeat(nodeId string) {
 	req.Header.Add("Content-Type", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
-		logs.GetLogger().Errorf("Error sending heartbeat, retrying to connect to the Swan Hub server: %v", err)
+		mlog.Errorf("Error sending heartbeat, retrying to connect to the Swan Hub server: %v", err)
 		pkg.Reconnect(nodeId)
 	} else {
 		_, err := ioutil.ReadAll(resp.Body)
 		if resp.StatusCode != http.StatusOK {
-			logs.GetLogger().Warningln("resp status: %d, retrying to connect to the Swan Hub server", resp.StatusCode)
+			mlog.Warnf("resp status: %d, retrying to connect to the Swan Hub server", resp.StatusCode)
 			pkg.Reconnect(nodeId)
 		}
 		if err != nil {
@@ -57,7 +56,7 @@ func sendHeartbeats(nodeId string) {
 }
 func ProjectInit(cpRepoPath string) {
 	if err := conf.InitConfig(cpRepoPath); err != nil {
-		logs.GetLogger().Fatal(err)
+		mlog.Fatal(err)
 	}
 	nodeID := pkg.InitComputingProvider(cpRepoPath)
 	// Start sending heartbeats
