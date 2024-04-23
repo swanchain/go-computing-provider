@@ -1,29 +1,5 @@
 package service
 
-import (
-	"github.com/gin-gonic/gin"
-)
-
-func CreateJob(c *gin.Context) {
-
-}
-
-func ExtendJob(c *gin.Context) {
-
-}
-
-func TerminateJob(c *gin.Context) {
-
-}
-
-func GetCpResources(c *gin.Context) {
-
-}
-
-func GetJobInfo(c *gin.Context) {
-
-}
-
 type Result struct {
 	Code int    `json:"code"`
 	Msg  string `json:"msg,omitempty"`

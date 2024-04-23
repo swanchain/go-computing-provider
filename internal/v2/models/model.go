@@ -9,7 +9,7 @@ type CreateJobReq struct {
 	Source     string  `json:"source" binding:"required"`
 	Config     *Config `json:"config" binding:"required"`
 	Sign       string  `json:"sign" binding:"required"`
-	TxHash     string  `json:"tx_hash" binding:"required"`
+	Payment    Payment `json:"pyment" binding:"required"`
 }
 
 type Config struct {
@@ -19,4 +19,9 @@ type Config struct {
 	StorageType string `json:"storage_type"`
 	GPU         int    `json:"gpu"`
 	GPUModel    string `json:"gpu_model"`
+}
+
+type Payment struct {
+	TxHash  string `json:"tx_hash"`
+	ChainId int64  `json:"chain_id"`
 }

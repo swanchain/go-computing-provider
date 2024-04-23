@@ -16,7 +16,7 @@ type JobService struct {
 	k8sClient pkg.K8sService
 }
 
-func (js *JobService) doJob(c *gin.Context) {
+func (js *JobService) CreateJob(c *gin.Context) {
 	var job models.CreateJobReq
 	if err := c.ShouldBindJSON(&job); err != nil {
 		c.JSON(http.StatusBadRequest, CreateFailedRespWithCode(ReqParseJsonCode))
@@ -24,5 +24,21 @@ func (js *JobService) doJob(c *gin.Context) {
 	}
 
 	servlog.Infof("Job received Data: %+v", job)
+
+}
+
+func (js *JobService) ExtendJob(c *gin.Context) {
+
+}
+
+func (js *JobService) TerminateJob(c *gin.Context) {
+
+}
+
+func (js *JobService) GetCpResources(c *gin.Context) {
+
+}
+
+func (js *JobService) GetJobInfo(c *gin.Context) {
 
 }
