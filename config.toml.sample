@@ -7,7 +7,7 @@ NodeName = "<YOUR CP NodeName>"               # The computing-provider node name
 RedisUrl = "redis://127.0.0.1:6379"             # The redis server address
 RedisPassword = ""                              # The redis server access password
 
-WalletWhiteList=""
+WalletWhiteList=""                             # CP only accepts user addresses from this whitelist for space deployment
 
 [UBI]
 UbiTask = true                                               # Accept the UBI task (Default: true)

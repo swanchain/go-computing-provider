@@ -337,31 +337,31 @@ Edit the necessary configuration files according to your deployment requirements
 
 ```toml
 [API]
-Port = 8085                                     # The port number that the web server listens on
-MultiAddress = "/ip4/<public_ip>/tcp/<port>"    # The multiAddress for libp2p
-Domain = ""                                     # The domain name
-NodeName = ""                                   # The computing-provider node name
+Port = 8085                                    # The port number that the web server listens on
+MultiAddress = "/ip4/<public_ip>/tcp/<port>"   # The multiAddress for libp2p
+Domain = ""                                    # The domain name
+NodeName = ""                                  # The computing-provider node name
 
-RedisUrl = "redis://127.0.0.1:6379"           # The redis server address
-RedisPassword = ""                            # The redis server access password
-WalletWhiteList = ""                          # 
+RedisUrl = "redis://127.0.0.1:6379"            # The redis server address
+RedisPassword = ""                             # The redis server access password
+WalletWhiteList = ""                           # CP only accepts user addresses from this whitelist for space deployment
 
 [UBI]
-UbiTask = true                                 # Accept the UBI task (Default: true)
-UbiEnginePk = "0xB5aeb540B4895cd024c1625E146684940A849ED9"  # UBI Engine's public key, CP only accept the task from this UBI engine 
-UbiUrl ="https://ubi-task.swanchain.io/v1"     # UBI Engine's API address
+UbiTask = true                                                # Accept the UBI task (Default: true)
+UbiEnginePk = "0xB5aeb540B4895cd024c1625E146684940A849ED9"    # UBI Engine's public key, CP only accept the task from this UBI engine 
+UbiUrl ="https://ubi-task.swanchain.io/v1"                    # UBI Engine's API address
 
 [LOG]
-CrtFile = "/YOUR_DOMAIN_NAME_CRT_PATH/server.crt"   # Your domain name SSL .crt file path
-KeyFile = "/YOUR_DOMAIN_NAME_KEY_PATH/server.key"   # Your domain name SSL .key file path
+CrtFile = "/YOUR_DOMAIN_NAME_CRT_PATH/server.crt"             # Your domain name SSL .crt file path
+KeyFile = "/YOUR_DOMAIN_NAME_KEY_PATH/server.key"             # Your domain name SSL .key file path
 
 [HUB]
-ServerUrl = "https://orchestrator-api.swanchain.io"     # The Orchestrator's API address
-AccessToken = ""                                    # The Orchestrator's access token, Acquired from "https://orchestrator.swanchain.io" 
-WalletAddress = ""                                  # The cp‘s wallet address
-BalanceThreshold= 1                                # The cp’s collateral balance threshold
+ServerUrl = "https://orchestrator-api.swanchain.io"           # The Orchestrator's API address
+AccessToken = ""                                              # The Orchestrator's access token, Acquired from "https://orchestrator.swanchain.io" 
+WalletAddress = ""                                            # The cp‘s wallet address
+BalanceThreshold= 1                                            # The cp’s collateral balance threshold
 OrchestratorPk = "0x29eD49c8E973696D07E7927f748F6E5Eacd5516D"  # Orchestrator's public key, CP only accept the task from this Orchestrator
-VerifySign = true                                  # Verify that the task signature is from Orchestrator
+VerifySign = true                                              # Verify that the task signature is from Orchestrator
 
 
 [MCS]
@@ -383,6 +383,8 @@ SWAN_MAINNET= ""								   # Swan mainnet RPC
 SWAN_CONTRACT="0x91B25A65b295F0405552A4bbB77879ab5e38166c"              # Swan token's contract address
 SWAN_COLLATERAL_CONTRACT="0xfD9190027cd42Fc4f653Dfd9c4c45aeBAf0ae063"   # Swan's collateral address
 ```
+*Note:*  Example WalletWhiteList hosted on GitHub can be found [here](https://raw.githubusercontent.com/swanchain/market-providers/main/clients/whitelist.txt).
+
 ## Install AI Inference Dependency
 It is necessary for Computing Provider to deploy the  AI inference endpoint. But if you do not want to support the feature, you can skip it.
 ```bash

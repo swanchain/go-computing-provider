@@ -17,6 +17,7 @@ import (
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"github.com/swanchain/go-computing-provider/util"
 	"github.com/swanchain/go-computing-provider/wallet"
+	"io"
 	batchv1 "k8s.io/api/batch/v1"
 	coreV1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
@@ -327,6 +328,45 @@ func DoUbiTaskForK8s(c *gin.Context) {
 
 		if _, err = k8sService.k8sClient.BatchV1().Jobs(namespace).Create(context.TODO(), job, metaV1.CreateOptions{}); err != nil {
 			logs.GetLogger().Errorf("Failed creating ubi task job: %v", err)
+			return
+		}
+
+		time.Sleep(5 * time.Second)
+		createdJob, err := k8sService.k8sClient.BatchV1().Jobs(namespace).Get(context.TODO(), JobName, metaV1.GetOptions{})
+		if err != nil {
+			panic(err.Error())
+		}
+
+		var podNames string
+		for _, ownerReference := range createdJob.OwnerReferences {
+			if ownerReference.Kind == "Pod" {
+				podNames = ownerReference.Name
+				break
+			}
+		}
+		req := k8sService.k8sClient.CoreV1().Pods(namespace).GetLogs(podNames, &v1.PodLogOptions{
+			Container:  "",
+			Follow:     true,
+			Timestamps: true,
+		})
+
+		podLogs, err := req.Stream(context.Background())
+		if err != nil {
+			logs.GetLogger().Errorf("Error opening log stream: %v", err)
+			return
+		}
+		defer podLogs.Close()
+
+		ubiLogFileName := filepath.Join(os.Getenv("CP_PATH"), "ubi.log")
+		logFile, err := os.OpenFile(ubiLogFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			logs.GetLogger().Errorf("opening ubi log file failed, error: %v", err)
+			return
+		}
+		defer logFile.Close()
+
+		if _, err = io.Copy(logFile, podLogs); err != nil {
+			logs.GetLogger().Errorf("write ubi log to file failed, error: %v", err)
 			return
 		}
 	}()
