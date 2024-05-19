@@ -25,55 +25,55 @@ func Reconnect(nodeID string) string {
 }
 
 func updateProviderInfo(nodeID, peerID, address string, status string) {
-	updateURL := conf.GetConfig().HUB.ServerUrl + "/cp"
+    updateURL := conf.GetConfig().HUB.ServerUrl + "/cp"
 
-	var cpName string
-	if conf.GetConfig().API.NodeName != "" {
-		cpName = conf.GetConfig().API.NodeName
-	} else {
-		cpName, _ = os.Hostname()
-	}
+    var cpName string
+    if conf.GetConfig().API.NodeName != "" {
+        cpName = conf.GetConfig().API.NodeName
+    } else {
+        cpName, _ = os.Hostname()
+    }
 
-	provider := models.ComputingProvider{
-		PublicAddress: conf.GetConfig().HUB.WalletAddress,
-		Name:          cpName,
-		NodeId:        nodeID,
-		MultiAddress:  conf.GetConfig().API.MultiAddress,
-		Status:        status,
-	}
+    provider := models.ComputingProvider{
+        PublicAddress: conf.GetConfig().HUB.WalletAddress,
+        Name:          cpName,
+        NodeId:        nodeID,
+        MultiAddress:  conf.GetConfig().API.MultiAddress,
+        Status:        status,
+    }
 
-	jsonData, err := json.Marshal(provider)
-	if err != nil {
-		logs.GetLogger().Errorf("Error marshaling provider data: %v", err)
-		return
-	}
+    jsonData, err := json.Marshal(provider)
+    if err != nil {
+        logs.GetLogger().Errorf("Error marshaling provider data: %v", err)
+        return
+    }
 
-	client := &http.Client{}
-	req, err := http.NewRequest("POST", updateURL, bytes.NewBuffer(jsonData))
-	if err != nil {
-		logs.GetLogger().Errorf("Error creating request: %v", err)
-		return
-	}
+    client := &http.Client{}
+    req, err := http.NewRequest("POST", updateURL, bytes.NewBuffer(jsonData))
+    if err != nil {
+        logs.GetLogger().Errorf("Error creating request: %v", err)
+        return
+    }
 
-	// Set the content type and API token in the request header
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+conf.GetConfig().HUB.AccessToken)
+    // Set the content type and API token in the request header
+    req.Header.Set("Content-Type", "application/json")
+    req.Header.Set("Authorization", "Bearer " + conf.GetConfig().HUB.AccessToken)
 
-	resp, err := client.Do(req)
-	if err != nil {
-		logs.GetLogger().Errorf("Error updating provider info: %v", err)
-	} else {
-		if resp.StatusCode == 400 {
-			respData, _ := io.ReadAll(resp.Body)
-			logs.GetLogger().Info(string(respData))
-		}
+    resp, err := client.Do(req)
+    if err != nil {
+        logs.GetLogger().Errorf("Error updating provider info: %v", err)
+        return
+    }
+    defer resp.Body.Close()
 
-		err := resp.Body.Close()
-		if err != nil {
-			logs.GetLogger().Errorf(err.Error())
-			return
-		}
-	}
+    bodyBytes, _ := io.ReadAll(resp.Body)
+    responseBody := string(bodyBytes)
+
+    if resp.StatusCode != http.StatusOK {
+        logs.GetLogger().Errorf("Failed to update provider info, status code: %d, response: %s", resp.StatusCode, responseBody)
+    } else {
+        logs.GetLogger().Infof("Provider info updated successfully, response: %s", responseBody)
+    }
 }
 
 func InitComputingProvider(cpRepoPath string) string {
