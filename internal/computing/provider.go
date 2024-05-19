@@ -34,6 +34,12 @@ func updateProviderInfo(nodeID, peerID, address string, status string) {
         cpName, _ = os.Hostname()
     }
 
+    // Verify that required fields are not empty before sending them
+    if nodeID == "" || conf.GetConfig().HUB.WalletAddress == "" || status == "" {
+        logs.GetLogger().Error("Required fields are missing: ensure NodeID, WalletAddress, and Status are provided")
+        return
+    }
+
     provider := models.ComputingProvider{
         PublicAddress: conf.GetConfig().HUB.WalletAddress,
         Name:          cpName,
@@ -55,23 +61,23 @@ func updateProviderInfo(nodeID, peerID, address string, status string) {
         return
     }
 
-    // Set the content type and API token in the request header
     req.Header.Set("Content-Type", "application/json")
     req.Header.Set("Authorization", "Bearer " + conf.GetConfig().HUB.AccessToken)
 
     resp, err := client.Do(req)
     if err != nil {
-        logs.GetLogger().Errorf("Error updating provider info: %v", err)
+        logs.GetLogger().Errorf("Error sending request to update provider info: %v", err)
         return
     }
     defer resp.Body.Close()
 
-    bodyBytes, _ := io.ReadAll(resp.Body)
-    responseBody := string(bodyBytes)
-
     if resp.StatusCode != http.StatusOK {
+        bodyBytes, _ := io.ReadAll(resp.Body)
+        responseBody := string(bodyBytes)
         logs.GetLogger().Errorf("Failed to update provider info, status code: %d, response: %s", resp.StatusCode, responseBody)
     } else {
+        bodyBytes, _ := io.ReadAll(resp.Body)
+        responseBody := string(bodyBytes)
         logs.GetLogger().Infof("Provider info updated successfully, response: %s", responseBody)
     }
 }
