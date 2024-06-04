@@ -31,7 +31,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -155,8 +154,6 @@ func ReceiveJob(c *gin.Context) {
 
 func submitJob(jobData *models.JobData) error {
 	logs.GetLogger().Printf("submitting job...")
-	oldMask := syscall.Umask(0)
-	defer syscall.Umask(oldMask)
 
 	fileCachePath := conf.GetConfig().MCS.FileCachePath
 	folderPath := "jobs"
@@ -171,10 +168,17 @@ func submitJob(jobData *models.JobData) error {
 		logs.GetLogger().Errorf("Failed Marshal JobData, error: %v", err)
 		return err
 	}
-	if err = os.WriteFile(taskDetailFilePath, bytes, os.ModePerm); err != nil {
+
+	f, err := os.OpenFile(taskDetailFilePath, os.O_RDWR|os.O_CREATE, 0777)
+	if err != nil {
+		logs.GetLogger().Errorf("Failed to open file, error: %v", err)
+		return err
+	}
+	if _, err = f.Write(bytes); err != nil {
 		logs.GetLogger().Errorf("Failed jobData write to file, error: %v", err)
 		return err
 	}
+	defer f.Close()
 
 	storageService := NewStorageService()
 	mcsOssFile, err := storageService.UploadFileToBucket(jobDetailFile, taskDetailFilePath, true)
