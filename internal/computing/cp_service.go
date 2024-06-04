@@ -174,6 +174,7 @@ func submitJob(jobData *models.JobData) error {
 		logs.GetLogger().Errorf("Failed to open file, error: %v", err)
 		return err
 	}
+
 	if _, err = f.Write(bytes); err != nil {
 		logs.GetLogger().Errorf("Failed jobData write to file, error: %v", err)
 		return err
