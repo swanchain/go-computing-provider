@@ -63,7 +63,7 @@ Output:
 ./computing-provider account create \
                     --ownerAddress <YOUR_OWNER_ADDRESS> \
                     --workerAddress <YOUR_WORKER_ADDRESS> \
-                    --beneficiaryAddress <YOUR_BENEFICIAERY_ADDRESS  \
+                    --beneficiaryAddress <YOUR_BENEFICIAERY_ADDRESS>  \
                     --task-types 1,2,4
 ```
 **Note:** `--task-types`: Supports 4 task types (1: Fil-C2-512M, 2: Aleo, 3: AI, 4: Fil-C2-32G), separated by commas. For ECP, it needs to be set to 1,2,4.
