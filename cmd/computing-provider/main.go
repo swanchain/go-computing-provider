@@ -5,6 +5,7 @@ import (
 	"github.com/mitchellh/go-homedir"
 	"github.com/swanchain/go-computing-provider/build"
 	"github.com/swanchain/go-computing-provider/conf"
+	"github.com/swanchain/go-computing-provider/internal/db"
 	"github.com/urfave/cli/v2"
 	"os"
 )
@@ -33,6 +34,7 @@ func main() {
 			initCmd,
 			runCmd,
 			infoCmd,
+			stateCmd,
 			accountCmd,
 			taskCmd,
 			walletCmd,
@@ -54,6 +56,8 @@ func main() {
 				return fmt.Errorf("init repo failed, error: %v", err)
 			}
 			os.Setenv("CP_PATH", cpRepoPath)
+			db.InitDb(cpRepoPath)
+
 			return nil
 		},
 	}

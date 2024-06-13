@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
-	"github.com/gomodule/redigo/redis"
 	"github.com/swanchain/go-computing-provider/constants"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"github.com/swanchain/go-computing-provider/internal/yaml"
@@ -172,14 +171,14 @@ func (d *Deploy) DockerfileToK8s() {
 		return
 	}
 	d.DeployName = createDeployment.GetName()
-	updateJobStatus(d.jobUuid, models.JobPullImage)
+	updateJobStatus(d.jobUuid, models.DEPLOY_PULL_IMAGE)
 	logs.GetLogger().Infof("Created deployment: %s", createDeployment.GetName())
 
 	if _, err := d.deployK8sResource(int32(containerPort)); err != nil {
 		logs.GetLogger().Error(err)
 		return
 	}
-	updateJobStatus(d.jobUuid, models.JobDeployToK8s, "https://"+d.hostName)
+	updateJobStatus(d.jobUuid, models.DEPLOY_TO_K8S, "https://"+d.hostName)
 
 	d.watchContainerRunningTime()
 	return
@@ -325,7 +324,7 @@ func (d *Deploy) YamlToK8s() {
 			return
 		}
 		d.DeployName = createDeployment.GetName()
-		updateJobStatus(d.jobUuid, models.JobPullImage)
+		updateJobStatus(d.jobUuid, models.DEPLOY_PULL_IMAGE)
 
 		serviceHost, err := d.deployK8sResource(cr.Ports[0].ContainerPort)
 		if err != nil {
@@ -333,7 +332,7 @@ func (d *Deploy) YamlToK8s() {
 			return
 		}
 
-		updateJobStatus(d.jobUuid, models.JobDeployToK8s, "https://"+d.hostName)
+		updateJobStatus(d.jobUuid, models.DEPLOY_TO_K8S, "https://"+d.hostName)
 
 		if len(cr.Models) > 0 {
 			for _, res := range cr.Models {
@@ -450,14 +449,14 @@ func (d *Deploy) ModelInferenceToK8s() error {
 		return err
 	}
 	d.DeployName = createDeployment.GetName()
-	updateJobStatus(d.jobUuid, models.JobPullImage)
+	updateJobStatus(d.jobUuid, models.DEPLOY_PULL_IMAGE)
 	logs.GetLogger().Infof("Created deployment: %s", createDeployment.GetObjectMeta().GetName())
 
 	if _, err := d.deployK8sResource(int32(80)); err != nil {
 		logs.GetLogger().Error(err)
 		return err
 	}
-	updateJobStatus(d.jobUuid, models.JobDeployToK8s)
+	updateJobStatus(d.jobUuid, models.DEPLOY_TO_K8S)
 	d.watchContainerRunningTime()
 	return nil
 }
@@ -563,36 +562,19 @@ func (d *Deploy) deployK8sResource(containerPort int32) (string, error) {
 }
 
 func (d *Deploy) watchContainerRunningTime() {
-	conn := redisPool.Get()
-	_, err := conn.Do("SET", d.spaceUuid, "wait-delete", "EX", d.duration)
-	if err != nil {
-		logs.GetLogger().Errorf("Failed set redis key and expire time, key: %s, error: %+v", d.jobUuid, err)
+	var job = new(models.JobEntity)
+	job.SpaceUuid = d.spaceUuid
+	job.ExpireTime = time.Now().Unix() + d.duration
+	job.K8sDeployName = d.DeployName
+	job.NameSpace = d.k8sNameSpace
+	job.ImageName = d.image
+	job.K8sResourceType = "deployment"
+	job.ResourceType = d.TaskType
+	if err := NewJobService().UpdateJobEntityBySpaceUuid(job); err != nil {
+		logs.GetLogger().Errorf("update job info failed, error: %v", err)
 		return
 	}
-
-	key := constants.REDIS_SPACE_PREFIX + d.spaceUuid
-	conn.Do("DEL", redis.Args{}.AddFlat(key)...)
-
-	fullArgs := []interface{}{key}
-	fields := map[string]string{
-		"wallet_address": d.walletAddress,
-		"space_name":     d.spaceName,
-		"expire_time":    strconv.Itoa(int(time.Now().Unix() + d.duration)),
-		"space_uuid":     d.spaceUuid,
-		"job_uuid":       d.jobUuid,
-		"task_type":      d.TaskType,
-		"deploy_name":    d.DeployName,
-		"hardware":       d.hardwareDesc,
-		"url":            fmt.Sprintf("https://%s", d.hostName),
-		"task_uuid":      d.taskUuid,
-		"space_type":     d.spaceType,
-	}
-
-	for key, val := range fields {
-		fullArgs = append(fullArgs, key, val)
-	}
-	_, _ = conn.Do("HSET", fullArgs...)
-
+	logs.GetLogger().Infof("space service deployed, spaceUuid: %s, spaceName: %s", d.spaceUuid, d.spaceName)
 }
 
 func getHardwareDetail(description string) (string, models.Resource) {

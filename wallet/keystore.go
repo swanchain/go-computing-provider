@@ -4,12 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/syndtr/goleveldb/leveldb"
-	"os"
 	"sync"
 )
 
 var diskKeyStore *DiskKeyStore
-var once sync.Once
 var lock sync.Mutex
 
 type DiskKeyStore struct {
@@ -19,23 +17,11 @@ type DiskKeyStore struct {
 func OpenOrInitKeystore(p string) (*DiskKeyStore, error) {
 	lock.Lock()
 	defer lock.Unlock()
-	_, err := os.Stat(p)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return diskKeyStore, err
-		} else {
-			if err = os.Mkdir(p, 0700); err != nil {
-				return diskKeyStore, err
-			}
-		}
-	}
-
 	db, err := leveldb.OpenFile(p, nil)
 	if err != nil {
 		return diskKeyStore, err
 	}
 	diskKeyStore = &DiskKeyStore{db}
-
 	return diskKeyStore, err
 }
 

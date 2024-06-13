@@ -1,14 +1,11 @@
 package computing
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	corev1 "k8s.io/api/core/v1"
-	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -20,14 +17,8 @@ const (
 	ResourceStorage string = "storage"
 )
 
-func allActivePods(clientSet *kubernetes.Clientset) ([]corev1.Pod, error) {
-	allPods, err := clientSet.CoreV1().Pods("").List(context.TODO(), metaV1.ListOptions{
-		FieldSelector: "status.phase=Running",
-	})
-	if err != nil {
-		return nil, err
-	}
-	return allPods.Items, nil
+type CpResourceSummary struct {
+	ClusterInfo []*models.NodeResource
 }
 
 func GetNodeResource(allPods []corev1.Pod, node *corev1.Node) (map[string]int64, map[string]int64, *models.NodeResource) {
@@ -58,6 +49,7 @@ func GetNodeResource(allPods []corev1.Pod, node *corev1.Node) (map[string]int64,
 	nodeResource.Cpu.Total = strconv.FormatInt(node.Status.Capacity.Cpu().Value(), 10)
 	nodeResource.Cpu.Used = strconv.FormatInt(usedCpu, 10)
 	nodeResource.Cpu.Free = strconv.FormatInt(node.Status.Capacity.Cpu().Value()-usedCpu, 10)
+	nodeResource.Cpu.RemainderNum = node.Status.Capacity.Cpu().Value() - usedCpu
 	remainderResource[ResourceCpu] = node.Status.Capacity.Cpu().Value() - usedCpu
 
 	nodeResource.Vcpu.Total = nodeResource.Cpu.Total
@@ -68,12 +60,14 @@ func GetNodeResource(allPods []corev1.Pod, node *corev1.Node) (map[string]int64,
 	nodeResource.Memory.Used = fmt.Sprintf("%.2f GiB", float64(usedMem/1024/1024/1024))
 	freeMemory := node.Status.Capacity.Memory().Value() - usedMem
 	nodeResource.Memory.Free = fmt.Sprintf("%.2f GiB", float64(freeMemory/1024/1024/1024))
+	nodeResource.Memory.RemainderNum = freeMemory
 	remainderResource[ResourceMem] = freeMemory
 
 	nodeResource.Storage.Total = fmt.Sprintf("%.2f GiB", float64(node.Status.Allocatable.StorageEphemeral().Value()/1024/1024/1024))
 	nodeResource.Storage.Used = fmt.Sprintf("%.2f GiB", float64(usedStorage/1024/1024/1024))
 	freeStorage := node.Status.Allocatable.StorageEphemeral().Value() - usedStorage
 	nodeResource.Storage.Free = fmt.Sprintf("%.2f GiB", float64(freeStorage/1024/1024/1024))
+	nodeResource.Storage.RemainderNum = freeStorage
 	remainderResource[ResourceStorage] = freeStorage
 
 	return nodeGpu, remainderResource, nodeResource
@@ -144,7 +138,7 @@ func gpuInPod(pod *corev1.Pod) (gpuName string, gpuCount int64) {
 	return gpuName, gpuCount
 }
 
-func checkClusterProviderStatus() {
+func checkClusterProviderStatus(nodeResources []*models.NodeResource) {
 	var policy models.ResourcePolicy
 	cpPath, _ := os.LookupEnv("CP_PATH")
 	resourcePolicy := filepath.Join(cpPath, "resource_policy.json")
@@ -157,31 +151,18 @@ func checkClusterProviderStatus() {
 			return
 		}
 	}
-	service := NewK8sService()
-	activePods, err := allActivePods(service.k8sClient)
-	if err != nil {
-		logs.GetLogger().Errorf("get all active pod failed, error: %v", err)
-		return
-	}
 
-	nodes, err := service.k8sClient.CoreV1().Nodes().List(context.TODO(), metaV1.ListOptions{})
-	if err != nil {
-		logs.GetLogger().Errorf("get all node failed, error: %v", err)
-		return
-	}
-
-	for _, node := range nodes.Items {
-		_, remainderResource, nodeResource := GetNodeResource(activePods, &node)
-		if remainderResource[ResourceCpu] < policy.Cpu.Quota {
-			logs.GetLogger().Warningf("Insufficient cpu resources, current cpu resource: %s less than %d", nodeResource.Cpu.Free, policy.Cpu.Quota)
+	for _, node := range nodeResources {
+		if node.Cpu.RemainderNum < policy.Cpu.Quota {
+			logs.GetLogger().Warningf("Insufficient cpu resources, current cpu resource: %s less than %d", node.Cpu.Free, policy.Cpu.Quota)
 			return
 		}
-		if remainderResource[ResourceMem] < policy.Memory.Quota {
-			logs.GetLogger().Warningf("Insufficient memory resources, current memory resource: %s less than %d %s", nodeResource.Memory.Free, policy.Memory.Quota, policy.Memory.Unit)
+		if node.Memory.RemainderNum < policy.Memory.Quota {
+			logs.GetLogger().Warningf("Insufficient memory resources, current memory resource: %s less than %d %s", node.Memory.Free, policy.Memory.Quota, policy.Memory.Unit)
 			return
 		}
-		if remainderResource[ResourceStorage] < policy.Storage.Quota {
-			logs.GetLogger().Warningf("Insufficient storage resources, current storage resource: %s less than %d %s", nodeResource.Storage.Free, policy.Storage.Quota, policy.Storage.Unit)
+		if node.Storage.RemainderNum < policy.Storage.Quota {
+			logs.GetLogger().Warningf("Insufficient storage resources, current storage resource: %s less than %d %s", node.Storage.Free, policy.Storage.Quota, policy.Storage.Unit)
 			return
 		}
 	}

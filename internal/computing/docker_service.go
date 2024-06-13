@@ -14,6 +14,7 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/registry"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
+	"github.com/swanchain/go-computing-provider/build"
 	"io"
 	"log"
 	"os"
@@ -295,7 +296,7 @@ func (ds *DockerService) RemoveImage(imageId string) error {
 	return err
 }
 
-func (ds *DockerService) RemoveImageByName(containerName string) error {
+func (ds *DockerService) RemoveContainerByName(containerName string) error {
 	containerList, err := ds.c.ContainerList(context.Background(), container.ListOptions{})
 	if err != nil {
 		return err
@@ -314,49 +315,99 @@ func (ds *DockerService) RemoveImageByName(containerName string) error {
 }
 
 func (ds *DockerService) CleanResource() {
-	images, err := ds.c.ImageList(context.Background(), types.ImageListOptions{})
+	containers, err := ds.c.ContainerList(context.Background(), container.ListOptions{All: true})
+	if err != nil {
+		logs.GetLogger().Errorf("get all container failed, error: %v", err)
+		return
+	}
+
+	for _, c := range containers {
+		if c.State != "running" {
+			ds.c.ContainerRemove(context.Background(), c.ID, container.RemoveOptions{Force: true})
+		}
+	}
+
+	imagesToKeep := []string{
+		build.UBITaskImageIntelCpu,
+		build.UBITaskImageIntelGpu,
+		build.UBITaskImageAmdCpu,
+		build.UBITaskImageAmdGpu,
+		build.UBIResourceExporterDockerImage,
+	}
+
+	keepSet := make(map[string]bool)
+	for _, imageName := range imagesToKeep {
+		keepSet[imageName] = true
+	}
+
+	allImages, err := ds.c.ImageList(context.Background(), image.ListOptions{})
 	if err != nil {
 		logs.GetLogger().Errorf("Failed get image list, error: %+v", err)
 		return
 	}
-
-	for _, image := range images {
-		var specialImage bool
-		for _, tag := range image.RepoTags {
-			if strings.HasPrefix(tag, "filswan/ubi-worker") || strings.HasPrefix(tag, "filswan/cpu-model-collector") {
-				specialImage = true
-				break
+	for _, img := range allImages {
+		for _, tag := range img.RepoTags {
+			if !keepSet[tag] {
+				ds.c.ImageRemove(context.Background(), tag, image.RemoveOptions{
+					Force:         false,
+					PruneChildren: true,
+				})
 			}
-		}
-
-		if !specialImage {
-			ds.RemoveImage(image.ID)
 		}
 	}
 
 	ctx := context.Background()
 	danglingFilters := filters.NewArgs()
 	danglingFilters.Add("dangling", "true")
-	_, err = ds.c.ImagesPrune(ctx, danglingFilters)
-	if err != nil {
-		logs.GetLogger().Errorf("Failed delete dangling image, error: %+v", err)
-		return
-	}
+	ds.c.ImagesPrune(ctx, danglingFilters)
+	ds.c.ContainersPrune(ctx, filters.NewArgs())
+}
 
-	if _, err = ds.c.ContainersPrune(ctx, filters.NewArgs()); err != nil {
-		logs.GetLogger().Errorf("Failed delete unused container, error: %+v", err)
-		return
+func (ds *DockerService) PullImage(imageName string) error {
+	filterArgs := filters.NewArgs()
+	filterArgs.Add("reference", imageName)
+
+	images, err := ds.c.ImageList(context.Background(), image.ListOptions{
+		Filters: filterArgs,
+	})
+	if err != nil {
+		logs.GetLogger().Errorf("get %s image failed, error: %+v", imageName, err)
+		return err
+	}
+	if len(images) > 0 {
+		return nil
+	} else {
+		resp, err := ds.c.ImagePull(context.TODO(), imageName, image.PullOptions{})
+		if err != nil {
+			return err
+		}
+		defer resp.Close()
+		printOut(resp)
+		return nil
 	}
 }
 
-func (ds *DockerService) PullImage(imagesName string) error {
-	resp, err := ds.c.ImagePull(context.TODO(), imagesName, image.PullOptions{})
+func (ds *DockerService) CheckRunningContainer(containerName string) (bool, error) {
+	containers, err := ds.c.ContainerList(context.Background(), container.ListOptions{})
 	if err != nil {
-		return err
+		logs.GetLogger().Errorf("listing containers failed, error: %v", err)
+		return false, err
 	}
-	defer resp.Close()
-	printOut(resp)
-	return nil
+	containerRunning := false
+	for _, c := range containers {
+		for _, name := range c.Names {
+			if name == "/"+containerName {
+				if c.State == "running" {
+					containerRunning = true
+					break
+				}
+			}
+		}
+	}
+	if containerRunning {
+		return true, nil
+	}
+	return false, nil
 }
 
 func (ds *DockerService) ContainerCreateAndStart(config *container.Config, hostConfig *container.HostConfig, containerName string) error {
@@ -388,4 +439,27 @@ func (ds *DockerService) ContainerLogs(containerName string) (string, error) {
 	} else {
 		return result, nil
 	}
+}
+
+func (ds *DockerService) GetContainerLogStream(containerName string) (io.ReadCloser, error) {
+	ctx := context.Background()
+	return ds.c.ContainerLogs(ctx, containerName, container.LogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Follow:     true,
+		Timestamps: true,
+	})
+}
+
+func (ds *DockerService) checkImageExists(imageName string) bool {
+	filterArgs := filters.NewArgs()
+	filterArgs.Add("reference", imageName)
+
+	images, err := ds.c.ImageList(context.Background(), image.ListOptions{
+		Filters: filterArgs,
+	})
+	if err != nil {
+		return false
+	}
+	return len(images) > 0
 }

@@ -3,17 +3,15 @@ package main
 import (
 	"context"
 	"crypto/ecdsa"
-	"errors"
 	"fmt"
-	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/swanchain/go-computing-provider/account"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/computing"
+	account2 "github.com/swanchain/go-computing-provider/internal/contract/account"
+	"github.com/swanchain/go-computing-provider/internal/models"
 	"github.com/swanchain/go-computing-provider/wallet"
 	"math/big"
 	"os"
@@ -22,7 +20,7 @@ import (
 	"time"
 )
 
-func createAccount(cpRepoPath, ownerAddress, beneficiaryAddress string, ubiFlag bool) error {
+func createAccount(cpRepoPath, ownerAddress, beneficiaryAddress string, workerAddress string, taskTypes []uint8) error {
 	chainUrl, err := conf.GetRpcByName(conf.DefaultRpc)
 	if err != nil {
 		return fmt.Errorf("get rpc url failed, error: %v", err)
@@ -85,94 +83,74 @@ func createAccount(cpRepoPath, ownerAddress, beneficiaryAddress string, ubiFlag 
 		return fmt.Errorf("the multi-address field needs to be configured, by modify config.toml or computing-provider init")
 	}
 
-	var ubiTaskFlag uint8
-	if ubiFlag || conf.GetConfig().UBI.UbiTask {
-		ubiTaskFlag = 1
-	}
-
-	contractAddress, tx, _, err := account.DeployAccount(auth, client, nodeID, []string{multiAddresses}, ubiTaskFlag, common.HexToAddress(beneficiaryAddress))
+	contractAddress, tx, _, err := account2.DeployAccount(auth, client, nodeID, []string{multiAddresses}, common.HexToAddress(beneficiaryAddress),
+		common.HexToAddress(workerAddress), common.HexToAddress(conf.GetConfig().CONTRACT.Register), taskTypes)
 	if err != nil {
 		return fmt.Errorf("deploy cp account contract failed, error: %v", err)
 	}
+	cpAccountAddress := contractAddress.Hex()
 
-	err = os.WriteFile(filepath.Join(cpRepoPath, "account"), []byte(contractAddress.Hex()), 0666)
+	err = os.WriteFile(filepath.Join(cpRepoPath, "account"), []byte(cpAccountAddress), 0666)
 	if err != nil {
-		return fmt.Errorf("write cp account contract address failed, error: %v", err)
+		return fmt.Errorf("write cp account contract address to fie failed, error: %v", err)
 	}
 
-	fmt.Printf("Contract deployed! Address: %s\n", contractAddress.Hex())
+	var cpInfo = new(models.CpInfoEntity)
+	cpInfo.NodeId = nodeID
+	cpInfo.OwnerAddress = ownerAddress
+	cpInfo.Beneficiary = beneficiaryAddress
+	cpInfo.WorkerAddress = workerAddress
+	cpInfo.ContractAddress = cpAccountAddress
+	cpInfo.CreateAt = time.Now().Format("2006-01-02 15:04:05")
+	cpInfo.UpdateAt = time.Now().Format("2006-01-02 15:04:05")
+	cpInfo.MultiAddresses = []string{multiAddresses}
+	cpInfo.TaskTypes = taskTypes
+	if err = computing.NewCpInfoService().SaveCpInfoEntity(cpInfo); err != nil {
+		return fmt.Errorf("save cp info to db failed, error: %v", err)
+	}
+
+	fmt.Printf("Contract deployed! Address: %s\n", cpAccountAddress)
 	fmt.Printf("Transaction hash: %s\n", tx.Hash().Hex())
-
-	var blockNumber string
-	timeout := time.After(3 * time.Minute)
-	ticker := time.Tick(3 * time.Second)
-	for {
-		select {
-		case <-timeout:
-			return fmt.Errorf("timeout waiting for transaction confirmation, tx: %s", tx.Hash().Hex())
-		case <-ticker:
-			receipt, err := client.TransactionReceipt(context.Background(), tx.Hash())
-			if err != nil {
-				if errors.Is(err, ethereum.NotFound) {
-					continue
-				}
-				return err
-			}
-
-			if receipt != nil && receipt.Status == types.ReceiptStatusSuccessful {
-				blockNumber = receipt.BlockNumber.String()
-				err := DoSend(contractAddress.Hex(), blockNumber)
-				if err != nil {
-					return err
-				}
-				fmt.Println("computing-provider successfully initialized, you can now start it with 'computing-provider ubi daemon'")
-				return nil
-			} else if receipt != nil && receipt.Status == 0 {
-				return err
-			}
-		}
-	}
+	fmt.Println("computing-provider account is created successfully! You can now start it with 'computing-provider run' or 'computing-provider ubi daemon'")
+	return nil
 }
 
-func changeMultiAddress(ownerAddress, multiAddr string) error {
+func getVerifyAccountClient(ownerAddress string) (*ethclient.Client, *account2.CpStub, error) {
 	chainUrl, err := conf.GetRpcByName(conf.DefaultRpc)
 	if err != nil {
-		return fmt.Errorf("get rpc url failed, error: %v", err)
+		return nil, nil, fmt.Errorf("get rpc url failed, error: %v", err)
 	}
 
 	localWallet, err := wallet.SetupWallet(wallet.WalletRepo)
 	if err != nil {
-		return fmt.Errorf("setup wallet ubi failed, error: %v", err)
+		return nil, nil, fmt.Errorf("setup wallet failed, error: %v", err)
 	}
 
 	ki, err := localWallet.FindKey(ownerAddress)
 	if err != nil || ki == nil {
-		return fmt.Errorf("the address: %s, private key %v", ownerAddress, wallet.ErrKeyInfoNotFound)
+		return nil, nil, fmt.Errorf("the address: %s, private key %v", ownerAddress, wallet.ErrKeyInfoNotFound)
 	}
 
 	client, err := ethclient.Dial(chainUrl)
 	if err != nil {
-		return fmt.Errorf("dial rpc connect failed, error: %v", err)
+		client.Close()
+		return nil, nil, fmt.Errorf("dial rpc connect failed, error: %v", err)
 	}
-	defer client.Close()
 
-	cpStub, err := account.NewAccountStub(client, account.WithCpPrivateKey(ki.PrivateKey))
+	cpStub, err := account2.NewAccountStub(client, account2.WithCpPrivateKey(ki.PrivateKey))
 	if err != nil {
-		return fmt.Errorf("create ubi task client failed, error: %v", err)
+		client.Close()
+		return nil, nil, err
 	}
 
 	cpAccount, err := cpStub.GetCpAccountInfo()
 	if err != nil {
-		return fmt.Errorf("get cpAccount faile, error: %v", err)
+		client.Close()
+		return nil, nil, fmt.Errorf("get cpAccount failed, error: %v", err)
 	}
 	if !strings.EqualFold(cpAccount.OwnerAddress, ownerAddress) {
-		return fmt.Errorf("the owner address is incorrect. The owner on the chain is %s, and the current address is %s", cpAccount.OwnerAddress, ownerAddress)
+		client.Close()
+		return nil, nil, fmt.Errorf("Only the owner can change CP account owner address, the CP account is: %s, the owner should be %s", cpAccount.Contract, cpAccount.OwnerAddress)
 	}
-
-	submitUBIProofTx, err := cpStub.ChangeMultiAddress([]string{multiAddr})
-	if err != nil {
-		return fmt.Errorf("change multi-addr tx failed, error: %v", err)
-	}
-	fmt.Printf("ChangeMultiAddress: %s \n", submitUBIProofTx)
-	return nil
+	return client, cpStub, nil
 }

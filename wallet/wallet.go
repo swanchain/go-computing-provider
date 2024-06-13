@@ -2,7 +2,6 @@ package wallet
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/ethereum/go-ethereum"
@@ -13,13 +12,13 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/swanchain/go-computing-provider/conf"
-	"github.com/swanchain/go-computing-provider/wallet/contract/collateral"
-	"github.com/swanchain/go-computing-provider/wallet/contract/swan_token"
+	account2 "github.com/swanchain/go-computing-provider/internal/contract/account"
+	"github.com/swanchain/go-computing-provider/internal/contract/ecp"
+	"github.com/swanchain/go-computing-provider/internal/contract/fcp"
+	"github.com/swanchain/go-computing-provider/internal/contract/token"
 	"github.com/swanchain/go-computing-provider/wallet/tablewriter"
 	"golang.org/x/xerrors"
-	"io"
 	"math/big"
-	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -35,7 +34,6 @@ const (
 
 var (
 	ErrKeyInfoNotFound = fmt.Errorf("key info not found")
-	ErrKeyExists       = fmt.Errorf("key already exists")
 )
 
 var reAddress = regexp.MustCompile("^0x[0-9a-fA-F]{40}$")
@@ -49,23 +47,36 @@ func SetupWallet(dir string) (*LocalWallet, error) {
 		return nil, fmt.Errorf("load config file failed, error: %+v", err)
 	}
 
-	kstore, err := OpenOrInitKeystore(filepath.Join(cpPath, dir))
-	if err != nil {
-		return nil, err
+	var resultErr error
+	timeOutCh := time.After(10 * time.Second)
+loop:
+	for {
+		select {
+		case <-timeOutCh:
+			return nil, fmt.Errorf("open wallet timeout, retry again")
+		default:
+			kstore, err := OpenOrInitKeystore(filepath.Join(cpPath, dir))
+			if err != nil {
+				if strings.Contains(err.Error(), "permission denied") {
+					resultErr = err
+					break loop
+				}
+				time.Sleep(time.Second)
+				continue
+			}
+			return NewWallet(kstore), nil
+		}
 	}
-	return NewWallet(kstore), nil
+	return nil, resultErr
 }
 
 type LocalWallet struct {
-	keys     map[string]*KeyInfo
 	keystore KeyStore
-
-	lk sync.Mutex
+	lk       sync.Mutex
 }
 
 func NewWallet(keystore KeyStore) *LocalWallet {
 	w := &LocalWallet{
-		keys:     make(map[string]*KeyInfo),
 		keystore: keystore,
 	}
 	return w
@@ -97,16 +108,12 @@ func (w *LocalWallet) FindKey(addr string) (*KeyInfo, error) {
 	w.lk.Lock()
 	defer w.lk.Unlock()
 
-	k, ok := w.keys[addr]
-	if ok {
-		return k, nil
-	}
 	if w.keystore == nil {
 		log.Warn("FindKey didn't find the key in in-memory wallet")
 		return nil, nil
 	}
 
-	ki, err := w.tryFind(addr)
+	ki, err := w.keystore.Get(KNamePrefix + addr)
 	if err != nil {
 		if xerrors.Is(err, ErrKeyInfoNotFound) {
 			return nil, nil
@@ -114,21 +121,7 @@ func (w *LocalWallet) FindKey(addr string) (*KeyInfo, error) {
 		return nil, xerrors.Errorf("getting from keystore: %w", err)
 	}
 
-	w.keys[addr] = &ki
 	return &ki, nil
-}
-
-func (w *LocalWallet) tryFind(key string) (KeyInfo, error) {
-	ki, err := w.keystore.Get(KNamePrefix + key)
-	if err == nil {
-		return ki, err
-	}
-
-	if !xerrors.Is(err, ErrKeyInfoNotFound) {
-		return KeyInfo{}, err
-	}
-
-	return ki, nil
 }
 
 func (w *LocalWallet) WalletExport(ctx context.Context, addr string) (*KeyInfo, error) {
@@ -157,7 +150,7 @@ func (w *LocalWallet) WalletImport(ctx context.Context, ki *KeyInfo) (string, er
 
 	address := crypto.PubkeyToAddress(*publicKeyECDSA).Hex()
 
-	existAddress, err := w.tryFind(address)
+	existAddress, err := w.keystore.Get(KNamePrefix + address)
 	if err == nil && existAddress.PrivateKey != "" {
 		return "", xerrors.Errorf("This wallet address already exists")
 	}
@@ -194,7 +187,7 @@ func (w *LocalWallet) WalletList(ctx context.Context, chainName string, contract
 	for _, addr := range addressList {
 		var balance string
 		if contractFlag {
-			tokenStub, err := swan_token.NewTokenStub(client, swan_token.WithPublicKey(addr))
+			tokenStub, err := token.NewTokenStub(client, token.WithPublicKey(addr))
 			if err == nil {
 				balance, err = tokenStub.BalanceOf()
 			}
@@ -258,20 +251,18 @@ func (w *LocalWallet) WalletNew(ctx context.Context) (string, error) {
 	if err := w.keystore.Put(KNamePrefix+address, keyInfo); err != nil {
 		return "", xerrors.Errorf("saving to keystore: %w", err)
 	}
-	w.keys[address] = &keyInfo
 
 	return address, nil
 }
 
 func (w *LocalWallet) walletDelete(ctx context.Context, addr string) error {
+	w.keystore.Close()
 	w.lk.Lock()
 	defer w.lk.Unlock()
 
 	if err := w.keystore.Delete(KNamePrefix + addr); err != nil {
 		return xerrors.Errorf("failed to delete key %s: %w", addr, err)
 	}
-
-	delete(w.keys, addr)
 
 	return nil
 }
@@ -317,7 +308,7 @@ func (w *LocalWallet) WalletSend(ctx context.Context, chainName string, from, to
 	return txHash, nil
 }
 
-func (w *LocalWallet) WalletCollateral(ctx context.Context, chainName string, from string, amount string) (string, error) {
+func (w *LocalWallet) WalletCollateral(ctx context.Context, chainName string, from string, amount string, cpAccountAddress string, collateralType string) (string, error) {
 	defer w.keystore.Close()
 	sendAmount, err := convertToWei(amount)
 	if err != nil {
@@ -342,112 +333,71 @@ func (w *LocalWallet) WalletCollateral(ctx context.Context, chainName string, fr
 	}
 	defer client.Close()
 
-	tokenStub, err := swan_token.NewTokenStub(client, swan_token.WithPrivateKey(ki.PrivateKey))
-	if err != nil {
-		return "", err
-	}
-
-	swanTokenTxHash, err := tokenStub.Approve(sendAmount)
-	if err != nil {
-		return "", err
-	}
-
-	timeout := time.After(3 * time.Minute)
-	ticker := time.Tick(3 * time.Second)
-	for {
-		select {
-		case <-timeout:
-			return "", fmt.Errorf("timeout waiting for transaction confirmation, tx: %s", swanTokenTxHash)
-		case <-ticker:
-			receipt, err := client.TransactionReceipt(context.Background(), common.HexToHash(swanTokenTxHash))
-			if err != nil {
-				if errors.Is(err, ethereum.NotFound) {
-					continue
-				}
-				return "", fmt.Errorf("mintor swan token Approve tx, error: %+v", err)
-			}
-
-			if receipt != nil && receipt.Status == types.ReceiptStatusSuccessful {
-				collateralStub, err := collateral.NewCollateralStub(client, collateral.WithPrivateKey(ki.PrivateKey))
-				if err != nil {
-					return "", err
-				}
-				collateralTxHash, err := collateralStub.Deposit(sendAmount)
-				if err != nil {
-					return "", err
-				}
-				return collateralTxHash, nil
-			} else if receipt != nil && receipt.Status == 0 {
-				return "", fmt.Errorf("swan token approve transaction execution failed, tx: %s", swanTokenTxHash)
-			}
-		}
-	}
-}
-
-func (w *LocalWallet) CollateralInfo(ctx context.Context, chainName string) error {
-	defer w.keystore.Close()
-	addrs, err := w.addressList(ctx)
-	if err != nil {
-		return err
-	}
-
-	addressKey := "Address"
-	balanceKey := "Balance"
-	collateralKey := "Collateral"
-	frozenKey := "Escrow"
-	errorKey := "Error"
-
-	chainRpc, err := conf.GetRpcByName(chainName)
-	if err != nil {
-		return err
-	}
-	client, err := ethclient.Dial(chainRpc)
-	if err != nil {
-		return err
-	}
-	defer client.Close()
-
-	var wallets []map[string]interface{}
-	for _, addr := range addrs {
-		var balance, collateralBalance string
-		balance, err = Balance(ctx, client, addr)
-
-		collateralStub, err := collateral.NewCollateralStub(client, collateral.WithPublicKey(addr))
-		if err == nil {
-			collateralBalance, err = collateralStub.Balances()
-		}
-
-		frozenCollateral, err := getFrozenCollateral(addr)
-
-		var errmsg string
+	if collateralType == "fcp" {
+		tokenStub, err := token.NewTokenStub(client, token.WithPrivateKey(ki.PrivateKey))
 		if err != nil {
-			errmsg = err.Error()
+			return "", err
 		}
 
-		wallet := map[string]interface{}{
-			addressKey:    addr,
-			balanceKey:    balance,
-			collateralKey: collateralBalance,
-			frozenKey:     frozenCollateral,
-			errorKey:      errmsg,
+		swanTokenTxHash, err := tokenStub.Approve(sendAmount)
+		if err != nil {
+			return "", err
 		}
-		wallets = append(wallets, wallet)
-	}
 
-	tw := tablewriter.New(
-		tablewriter.Col(addressKey),
-		tablewriter.Col(balanceKey),
-		tablewriter.Col(collateralKey),
-		tablewriter.Col(frozenKey),
-		tablewriter.NewLineCol(errorKey))
+		timeout := time.After(3 * time.Minute)
+		ticker := time.Tick(3 * time.Second)
+		for {
+			select {
+			case <-timeout:
+				return "", fmt.Errorf("timeout waiting for transaction confirmation, tx: %s", swanTokenTxHash)
+			case <-ticker:
+				receipt, err := client.TransactionReceipt(context.Background(), common.HexToHash(swanTokenTxHash))
+				if err != nil {
+					if errors.Is(err, ethereum.NotFound) {
+						continue
+					}
+					return "", fmt.Errorf("mintor swan token Approve tx, error: %+v", err)
+				}
 
-	for _, wallet := range wallets {
-		tw.Write(wallet)
+				if receipt != nil && receipt.Status == types.ReceiptStatusSuccessful {
+					collateralStub, err := fcp.NewCollateralStub(client, fcp.WithPrivateKey(ki.PrivateKey))
+					if err != nil {
+						return "", err
+					}
+					collateralTxHash, err := collateralStub.Deposit(sendAmount)
+					if err != nil {
+						return "", err
+					}
+					return collateralTxHash, nil
+				} else if receipt != nil && receipt.Status == 0 {
+					return "", fmt.Errorf("swan token approve transaction execution failed, tx: %s", swanTokenTxHash)
+				}
+			}
+		}
+	} else {
+
+		cpStub, err := account2.NewAccountStub(client, account2.WithContractAddress(cpAccountAddress))
+		if err != nil {
+			return "", err
+		}
+		if _, err = cpStub.GetCpAccountInfo(); err != nil {
+			return "", fmt.Errorf("cp account: %s does not exist on the chain", cpAccountAddress)
+		}
+
+		zkCollateral, err := ecp.NewCollateralStub(client, ecp.WithPrivateKey(ki.PrivateKey))
+		if err != nil {
+			return "", err
+		}
+
+		collateralTxHash, err := zkCollateral.Deposit(cpAccountAddress, sendAmount)
+		if err != nil {
+			return "", err
+		}
+		return collateralTxHash, nil
 	}
-	return tw.Flush(os.Stdout)
 }
 
-func (w *LocalWallet) CollateralWithdraw(ctx context.Context, chainName string, to string, amount string) (string, error) {
+func (w *LocalWallet) CollateralWithdraw(ctx context.Context, chainName string, address string, amount string, cpAccountAddress string, collateralType string) (string, error) {
 	defer w.keystore.Close()
 	withDrawAmount, err := convertToWei(amount)
 	if err != nil {
@@ -459,12 +409,12 @@ func (w *LocalWallet) CollateralWithdraw(ctx context.Context, chainName string, 
 		return "", err
 	}
 
-	ki, err := w.FindKey(to)
+	ki, err := w.FindKey(address)
 	if err != nil {
 		return "", err
 	}
 	if ki == nil {
-		return "", xerrors.Errorf("the address: %s, private key %w,", to, ErrKeyInfoNotFound)
+		return "", xerrors.Errorf("the address: %s, private key %w,", address, ErrKeyInfoNotFound)
 	}
 
 	client, err := ethclient.Dial(chainUrl)
@@ -473,26 +423,29 @@ func (w *LocalWallet) CollateralWithdraw(ctx context.Context, chainName string, 
 	}
 	defer client.Close()
 
-	collateralStub, err := collateral.NewCollateralStub(client, collateral.WithPrivateKey(ki.PrivateKey))
-	if err != nil {
-		return "", err
+	if collateralType == "fcp" {
+		collateralStub, err := fcp.NewCollateralStub(client, fcp.WithPrivateKey(ki.PrivateKey))
+		if err != nil {
+			return "", err
+		}
+		return collateralStub.Withdraw(withDrawAmount)
+	} else {
+		zkCollateral, err := ecp.NewCollateralStub(client, ecp.WithPrivateKey(ki.PrivateKey))
+		if err != nil {
+			return "", err
+		}
+		return zkCollateral.Withdraw(cpAccountAddress, withDrawAmount)
 	}
-	withdrawHash, err := collateralStub.Withdraw(withDrawAmount)
-	if err != nil {
-		return "", err
-	}
-
-	return withdrawHash, nil
 }
 
-func (w *LocalWallet) CollateralSendCmd(ctx context.Context, from, to string, amount string) (string, error) {
+func (w *LocalWallet) CollateralSend(ctx context.Context, chainName, from, to string, amount string) (string, error) {
 	defer w.keystore.Close()
 	withDrawAmount, err := convertToWei(amount)
 	if err != nil {
 		return "", err
 	}
 
-	chainUrl, err := conf.GetRpcByName(conf.DefaultRpc)
+	chainUrl, err := conf.GetRpcByName(chainName)
 	if err != nil {
 		return "", err
 	}
@@ -511,7 +464,7 @@ func (w *LocalWallet) CollateralSendCmd(ctx context.Context, from, to string, am
 	}
 	defer client.Close()
 
-	collateralStub, err := swan_token.NewTokenStub(client, swan_token.WithPrivateKey(ki.PrivateKey))
+	collateralStub, err := token.NewTokenStub(client, token.WithPrivateKey(ki.PrivateKey))
 	if err != nil {
 		return "", err
 	}
@@ -552,43 +505,4 @@ func convertToWei(ethValue string) (*big.Int, error) {
 		return nil, fmt.Errorf("conversion to Wei failed")
 	}
 	return weiInt, nil
-}
-
-func getFrozenCollateral(walletAddress string) (string, error) {
-	url := fmt.Sprintf("%s/check_holding_collateral/%s", conf.GetConfig().HUB.ServerUrl, walletAddress)
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return "", fmt.Errorf("create request failed: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+conf.GetConfig().HUB.AccessToken)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("request failed: %v", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read response body: %v", err)
-	}
-
-	var frozenResp struct {
-		Data struct {
-			FrozenCollateral big.Int `json:"Frozen_Collateral"`
-		} `json:"data"`
-		Message string `json:"message"`
-		Status  string `json:"status"`
-	}
-
-	if err = json.Unmarshal(body, &frozenResp); err != nil {
-	}
-	fbalance := new(big.Float)
-	fbalance.SetString(frozenResp.Data.FrozenCollateral.String())
-	etherQuotient := new(big.Float).Quo(fbalance, new(big.Float).SetInt(big.NewInt(1e18)))
-	ethValue := etherQuotient.Text('f', 5)
-	return ethValue, nil
 }

@@ -51,7 +51,7 @@ func (v *VisualTable) Generate(formatHeaders bool) {
 	}
 
 	table.SetHeader(v.Header)
-	table.SetAutoWrapText(false)
+	table.SetAutoWrapText(true)
 	table.SetAutoFormatHeaders(formatHeaders)
 	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
 	table.SetHeaderLine(false)

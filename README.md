@@ -30,10 +30,9 @@ As a resource provider, you can run a **ECP**(Edge Computing Provider) and **FCP
 		- [Install the Ingress-nginx Controller](#Install-the-Ingress-nginx-Controller)
  	- [Install and config the Nginx](#Install-the-Ingress-nginx-Controller)
  	- [Install the Hardware resource-exporter](#Install-the-Hardware-resource-exporter)
- 	- [Install the Redis service](#Install-Redis-service)
  	- [Build and config the Computing Provider](#Build-and-config-the-Computing-Provider)
- 	- [Install AI Inference Dependency(Optional)](#Install-AI-Inference-Dependency)
- 	- [Config and Receive UBI Tasks(optional)](#Config-and-Receive-UBI-Tasks)
+ 	- [Install AI Inference Dependency(Optional)](#optional-Install-AI-Inference-Dependency)
+ 	- [Config and Receive UBI Tasks(Optional)](#optional-Config-and-Receive-UBI-Tasks)
 	 - [Start the Computing Provider](#Start-the-Computing-Provider)
 	 - [CLI of Computing Provider](#CLI-of-Computing-Provider)
  
@@ -287,7 +286,7 @@ spec:
     spec:
       containers:
       - name: resource-exporter
-        image: filswan/resource-exporter:v11.2.5
+        image: filswan/resource-exporter:v11.2.7
         imagePullPolicy: IfNotPresent
 EOF
 ```
@@ -295,19 +294,6 @@ If you have installed it correctly, you can see the result shown in the figure b
 `kubectl get po -n kube-system`
 
 ![7](https://github.com/lagrangedao/go-computing-provider/assets/102578774/38b0e15f-5ff9-4edc-a313-d0f6f4a0bda8)
-
-### Install Redis service
- - Install the `redis-server`
-```bash
-sudo apt update
-sudo apt install redis-server
-```
-
- - Run Redis service:
-
-```bash
-systemctl start redis-server.service
-```
 
 ## Build and config the Computing Provider
 
@@ -326,7 +312,8 @@ Then build the Computing provider follow the below steps:
 make clean && make
 make install
 ```
- - Update Configuration 
+ - Update Configuration
+
 The computing provider's configuration sample locate in `./go-computing-provider/config.toml.sample`
 
 ```
@@ -341,34 +328,26 @@ Port = 8085                                    # The port number that the web se
 MultiAddress = "/ip4/<public_ip>/tcp/<port>"   # The multiAddress for libp2p
 Domain = ""                                    # The domain name
 NodeName = ""                                  # The computing-provider node name
-
-RedisUrl = "redis://127.0.0.1:6379"            # The redis server address
-RedisPassword = ""                             # The redis server access password
 WalletWhiteList = ""                           # CP only accepts user addresses from this whitelist for space deployment
 
 [UBI]
-UbiTask = true                                                # Accept the UBI task (Default: true)
-UbiEnginePk = "0xB5aeb540B4895cd024c1625E146684940A849ED9"    # UBI Engine's public key, CP only accept the task from this UBI engine 
-UbiUrl ="https://ubi-task.swanchain.io/v1"                    # UBI Engine's API address
+UbiEnginePk = "0xB5aeb540B4895cd024c1625E146684940A849ED9"     # UBI Engine's public key, CP only accept the task from this UBI engine
 
 [LOG]
-CrtFile = "/YOUR_DOMAIN_NAME_CRT_PATH/server.crt"             # Your domain name SSL .crt file path
-KeyFile = "/YOUR_DOMAIN_NAME_KEY_PATH/server.key"             # Your domain name SSL .key file path
+CrtFile = "/YOUR_DOMAIN_NAME_CRT_PATH/server.crt"              # Your domain name SSL .crt file path
+KeyFile = "/YOUR_DOMAIN_NAME_KEY_PATH/server.key"              # Your domain name SSL .key file path
 
 [HUB]
-ServerUrl = "https://orchestrator-api.swanchain.io"           # The Orchestrator's API address
-AccessToken = ""                                              # The Orchestrator's access token, Acquired from "https://orchestrator.swanchain.io" 
-WalletAddress = ""                                            # The cp‘s wallet address
+ServerUrl = "https://orchestrator-api.swanchain.io"            # The Orchestrator's API address
+AccessToken = ""                                               # The Orchestrator's access token, Use the owner address Acquired from "https://orchestrator.swanchain.io"
 BalanceThreshold= 1                                            # The cp’s collateral balance threshold
 OrchestratorPk = "0x29eD49c8E973696D07E7927f748F6E5Eacd5516D"  # Orchestrator's public key, CP only accept the task from this Orchestrator
 VerifySign = true                                              # Verify that the task signature is from Orchestrator
-
 
 [MCS]
 ApiKey = ""                                   # Acquired from "https://www.multichain.storage" -> setting -> Create API Key
 BucketName = ""                               # Acquired from "https://www.multichain.storage" -> bucket -> Add Bucket
 Network = "polygon.mainnet"                   # polygon.mainnet for mainnet, polygon.mumbai for testnet
-FileCachePath = "/tmp"                        # Cache directory of job data
 
 [Registry]
 ServerAddress = ""                            # The docker container image registry address, if only a single node, you can ignore
@@ -377,99 +356,126 @@ Password = ""                                 # The login password, if only a si
 
 [RPC]
 SWAN_TESTNET ="https://rpc-proxima.swanchain.io"  # Swan testnet RPC
-SWAN_MAINNET= ""								   # Swan mainnet RPC
+SWAN_MAINNET= ""	                          # Swan mainnet RPC
 
 [CONTRACT]
-SWAN_CONTRACT="0x91B25A65b295F0405552A4bbB77879ab5e38166c"              # Swan token's contract address
-SWAN_COLLATERAL_CONTRACT="0xfD9190027cd42Fc4f653Dfd9c4c45aeBAf0ae063"   # Swan's collateral address
+SWAN_CONTRACT = "0x91B25A65b295F0405552A4bbB77879ab5e38166c"              # Swan token's contract address
+SWAN_COLLATERAL_CONTRACT = "0xC7980d5a69e8AA9797934aCf18e483EB4C986e01"   # Swan's collateral address
+REGISTER_CP_CONTRACT = "0x6EDf891B53ba2c6Fade6Ae373682ED48dEa5AF48"       # The CP registration contract address
+ZK_COLLATERAL_CONTRACT = "0x1d2557C9d14882D9eE291BB66eaC6c1C4a587054"     # The ZK task's collateral contract address
 ```
 *Note:*  Example WalletWhiteList hosted on GitHub can be found [here](https://raw.githubusercontent.com/swanchain/market-providers/main/clients/whitelist.txt).
 
-## Install AI Inference Dependency
+## Initialize a Wallet and Deposit Swan-ETH
+1.  Generate a new wallet address or import the previous wallet:
+
+	```bash
+    computing-provider wallet new
+    ```
+
+	Example output:
+
+	```
+    0x7791f48931DB81668854921fA70bFf0eB85B8211
+    ```
+ 
+	or import your own wallet:
+	```bash
+	# Import wallet using private key
+	computing-provider wallet import <YOUR_PRIVATE_KEY_FILE>
+ 	```
+ >**Note:** 
+>1. By default, the CP's repo is `~/.swan/computing`, you can configure it by `export CP_PATH="<YOUR_CP_PATH>"`
+>
+>2. `<YOUR_PRIVATE_KEY_FILE>` is a file that contains the private key
+
+
+2.  Deposit Swan-ETH to the wallet address:
+```bash
+computing-provider wallet send --from 0xFbc1d38a2127D81BFe3EA347bec7310a1cfa2373 0x7791f48931DB81668854921fA70bFf0eB85B8211 0.001
+```
+
+**Note:** Follow [the guideline](https://docs.swanchain.io/swan-testnet/atom-accelerator-race/before-you-get-started/claim-sepoliaeth) to claim Swan-ETH and bridge it to Swan Proxima Chain.
+
+## Initialization CP Account
+Deploy a CP account contract:
+```bash
+computing-provider account create --ownerAddress <YOUR_OWNER_WALLET_ADDRESS> \
+	--workerAddress <YOUR_WORKER_WALLET_ADDRESS> \
+	--beneficiaryAddress <YOUR_BENEFICIARY_WALLET_ADDRESS>  \
+	--task-types 3
+```
+**Note:** `--task-types`: Supports 4 task types (1: Fil-C2-512M, 2: Aleo, 3: AI, 4: Fil-C2-32G), separated by commas. For FCP, it needs to be set to 3.
+_Output:_
+
+```
+Contract deployed! Address: 0x3091c9647Ea5248079273B52C3707c958a3f2658
+Transaction hash: 0xb8fd9cc9bfac2b2890230b4f14999b9d449e050339b252273379ab11fac15926
+```
+
+## Collateral Swan-ETH for FCP
+```bash
+ computing-provider collateral add --fcp --from <YOUR_WALLET_ADDRESS>  <amount>
+```
+**Note:** Currently one AI task requires 0.01 Swan-ETH.
+
+## Start the Computing Provider
+You can run `computing-provider` using the following command
+```bash
+export CP_PATH=<YOUR_CP_PATH>
+nohup computing-provider run >> cp.log 2>&1 & 
+```
+---
+## [**OPTIONAL**] Install AI Inference Dependency
 It is necessary for Computing Provider to deploy the  AI inference endpoint. But if you do not want to support the feature, you can skip it.
 ```bash
-export CP_PATH=<YOUR CP_PATH>
+export CP_PATH=<YOUR_CP_PATH>
 ./install.sh
 ```
 
-## Config and Receive UBI Tasks
-### **Step 1: Prerequisites:** Perform Filecoin Commit2 (fil-c2) UBI tasks.
-
-1.  Download the tool for Filecoin Commit2 task parameters:
-
-    ```bash
-    wget https://github.com/swanchain/ubi-benchmark/releases/download/v0.0.1/lotus-shed
-    ```
-2.  Download parameters (specify path with FIL\_PROOFS\_PARAMETER\_CACHE variable):
-
-    ```bash
-    export FIL_PROOFS_PARAMETER_CACHE=/var/tmp/filecoin-proof-parameters
-    lotus-shed fetch-params --proving-params 512MiB # 512MiB represent sector size
-    lotus-shed fetch-params --proving-params 32GiB # 32GiB represent sector size
-    ```
-3.  Configure environment variables in `fil-c2.env` under CP repo ($CP\_PATH):
+## [**OPTIONAL**] Config and Receive UBI Tasks
+### **Step 1: Prerequisites:** Perform Filecoin Commit2 (fil-c2) ZK tasks.
+1. Download parameters (specify path with PARENT_PATH variable):
+	```bash
+	# At least 200G storage is needed
+	export PARENT_PATH="<V28_PARAMS_PATH>"
+	
+	# 512MiB parameters
+	curl -fsSL https://raw.githubusercontent.com/swanchain/go-computing-provider/releases/ubi/fetch-param-512.sh | bash
+	
+	# 32GiB parameters
+	curl -fsSL https://raw.githubusercontent.com/swanchain/go-computing-provider/releases/ubi/fetch-param-32.sh | bash
+	```
+2. Configure environment variables in `fil-c2.env` under CP repo (`$CP_PATH`):
 
     ```bash
-    FIL_PROOFS_PARAMETER_CACHE="/var/tmp/filecoin-proof-parameters"
+    FIL_PROOFS_PARAMETER_CACHE=$PARENT_PATH
     RUST_GPU_TOOLS_CUSTOM_GPU="GeForce RTX 3080:8704" 
     ```
 
 * Adjust the value of `RUST_GPU_TOOLS_CUSTOM_GPU` based on the GPU used by the CP's Kubernetes cluster for fil-c2 tasks.
 * For more device choices, please refer to this page:[https://github.com/filecoin-project/bellperson](https://github.com/filecoin-project/bellperson)
 
-### **Step 2: Enable UBI tasks in CP's** `config.toml`**:**
+### Step 2: Collateral Swan-ETH for receive ZK Task
 
-```ini
-[UBI]
-UbiTask = true
+```bash
+computing-provider collateral add --ecp --from <YOUR_WALLET_ADDRESS>  <amount>
 ```
+**Note:** Currently one zk-task requires 0.0005 Swan-ETH.
 
-### Step 3: Initialize a Wallet and Deposit Swan-ETH
+Example output:
 
-1.  Generate a new wallet address:
+```
+0x7791f48931DB81668854921fA70bFf0eB85B8211
+```
+### Step 3: Add the type of ZK task
 
-    ```bash
-    computing-provider wallet new
-    ```
+```bash
+computing-provider account changeTaskTypes --ownerAddress <YOUR_OWNER_WALLET_ADDRESS> 1,2,3,4
+```
+**Note:** `--task-types`: Supports 4 task types (1: Fil-C2-512M, 2: Aleo, 3: AI, 4: Fil-C2-32G), separated by commas. If you need to run FCP and ECP at the same time, you need to set it to 1,2,3,4 
 
-    Example output:
-
-    ```
-    0x7791f48931DB81668854921fA70bFf0eB85B8211
-    ```
-2.  Deposit Swan-ETH to the generated wallet address as a gas fee:
-
-    ```bash
-    computing-provider wallet send --from 0xFbc1d38a2127D81BFe3EA347bec7310a1cfa2373 0x7791f48931DB81668854921fA70bFf0eB85B8211 0.001
-    ```
-
-    Example output:
-
-    ```
-    0xa255d9046eff7c7c7ef6f4b55efcf97b62c79aeece748ab2188de21da620f29b
-    ```
-
-
-
-Note: Follow [this guide](https://docs.swanchain.io/swan-testnet/swan-saturn-testnet/before-you-get-started/claim-faucet-tokens) to claim Swan-ETH and bridge it to Swan Saturn Chain.
-
-### **Step 4: Initialization**
-
-1.  Deploy a contract with CP's basic info:
-
-    ```bash
-    computing-provider account create --ownerAddress 0xFbc1d38a2127D81BFe3EA347bec7310a1cfa2373
-    ```
-
-    _Output:_
-
-    ```
-    Contract deployed! Address: 0x3091c9647Ea5248079273B52C3707c958a3f2658
-    Transaction hash: 0xb8fd9cc9bfac2b2890230b4f14999b9d449e050339b252273379ab11fac15926
-    The height of the block: 44900354
-    ```
-
-### **Step 5: Account Management**
+### **Step 4: Account Management**
 
 Use `computing-provider account` subcommands to update CP details:
 
@@ -483,22 +489,23 @@ USAGE:
 
 COMMANDS:
    create                    Create a cp account to chain
-   changeMultiAddress        Update MultiAddress of CP
+   changeMultiAddress        Update MultiAddress of CP (/ip4/<public_ip>/tcp/<port>)
    changeOwnerAddress        Update OwnerAddress of CP
-   changeBeneficiaryAddress  Update BeneficiaryAddress of CP
-   changeUbiFlag             Update UbiFlag of CP
+   changeWorkerAddress       Update workerAddress of CP
+   changeBeneficiaryAddress  Update beneficiaryAddress of CP
+   changeTaskTypes           Update taskTypes of CP (1:Fil-C2-512M, 2:Aleo, 3: AI, 4:Fil-C2-32G), separated by commas
    help, h                   Shows a list of commands or help for one command
 
 OPTIONS:
    --help, -h  show help
 ```
 
-### Step 6: Check the Status of UBI-Task&#x20;
+### Step 6: Check the Status of ZK task;
 
-To check the UBI task list, use the following command:
+To check the ZK task list, use the following command:
 
 ```
-computing-provider ubi list
+computing-provider ubi list --show-failed
 ```
 
 Example output:
@@ -511,13 +518,10 @@ TASK ID TASK TYPE       ZK TYPE         TRANSACTION HASH                        
 238     CPU             fil-c2-512M     0xb8eb1f7b3cfc8210fa5546adc528f230241110e5cc9b4900725a9da28895aad9      success 2.0     2024-01-18 17:08:21
 ```
 
-
-
-
-## Start the Computing Provider
+## Restart the Computing Provider
 You can run `computing-provider` using the following command
 ```bash
-export CP_PATH=<YOUR CP_PATH>
+export CP_PATH=<YOUR_CP_PATH>
 nohup computing-provider run >> cp.log 2>&1 & 
 ```
 

@@ -1,10 +1,8 @@
-
 package main
 
 import (
 	"context"
 	"fmt"
-	"github.com/gomodule/redigo/redis"
 	"github.com/olekukonko/tablewriter"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/constants"
@@ -46,54 +44,47 @@ var taskList = &cli.Command{
 			return fmt.Errorf("load config file failed, error: %+v", err)
 		}
 
-		conn := computing.GetRedisClient()
-		prefix := constants.REDIS_SPACE_PREFIX + "*"
-		keys, err := redis.Strings(conn.Do("KEYS", prefix))
-		if err != nil {
-			return fmt.Errorf("failed get redis %s prefix, error: %+v", prefix, err)
-		}
-
 		var taskData [][]string
 		var rowColorList []RowColor
-		var number int
-		for _, key := range keys {
-			jobDetail, err := computing.RetrieveJobMetadata(key)
-			if err != nil {
-				return fmt.Errorf("failed get job detail: %s, error: %+v", key, err)
-			}
 
+		list, err := computing.NewJobService().GetJobList()
+		if err != nil {
+			return fmt.Errorf("get jobs failed, error: %+v", err)
+		}
+		for i, job := range list {
 			k8sService := computing.NewK8sService()
-			status, err := k8sService.GetDeploymentStatus(jobDetail.WalletAddress, jobDetail.SpaceUuid)
+			status, err := k8sService.GetDeploymentStatus(job.WalletAddress, job.SpaceUuid)
 			if err != nil {
-				return fmt.Errorf("failed get job status: %s, error: %+v", jobDetail.JobUuid, err)
+				return fmt.Errorf("failed get job status: %s, error: %+v", job.JobUuid, err)
+			}
+			var fullSpaceUuid string
+			if len(job.K8sDeployName) > 0 {
+				fullSpaceUuid = job.K8sDeployName[7:]
 			}
 
-			var fullSpaceUuid string
-			if len(jobDetail.DeployName) > 0 {
-				fullSpaceUuid = jobDetail.DeployName[7:]
-			}
+			expireTime := time.Unix(job.ExpireTime, 0).Format("2006-01-02 15:04:05")
 
 			if fullFlag {
 				taskData = append(taskData,
-					[]string{jobDetail.TaskUuid, jobDetail.TaskType, jobDetail.WalletAddress, fullSpaceUuid, jobDetail.SpaceName, status})
+					[]string{job.TaskUuid, job.ResourceType, job.WalletAddress, fullSpaceUuid, job.Name, status, expireTime})
 			} else {
 				var walletAddress string
-				if len(jobDetail.WalletAddress) > 0 {
-					walletAddress = jobDetail.WalletAddress[:5] + "..." + jobDetail.WalletAddress[37:]
+				if len(job.WalletAddress) > 0 {
+					walletAddress = job.WalletAddress[:5] + "..." + job.WalletAddress[37:]
 				}
 
 				var taskUuid string
-				if len(jobDetail.TaskUuid) > 0 {
-					taskUuid = "..." + jobDetail.TaskUuid[26:]
+				if len(job.TaskUuid) > 0 {
+					taskUuid = "..." + job.TaskUuid[26:]
 				}
 
 				var spaceUuid string
-				if len(jobDetail.SpaceUuid) > 0 {
-					spaceUuid = "..." + jobDetail.SpaceUuid[26:]
+				if len(job.SpaceUuid) > 0 {
+					spaceUuid = "..." + job.SpaceUuid[26:]
 				}
 
 				taskData = append(taskData,
-					[]string{taskUuid, jobDetail.TaskType, walletAddress, spaceUuid, jobDetail.SpaceName, status})
+					[]string{taskUuid, job.ResourceType, walletAddress, spaceUuid, job.Name, status, expireTime})
 			}
 
 			var rowColor []tablewriter.Colors
@@ -106,19 +97,15 @@ var taskList = &cli.Command{
 			}
 
 			rowColorList = append(rowColorList, RowColor{
-				row:    number,
+				row:    i,
 				column: []int{5},
 				color:  rowColor,
 			})
-
-			number++
 		}
 
-		header := []string{"TASK UUID", "TASK TYPE", "WALLET ADDRESS", "SPACE UUID", "SPACE NAME", "STATUS"}
+		header := []string{"TASK UUID", "TASK TYPE", "WALLET ADDRESS", "SPACE UUID", "SPACE NAME", "STATUS", "EXPIRE TIME"}
 		NewVisualTable(header, taskData, rowColorList).Generate(true)
-
 		return nil
-
 	},
 }
 
@@ -138,38 +125,37 @@ var taskDetail = &cli.Command{
 		if err := conf.InitConfig(cpRepoPath, false); err != nil {
 			return fmt.Errorf("load config file failed, error: %+v", err)
 		}
-		computing.GetRedisClient()
 
-		spaceUuid := constants.REDIS_SPACE_PREFIX + cctx.Args().First()
-		jobDetail, err := computing.RetrieveJobMetadata(spaceUuid)
+		spaceUuid := cctx.Args().First()
+		job, err := computing.NewJobService().GetJobEntityBySpaceUuid(spaceUuid)
 		if err != nil {
 			return fmt.Errorf("failed get job detail: %s, error: %+v", spaceUuid, err)
 		}
 
 		k8sService := computing.NewK8sService()
-		status, err := k8sService.GetDeploymentStatus(jobDetail.WalletAddress, jobDetail.SpaceUuid)
+		status, err := k8sService.GetDeploymentStatus(job.WalletAddress, job.SpaceUuid)
 		if err != nil {
-			return fmt.Errorf("failed get job status: %s, error: %+v", jobDetail.JobUuid, err)
+			return fmt.Errorf("failed get job status: %s, error: %+v", job.JobUuid, err)
 		}
 
 		var taskData [][]string
-		taskData = append(taskData, []string{"TASK TYPE:", jobDetail.TaskType})
-		taskData = append(taskData, []string{"WALLET ADDRESS:", jobDetail.WalletAddress})
-		taskData = append(taskData, []string{"SPACE NAME:", jobDetail.SpaceName})
-		taskData = append(taskData, []string{"SPACE URL:", jobDetail.Url})
-		taskData = append(taskData, []string{"HARDWARE:", jobDetail.Hardware})
+		taskData = append(taskData, []string{"TASK TYPE:", job.ResourceType})
+		taskData = append(taskData, []string{"WALLET ADDRESS:", job.WalletAddress})
+		taskData = append(taskData, []string{"SPACE NAME:", job.Name})
+		taskData = append(taskData, []string{"SPACE URL:", job.RealUrl})
+		taskData = append(taskData, []string{"HARDWARE:", job.Hardware})
 		taskData = append(taskData, []string{"STATUS:", status})
 
 		var rowColor []tablewriter.Colors
 		if status == "Pending" {
-			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgYellowColor}, {tablewriter.Bold, tablewriter.FgWhiteColor}}
+			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgYellowColor}, {tablewriter.Bold, tablewriter.FgYellowColor}}
 		} else if status == "Running" {
-			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}, {tablewriter.Bold, tablewriter.FgWhiteColor}}
+			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}, {tablewriter.Bold, tablewriter.FgGreenColor}}
 		} else {
-			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}, {tablewriter.Bold, tablewriter.FgWhiteColor}}
+			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}, {tablewriter.Bold, tablewriter.FgCyanColor}}
 		}
 
-		header := []string{"TASK UUID:", jobDetail.TaskUuid}
+		header := []string{"TASK UUID:", job.TaskUuid}
 
 		var rowColorList []RowColor
 		rowColorList = append(rowColorList, RowColor{
@@ -198,16 +184,15 @@ var taskDelete = &cli.Command{
 		if err := conf.InitConfig(cpRepoPath, false); err != nil {
 			return fmt.Errorf("load config file failed, error: %+v", err)
 		}
-		computing.GetRedisClient()
 
 		spaceUuid := strings.ToLower(cctx.Args().First())
-		jobDetail, err := computing.RetrieveJobMetadata(constants.REDIS_SPACE_PREFIX + spaceUuid)
+		job, err := computing.NewJobService().GetJobEntityBySpaceUuid(spaceUuid)
 		if err != nil {
 			return fmt.Errorf("failed get job detail: %s, error: %+v", spaceUuid, err)
 		}
 
 		deployName := constants.K8S_DEPLOY_NAME_PREFIX + spaceUuid
-		namespace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(jobDetail.WalletAddress)
+		namespace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(job.WalletAddress)
 		k8sService := computing.NewK8sService()
 		if err := k8sService.DeleteDeployment(context.TODO(), namespace, deployName); err != nil && !errors.IsNotFound(err) {
 			return err
@@ -218,9 +203,7 @@ var taskDelete = &cli.Command{
 			return err
 		}
 
-		conn := computing.GetRedisClient()
-		conn.Do("DEL", redis.Args{}.AddFlat(constants.REDIS_SPACE_PREFIX+spaceUuid)...)
-
+		computing.NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid)
 		return nil
 	},
 }

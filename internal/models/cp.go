@@ -1,19 +1,11 @@
 package models
 
 import (
-	"math/big"
 	"time"
 )
 
-type BidStatus string
-
 const (
-	BidDisabledStatus    BidStatus = "bidding_disabled"
-	BidEnabledStatus     BidStatus = "bidding_enabled"
-	BidGpuDisabledStatus BidStatus = "bidding_gpu_disabled"
-
-	ActiveStatus   string = "Active"
-	InactiveStatus string = "Inactive"
+	ActiveStatus string = "Active"
 )
 
 type ComputingProvider struct {
@@ -26,39 +18,26 @@ type ComputingProvider struct {
 }
 
 type JobData struct {
-	UUID     string `json:"uuid"`
-	Name     string `json:"name"`
-	Status   string `json:"status"`
-	Duration int    `json:"duration"`
-	//Hardware      string `json:"hardware"`
+	UUID                        string `json:"uuid"`
+	Name                        string `json:"name"`
+	Duration                    int    `json:"duration"`
 	JobSourceURI                string `json:"job_source_uri"`
 	JobResultURI                string `json:"job_result_uri,omitempty"`
 	StorageSource               string `json:"storage_source,omitempty"`
 	TaskUUID                    string `json:"task_uuid"`
-	CreatedAt                   string `json:"created_at"`
-	UpdatedAt                   string `json:"updated_at,omitempty"`
 	BuildLog                    string `json:"build_log,omitempty"`
 	ContainerLog                string `json:"container_log"`
-	NodeIdJobSourceUriSignature string `json:"node_id_job_source_uri_signature"`
+	NodeIdJobSourceUriSignature string `json:"node_id_job_source_uri_signature,omitempty"`
 	JobRealUri                  string `json:"job_real_uri,omitempty"`
 }
 
 type Job struct {
 	Uuid   string
-	Status JobStatus
+	Status int
 	Url    string
 }
 
 type JobStatus string
-
-const (
-	JobDownloadSource JobStatus = "downloadSource" // download file form job_resource_uri
-	JobUploadResult   JobStatus = "uploadResult"   // upload task result to mcs
-	JobBuildImage     JobStatus = "buildImage"     // build images
-	JobPushImage      JobStatus = "pushImage"      // push image to registry
-	JobPullImage      JobStatus = "pullImage"      // download file form job_resource_uri
-	JobDeployToK8s    JobStatus = "deployToK8s"    // deploy image to k8s
-)
 
 type DeleteJobReq struct {
 	CreatorWallet string `json:"creator_wallet"`
@@ -123,21 +102,22 @@ type CacheSpaceDetail struct {
 }
 
 type UBITaskReq struct {
-	ID         int           `json:"id"`
-	Name       string        `json:"name,omitempty"`
-	Type       int           `json:"type"`
-	ZkType     string        `json:"zk_type"`
-	InputParam string        `json:"input_param"`
-	Signature  string        `json:"signature"`
-	Resource   *TaskResource `json:"resource"`
+	ID           int           `json:"id"`
+	Name         string        `json:"name,omitempty"`
+	Type         int           `json:"type"`
+	InputParam   string        `json:"input_param"`
+	Signature    string        `json:"signature"`
+	Resource     *TaskResource `json:"resource"`
+	ResourceType int           `json:"resource_type"`
+	ContractAddr string        `json:"contract_addr"`
 }
 
 type UbiC2Proof struct {
-	TaskId    string `json:"task_id"`
-	TaskType  string `json:"task_type"`
-	Proof     string `json:"proof"`
-	ZkType    string `json:"zk_type"`
-	NameSpace string `json:"name_space"`
+	TaskId    string `json:"task_id,omitempty"`
+	TaskType  string `json:"task_type,omitempty"`
+	Proof     string `json:"proof,omitempty"`
+	ZkType    string `json:"zk_type,omitempty"`
+	NameSpace string `json:"name_space,omitempty"`
 }
 
 type TaskResource struct {
@@ -155,18 +135,32 @@ type CacheUbiTaskDetail struct {
 	Status     string `json:"status"`
 	Reward     string `json:"reward"`
 	CreateTime string `json:"create_time"`
+	Contract   string `json:"contract"`
 }
 
 type Account struct {
 	OwnerAddress   string
 	NodeId         string
 	MultiAddresses []string
-	UbiFlag        uint8
-	Beneficiary    struct {
-		BeneficiaryAddress string
-		Quota              *big.Int
-		Expiration         *big.Int
-	}
+	TaskTypes      []uint8 // 1:Fil-C2-512M, 2:Aleo, 3: AI, 4:Fil-C2-32G
+	Beneficiary    string
+	WorkerAddress  string
+	Version        string
+	Contract       string
+}
+
+type EcpCollateralInfo struct {
+	CpAddress         string
+	CollateralBalance string
+	FrozenBalance     string
+	Status            string
+}
+
+type FcpCollateralInfo struct {
+	CpAddress        string
+	AvailableBalance string
+	LockedCollateral string
+	Status           string
 }
 
 type TaskList []CacheUbiTaskDetail

@@ -5,25 +5,10 @@ import (
 )
 
 type BasicResponse struct {
-	Status   string      `json:"status"`
-	Code     int         `json:"code"`
-	Data     interface{} `json:"data,omitempty"`
-	Message  string      `json:"message,omitempty"`
-	PageInfo *PageInfo   `json:"page_info,omitempty"`
-}
-
-type PageInfo struct {
-	PageNumber       string `json:"page_number"`
-	PageSize         string `json:"page_size"`
-	TotalRecordCount string `json:"total_record_count"`
-}
-
-type MixedResponse struct {
-	BasicResponse
-	MixData struct {
-		Success interface{} `json:"success"`
-		Fail    interface{} `json:"fail"`
-	} `json:"mix_data"`
+	Status  string      `json:"status"`
+	Code    int         `json:"code"`
+	Data    interface{} `json:"data,omitempty"`
+	Message string      `json:"message,omitempty"`
 }
 
 func CreateSuccessResponse(_data interface{}) BasicResponse {
@@ -50,32 +35,56 @@ func CreateErrorResponse(code int, errMsg ...string) BasicResponse {
 
 const (
 	SuccessCode = 200
-	JsonError   = 400
 	ServerError = 500
 
-	BadParamError           = 5001
-	SpaceSignatureError     = 6001
-	ProofParamError         = 7001
-	ProofReadLogError       = 7002
-	ProofError              = 7003
-	UbiTaskParamError       = 8001
-	UbiTaskReadLogError     = 8002
-	UbiTaskError            = 8003
-	CheckResourcesError     = 9001
-	CheckAvailableResources = 9002
-	CheckWhiteListError     = 9003
+	GetLocationError           = 3000
+	GetCpAccountError          = 3001
+	GeResourceError            = 3002
+	JsonError                  = 4000
+	BadParamError              = 4001
+	SignatureError             = 4002
+	SpaceParseResourceUriError = 4003
+	CheckResourcesError        = 4004
+	SpaceCheckWhiteListError   = 4005
+	NoAvailableResourcesError  = 4006
+	FoundJobEntityError        = 4007
+	NotFoundJobEntityError     = 4008
+	SaveJobEntityError         = 4009
+	FoundWhiteListError        = 4010
+
+	ProofParamError   = 7001
+	ProofReadLogError = 7002
+	ProofError        = 7003
+
+	UbiTaskParamError    = 8001
+	UbiTaskContractError = 8002
+	FoundTaskEntityError = 8003
+	SaveTaskEntityError  = 8004
+	SubmitProofError     = 8005
 )
 
 var codeMsg = map[int]string{
-	BadParamError:       "The request parameter is not valid",
-	JsonError:           "An error occurred while converting to json",
-	ServerError:         "Service failed",
-	SpaceSignatureError: "Verify signature failed",
+	ServerError:                "Service failed",
+	GetLocationError:           "An error occurred while get location of cp",
+	GetCpAccountError:          "An error occurred while get cp account address",
+	GeResourceError:            "An error occurred while get cp account resource",
+	JsonError:                  "An error occurred while converting to json",
+	BadParamError:              "The request parameter is not valid",
+	SignatureError:             "Verify signature failed",
+	SpaceParseResourceUriError: "An error occurred while parsing sourceUri",
+	CheckResourcesError:        "An error occurred while check resources available",
+	SpaceCheckWhiteListError:   "This cp does not accept tasks from wallet addresses outside the whitelist",
+	NoAvailableResourcesError:  "No resources available",
+	FoundJobEntityError:        "An error occurred while get job info",
+	NotFoundJobEntityError:     "No found this Job",
+	SaveJobEntityError:         "An error occurred while save job info",
+	FoundWhiteListError:        "An error occurred while get whitelist",
 
 	ProofReadLogError: "An error occurred while read the log of proof",
 	ProofError:        "An error occurred while executing the calculation task",
 
-	CheckResourcesError:     "An error occurred while check resources available",
-	CheckAvailableResources: "No resources available",
-	CheckWhiteListError:     "This cp does not accept tasks from wallet addresses outside the whitelist",
+	UbiTaskContractError: "Not found this task contract on the chain",
+	FoundTaskEntityError: "An error occurred while get task info",
+	SaveTaskEntityError:  "An error occurred while save task info",
+	SubmitProofError:     "An error occurred while submit proof",
 }

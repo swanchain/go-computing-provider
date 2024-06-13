@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"github.com/swanchain/go-computing-provider/constants"
 	"github.com/swanchain/go-computing-provider/internal/models"
@@ -47,22 +46,13 @@ type K8sService struct {
 func NewK8sService() *K8sService {
 	var err error
 	k8sOnce.Do(func() {
-		config, err = rest.InClusterConfig()
+		kubeConfig := filepath.Join(homedir.HomeDir(), ".kube/config")
+		config, err = clientcmd.BuildConfigFromFlags("", kubeConfig)
 		if err != nil {
-			var kubeConfig *string
-			if home := homedir.HomeDir(); home != "" {
-				kubeConfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
-			} else {
-				kubeConfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
-			}
-			flag.Parse()
-			config, err = clientcmd.BuildConfigFromFlags("", *kubeConfig)
-			if err != nil {
-				return
-			}
+			return
 		}
 		config.QPS = 30
-		config.Burst = 50
+		config.Burst = 200
 		clientSet, err = kubernetes.NewForConfig(config)
 		if err != nil {
 			logs.GetLogger().Errorf("Failed create k8s clientset, error: %v", err)
@@ -71,7 +61,6 @@ func NewK8sService() *K8sService {
 
 		versionInfo, err := clientSet.Discovery().ServerVersion()
 		if err != nil {
-			logs.GetLogger().Errorf("Failed get k8s version, error: %v", err)
 			return
 		}
 		version = versionInfo.String()

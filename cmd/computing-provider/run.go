@@ -1,10 +1,9 @@
 package main
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
@@ -12,18 +11,20 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/itsjamie/gin-cors"
 	"github.com/olekukonko/tablewriter"
-	"github.com/swanchain/go-computing-provider/account"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/computing"
+	account2 "github.com/swanchain/go-computing-provider/internal/contract/account"
+	"github.com/swanchain/go-computing-provider/internal/contract/ecp"
+	"github.com/swanchain/go-computing-provider/internal/contract/fcp"
+	"github.com/swanchain/go-computing-provider/internal/contract/token"
 	"github.com/swanchain/go-computing-provider/internal/initializer"
+	"github.com/swanchain/go-computing-provider/internal/models"
 	"github.com/swanchain/go-computing-provider/util"
 	"github.com/swanchain/go-computing-provider/wallet"
-	"github.com/swanchain/go-computing-provider/wallet/contract/collateral"
 	"github.com/urfave/cli/v2"
-	"io"
 	"math/big"
-	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -33,7 +34,7 @@ var runCmd = &cli.Command{
 	Name:  "run",
 	Usage: "Start a cp process",
 	Action: func(cctx *cli.Context) error {
-		logs.GetLogger().Info("Start in computing provider mode.")
+		logs.GetLogger().Info("Start a computing provider client.")
 
 		cpRepoPath, ok := os.LookupEnv("CP_PATH")
 		if !ok {
@@ -71,17 +72,17 @@ var runCmd = &cli.Command{
 }
 
 func cpManager(router *gin.RouterGroup) {
+	router.GET("/cp", computing.StatisticalSources)
 	router.GET("/host/info", computing.GetServiceProviderInfo)
 	router.POST("/lagrange/jobs", computing.ReceiveJob)
 	router.POST("/lagrange/jobs/redeploy", computing.RedeployJob)
 	router.DELETE("/lagrange/jobs", computing.CancelJob)
-	router.GET("/lagrange/cp", computing.StatisticalSources)
 	router.POST("/lagrange/jobs/renew", computing.ReNewJob)
 	router.GET("/lagrange/spaces/log", computing.GetSpaceLog)
 	router.POST("/lagrange/cp/proof", computing.DoProof)
+	router.GET("/lagrange/cp/whitelist", computing.WhiteList)
+	router.GET("/lagrange/job/:job_uuid", computing.GetJobStatus)
 
-	router.GET("/cp", computing.StatisticalSources)
-	router.GET("/cp/info", computing.GetCpInfo)
 	router.POST("/cp/ubi", computing.DoUbiTaskForK8s)
 	router.POST("/cp/receive/ubi", computing.ReceiveUbiProofForK8s)
 
@@ -119,34 +120,55 @@ var infoCmd = &cli.Command{
 		}
 		defer client.Close()
 
-		var balance, collateralBalance, ownerBalance string
-		var contractAddress, ownerAddress, beneficiaryAddress, ubiFlag, chainNodeId string
+		var fcpCollateralBalance = "0.000"
+		var fcpEscrowBalance = "0.000"
+		var ecpCollateralBalance = "0.000"
+		var ecpEscrowBalance = "0.000"
+		var ownerBalance = "0.000"
+		var workerBalance = "0.000"
+		var contractAddress, ownerAddress, workerAddress, beneficiaryAddress, taskTypes, chainNodeId, version string
+		var cpAccount models.Account
 
-		cpStub, err := account.NewAccountStub(client)
+		cpStub, err := account2.NewAccountStub(client)
 		if err == nil {
-			cpAccount, err := cpStub.GetCpAccountInfo()
+			cpAccount, err = cpStub.GetCpAccountInfo()
 			if err != nil {
-				err = fmt.Errorf("get cpAccount failed, error: %v", err)
+				err = fmt.Errorf("get cpAccount info on the chain failed, error: %v", err)
 			}
-			if cpAccount.UbiFlag == 1 {
-				ubiFlag = "Accept"
-			} else {
-				ubiFlag = "Reject"
+
+			for _, taskType := range cpAccount.TaskTypes {
+				taskTypes += models.TaskTypeStr(int(taskType)) + ","
 			}
+			if taskTypes != "" {
+				taskTypes = taskTypes[:len(taskTypes)-1]
+			}
+
 			contractAddress = cpStub.ContractAddress
 			ownerAddress = cpAccount.OwnerAddress
-			beneficiaryAddress = cpAccount.Beneficiary.BeneficiaryAddress
+			workerAddress = cpAccount.WorkerAddress
+			beneficiaryAddress = cpAccount.Beneficiary
 			chainNodeId = cpAccount.NodeId
+			version = cpAccount.Version
 		}
 
-		balance, err = wallet.Balance(context.TODO(), client, conf.GetConfig().HUB.WalletAddress)
-		collateralStub, err := collateral.NewCollateralStub(client, collateral.WithPublicKey(conf.GetConfig().HUB.WalletAddress))
+		ownerBalance, err = wallet.Balance(context.TODO(), client, ownerAddress)
+		workerBalance, err = wallet.Balance(context.TODO(), client, workerAddress)
+		fcpCollateralStub, err := fcp.NewCollateralStub(client)
 		if err == nil {
-			collateralBalance, err = collateralStub.Balances()
+			fcpCollateralInfo, err := fcpCollateralStub.CollateralInfo()
+			if err == nil {
+				fcpCollateralBalance = fcpCollateralInfo.AvailableBalance
+				fcpEscrowBalance = fcpCollateralInfo.LockedCollateral
+			}
 		}
 
-		if ownerAddress != "" {
-			ownerBalance, err = wallet.Balance(context.TODO(), client, ownerAddress)
+		ecpCollateral, err := ecp.NewCollateralStub(client, ecp.WithPublicKey(ownerAddress))
+		if err == nil {
+			cpCollateralInfo, err := ecpCollateral.CpInfo()
+			if err == nil {
+				ecpCollateralBalance = cpCollateralInfo.CollateralBalance
+				ecpEscrowBalance = cpCollateralInfo.FrozenBalance
+			}
 		}
 
 		var domain = conf.GetConfig().API.Domain
@@ -155,42 +177,310 @@ var infoCmd = &cli.Command{
 		}
 		var taskData [][]string
 
-		taskData = append(taskData, []string{"Multi-Address:", conf.GetConfig().API.MultiAddress})
-		taskData = append(taskData, []string{"Node ID:", localNodeId})
-		taskData = append(taskData, []string{"ECP:"})
-		taskData = append(taskData, []string{"   Contract Address:", contractAddress})
-		taskData = append(taskData, []string{"   UBI FLAG:", ubiFlag})
+		taskData = append(taskData, []string{fmt.Sprintf("   CP Account Address(%s):", version), contractAddress})
+		taskData = append(taskData, []string{"   Name:", conf.GetConfig().API.NodeName})
 		taskData = append(taskData, []string{"   Owner:", ownerAddress})
-		taskData = append(taskData, []string{"   Beneficiary Address:", beneficiaryAddress})
-		taskData = append(taskData, []string{"   Available(SWAN-ETH):", ownerBalance})
-		taskData = append(taskData, []string{"   Collateral(SWAN-ETH):", "0"})
-		taskData = append(taskData, []string{"FCP:"})
-		taskData = append(taskData, []string{"   Wallet:", conf.GetConfig().HUB.WalletAddress})
+		taskData = append(taskData, []string{"   Node ID:", localNodeId})
 		taskData = append(taskData, []string{"   Domain:", domain})
-		taskData = append(taskData, []string{"   Running deployments:", strconv.Itoa(count)})
-		taskData = append(taskData, []string{"   Available(SWAN-ETH):", balance})
-		taskData = append(taskData, []string{"   Collateral(SWAN-ETH):", collateralBalance})
-
-		var rowColor []tablewriter.Colors
-		if ubiFlag == "Accept" {
-			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
-		} else {
-			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
-		}
+		taskData = append(taskData, []string{"   Multi-Address:", conf.GetConfig().API.MultiAddress})
+		taskData = append(taskData, []string{"   Worker Address:", workerAddress})
+		taskData = append(taskData, []string{"   Beneficiary Address:", beneficiaryAddress})
+		taskData = append(taskData, []string{""})
+		taskData = append(taskData, []string{"Capabilities:"})
+		taskData = append(taskData, []string{"   Task Types:", taskTypes})
+		taskData = append(taskData, []string{"   Applications:", strconv.Itoa(count)})
+		taskData = append(taskData, []string{""})
+		taskData = append(taskData, []string{"Owner Balance(sETH):", ownerBalance})
+		taskData = append(taskData, []string{"Worker Balance(sETH):", workerBalance})
+		taskData = append(taskData, []string{""})
+		taskData = append(taskData, []string{"ECP Balance(sETH):"})
+		taskData = append(taskData, []string{"   Collateral:", ecpCollateralBalance})
+		taskData = append(taskData, []string{"   Escrow:", ecpEscrowBalance})
+		taskData = append(taskData, []string{"FCP Balance(sETH):"})
+		taskData = append(taskData, []string{"   Collateral:", fcpCollateralBalance})
+		taskData = append(taskData, []string{"   Escrow:", fcpEscrowBalance})
 
 		var rowColorList []RowColor
-		rowColorList = append(rowColorList, RowColor{
-			row:    4,
-			column: []int{1},
-			color:  rowColor,
-		})
-
-		header := []string{"Name:", conf.GetConfig().API.NodeName}
+		if taskTypes != "" {
+			var rowColor []tablewriter.Colors
+			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
+			rowColorList = append(rowColorList, RowColor{
+				row:    10,
+				column: []int{1},
+				color:  rowColor,
+			})
+		}
+		header := []string{"CP Account Info:"}
 		NewVisualTable(header, taskData, rowColorList).Generate(false)
+		if err != nil {
+			return err
+		}
 		if localNodeId != chainNodeId {
 			fmt.Printf("NodeId mismatch, local node id: %s, chain node id: %s.\n", localNodeId, chainNodeId)
 		}
 		return nil
+	},
+}
+
+var stateCmd = &cli.Command{
+	Name:  "state",
+	Usage: "Print computing-provider info on the chain",
+	Subcommands: []*cli.Command{
+		stateInfoCmd,
+		taskInfoCmd,
+	},
+}
+
+var stateInfoCmd = &cli.Command{
+	Name:      "cp-info",
+	Usage:     "Print computing-provider chain info",
+	ArgsUsage: "[cp_account_contract_address]",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "chain",
+			Usage: "Specify which rpc connection chain to use",
+			Value: conf.DefaultRpc,
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+		cpRepoPath, ok := os.LookupEnv("CP_PATH")
+		if !ok {
+			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
+		}
+		if err := conf.InitConfig(cpRepoPath, true); err != nil {
+			return fmt.Errorf("load config file failed, error: %+v", err)
+		}
+
+		chain := cctx.String("chain")
+		if strings.TrimSpace(chain) == "" {
+			return fmt.Errorf("the chain is required")
+		}
+
+		chainRpc, err := conf.GetRpcByName(conf.DefaultRpc)
+		if err != nil {
+			return err
+		}
+		client, err := ethclient.Dial(chainRpc)
+		if err != nil {
+			return err
+		}
+		defer client.Close()
+
+		var fcpCollateralBalance = "0.000"
+		var fcpEscrowBalance = "0.000"
+		var ecpCollateralBalance = "0.000"
+		var ecpEscrowBalance = "0.000"
+		var ownerBalance = "0.000"
+		var workerBalance = "0.000"
+		var chainMultiAddress string
+		var contractAddress, ownerAddress, workerAddress, beneficiaryAddress, taskTypes, chainNodeId, version string
+
+		cpStub, err := account2.NewAccountStub(client, account2.WithContractAddress(cctx.Args().Get(0)))
+		if err == nil {
+			cpAccount, err := cpStub.GetCpAccountInfo()
+			if err != nil {
+				err = fmt.Errorf("get cpAccount failed, error: %v", err)
+			}
+
+			for _, taskType := range cpAccount.TaskTypes {
+				taskTypes += models.TaskTypeStr(int(taskType)) + ","
+			}
+			if taskTypes != "" {
+				taskTypes = taskTypes[:len(taskTypes)-1]
+			}
+
+			contractAddress = cpStub.ContractAddress
+			ownerAddress = cpAccount.OwnerAddress
+			workerAddress = cpAccount.WorkerAddress
+			beneficiaryAddress = cpAccount.Beneficiary
+			chainNodeId = cpAccount.NodeId
+			chainMultiAddress = strings.Join(cpAccount.MultiAddresses, ",")
+			version = cpAccount.Version
+		}
+
+		if strings.HasSuffix(chainMultiAddress, ",") {
+			chainMultiAddress = chainMultiAddress[:len(chainMultiAddress)-1]
+		}
+
+		ownerBalance, err = wallet.Balance(context.TODO(), client, ownerAddress)
+		workerBalance, err = wallet.Balance(context.TODO(), client, workerAddress)
+		fcpCollateralStub, err := fcp.NewCollateralStub(client, fcp.WithPublicKey(ownerAddress))
+		if err == nil {
+			fcpCollateralInfo, err := fcpCollateralStub.CollateralInfo()
+			if err == nil {
+				fcpCollateralBalance = fcpCollateralInfo.AvailableBalance
+				fcpEscrowBalance = fcpCollateralInfo.LockedCollateral
+			}
+		}
+
+		ecpCollateral, err := ecp.NewCollateralStub(client, ecp.WithPublicKey(ownerAddress))
+		if err == nil {
+			cpCollateralInfo, err := ecpCollateral.CpInfo()
+			if err == nil {
+				ecpCollateralBalance = cpCollateralInfo.CollateralBalance
+				ecpEscrowBalance = cpCollateralInfo.FrozenBalance
+			}
+		}
+
+		var taskData [][]string
+		taskData = append(taskData, []string{"Node ID:", chainNodeId})
+		taskData = append(taskData, []string{"Multi-Address:", chainMultiAddress})
+		taskData = append(taskData, []string{"Owner:", ownerAddress})
+		taskData = append(taskData, []string{"Worker Address:", workerAddress})
+		taskData = append(taskData, []string{"Beneficiary Address:", beneficiaryAddress})
+		taskData = append(taskData, []string{"Task Types:", taskTypes})
+		taskData = append(taskData, []string{""})
+		taskData = append(taskData, []string{"Owner Balance(sETH):", ownerBalance})
+		taskData = append(taskData, []string{"Worker Balance(sETH):", workerBalance})
+		taskData = append(taskData, []string{""})
+		taskData = append(taskData, []string{"ECP Balance(sETH):"})
+		taskData = append(taskData, []string{"   Collateral:", ecpCollateralBalance})
+		taskData = append(taskData, []string{"   Escrow:", ecpEscrowBalance})
+		taskData = append(taskData, []string{"FCP Balance(sETH):"})
+		taskData = append(taskData, []string{"   Collateral:", fcpCollateralBalance})
+		taskData = append(taskData, []string{"   Escrow:", fcpEscrowBalance})
+
+		var rowColorList []RowColor
+		if taskTypes != "" {
+			var rowColor []tablewriter.Colors
+			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
+			rowColorList = append(rowColorList, RowColor{
+				row:    5,
+				column: []int{1},
+				color:  rowColor,
+			})
+		}
+		header := []string{fmt.Sprintf("CP Account Address(%s):", version), contractAddress}
+		NewVisualTable(header, taskData, rowColorList).Generate(false)
+		return nil
+	},
+}
+
+var taskInfoCmd = &cli.Command{
+	Name:      "task-info",
+	Usage:     "Print task info on the chain",
+	ArgsUsage: "[task_contract_address]",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "chain",
+			Usage: "Specify which rpc connection chain to use",
+			Value: conf.DefaultRpc,
+		},
+		&cli.BoolFlag{
+			Name:     "ecp",
+			Usage:    "Check ECP task on the chain",
+			Required: true,
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+
+		taskContract := cctx.Args().Get(0)
+		if strings.TrimSpace(taskContract) == "" {
+			return fmt.Errorf("the task contract address is required")
+		}
+
+		cpRepoPath, ok := os.LookupEnv("CP_PATH")
+		if !ok {
+			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
+		}
+		if err := conf.InitConfig(cpRepoPath, true); err != nil {
+			return fmt.Errorf("load config file failed, error: %+v", err)
+		}
+
+		chain := cctx.String("chain")
+		if strings.TrimSpace(chain) == "" {
+			return fmt.Errorf("the chain is required")
+		}
+
+		chainRpc, err := conf.GetRpcByName(chain)
+		if err != nil {
+			return err
+		}
+
+		taskInfo, err := computing.GetTaskInfoOnChain(chain, taskContract)
+		if err != nil {
+			return fmt.Errorf("get task info on the chain failed, error: %v", err)
+		}
+
+		var lockFundTx, unlockFundTx, rewardTx, challengeTx, slashTx, reward string
+		if taskInfo.LockFundTx != "" {
+			lockFundTx = taskInfo.LockFundTx
+		} else {
+			lockFundTx = "-"
+		}
+		if taskInfo.UnlockFundTx != "" {
+			unlockFundTx = taskInfo.UnlockFundTx
+		} else {
+			unlockFundTx = "-"
+		}
+		if taskInfo.RewardTx != "" {
+			rewardTx = taskInfo.RewardTx
+		} else {
+			rewardTx = "-"
+		}
+		if taskInfo.ChallengeTx != "" {
+			challengeTx = taskInfo.ChallengeTx
+		} else {
+			challengeTx = "-"
+		}
+		if taskInfo.SlashTx != "" {
+			slashTx = taskInfo.SlashTx
+		} else {
+			slashTx = "-"
+		}
+
+		if taskInfo.RewardTx != "" {
+			client, err := ethclient.Dial(chainRpc)
+			if err == nil {
+				defer client.Close()
+				receipt, err := client.TransactionReceipt(context.Background(), common.HexToHash(taskInfo.RewardTx))
+				if err == nil {
+					contractAbi, err := abi.JSON(strings.NewReader(token.MainMetaData.ABI))
+					if err == nil {
+						for _, l := range receipt.Logs {
+							event := struct {
+								From  common.Address
+								To    common.Address
+								Value *big.Int
+							}{}
+							if err := contractAbi.UnpackIntoInterface(&event, "Transfer", l.Data); err != nil {
+								continue
+							}
+
+							if len(l.Topics) == 3 && l.Topics[0] == contractAbi.Events["Transfer"].ID {
+								balance := event.Value
+								if balance.String() == "0" {
+									reward = "0.000"
+								} else {
+									fbalance := new(big.Float)
+									fbalance.SetString(balance.String())
+									etherQuotient := new(big.Float).Quo(fbalance, new(big.Float).SetInt(big.NewInt(1e18)))
+									reward = etherQuotient.Text('f', 3)
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		var taskData [][]string
+		taskData = append(taskData, []string{"ZK Type:", models.TaskTypeStr(int(taskInfo.TaskType.Int64()))})
+		taskData = append(taskData, []string{"Resource Type:", models.GetSourceTypeStr(int(taskInfo.ResourceType.Int64()))})
+		taskData = append(taskData, []string{"CP Account:", taskInfo.CpContractAddress.Hex()})
+		taskData = append(taskData, []string{"Task Status:", taskInfo.Status})
+		taskData = append(taskData, []string{"Deadline:", taskInfo.Deadline.String()})
+		taskData = append(taskData, []string{"Reward(SWAN):", reward})
+		taskData = append(taskData, []string{"LockFund TxHash:", lockFundTx})
+		taskData = append(taskData, []string{"UnLockFund TxHash:", unlockFundTx})
+		taskData = append(taskData, []string{"Reward TxHash:", rewardTx})
+		taskData = append(taskData, []string{"Challenge TxHash:", challengeTx})
+		taskData = append(taskData, []string{"Slash TxHash:", slashTx})
+
+		header := []string{"Task Contract:", taskContract}
+		NewVisualTable(header, taskData, []RowColor{}).Generate(false)
+		return nil
+
 	},
 }
 
@@ -200,7 +490,7 @@ var initCmd = &cli.Command{
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:  "multi-address",
-			Usage: "The multiAddress for libp2p(public ip)",
+			Usage: "The multiAddress for libp2p(example: /ip4/<PUBLIC_IP>/tcp/<PORT>)",
 		},
 		&cli.StringFlag{
 			Name:  "node-name",
@@ -208,7 +498,8 @@ var initCmd = &cli.Command{
 		},
 		&cli.IntFlag{
 			Name:  "port",
-			Usage: "The cp listens on port, default: 9085",
+			Usage: "The cp listens on port",
+			Value: 9085,
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -226,7 +517,7 @@ var initCmd = &cli.Command{
 		if err := conf.InitConfig(cpRepoPath, true); err != nil {
 			logs.GetLogger().Fatal(err)
 		}
-		return conf.UpdateConfigFile(cpRepoPath, multiAddr, nodeName, port)
+		return conf.UpdateConfigFile(cpRepoPath, strings.TrimSpace(multiAddr), nodeName, port)
 	},
 }
 
@@ -237,8 +528,9 @@ var accountCmd = &cli.Command{
 		createAccountCmd,
 		changeMultiAddressCmd,
 		changeOwnerAddressCmd,
+		changeWorkerAddressCmd,
 		changeBeneficiaryAddressCmd,
-		changeUbiFlagCmd,
+		changeTaskTypesCmd,
 	},
 }
 
@@ -251,13 +543,16 @@ var createAccountCmd = &cli.Command{
 			Usage: "Specify a OwnerAddress",
 		},
 		&cli.StringFlag{
+			Name:  "workerAddress",
+			Usage: "Specify a workerAddress",
+		},
+		&cli.StringFlag{
 			Name:  "beneficiaryAddress",
 			Usage: "Specify a beneficiaryAddress to receive rewards. If not specified, use the same address as ownerAddress",
 		},
-		&cli.BoolFlag{
-			Name:  "ubi-flag",
-			Usage: "Whether to accept the UBI task",
-			Value: false,
+		&cli.StringFlag{
+			Name:  "task-types",
+			Usage: "Task types of CP (1:Fil-C2-512M, 2:Aleo, 3:AI, 4:Fil-C2-32G), separated by commas",
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -266,12 +561,49 @@ var createAccountCmd = &cli.Command{
 			return fmt.Errorf("ownerAddress is not empty")
 		}
 
+		workerAddress := cctx.String("workerAddress")
+		if strings.TrimSpace(workerAddress) == "" {
+			return fmt.Errorf("workerAddress is not empty")
+		}
+
 		beneficiaryAddress := cctx.String("beneficiaryAddress")
 		if strings.TrimSpace(beneficiaryAddress) == "" {
 			beneficiaryAddress = ownerAddress
 		}
 
-		ubiFlag := cctx.Bool("ubi-flag")
+		if !isValidWalletAddress(ownerAddress) {
+			return fmt.Errorf("the ownerAddress is invalid wallet address")
+		}
+
+		if !isValidWalletAddress(workerAddress) {
+			return fmt.Errorf("the workerAddress is invalid wallet address")
+		}
+
+		if !isValidWalletAddress(beneficiaryAddress) {
+			return fmt.Errorf("the beneficiaryAddress is invalid wallet address")
+		}
+
+		taskTypes := strings.TrimSpace(cctx.String("task-types"))
+		if strings.TrimSpace(taskTypes) == "" {
+			return fmt.Errorf("taskTypes is not empty")
+		}
+
+		var taskTypesUint []uint8
+		if strings.Index(taskTypes, ",") > 0 {
+			for _, taskT := range strings.Split(taskTypes, ",") {
+				tt, _ := strconv.ParseUint(taskT, 10, 64)
+				if tt < 0 {
+					return fmt.Errorf("task-types must be int")
+				}
+				taskTypesUint = append(taskTypesUint, uint8(tt))
+			}
+		} else {
+			tt, _ := strconv.ParseUint(taskTypes, 10, 64)
+			if tt < 0 {
+				return fmt.Errorf("task-types must be int")
+			}
+			taskTypesUint = append(taskTypesUint, uint8(tt))
+		}
 
 		cpRepoPath, ok := os.LookupEnv("CP_PATH")
 		if !ok {
@@ -280,7 +612,7 @@ var createAccountCmd = &cli.Command{
 		if err := conf.InitConfig(cpRepoPath, true); err != nil {
 			logs.GetLogger().Fatal(err)
 		}
-		return createAccount(cpRepoPath, ownerAddress, beneficiaryAddress, ubiFlag)
+		return createAccount(cpRepoPath, ownerAddress, beneficiaryAddress, workerAddress, taskTypesUint)
 	},
 }
 
@@ -296,18 +628,18 @@ var changeMultiAddressCmd = &cli.Command{
 		},
 	},
 	Action: func(cctx *cli.Context) error {
-		if cctx.NArg() != 1 {
-			return fmt.Errorf(" Requires a multiAddress")
-		}
-
 		ownerAddress := cctx.String("ownerAddress")
 		if strings.TrimSpace(ownerAddress) == "" {
-			return fmt.Errorf("ownerAddress is not empty")
+			return fmt.Errorf("ownerAddress is required")
+		}
+
+		if !isValidWalletAddress(ownerAddress) {
+			return fmt.Errorf("the ownerAddress is invalid wallet address")
 		}
 
 		multiAddr := cctx.Args().Get(0)
 		if strings.TrimSpace(multiAddr) == "" {
-			return fmt.Errorf("failed to parse : %s", multiAddr)
+			return fmt.Errorf("multiAddress is required")
 		}
 
 		cpRepoPath, ok := os.LookupEnv("CP_PATH")
@@ -317,15 +649,34 @@ var changeMultiAddressCmd = &cli.Command{
 		if err := conf.InitConfig(cpRepoPath, false); err != nil {
 			logs.GetLogger().Fatal(err)
 		}
-		return changeMultiAddress(ownerAddress, multiAddr)
 
+		client, cpStub, err := getVerifyAccountClient(ownerAddress)
+		if err != nil {
+			return fmt.Errorf("create cp account client failed, error: %v", err)
+		}
+		defer client.Close()
+
+		newMultiAddress := []string{strings.TrimSpace(multiAddr)}
+		changeMultiAddressTx, err := cpStub.ChangeMultiAddress(newMultiAddress)
+		if err != nil {
+			return fmt.Errorf("changeMultiAddress tx failed, error: %v", err)
+		}
+
+		nodeId := computing.GetNodeId(cpRepoPath)
+		if err = computing.NewCpInfoService().UpdateCpInfoByNodeId(&models.CpInfoEntity{NodeId: nodeId, MultiAddresses: newMultiAddress}); err != nil {
+			return fmt.Errorf("update multi_addresses of cp to db failed, error: %v", err)
+		}
+		fmt.Printf("changeMultiAddress Transaction hash: %s\n", changeMultiAddressTx)
+		fmt.Printf("Multi-Address is changed successfully! please manually update the `MultiAddress` in the config.toml file \n")
+
+		return nil
 	},
 }
 
 var changeOwnerAddressCmd = &cli.Command{
 	Name:      "changeOwnerAddress",
 	Usage:     "Update OwnerAddress of CP",
-	ArgsUsage: "[newOwnerAddress]",
+	ArgsUsage: "[the target newOwnerAddress]",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:     "ownerAddress",
@@ -334,19 +685,22 @@ var changeOwnerAddressCmd = &cli.Command{
 		},
 	},
 	Action: func(cctx *cli.Context) error {
-
-		ownerAddress := cctx.String("oldOwnerAddress")
+		ownerAddress := cctx.String("ownerAddress")
 		if strings.TrimSpace(ownerAddress) == "" {
 			return fmt.Errorf("ownerAddress is not empty")
 		}
 
-		if cctx.NArg() != 1 {
-			return fmt.Errorf(" Requires a ownerAddress")
+		if !isValidWalletAddress(ownerAddress) {
+			return fmt.Errorf("the ownerAddress is invalid wallet address")
 		}
 
 		newOwnerAddr := cctx.Args().Get(0)
 		if strings.TrimSpace(newOwnerAddr) == "" {
-			return fmt.Errorf("failed to parse : %s", newOwnerAddr)
+			return fmt.Errorf("the target newOwnerAddress is required")
+		}
+
+		if !isValidWalletAddress(ownerAddress) {
+			return fmt.Errorf("the target newOwnerAddress is invalid wallet address")
 		}
 
 		cpRepoPath, ok := os.LookupEnv("CP_PATH")
@@ -357,52 +711,24 @@ var changeOwnerAddressCmd = &cli.Command{
 			logs.GetLogger().Fatal(err)
 		}
 
-		chainUrl, err := conf.GetRpcByName(conf.DefaultRpc)
+		client, cpStub, err := getVerifyAccountClient(ownerAddress)
 		if err != nil {
-			logs.GetLogger().Errorf("get rpc url failed, error: %v,", err)
-			return err
-		}
-
-		localWallet, err := wallet.SetupWallet(wallet.WalletRepo)
-		if err != nil {
-			logs.GetLogger().Errorf("setup wallet ubi failed, error: %v,", err)
-			return err
-		}
-
-		ki, err := localWallet.FindKey(ownerAddress)
-		if err != nil || ki == nil {
-			logs.GetLogger().Errorf("the old owner address: %s, private key %v,", ownerAddress, wallet.ErrKeyInfoNotFound)
-			return err
-		}
-
-		client, err := ethclient.Dial(chainUrl)
-		if err != nil {
-			logs.GetLogger().Errorf("dial rpc connect failed, error: %v,", err)
-			return err
+			return fmt.Errorf("create cp account client failed, error: %v", err)
 		}
 		defer client.Close()
 
-		cpStub, err := account.NewAccountStub(client, account.WithCpPrivateKey(ki.PrivateKey))
+		changeOwnerAddressTx, err := cpStub.ChangeOwnerAddress(common.HexToAddress(newOwnerAddr))
 		if err != nil {
-			logs.GetLogger().Errorf("create cp client failed, error: %v,", err)
+			logs.GetLogger().Errorf("changeOwnerAddress tx failed, error: %v", err)
 			return err
 		}
 
-		cpAccount, err := cpStub.GetCpAccountInfo()
-		if err != nil {
-			return fmt.Errorf("get cpAccount faile, error: %v", err)
-		}
-		if !strings.EqualFold(cpAccount.OwnerAddress, ownerAddress) {
-			return fmt.Errorf("the owner address is incorrect. The owner on the chain is %s, and the current address is %s", cpAccount.OwnerAddress, ownerAddress)
+		nodeId := computing.GetNodeId(cpRepoPath)
+		if err = computing.NewCpInfoService().UpdateCpInfoByNodeId(&models.CpInfoEntity{NodeId: nodeId, OwnerAddress: newOwnerAddr}); err != nil {
+			return fmt.Errorf("update owner_address of cp to db failed, error: %v", err)
 		}
 
-		submitUBIProofTx, err := cpStub.ChangeOwnerAddress(common.HexToAddress(newOwnerAddr))
-		if err != nil {
-			logs.GetLogger().Errorf("change owner address tx failed, error: %v,", err)
-			return err
-		}
-		fmt.Printf("ChangeOwnerAddress: %s \n", submitUBIProofTx)
-
+		fmt.Printf("changeOwnerAddress Transaction hash: %s\n", changeOwnerAddressTx)
 		return nil
 	},
 }
@@ -425,13 +751,17 @@ var changeBeneficiaryAddressCmd = &cli.Command{
 			return fmt.Errorf("ownerAddress is not empty")
 		}
 
-		if cctx.NArg() != 1 {
-			return fmt.Errorf(" Requires a beneficiaryAddress")
+		if !isValidWalletAddress(ownerAddress) {
+			return fmt.Errorf("the ownerAddress is invalid wallet address")
 		}
 
 		beneficiaryAddress := cctx.Args().Get(0)
 		if strings.TrimSpace(beneficiaryAddress) == "" {
-			return fmt.Errorf("failed to parse target address: %s", beneficiaryAddress)
+			return fmt.Errorf("failed to parse target beneficiary address: %s", beneficiaryAddress)
+		}
+
+		if !isValidWalletAddress(ownerAddress) {
+			return fmt.Errorf("the target beneficiary address is invalid wallet address")
 		}
 
 		cpRepoPath, ok := os.LookupEnv("CP_PATH")
@@ -442,60 +772,32 @@ var changeBeneficiaryAddressCmd = &cli.Command{
 			logs.GetLogger().Fatal(err)
 		}
 
-		chainUrl, err := conf.GetRpcByName(conf.DefaultRpc)
+		client, cpStub, err := getVerifyAccountClient(ownerAddress)
 		if err != nil {
-			logs.GetLogger().Errorf("get rpc url failed, error: %v,", err)
-			return err
-		}
-
-		localWallet, err := wallet.SetupWallet(wallet.WalletRepo)
-		if err != nil {
-			logs.GetLogger().Errorf("setup wallet ubi failed, error: %v,", err)
-			return err
-		}
-
-		ki, err := localWallet.FindKey(ownerAddress)
-		if err != nil || ki == nil {
-			logs.GetLogger().Errorf("the address: %s, private key %v. Please import the address into the wallet", ownerAddress, wallet.ErrKeyInfoNotFound)
-			return err
-		}
-
-		client, err := ethclient.Dial(chainUrl)
-		if err != nil {
-			logs.GetLogger().Errorf("dial rpc connect failed, error: %v,", err)
-			return err
+			return fmt.Errorf("create cp account client failed, error: %v", err)
 		}
 		defer client.Close()
 
-		cpStub, err := account.NewAccountStub(client, account.WithCpPrivateKey(ki.PrivateKey))
+		changeBeneficiaryAddressTx, err := cpStub.ChangeBeneficiary(common.HexToAddress(beneficiaryAddress))
 		if err != nil {
-			logs.GetLogger().Errorf("create cp client failed, error: %v,", err)
+			logs.GetLogger().Errorf("changeBeneficiaryAddress tx failed, error: %v", err)
 			return err
 		}
 
-		cpAccount, err := cpStub.GetCpAccountInfo()
-		if err != nil {
-			return fmt.Errorf("get cpAccount faile, error: %v", err)
+		nodeId := computing.GetNodeId(cpRepoPath)
+		if err = computing.NewCpInfoService().UpdateCpInfoByNodeId(&models.CpInfoEntity{NodeId: nodeId, Beneficiary: beneficiaryAddress}); err != nil {
+			return fmt.Errorf("update beneficiary_address of cp to db failed, error: %v", err)
 		}
-		if !strings.EqualFold(cpAccount.OwnerAddress, ownerAddress) {
-			return fmt.Errorf("the owner address is incorrect. The owner on the chain is %s, and the current address is %s", cpAccount.OwnerAddress, ownerAddress)
-		}
-		newQuota := big.NewInt(int64(0))
-		newExpiration := big.NewInt(int64(0))
-		changeBeneficiaryAddressTx, err := cpStub.ChangeBeneficiary(common.HexToAddress(beneficiaryAddress), newQuota, newExpiration)
-		if err != nil {
-			logs.GetLogger().Errorf("change owner address tx failed, error: %v,", err)
-			return err
-		}
+
 		fmt.Printf("changeBeneficiaryAddress Transaction hash: %s \n", changeBeneficiaryAddressTx)
 		return nil
 	},
 }
 
-var changeUbiFlagCmd = &cli.Command{
-	Name:      "changeUbiFlag",
-	Usage:     "Update ubiFlag of CP (0:Reject, 1:Accept)",
-	ArgsUsage: "[ubiFlag]",
+var changeWorkerAddressCmd = &cli.Command{
+	Name:      "changeWorkerAddress",
+	Usage:     "Update workerAddress of CP",
+	ArgsUsage: "[workerAddress]",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:     "ownerAddress",
@@ -510,17 +812,17 @@ var changeUbiFlagCmd = &cli.Command{
 			return fmt.Errorf("ownerAddress is not empty")
 		}
 
-		if cctx.NArg() != 1 {
-			return fmt.Errorf(" Requires a beneficiaryAddress")
+		if !isValidWalletAddress(ownerAddress) {
+			return fmt.Errorf("the ownerAddress is invalid wallet address")
 		}
 
-		ubiFlag := cctx.Args().Get(0)
-		if strings.TrimSpace(ubiFlag) == "" {
-			return fmt.Errorf("ubiFlag is not empty")
+		workerAddress := cctx.Args().Get(0)
+		if strings.TrimSpace(workerAddress) == "" {
+			return fmt.Errorf("failed to parse target worker address: %s", workerAddress)
 		}
 
-		if strings.TrimSpace(ubiFlag) != "0" && strings.TrimSpace(ubiFlag) != "1" {
-			return fmt.Errorf("ubiFlag must be 0 or 1")
+		if !isValidWalletAddress(workerAddress) {
+			return fmt.Errorf("the target worker address is invalid wallet address")
 		}
 
 		cpRepoPath, ok := os.LookupEnv("CP_PATH")
@@ -531,98 +833,103 @@ var changeUbiFlagCmd = &cli.Command{
 			logs.GetLogger().Fatal(err)
 		}
 
-		chainUrl, err := conf.GetRpcByName(conf.DefaultRpc)
+		client, cpStub, err := getVerifyAccountClient(ownerAddress)
 		if err != nil {
-			logs.GetLogger().Errorf("get rpc url failed, error: %v,", err)
-			return err
-		}
-
-		localWallet, err := wallet.SetupWallet(wallet.WalletRepo)
-		if err != nil {
-			logs.GetLogger().Errorf("setup wallet ubi failed, error: %v,", err)
-			return err
-		}
-
-		ki, err := localWallet.FindKey(ownerAddress)
-		if err != nil || ki == nil {
-			logs.GetLogger().Errorf("the address: %s, private key %v. Please import the address into the wallet", ownerAddress, wallet.ErrKeyInfoNotFound)
-			return err
-		}
-
-		client, err := ethclient.Dial(chainUrl)
-		if err != nil {
-			logs.GetLogger().Errorf("dial rpc connect failed, error: %v,", err)
-			return err
+			return fmt.Errorf("create cp account client failed, error: %v", err)
 		}
 		defer client.Close()
 
-		cpStub, err := account.NewAccountStub(client, account.WithCpPrivateKey(ki.PrivateKey))
+		changeBeneficiaryAddressTx, err := cpStub.ChangeWorkerAddress(common.HexToAddress(workerAddress))
 		if err != nil {
-			logs.GetLogger().Errorf("create cp client failed, error: %v,", err)
+			logs.GetLogger().Errorf("changeWorkerAddress tx failed, error: %v", err)
 			return err
 		}
 
-		cpAccount, err := cpStub.GetCpAccountInfo()
-		if err != nil {
-			return fmt.Errorf("get cpAccount faile, error: %v", err)
-		}
-		if !strings.EqualFold(cpAccount.OwnerAddress, ownerAddress) {
-			return fmt.Errorf("the owner address is incorrect. The owner on the chain is %s, and the current address is %s", cpAccount.OwnerAddress, ownerAddress)
+		nodeId := computing.GetNodeId(cpRepoPath)
+		if err = computing.NewCpInfoService().UpdateCpInfoByNodeId(&models.CpInfoEntity{NodeId: nodeId, WorkerAddress: workerAddress}); err != nil {
+			return fmt.Errorf("update worker_address of cp to db failed, error: %v", err)
 		}
 
-		newUbiFlag, _ := strconv.ParseUint(strings.TrimSpace(ubiFlag), 10, 64)
-
-		changeBeneficiaryAddressTx, err := cpStub.ChangeUbiFlag(uint8(newUbiFlag))
-		if err != nil {
-			logs.GetLogger().Errorf("change ubi flag tx failed, error: %v,", err)
-			return err
-		}
-		fmt.Printf("ChangeUbiFlag Transaction hash: %s \n", changeBeneficiaryAddressTx)
+		fmt.Printf("changeWorkerAddress Transaction hash: %s \n", changeBeneficiaryAddressTx)
 		return nil
 	},
 }
 
-func DoSend(contractAddr, height string) error {
-	type ContractReq struct {
-		Addr   string `json:"addr"`
-		Height int    `json:"height"`
-	}
-	h, _ := strconv.ParseInt(height, 10, 64)
-	var contractReq ContractReq
-	contractReq.Addr = contractAddr
-	contractReq.Height = int(h)
+var changeTaskTypesCmd = &cli.Command{
+	Name:      "changeTaskTypes",
+	Usage:     "Update taskTypes of CP (1:Fil-C2-512M, 2:Aleo, 3: AI, 4:Fil-C2-32G), separated by commas",
+	ArgsUsage: "[TaskTypes]",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:     "ownerAddress",
+			Usage:    "Specify a OwnerAddress",
+			Required: true,
+		},
+	},
+	Action: func(cctx *cli.Context) error {
 
-	jsonData, err := json.Marshal(contractReq)
-	if err != nil {
-		logs.GetLogger().Errorf("JSON encoding failed: %v", err)
-		return err
-	}
+		ownerAddress := cctx.String("ownerAddress")
+		if strings.TrimSpace(ownerAddress) == "" {
+			return fmt.Errorf("ownerAddress is not empty")
+		}
 
-	resp, err := http.Post(conf.GetConfig().UBI.UbiUrl+"/contracts", "application/json", bytes.NewBuffer(jsonData))
-	if err != nil {
-		logs.GetLogger().Errorf("POST request failed: %v", err)
-		return err
-	}
-	defer resp.Body.Close()
+		if !isValidWalletAddress(ownerAddress) {
+			return fmt.Errorf("the ownerAddress is invalid wallet address")
+		}
 
-	var resultResp struct {
-		Code int    `json:"code"`
-		Msg  string `json:"msg"`
-		Data any    `json:"data,omitempty"`
-	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		logs.GetLogger().Errorf("read response failed: %v", err)
-		return err
-	}
-	err = json.Unmarshal(body, &resultResp)
-	if err != nil {
-		logs.GetLogger().Errorf("response convert to json failed: %v", err)
-		return err
-	}
+		taskTypes := strings.TrimSpace(cctx.Args().Get(0))
+		if strings.TrimSpace(taskTypes) == "" {
+			return fmt.Errorf("taskTypes is required")
+		}
 
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("register cp to ubi hub failed, error: %s", resultResp.Msg)
-	}
-	return nil
+		var taskTypesUint []uint8
+		if strings.Index(taskTypes, ",") > 0 {
+			for _, taskT := range strings.Split(taskTypes, ",") {
+				tt, _ := strconv.ParseUint(taskT, 10, 64)
+				if tt < 0 {
+					return fmt.Errorf("task-types must be int")
+				}
+				taskTypesUint = append(taskTypesUint, uint8(tt))
+			}
+		} else {
+			tt, _ := strconv.ParseUint(taskTypes, 10, 64)
+			if tt < 0 {
+				return fmt.Errorf("task-types must be int")
+			}
+			taskTypesUint = append(taskTypesUint, uint8(tt))
+		}
+
+		cpRepoPath, ok := os.LookupEnv("CP_PATH")
+		if !ok {
+			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
+		}
+		if err := conf.InitConfig(cpRepoPath, false); err != nil {
+			logs.GetLogger().Fatal(err)
+		}
+
+		client, cpStub, err := getVerifyAccountClient(ownerAddress)
+		if err != nil {
+			return fmt.Errorf("create cp account client failed, error: %v", err)
+		}
+		defer client.Close()
+
+		changeTaskTypesTx, err := cpStub.ChangeTaskTypes(taskTypesUint)
+		if err != nil {
+			logs.GetLogger().Errorf("changeTaskTypes tx failed, error: %v", err)
+			return err
+		}
+
+		nodeId := computing.GetNodeId(cpRepoPath)
+		if err = computing.NewCpInfoService().UpdateCpInfoByNodeId(&models.CpInfoEntity{NodeId: nodeId, TaskTypes: taskTypesUint}); err != nil {
+			return fmt.Errorf("update task_types of cp to db failed, error: %v", err)
+		}
+
+		fmt.Printf("changeTaskTypes Transaction hash: %s \n", changeTaskTypesTx)
+		return nil
+	},
+}
+
+func isValidWalletAddress(address string) bool {
+	re := regexp.MustCompile(`^0x[0-9a-fA-F]{40}$`)
+	return re.MatchString(address)
 }
