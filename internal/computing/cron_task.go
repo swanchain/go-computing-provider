@@ -147,6 +147,14 @@ func (task *CronTask) watchExpiredTask() {
 		var deleteSpaceIds []string
 		for _, job := range jobList {
 			namespace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(job.WalletAddress)
+			deployName := constants.K8S_DEPLOY_NAME_PREFIX + job.SpaceUuid
+			service := NewK8sService()
+
+			if _, err = service.k8sClient.AppsV1().Deployments(namespace).Get(context.TODO(), deployName, metav1.GetOptions{}); err != nil && errors.IsNotFound(err) {
+				deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
+				continue
+			}
+
 			if len(strings.TrimSpace(job.TaskUuid)) != 0 {
 				taskStatus, err := checkTaskStatusByHub(job.TaskUuid, task.nodeId)
 				if err != nil {
@@ -170,21 +178,16 @@ func (task *CronTask) watchExpiredTask() {
 			}
 
 			if time.Now().Unix() > job.ExpireTime {
-				expireTimeStr := time.Unix(job.ExpireTime, 0).Format("2006-01-02 15:04:05")
-				logs.GetLogger().Infof("<timer-task> space_uuid: %s, expire_time: %s. the job starting terminated", job.SpaceUuid, expireTimeStr)
+				logs.GetLogger().Infof("<timer-task> space_uuid: %s has expired, the job starting terminated", job.SpaceUuid)
 				if err = deleteJob(namespace, job.SpaceUuid); err == nil {
 					deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
 					continue
 				}
 			}
+		}
 
-			k8sNameSpace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(job.WalletAddress)
-			deployName := constants.K8S_DEPLOY_NAME_PREFIX + job.SpaceUuid
-			service := NewK8sService()
-			if _, err = service.k8sClient.AppsV1().Deployments(k8sNameSpace).Get(context.TODO(), deployName, metav1.GetOptions{}); err != nil && errors.IsNotFound(err) {
-				deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
-				continue
-			}
+		for _, spaceUuid := range deleteSpaceIds {
+			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid)
 		}
 
 	})
