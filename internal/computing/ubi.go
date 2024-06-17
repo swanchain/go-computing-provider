@@ -377,9 +377,8 @@ func DoUbiTaskForK8s(c *gin.Context) {
 		}
 
 		req := k8sService.k8sClient.CoreV1().Pods(namespace).GetLogs(podName, &v1.PodLogOptions{
-			Container:  "",
-			Follow:     true,
-			Timestamps: true,
+			Container: "",
+			Follow:    true,
 		})
 
 		time.Sleep(2 * time.Second)
