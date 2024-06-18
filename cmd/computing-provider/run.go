@@ -466,7 +466,7 @@ var taskInfoCmd = &cli.Command{
 
 		var taskData [][]string
 		taskData = append(taskData, []string{"ZK Type:", models.TaskTypeStr(int(taskInfo.TaskType.Int64()))})
-		taskData = append(taskData, []string{"Resource Type:", models.GetSourceTypeStr(int(taskInfo.ResourceType.Int64()))})
+		taskData = append(taskData, []string{"Resource Type:", models.GetResourceTypeStr(int(taskInfo.ResourceType.Int64()))})
 		taskData = append(taskData, []string{"CP Account:", taskInfo.CpContractAddress.Hex()})
 		taskData = append(taskData, []string{"Task Status:", taskInfo.Status})
 		taskData = append(taskData, []string{"Deadline:", taskInfo.Deadline.String()})

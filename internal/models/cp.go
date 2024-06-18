@@ -106,10 +106,11 @@ type UBITaskReq struct {
 	Name         string        `json:"name,omitempty"`
 	Type         int           `json:"type"`
 	InputParam   string        `json:"input_param"`
+	VerifyParam  string        `json:"verify_param"`
 	Signature    string        `json:"signature"`
 	Resource     *TaskResource `json:"resource"`
 	ResourceType int           `json:"resource_type"`
-	ContractAddr string        `json:"contract_addr"`
+	DeadLine     int64         `json:"deadline"`
 }
 
 type UbiC2Proof struct {

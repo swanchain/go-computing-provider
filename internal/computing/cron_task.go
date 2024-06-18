@@ -52,7 +52,6 @@ func (task *CronTask) RunTask() {
 	task.cleanAbnormalDeployment()
 	task.setFailedUbiTaskStatus()
 	task.watchNameSpaceForDeleted()
-	task.updateUbiTaskReward()
 	task.reportClusterResourceToHub()
 	task.watchExpiredTask()
 }
@@ -305,33 +304,6 @@ func (task *CronTask) setFailedUbiTaskStatus() {
 			}
 
 			NewTaskService().SaveTaskEntity(&ubiTask)
-		}
-	})
-	c.Start()
-}
-
-func (task *CronTask) updateUbiTaskReward() {
-	c := cron.New(cron.WithSeconds())
-	c.AddFunc("0 0/30 * * * ?", func() {
-		defer func() {
-			if err := recover(); err != nil {
-				logs.GetLogger().Errorf("task job: [updateUbiTaskReward], error: %+v", err)
-			}
-		}()
-
-		taskList, err := NewTaskService().GetTaskListNoReward()
-		if err != nil {
-			logs.GetLogger().Errorf("get task list failed, error: %+v", err)
-			return
-		}
-
-		for _, entity := range taskList {
-			ubiTask := entity
-			err = getReward(ubiTask)
-			if err != nil {
-				logs.GetLogger().Errorf("taskId: %d, %v", ubiTask.Id, err)
-				continue
-			}
 		}
 	})
 	c.Start()

@@ -78,7 +78,7 @@ var listCmd = &cli.Command{
 				}
 				createTime := time.Unix(task.CreateTime, 0).Format("2006-01-02 15:04:05")
 				taskData = append(taskData,
-					[]string{strconv.Itoa(int(task.Id)), task.Contract, models.GetSourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type), task.TxHash, models.TaskStatusStr(task.Status),
+					[]string{strconv.Itoa(int(task.Id)), task.Contract, models.GetResourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type), task.TxHash, models.TaskStatusStr(task.Status),
 						fmt.Sprintf("%s", task.Reward), createTime, errorMsg})
 
 				var rowColor []tablewriter.Colors
@@ -110,7 +110,7 @@ var listCmd = &cli.Command{
 					errorMsg = task.Error
 				}
 				taskData = append(taskData,
-					[]string{strconv.Itoa(int(task.Id)), contract, models.GetSourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type), proofHash, models.TaskStatusStr(task.Status),
+					[]string{strconv.Itoa(int(task.Id)), contract, models.GetResourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type), proofHash, models.TaskStatusStr(task.Status),
 						fmt.Sprintf("%s", task.Reward), createTime, errorMsg})
 
 				var rowColor []tablewriter.Colors
