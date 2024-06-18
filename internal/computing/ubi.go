@@ -548,6 +548,11 @@ func DoUbiTaskForDocker(c *gin.Context) {
 
 	go func() {
 		defer func() {
+			if err := recover(); err != nil {
+				logs.GetLogger().Errorf("do zk task painc, error: %+v", err)
+				return
+			}
+
 			ubiTaskRun, err := NewTaskService().GetTaskEntity(int64(ubiTask.ID))
 			if err != nil {
 				logs.GetLogger().Errorf("get ubi task detail from db failed, ubiTaskId: %d, error: %+v", ubiTask.ID, err)
@@ -631,11 +636,13 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		dockerService := NewDockerService()
 		if err = dockerService.ContainerCreateAndStart(containerConfig, hostConfig, containerName); err != nil {
 			logs.GetLogger().Errorf("create ubi task container failed, error: %v", err)
+			return
 		}
 
 		containerLogStream, err := dockerService.GetContainerLogStream(containerName)
 		if err != nil {
 			logs.GetLogger().Errorf("get docker container log stream failed, error: %v", err)
+			return
 		}
 		defer containerLogStream.Close()
 
