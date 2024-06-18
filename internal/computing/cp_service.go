@@ -306,7 +306,7 @@ func RedeployJob(c *gin.Context) {
 		DeploySpaceTask(jobData.JobSourceURI, hostName, jobData.Duration, jobData.UUID, jobData.TaskUUID, gpuProductName)
 	}()
 
-	c.JSON(http.StatusOK, jobData)
+	c.JSON(http.StatusOK, util.CreateSuccessResponse(jobData))
 }
 
 func ReNewJob(c *gin.Context) {

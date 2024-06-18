@@ -447,7 +447,6 @@ func (ds *DockerService) GetContainerLogStream(containerName string) (io.ReadClo
 		ShowStdout: true,
 		ShowStderr: true,
 		Follow:     true,
-		Timestamps: true,
 	})
 }
 
