@@ -209,21 +209,15 @@ func DoUbiTaskForK8s(c *gin.Context) {
 		var namespace = "ubi-task-" + strconv.Itoa(ubiTask.ID)
 		var err error
 		defer func() {
+			if err := recover(); err != nil {
+				logs.GetLogger().Errorf("do zk task painc, error: %+v", err)
+				return
+			}
+
 			ubiTaskRun, err := NewTaskService().GetTaskEntity(int64(ubiTask.ID))
 			if err != nil {
 				logs.GetLogger().Errorf("get ubi task detail from db failed, ubiTaskId: %d, error: %+v", ubiTask.ID, err)
 				return
-			}
-			if ubiTaskRun.Id == 0 {
-				ubiTaskRun = new(models.TaskEntity)
-				ubiTaskRun.Id = int64(ubiTask.ID)
-				ubiTaskRun.Type = ubiTask.Type
-				ubiTaskRun.Name = ubiTask.Name
-				ubiTaskRun.Contract = ubiTask.ContractAddr
-				ubiTaskRun.ResourceType = ubiTask.ResourceType
-				ubiTaskRun.InputParam = ubiTask.InputParam
-				ubiTaskRun.CreateTime = time.Now().Unix()
-				ubiTaskRun.Contract = ubiTask.ContractAddr
 			}
 
 			if ubiTaskRun.TxHash != "" {
@@ -528,7 +522,6 @@ func DoUbiTaskForDocker(c *gin.Context) {
 	if err != nil {
 		taskEntity.Status = models.TASK_FAILED_STATUS
 		NewTaskService().SaveTaskEntity(taskEntity)
-		logs.GetLogger().Errorf("check resource failed, error: %v", err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
 		return
 	}
@@ -671,7 +664,6 @@ func checkResourceForUbi(resource *models.TaskResource, gpuName string, resource
 
 	var nodeResource models.NodeResource
 	if err := json.Unmarshal([]byte(containerLogStr), &nodeResource); err != nil {
-		logs.GetLogger().Error("collect host hardware resource failed, error: %+v", err)
 		return false, "", 0, 0, err
 	}
 
@@ -771,7 +763,6 @@ func GetCpResource(c *gin.Context) {
 	dockerService := NewDockerService()
 	containerLogStr, err := dockerService.ContainerLogs("resource-exporter")
 	if err != nil {
-		logs.GetLogger().Errorf("collect host hardware resource failed, error: %v", err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ServerError, err.Error()))
 		return
 	}
