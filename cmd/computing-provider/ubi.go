@@ -125,7 +125,7 @@ var listCmd = &cli.Command{
 
 				rowColorList = append(rowColorList, RowColor{
 					row:    i,
-					column: []int{5},
+					column: []int{4},
 					color:  rowColor,
 				})
 			}
