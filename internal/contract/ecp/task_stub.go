@@ -81,7 +81,7 @@ outerLoop:
 				continue
 			}
 			contractAddress, transaction, _, err := DeployTask(txOptions, s.client, new(big.Int).SetInt64(task.Id), new(big.Int).SetInt64(int64(task.Type)),
-				models.GetResourceTypeStr(task.ResourceType), task.InputParam, task.VerifyParam, common.HexToAddress(conf.GetConfig().CONTRACT.TaskRegister),
+				new(big.Int).SetInt64(int64(task.ResourceType)), task.InputParam, task.VerifyParam, common.HexToAddress(conf.GetConfig().CONTRACT.TaskRegister),
 				proof, new(big.Int).SetInt64(task.Deadline), common.HexToAddress(conf.GetConfig().CONTRACT.TaskRegister), task.CheckCode)
 			if err != nil {
 				if err.Error() == "replacement transaction underpriced" {

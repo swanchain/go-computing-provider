@@ -403,7 +403,7 @@ var taskInfoCmd = &cli.Command{
 		var taskData [][]string
 		taskData = append(taskData, []string{"Task Id:", taskInfo.TaskID.String()})
 		taskData = append(taskData, []string{"ZK Type:", models.TaskTypeStr(int(taskInfo.TaskType.Int64()))})
-		taskData = append(taskData, []string{"Resource Type:", taskInfo.ResourceType})
+		taskData = append(taskData, []string{"Resource Type:", models.GetResourceTypeStr(int(taskInfo.ResourceType.Int64()))})
 		taskData = append(taskData, []string{"Owner:", taskInfo.CpAccount.Hex()})
 		taskData = append(taskData, []string{"CP Account:", taskInfo.CpAccount.Hex()})
 		taskData = append(taskData, []string{"Deadline:", taskInfo.Deadline.String()})
@@ -415,7 +415,7 @@ var taskInfoCmd = &cli.Command{
 			taskData = append(taskData, []string{"Proof:", taskInfo.Proof})
 		}
 
-		header := []string{"Task Contract:", taskContract}
+		header := []string{fmt.Sprintf("Task Contract(%s):", taskInfo.Version), taskContract}
 		NewVisualTable(header, taskData, []RowColor{}).Generate(false)
 		return nil
 
