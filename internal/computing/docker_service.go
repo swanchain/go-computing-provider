@@ -462,3 +462,29 @@ func (ds *DockerService) checkImageExists(imageName string) bool {
 	}
 	return len(images) > 0
 }
+
+func (ds *DockerService) IsExistContainer(containerName string) bool {
+	containers, err := ds.c.ContainerList(context.Background(), container.ListOptions{All: true})
+	if err != nil {
+		return false
+	}
+
+	exists := false
+	for _, c := range containers {
+		for _, name := range c.Names {
+			if name == "/"+containerName {
+				exists = true
+				break
+			}
+		}
+		if exists {
+			break
+		}
+	}
+
+	if exists {
+		return true
+	} else {
+		return false
+	}
+}

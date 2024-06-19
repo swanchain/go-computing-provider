@@ -230,6 +230,11 @@ func DoUbiTaskForK8s(c *gin.Context) {
 			err = NewTaskService().SaveTaskEntity(ubiTaskRun)
 		}()
 
+		if ubiTaskImage == "" {
+			logs.GetLogger().Errorf("please check the log output of the resource-exporter pod to see if cpu_name is intel or amd")
+			return
+		}
+
 		k8sService := NewK8sService()
 		if _, err = k8sService.GetNameSpace(context.TODO(), namespace, metaV1.GetOptions{}); err != nil {
 			if errors.IsNotFound(err) {
@@ -369,13 +374,15 @@ func DoUbiTaskForK8s(c *gin.Context) {
 			podName = pod.Name
 			break
 		}
+		if podName == "" {
+			return
+		}
 
 		req := k8sService.k8sClient.CoreV1().Pods(namespace).GetLogs(podName, &v1.PodLogOptions{
 			Container: "",
 			Follow:    true,
 		})
 
-		time.Sleep(2 * time.Second)
 		podLogs, err := req.Stream(context.Background())
 		if err != nil {
 			logs.GetLogger().Errorf("Error opening log stream: %v", err)
@@ -566,7 +573,8 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		}()
 
 		if ubiTaskImage == "" {
-			logs.GetLogger().Errorf("please check the log output of the resource-exporter container")
+			logs.GetLogger().Errorf("please check the log output of the resource-exporter container to see if cpu_name is intel or amd")
+			return
 		}
 
 		if err := NewDockerService().PullImage(ubiTaskImage); err != nil {
@@ -629,6 +637,11 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		dockerService := NewDockerService()
 		if err = dockerService.ContainerCreateAndStart(containerConfig, hostConfig, containerName); err != nil {
 			logs.GetLogger().Errorf("create ubi task container failed, error: %v", err)
+			return
+		}
+
+		time.Sleep(3 * time.Second)
+		if !dockerService.IsExistContainer(containerName) {
 			return
 		}
 
