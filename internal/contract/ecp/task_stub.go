@@ -114,17 +114,17 @@ outerLoop:
 	return taskContractAddress, err
 }
 
-func (s *TaskStub) GetTaskInfo() (ECPTaskTaskInfo, error) {
+func (s *TaskStub) GetTaskInfo() (models.EcpTaskInfo, error) {
 	if s.ContractAddress == "" {
-		return ECPTaskTaskInfo{}, errors.New("missing task contract address")
+		return models.EcpTaskInfo{}, errors.New("missing task contract address")
 	}
 
 	taskClient, err := NewTask(common.HexToAddress(s.ContractAddress), s.client)
 	if err != nil {
-		return ECPTaskTaskInfo{}, fmt.Errorf("create task contract client, error: %+v", err)
+		return models.EcpTaskInfo{}, fmt.Errorf("create task contract client, error: %+v", err)
 	}
 
-	return taskClient.GetTaskInfo(&bind.CallOpts{})
+	return taskClient.TaskInfo(&bind.CallOpts{})
 }
 
 func (s *TaskStub) privateKeyToPublicKey() (common.Address, error) {
