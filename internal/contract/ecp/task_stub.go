@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/filswan/go-swan-lib/logs"
 	"github.com/swanchain/go-computing-provider/conf"
+	"github.com/swanchain/go-computing-provider/internal/contract"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"math/big"
 	"strings"
@@ -58,6 +59,11 @@ func (s *TaskStub) CreateTaskContract(proof string, task *models.TaskEntity, tim
 	var taskContractAddress string
 	var flag bool
 
+	cpAccountAddress, err := contract.GetCpAccountAddress()
+	if err != nil {
+		return "", fmt.Errorf("get cp account contract address failed, error: %v", err)
+	}
+
 	timeOutCh := time.After(time.Second * time.Duration(timeOut))
 outerLoop:
 	for {
@@ -80,8 +86,9 @@ outerLoop:
 				logs.GetLogger().Warnf("taskId: %d, create transaction opts failed, error: %s", task.Id, ParseError(err))
 				continue
 			}
+
 			contractAddress, transaction, _, err := DeployTask(txOptions, s.client, new(big.Int).SetInt64(task.Id), new(big.Int).SetInt64(int64(task.Type)),
-				new(big.Int).SetInt64(int64(task.ResourceType)), task.InputParam, task.VerifyParam, common.HexToAddress(conf.GetConfig().CONTRACT.TaskRegister),
+				new(big.Int).SetInt64(int64(task.ResourceType)), task.InputParam, task.VerifyParam, common.HexToAddress(cpAccountAddress),
 				proof, new(big.Int).SetInt64(task.Deadline), common.HexToAddress(conf.GetConfig().CONTRACT.TaskRegister), task.CheckCode)
 			if err != nil {
 				if err.Error() == "replacement transaction underpriced" {

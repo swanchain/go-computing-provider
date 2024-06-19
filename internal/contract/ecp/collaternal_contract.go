@@ -53,23 +53,23 @@ type ECPCollateralTask struct {
 	Status           *big.Int
 }
 
-// CollaternalMetaData contains all meta data concerning the Collaternal contract.
-var CollaternalMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"OwnableInvalidOwner\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"OwnableUnauthorizedAccount\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"cp\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"frozenAmount\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"balanceAmount\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"operation\",\"type\":\"string\"}],\"name\":\"CollateralAdjusted\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"cp\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"collateralAmount\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"taskContractAddress\",\"type\":\"address\"}],\"name\":\"CollateralLocked\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"cp\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"taskContractAddress\",\"type\":\"address\"}],\"name\":\"CollateralSlashed\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"cp\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"collateralAmount\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"taskContractAddress\",\"type\":\"address\"}],\"name\":\"CollateralUnlocked\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"fundingWallet\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"cpAccount\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"depositAmount\",\"type\":\"uint256\"}],\"name\":\"Deposit\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"taskContractAddress\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"cpAccountAddress\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"collateral\",\"type\":\"uint256\"}],\"name\":\"TaskCreated\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"taskContractAddress\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"newStatus\",\"type\":\"uint256\"}],\"name\":\"TaskStatusChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"cpOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"cpAccount\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"withdrawAmount\",\"type\":\"uint256\"}],\"name\":\"Withdraw\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newAdmin\",\"type\":\"address\"}],\"name\":\"addAdmin\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"balances\",\"outputs\":[{\"internalType\":\"int256\",\"name\":\"\",\"type\":\"int256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"baseCollateral\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"collateralRatio\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"cpAddress\",\"type\":\"address\"}],\"name\":\"cpInfo\",\"outputs\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"cp\",\"type\":\"address\"},{\"internalType\":\"int256\",\"name\":\"balance\",\"type\":\"int256\"},{\"internalType\":\"uint256\",\"name\":\"frozenBalance\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"status\",\"type\":\"string\"}],\"internalType\":\"structECPCollateral.CPInfo\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"cpStatus\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"cpAccount\",\"type\":\"address\"}],\"name\":\"deposit\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"frozenBalance\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getBaseCollateral\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getECPCollateralInfo\",\"outputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"slashedFunds\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"baseCollateral\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"taskBalance\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"collateralRatio\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"slashRatio\",\"type\":\"uint256\"}],\"internalType\":\"structECPCollateral.ContractInfo\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"taskContractAddress\",\"type\":\"address\"}],\"name\":\"getTaskInfo\",\"outputs\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"cpAccountAddress\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"collateral\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"status\",\"type\":\"uint256\"}],\"internalType\":\"structECPCollateral.Task\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"isAdmin\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"cp\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"collateral\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"taskContractAddress\",\"type\":\"address\"}],\"name\":\"lockCollateral\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"admin\",\"type\":\"address\"}],\"name\":\"removeAdmin\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_baseCollateral\",\"type\":\"uint256\"}],\"name\":\"setBaseCollateral\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_collateralRatio\",\"type\":\"uint256\"}],\"name\":\"setCollateralRatio\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_slashRatio\",\"type\":\"uint256\"}],\"name\":\"setSlashRatio\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"taskContractAddress\",\"type\":\"address\"}],\"name\":\"slashCollateral\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"slashRatio\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"slashedFunds\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"taskBalance\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"tasks\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"cpAccountAddress\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"collateral\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"status\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"taskContractAddress\",\"type\":\"address\"}],\"name\":\"unlockCollateral\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"cpAccount\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"withdraw\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"stateMutability\":\"payable\",\"type\":\"receive\"}]",
-	Bin: "0x60806040523480156200001157600080fd5b5033600073ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff1603620000885760006040517f1e4fbdf70000000000000000000000000000000000000000000000000000000081526004016200007f919062000222565b60405180910390fd5b62000099816200011960201b60201c565b50620000ab336200011960201b60201c565b6001600660003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060006101000a81548160ff021916908315150217905550600560048190555060026005819055506200023f565b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff169050816000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055508173ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e060405160405180910390a35050565b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b60006200020a82620001dd565b9050919050565b6200021c81620001fd565b82525050565b600060208201905062000239600083018462000211565b92915050565b612ca5806200024f6000396000f3fe6080604052600436106101a05760003560e01c80637f58a7e5116100ec578063ce3518aa1161008a578063f2fde38b11610064578063f2fde38b146105ee578063f31cc88314610617578063f340fa0114610642578063f3fef3a31461065e576101b0565b8063ce3518aa14610571578063d27ca89b1461059a578063e0ed539d146105c5576101b0565b80639b5ddf09116100c65780639b5ddf09146104b55780639d1fef81146104e0578063a664c21614610509578063b4eae1cb14610546576101b0565b80637f58a7e5146104365780638da5cb5b1461045f5780639939cd181461048a576101b0565b80633fe65177116101595780637048027511610133578063704802751461038c57806370b72944146103b5578063715018a6146103e057806377c237fd146103f7576101b0565b80633fe65177146102fb5780636060663e146103385780636f99f15c14610361576101b0565b80630b4b73d1146101b55780631785f53c146101f257806324d7806c1461021b578063266565a91461025857806327e235e3146102955780633f001fd9146102d2576101b0565b366101b0576101ae33610687565b005b600080fd5b3480156101c157600080fd5b506101dc60048036038101906101d79190611f05565b61074e565b6040516101e99190611f9c565b60405180910390f35b3480156101fe57600080fd5b5061021960048036038101906102149190611f05565b610811565b005b34801561022757600080fd5b50610242600480360381019061023d9190611f05565b610874565b60405161024f9190611fd2565b60405180910390f35b34801561026457600080fd5b5061027f600480360381019061027a9190611f05565b610894565b60405161028c9190611ffc565b60405180910390f35b3480156102a157600080fd5b506102bc60048036038101906102b79190611f05565b6108ac565b6040516102c99190612030565b60405180910390f35b3480156102de57600080fd5b506102f960048036038101906102f49190611f05565b6108c4565b005b34801561030757600080fd5b50610322600480360381019061031d9190611f05565b610c0a565b60405161032f91906120db565b60405180910390f35b34801561034457600080fd5b5061035f600480360381019061035a9190612129565b610caa565b005b34801561036d57600080fd5b50610376610cbc565b6040516103839190611ffc565b60405180910390f35b34801561039857600080fd5b506103b360048036038101906103ae9190611f05565b610cc2565b005b3480156103c157600080fd5b506103ca610d25565b6040516103d79190611ffc565b60405180910390f35b3480156103ec57600080fd5b506103f5610d2f565b005b34801561040357600080fd5b5061041e60048036038101906104199190611f05565b610d43565b60405161042d93929190612165565b60405180910390f35b34801561044257600080fd5b5061045d60048036038101906104589190612129565b610d8d565b005b34801561046b57600080fd5b50610474610e23565b604051610481919061219c565b60405180910390f35b34801561049657600080fd5b5061049f610e4c565b6040516104ac919061221f565b60405180910390f35b3480156104c157600080fd5b506104ca610e8a565b6040516104d79190611ffc565b60405180910390f35b3480156104ec57600080fd5b5061050760048036038101906105029190611f05565b610e90565b005b34801561051557600080fd5b50610530600480360381019061052b9190611f05565b611292565b60405161053d91906122f6565b60405180910390f35b34801561055257600080fd5b5061055b61141d565b6040516105689190611ffc565b60405180910390f35b34801561057d57600080fd5b5061059860048036038101906105939190612129565b611423565b005b3480156105a657600080fd5b506105af611435565b6040516105bc9190611ffc565b60405180910390f35b3480156105d157600080fd5b506105ec60048036038101906105e79190612318565b61143b565b005b3480156105fa57600080fd5b5061061560048036038101906106109190611f05565b611772565b005b34801561062357600080fd5b5061062c6117f8565b6040516106399190611ffc565b60405180910390f35b61065c60048036038101906106579190611f05565b610687565b005b34801561066a57600080fd5b506106856004803603810190610680919061236b565b6117fe565b005b61069081611b49565b34600760008373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060008282546106df91906123da565b925050819055508073ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff167f5548c837ab068cf56a2c2479df0882a4922fd203edb7517321831d95078c5f62346040516107439190611ffc565b60405180910390a350565b610756611dfe565b600960008373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000206040518060600160405290816000820160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001600182015481526020016002820154815250509050919050565b610819611cab565b6000600660008373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060006101000a81548160ff02191690831515021790555050565b60066020528060005260406000206000915054906101000a900460ff1681565b60086020528060005260406000206000915090505481565b60076020528060005260406000206000915090505481565b600660003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060009054906101000a900460ff16610950576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161094790612490565b60405180910390fd5b6000600960008373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002090506000600860008360000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020549050600081836001015411610a12578260010154610a14565b815b905080600860008560000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000206000828254610a8991906124b0565b9250508190555080600760008560000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000206000828254610b0391906123da565b9250508190555060028360020181905550610b418360000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff16611b49565b8260000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff167f817d69f45cb0984f7141c288a3bea0d2dd7bc075758f311056d0aa31798614fa8286604051610bad9291906124e4565b60405180910390a28373ffffffffffffffffffffffffffffffffffffffff167f43a64df649a51c960307a3b5a4ec25a67c76629f0881669a214d162ae4ad2b5f6002604051610bfc9190611ffc565b60405180910390a250505050565b600a6020528060005260406000206000915090508054610c299061253c565b80601f0160208091040260200160405190810160405280929190818152602001828054610c559061253c565b8015610ca25780601f10610c7757610100808354040283529160200191610ca2565b820191906000526020600020905b815481529060010190602001808311610c8557829003601f168201915b505050505081565b610cb2611cab565b8060048190555050565b60015481565b610cca611cab565b6001600660008373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060006101000a81548160ff02191690831515021790555050565b6000600254905090565b610d37611cab565b610d416000611d32565b565b60096020528060005260406000206000915090508060000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff16908060010154908060020154905083565b600660003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060009054906101000a900460ff16610e19576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610e1090612490565b60405180910390fd5b8060028190555050565b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff16905090565b610e54611e35565b6040518060a001604052806001548152602001600254815260200160035481526020016004548152602001600554815250905090565b60025481565b600660003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060009054906101000a900460ff16610f1c576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610f1390612490565b60405180910390fd5b6000600960008373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020905060006005548260010154610f73919061256d565b90506000600860008460000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000205490506000818311610fec5782610fee565b815b9050600081841161100057600061100d565b818461100c91906124b0565b5b905081600860008760000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020600082825461108291906124b0565b9250508190555080600760008760000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060008282546110fc91906125af565b92505081905550836001600082825461111591906125f2565b92505081905550600385600201819055506111538560000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff16611b49565b8460000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff167f0f51f32e6325a6b213a7e9459df2a4564f058d9dca8309ff9b2508f6a83cf59385886040516111bf9291906124e4565b60405180910390a28573ffffffffffffffffffffffffffffffffffffffff167f43a64df649a51c960307a3b5a4ec25a67c76629f0881669a214d162ae4ad2b5f600360405161120e9190611ffc565b60405180910390a28460000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff167f42f1a8a1aee108e84e4eabfaa8d51d7baaa1a02d482295297883a44b2debd3e48383604051611282929190612672565b60405180910390a2505050505050565b61129a611e64565b60405180608001604052808373ffffffffffffffffffffffffffffffffffffffff168152602001600760008573ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020548152602001600860008573ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020548152602001600a60008573ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002080546113959061253c565b80601f01602080910402602001604051908101604052809291908181526020018280546113c19061253c565b801561140e5780601f106113e35761010080835404028352916020019161140e565b820191906000526020600020905b8154815290600101906020018083116113f157829003601f168201915b50505050508152509050919050565b60045481565b61142b611cab565b8060058190555050565b60055481565b600660003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060009054906101000a900460ff166114c7576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016114be90612490565b60405180910390fd5b81600760008573ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020541215611549576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161154090612720565b60405180910390fd5b81600760008573ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020600082825461159891906125af565b9250508190555081600860008573ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060008282546115ee91906125f2565b9250508190555060405180606001604052808473ffffffffffffffffffffffffffffffffffffffff1681526020018381526020016001815250600960008373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060008201518160000160006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555060208201518160010155604082015181600201559050506116cd83611b49565b8273ffffffffffffffffffffffffffffffffffffffff167f56b60085244fe1afa467f92231debadc8bcb6127e9dbf35dbb58ca8406a423fe83836040516117159291906124e4565b60405180910390a28073ffffffffffffffffffffffffffffffffffffffff167f3f9b921f6bb5d577cdf49122202d27f7c50e3cc981c47543dc4a59c00dee52298484604051611765929190612740565b60405180910390a2505050565b61177a611cab565b600073ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff16036117ec5760006040517f1e4fbdf70000000000000000000000000000000000000000000000000000000081526004016117e3919061219c565b60405180910390fd5b6117f581611d32565b50565b60035481565b61180782611b49565b6000808373ffffffffffffffffffffffffffffffffffffffff166040516024016040516020818303038152906040527f893d20e8000000000000000000000000000000000000000000000000000000007bffffffffffffffffffffffffffffffffffffffffffffffffffffffff19166020820180517bffffffffffffffffffffffffffffffffffffffffffffffffffffffff83818316178352505050506040516118b191906127b0565b6000604051808303816000865af19150503d80600081146118ee576040519150601f19603f3d011682016040523d82523d6000602084013e6118f3565b606091505b509150915081611938576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161192f90612839565b60405180910390fd5b60008180602001905181019061194e9190612897565b905083600760008773ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000205412156119d2576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016119c990612910565b60405180910390fd5b8073ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614611a40576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401611a37906129a2565b60405180910390fd5b83600760008773ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000206000828254611a8f91906125af565b925050819055503373ffffffffffffffffffffffffffffffffffffffff166108fc859081150290604051600060405180830381858888f19350505050158015611adc573d6000803e3d6000fd5b508473ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff167f9b1bfa7fa9ee420a16e124f794c35ac9f90472acc99140eb2f6447c714cad8eb86604051611b3a9190611ffc565b60405180910390a35050505050565b600254600454611b59919061256d565b600760008373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000205412611c25576040518060400160405280600981526020017f7a6b41756374696f6e0000000000000000000000000000000000000000000000815250600a60008373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000209081611c1f9190612b9d565b50611ca8565b6040518060400160405280600381526020017f4e53430000000000000000000000000000000000000000000000000000000000815250600a60008373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000209081611ca69190612b9d565b505b50565b611cb3611df6565b73ffffffffffffffffffffffffffffffffffffffff16611cd1610e23565b73ffffffffffffffffffffffffffffffffffffffff1614611d3057611cf4611df6565b6040517f118cdaa7000000000000000000000000000000000000000000000000000000008152600401611d27919061219c565b60405180910390fd5b565b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff169050816000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055508173ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e060405160405180910390a35050565b600033905090565b6040518060600160405280600073ffffffffffffffffffffffffffffffffffffffff16815260200160008152602001600081525090565b6040518060a0016040528060008152602001600081526020016000815260200160008152602001600081525090565b6040518060800160405280600073ffffffffffffffffffffffffffffffffffffffff1681526020016000815260200160008152602001606081525090565b600080fd5b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b6000611ed282611ea7565b9050919050565b611ee281611ec7565b8114611eed57600080fd5b50565b600081359050611eff81611ed9565b92915050565b600060208284031215611f1b57611f1a611ea2565b5b6000611f2984828501611ef0565b91505092915050565b611f3b81611ec7565b82525050565b6000819050919050565b611f5481611f41565b82525050565b606082016000820151611f706000850182611f32565b506020820151611f836020850182611f4b565b506040820151611f966040850182611f4b565b50505050565b6000606082019050611fb16000830184611f5a565b92915050565b60008115159050919050565b611fcc81611fb7565b82525050565b6000602082019050611fe76000830184611fc3565b92915050565b611ff681611f41565b82525050565b60006020820190506120116000830184611fed565b92915050565b6000819050919050565b61202a81612017565b82525050565b60006020820190506120456000830184612021565b92915050565b600081519050919050565b600082825260208201905092915050565b60005b8381101561208557808201518184015260208101905061206a565b60008484015250505050565b6000601f19601f8301169050919050565b60006120ad8261204b565b6120b78185612056565b93506120c7818560208601612067565b6120d081612091565b840191505092915050565b600060208201905081810360008301526120f581846120a2565b905092915050565b61210681611f41565b811461211157600080fd5b50565b600081359050612123816120fd565b92915050565b60006020828403121561213f5761213e611ea2565b5b600061214d84828501612114565b91505092915050565b61215f81611ec7565b82525050565b600060608201905061217a6000830186612156565b6121876020830185611fed565b6121946040830184611fed565b949350505050565b60006020820190506121b16000830184612156565b92915050565b60a0820160008201516121cd6000850182611f4b565b5060208201516121e06020850182611f4b565b5060408201516121f36040850182611f4b565b5060608201516122066060850182611f4b565b5060808201516122196080850182611f4b565b50505050565b600060a08201905061223460008301846121b7565b92915050565b61224381612017565b82525050565b600082825260208201905092915050565b60006122658261204b565b61226f8185612249565b935061227f818560208601612067565b61228881612091565b840191505092915050565b60006080830160008301516122ab6000860182611f32565b5060208301516122be602086018261223a565b5060408301516122d16040860182611f4b565b50606083015184820360608601526122e9828261225a565b9150508091505092915050565b600060208201905081810360008301526123108184612293565b905092915050565b60008060006060848603121561233157612330611ea2565b5b600061233f86828701611ef0565b935050602061235086828701612114565b925050604061236186828701611ef0565b9150509250925092565b6000806040838503121561238257612381611ea2565b5b600061239085828601611ef0565b92505060206123a185828601612114565b9150509250929050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b60006123e582612017565b91506123f083612017565b925082820190508281121560008312168382126000841215161715612418576124176123ab565b5b92915050565b7f4f6e6c79207468652061646d696e2063616e2063616c6c20746869732066756e60008201527f6374696f6e2e0000000000000000000000000000000000000000000000000000602082015250565b600061247a602683612056565b91506124858261241e565b604082019050919050565b600060208201905081810360008301526124a98161246d565b9050919050565b60006124bb82611f41565b91506124c683611f41565b92508282039050818111156124de576124dd6123ab565b5b92915050565b60006040820190506124f96000830185611fed565b6125066020830184612156565b9392505050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052602260045260246000fd5b6000600282049050600182168061255457607f821691505b6020821081036125675761256661250d565b5b50919050565b600061257882611f41565b915061258383611f41565b925082820261259181611f41565b915082820484148315176125a8576125a76123ab565b5b5092915050565b60006125ba82612017565b91506125c583612017565b92508282039050818112600084121682821360008512151617156125ec576125eb6123ab565b5b92915050565b60006125fd82611f41565b915061260883611f41565b92508282019050808211156126205761261f6123ab565b5b92915050565b7f536c617368656400000000000000000000000000000000000000000000000000600082015250565b600061265c600783612056565b915061266782612626565b602082019050919050565b60006060820190506126876000830185611fed565b6126946020830184611fed565b81810360408301526126a58161264f565b90509392505050565b7f4e6f7420656e6f7567682062616c616e636520666f7220636f6c6c617465726160008201527f6c00000000000000000000000000000000000000000000000000000000000000602082015250565b600061270a602183612056565b9150612715826126ae565b604082019050919050565b60006020820190508181036000830152612739816126fd565b9050919050565b60006040820190506127556000830185612156565b6127626020830184611fed565b9392505050565b600081519050919050565b600081905092915050565b600061278a82612769565b6127948185612774565b93506127a4818560208601612067565b80840191505092915050565b60006127bc828461277f565b915081905092915050565b7f4661696c656420746f2063616c6c206765744f776e65722066756e6374696f6e60008201527f206f662043504163636f756e7400000000000000000000000000000000000000602082015250565b6000612823602d83612056565b915061282e826127c7565b604082019050919050565b6000602082019050818103600083015261285281612816565b9050919050565b600061286482611ea7565b9050919050565b61287481612859565b811461287f57600080fd5b50565b6000815190506128918161286b565b92915050565b6000602082840312156128ad576128ac611ea2565b5b60006128bb84828501612882565b91505092915050565b7f576974686472617720616d6f756e7420657863656564732062616c616e636500600082015250565b60006128fa601f83612056565b9150612905826128c4565b602082019050919050565b60006020820190508181036000830152612929816128ed565b9050919050565b7f4f6e6c792043502773206f776e65722063616e2077697468647261772074686560008201527f20636f6c6c61746572616c2066756e6473000000000000000000000000000000602082015250565b600061298c603183612056565b915061299782612930565b604082019050919050565b600060208201905081810360008301526129bb8161297f565b9050919050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b60008190508160005260206000209050919050565b60006020601f8301049050919050565b600082821b905092915050565b600060088302612a537fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff82612a16565b612a5d8683612a16565b95508019841693508086168417925050509392505050565b6000819050919050565b6000612a9a612a95612a9084611f41565b612a75565b611f41565b9050919050565b6000819050919050565b612ab483612a7f565b612ac8612ac082612aa1565b848454612a23565b825550505050565b600090565b612add612ad0565b612ae8818484612aab565b505050565b5b81811015612b0c57612b01600082612ad5565b600181019050612aee565b5050565b601f821115612b5157612b22816129f1565b612b2b84612a06565b81016020851015612b3a578190505b612b4e612b4685612a06565b830182612aed565b50505b505050565b600082821c905092915050565b6000612b7460001984600802612b56565b1980831691505092915050565b6000612b8d8383612b63565b9150826002028217905092915050565b612ba68261204b565b67ffffffffffffffff811115612bbf57612bbe6129c2565b5b612bc9825461253c565b612bd4828285612b10565b600060209050601f831160018114612c075760008415612bf5578287015190505b612bff8582612b81565b865550612c67565b601f198416612c15866129f1565b60005b82811015612c3d57848901518255600182019150602085019450602081019050612c18565b86831015612c5a5784890151612c56601f891682612b63565b8355505b6001600288020188555050505b50505050505056fea2646970667358221220f6fc876c8cceefb175d874063e75d24a5bc5f3684a2fa35df9a68881ccc1d52b64736f6c63430008140033",
+// EcpCollaternalMetaData contains all meta data concerning the EcpCollaternal contract.
+var EcpCollaternalMetaData = &bind.MetaData{
+	ABI: "[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"OwnableInvalidOwner\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"OwnableUnauthorizedAccount\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"cp\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"frozenAmount\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"balanceAmount\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"operation\",\"type\":\"string\"}],\"name\":\"CollateralAdjusted\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"cp\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"collateralAmount\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"taskID\",\"type\":\"uint256\"}],\"name\":\"CollateralLocked\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"cp\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"taskID\",\"type\":\"uint256\"}],\"name\":\"CollateralSlashed\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"cp\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"collateralAmount\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"taskID\",\"type\":\"uint256\"}],\"name\":\"CollateralUnlocked\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"fundingWallet\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"cpAccount\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"depositAmount\",\"type\":\"uint256\"}],\"name\":\"Deposit\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"challenger\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"taskContractAddress\",\"type\":\"address\"}],\"name\":\"DisputeProof\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"taskID\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"cpAccountAddress\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"collateral\",\"type\":\"uint256\"}],\"name\":\"TaskCreated\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"taskID\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"newStatus\",\"type\":\"uint256\"}],\"name\":\"TaskStatusChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"cpOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"cpAccount\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"withdrawAmount\",\"type\":\"uint256\"}],\"name\":\"Withdraw\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"collateralContratOwner\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"slashfund\",\"type\":\"uint256\"}],\"name\":\"WithdrawSlash\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newAdmin\",\"type\":\"address\"}],\"name\":\"addAdmin\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"balances\",\"outputs\":[{\"internalType\":\"int256\",\"name\":\"\",\"type\":\"int256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"baseCollateral\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"cpAddresses\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"taskIDs\",\"type\":\"uint256[]\"}],\"name\":\"batchLock\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256[]\",\"name\":\"taskIDs\",\"type\":\"uint256[]\"}],\"name\":\"batchSlash\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256[]\",\"name\":\"taskIDs\",\"type\":\"uint256[]\"}],\"name\":\"batchUnlock\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"collateralRatio\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"cpAddress\",\"type\":\"address\"}],\"name\":\"cpInfo\",\"outputs\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"cp\",\"type\":\"address\"},{\"internalType\":\"int256\",\"name\":\"balance\",\"type\":\"int256\"},{\"internalType\":\"uint256\",\"name\":\"frozenBalance\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"status\",\"type\":\"string\"}],\"internalType\":\"structECPCollateral.CPInfo\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"cpStatus\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"cpAccount\",\"type\":\"address\"}],\"name\":\"deposit\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"taskContractAddress\",\"type\":\"address\"}],\"name\":\"disputeProof\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"frozenBalance\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getBaseCollateral\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getECPCollateralInfo\",\"outputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"slashedFunds\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"baseCollateral\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"taskBalance\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"collateralRatio\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"slashRatio\",\"type\":\"uint256\"}],\"internalType\":\"structECPCollateral.ContractInfo\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"taskID\",\"type\":\"uint256\"}],\"name\":\"getTaskInfo\",\"outputs\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"cpAccountAddress\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"collateral\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"status\",\"type\":\"uint256\"}],\"internalType\":\"structECPCollateral.Task\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"isAdmin\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"cp\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"taskID\",\"type\":\"uint256\"}],\"name\":\"lockCollateral\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"admin\",\"type\":\"address\"}],\"name\":\"removeAdmin\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_baseCollateral\",\"type\":\"uint256\"}],\"name\":\"setBaseCollateral\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_collateralRatio\",\"type\":\"uint256\"}],\"name\":\"setCollateralRatio\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_slashRatio\",\"type\":\"uint256\"}],\"name\":\"setSlashRatio\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"taskID\",\"type\":\"uint256\"}],\"name\":\"slashCollateral\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"slashRatio\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"slashedFunds\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"taskBalance\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"tasks\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"cpAccountAddress\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"collateral\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"status\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"taskID\",\"type\":\"uint256\"}],\"name\":\"unlockCollateral\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"cpAccount\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"withdraw\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"slashfund\",\"type\":\"uint256\"}],\"name\":\"withdrawSlashedFunds\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"stateMutability\":\"payable\",\"type\":\"receive\"}]",
+	Bin: "0x60806040523480156200001157600080fd5b5033600073ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff1603620000885760006040517f1e4fbdf70000000000000000000000000000000000000000000000000000000081526004016200007f919062000222565b60405180910390fd5b62000099816200011960201b60201c565b50620000ab336200011960201b60201c565b6001600660003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060006101000a81548160ff021916908315150217905550600560048190555060026005819055506200023f565b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff169050816000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055508173ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e060405160405180910390a35050565b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b60006200020a82620001dd565b9050919050565b6200021c81620001fd565b82525050565b600060208201905062000239600083018462000211565b92915050565b61341e806200024f6000396000f3fe6080604052600436106101e75760003560e01c8063715018a611610102578063ce3518aa11610095578063f2fde38b11610064578063f2fde38b14610702578063f31cc8831461072b578063f340fa0114610756578063f3fef3a314610772576101f7565b8063ce3518aa14610648578063d1a1b99914610671578063d27ca89b146106ae578063de2b2f53146106d9576101f7565b80639939cd18116100d15780639939cd181461058a5780639b5ddf09146105b5578063a664c216146105e0578063b4eae1cb1461061d576101f7565b8063715018a6146104e05780637f58a7e5146104f75780638d977672146105205780638da5cb5b1461055f576101f7565b806343a8906c1161017a57806363215bb71161014957806363215bb7146104385780636f99f15c14610461578063704802751461048c57806370b72944146104b5576101f7565b806343a8906c1461039457806347a7d107146103bd5780634a82942c146103e65780636060663e1461040f576101f7565b806327e235e3116101b657806327e235e3146102c85780632894493f146103055780633fe651771461032e578063436ea4911461036b576101f7565b80630fcc834e146101fc5780631785f53c1461022557806324d7806c1461024e578063266565a91461028b576101f7565b366101f7576101f53361079b565b005b600080fd5b34801561020857600080fd5b50610223600480360381019061021e91906123ab565b610862565b005b34801561023157600080fd5b5061024c60048036038101906102479190612436565b610b70565b005b34801561025a57600080fd5b5061027560048036038101906102709190612436565b610bd3565b604051610282919061247e565b60405180910390f35b34801561029757600080fd5b506102b260048036038101906102ad9190612436565b610bf3565b6040516102bf91906124a8565b60405180910390f35b3480156102d457600080fd5b506102ef60048036038101906102ea9190612436565b610c0b565b6040516102fc91906124dc565b60405180910390f35b34801561031157600080fd5b5061032c600480360381019061032791906123ab565b610c23565b005b34801561033a57600080fd5b5061035560048036038101906103509190612436565b610d21565b6040516103629190612587565b60405180910390f35b34801561037757600080fd5b50610392600480360381019061038d919061260e565b610dc1565b005b3480156103a057600080fd5b506103bb60048036038101906103b69190612436565b610e95565b005b3480156103c957600080fd5b506103e460048036038101906103df919061265b565b610ef2565b005b3480156103f257600080fd5b5061040d6004803603810190610408919061260e565b6111fb565b005b34801561041b57600080fd5b50610436600480360381019061043191906123ab565b6112cf565b005b34801561044457600080fd5b5061045f600480360381019061045a91906126f1565b6112e1565b005b34801561046d57600080fd5b50610476611427565b60405161048391906124a8565b60405180910390f35b34801561049857600080fd5b506104b360048036038101906104ae9190612436565b61142d565b005b3480156104c157600080fd5b506104ca611490565b6040516104d791906124a8565b60405180910390f35b3480156104ec57600080fd5b506104f561149a565b005b34801561050357600080fd5b5061051e600480360381019061051991906123ab565b6114ae565b005b34801561052c57600080fd5b50610547600480360381019061054291906123ab565b611544565b60405161055693929190612781565b60405180910390f35b34801561056b57600080fd5b5061057461158e565b60405161058191906127b8565b60405180910390f35b34801561059657600080fd5b5061059f6115b7565b6040516105ac919061284a565b60405180910390f35b3480156105c157600080fd5b506105ca6115f5565b6040516105d791906124a8565b60405180910390f35b3480156105ec57600080fd5b5061060760048036038101906106029190612436565b6115fb565b6040516106149190612930565b60405180910390f35b34801561062957600080fd5b50610632611786565b60405161063f91906124a8565b60405180910390f35b34801561065457600080fd5b5061066f600480360381019061066a91906123ab565b61178c565b005b34801561067d57600080fd5b50610698600480360381019061069391906123ab565b61179e565b6040516106a59190612994565b60405180910390f35b3480156106ba57600080fd5b506106c3611835565b6040516106d091906124a8565b60405180910390f35b3480156106e557600080fd5b5061070060048036038101906106fb91906123ab565b61183b565b005b34801561070e57600080fd5b5061072960048036038101906107249190612436565b611c3b565b005b34801561073757600080fd5b50610740611cc1565b60405161074d91906124a8565b60405180910390f35b610770600480360381019061076b9190612436565b61079b565b005b34801561077e57600080fd5b506107996004803603810190610794919061265b565b611cc7565b005b34600760008373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060008282546107ea91906129de565b925050819055508073ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff167f5548c837ab068cf56a2c2479df0882a4922fd203edb7517321831d95078c5f623460405161084e91906124a8565b60405180910390a361085f81612012565b50565b600660003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060009054906101000a900460ff166108ee576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016108e590612a94565b60405180910390fd5b60006009600083815260200190815260200160002090506000600860008360000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020549050600081836001015411610984578260010154610986565b815b905080600860008560000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060008282546109fb9190612ab4565b9250508190555080600760008560000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000206000828254610a7591906129de565b925050819055506000836001018190555060028360020181905550610abd8360000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff16612012565b8260000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff167fe8e7440c7efbb5d2d20a061fde9c0fa35db9764f5da8475a0090ea4f23466c848286604051610b29929190612ae8565b60405180910390a2837f857a475dc812e506ac81a9f3ffc00638593b96a880e2543da02a1a6b38f51f396002604051610b6291906124a8565b60405180910390a250505050565b610b78612174565b6000600660008373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060006101000a81548160ff02191690831515021790555050565b60066020528060005260406000206000915054906101000a900460ff1681565b60086020528060005260406000206000915090505481565b60076020528060005260406000206000915090505481565b610c2b612174565b806001541015610c70576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610c6790612b83565b60405180910390fd5b8060016000828254610c829190612ab4565b925050819055503373ffffffffffffffffffffffffffffffffffffffff166108fc829081150290604051600060405180830381858888f19350505050158015610ccf573d6000803e3d6000fd5b503373ffffffffffffffffffffffffffffffffffffffff167fbfd9c82485e2178fcfd5c40379d8e66fe60acc50aa1ef4c50966431eb1e381cd82604051610d1691906124a8565b60405180910390a250565b600a6020528060005260406000206000915090508054610d4090612bd2565b80601f0160208091040260200160405190810160405280929190818152602001828054610d6c90612bd2565b8015610db95780601f10610d8e57610100808354040283529160200191610db9565b820191906000526020600020905b815481529060010190602001808311610d9c57829003601f168201915b505050505081565b600660003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060009054906101000a900460ff16610e4d576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610e4490612a94565b60405180910390fd5b60005b82829050811015610e9057610e7d838383818110610e7157610e70612c03565b5b9050602002013561183b565b8080610e8890612c32565b915050610e50565b505050565b8073ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff167f1e61a07012c23d5019cb79991ed79d73a9fc17fb89182f5830f036bd544423f360405160405180910390a350565b600660003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060009054906101000a900460ff16610f7e576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610f7590612a94565b60405180910390fd5b6000600254600454610f909190612c7a565b905080600760008573ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020541215611014576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161100b90612d2e565b60405180910390fd5b80600760008573ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060008282546110639190612d4e565b9250508190555080600860008573ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060008282546110b99190612d91565b9250508190555060405180606001604052808473ffffffffffffffffffffffffffffffffffffffff16815260200182815260200160018152506009600084815260200190815260200160002060008201518160000160006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff160217905550602082015181600101556040820151816002015590505061116c83612012565b8273ffffffffffffffffffffffffffffffffffffffff167faff82f4178df227ea409be11c927e414a908fb01481236913cec80ea866b246882846040516111b4929190612ae8565b60405180910390a2817f6cf53aa7292e664152c2ea948c3b3c95d4b05c36daeb2626d0293473c4a4a15384836040516111ee929190612dc5565b60405180910390a2505050565b600660003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060009054906101000a900460ff16611287576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161127e90612a94565b60405180910390fd5b60005b828290508110156112ca576112b78383838181106112ab576112aa612c03565b5b90506020020135610862565b80806112c290612c32565b91505061128a565b505050565b6112d7612174565b8060048190555050565b600660003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060009054906101000a900460ff1661136d576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161136490612a94565b60405180910390fd5b8181905084849050146113b5576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016113ac90612e3a565b60405180910390fd5b60005b848490508110156114205761140d8585838181106113d9576113d8612c03565b5b90506020020160208101906113ee9190612436565b84848481811061140157611400612c03565b5b90506020020135610ef2565b808061141890612c32565b9150506113b8565b5050505050565b60015481565b611435612174565b6001600660008373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060006101000a81548160ff02191690831515021790555050565b6000600254905090565b6114a2612174565b6114ac60006121fb565b565b600660003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060009054906101000a900460ff1661153a576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161153190612a94565b60405180910390fd5b8060028190555050565b60096020528060005260406000206000915090508060000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff16908060010154908060020154905083565b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff16905090565b6115bf6122c7565b6040518060a001604052806001548152602001600254815260200160035481526020016004548152602001600554815250905090565b60025481565b6116036122f6565b60405180608001604052808373ffffffffffffffffffffffffffffffffffffffff168152602001600760008573ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020548152602001600860008573ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020548152602001600a60008573ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002080546116fe90612bd2565b80601f016020809104026020016040519081016040528092919081815260200182805461172a90612bd2565b80156117775780601f1061174c57610100808354040283529160200191611777565b820191906000526020600020905b81548152906001019060200180831161175a57829003601f168201915b50505050508152509050919050565b60045481565b611794612174565b8060058190555050565b6117a6612334565b600960008381526020019081526020016000206040518060600160405290816000820160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001600182015481526020016002820154815250509050919050565b60055481565b600660003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060009054906101000a900460ff166118c7576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016118be90612a94565b60405180910390fd5b600060096000838152602001908152602001600020905060006005546002546118f09190612c7a565b90506000600860008460000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000205490506000818311611969578261196b565b815b9050600081841161197d57600061198a565b81846119899190612ab4565b5b905081600860008760000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060008282546119ff9190612ab4565b9250508190555080600760008760000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000206000828254611a799190612d4e565b925050819055508360016000828254611a929190612d91565b925050819055506003856002018190555083856001015411611ab5576000611ac6565b838560010154611ac59190612ab4565b5b8560010181905550611afb8560000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff16612012565b8460000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff167fe23e4a65e8f09c2d92bbdfbe613a6007e35677ac2afed7f4eb690b5b93460bd98588604051611b67929190612ae8565b60405180910390a2857f857a475dc812e506ac81a9f3ffc00638593b96a880e2543da02a1a6b38f51f396003604051611ba091906124a8565b60405180910390a28460000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff167f42f1a8a1aee108e84e4eabfaa8d51d7baaa1a02d482295297883a44b2debd3e48383604051611c14929190612ea6565b60405180910390a2600085600101541115611c3357611c3286610862565b5b505050505050565b611c43612174565b600073ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff1603611cb55760006040517f1e4fbdf7000000000000000000000000000000000000000000000000000000008152600401611cac91906127b8565b60405180910390fd5b611cbe816121fb565b50565b60035481565b6000808373ffffffffffffffffffffffffffffffffffffffff166040516024016040516020818303038152906040527f893d20e8000000000000000000000000000000000000000000000000000000007bffffffffffffffffffffffffffffffffffffffffffffffffffffffff19166020820180517bffffffffffffffffffffffffffffffffffffffffffffffffffffffff8381831617835250505050604051611d719190612f29565b6000604051808303816000865af19150503d8060008114611dae576040519150601f19603f3d011682016040523d82523d6000602084013e611db3565b606091505b509150915081611df8576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401611def90612fb2565b60405180910390fd5b600081806020019051810190611e0e9190613010565b905083600760008773ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020541215611e92576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401611e8990613089565b60405180910390fd5b8073ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614611f00576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401611ef79061311b565b60405180910390fd5b83600760008773ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000206000828254611f4f9190612d4e565b925050819055503373ffffffffffffffffffffffffffffffffffffffff166108fc859081150290604051600060405180830381858888f19350505050158015611f9c573d6000803e3d6000fd5b50611fa685612012565b8473ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff167f9b1bfa7fa9ee420a16e124f794c35ac9f90472acc99140eb2f6447c714cad8eb8660405161200391906124a8565b60405180910390a35050505050565b6002546004546120229190612c7a565b600760008373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002054126120ee576040518060400160405280600981526020017f7a6b41756374696f6e0000000000000000000000000000000000000000000000815250600a60008373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002090816120e89190613316565b50612171565b6040518060400160405280600381526020017f4e53430000000000000000000000000000000000000000000000000000000000815250600a60008373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020908161216f9190613316565b505b50565b61217c6122bf565b73ffffffffffffffffffffffffffffffffffffffff1661219a61158e565b73ffffffffffffffffffffffffffffffffffffffff16146121f9576121bd6122bf565b6040517f118cdaa70000000000000000000000000000000000000000000000000000000081526004016121f091906127b8565b60405180910390fd5b565b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff169050816000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055508173ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e060405160405180910390a35050565b600033905090565b6040518060a0016040528060008152602001600081526020016000815260200160008152602001600081525090565b6040518060800160405280600073ffffffffffffffffffffffffffffffffffffffff1681526020016000815260200160008152602001606081525090565b6040518060600160405280600073ffffffffffffffffffffffffffffffffffffffff16815260200160008152602001600081525090565b600080fd5b600080fd5b6000819050919050565b61238881612375565b811461239357600080fd5b50565b6000813590506123a58161237f565b92915050565b6000602082840312156123c1576123c061236b565b5b60006123cf84828501612396565b91505092915050565b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b6000612403826123d8565b9050919050565b612413816123f8565b811461241e57600080fd5b50565b6000813590506124308161240a565b92915050565b60006020828403121561244c5761244b61236b565b5b600061245a84828501612421565b91505092915050565b60008115159050919050565b61247881612463565b82525050565b6000602082019050612493600083018461246f565b92915050565b6124a281612375565b82525050565b60006020820190506124bd6000830184612499565b92915050565b6000819050919050565b6124d6816124c3565b82525050565b60006020820190506124f160008301846124cd565b92915050565b600081519050919050565b600082825260208201905092915050565b60005b83811015612531578082015181840152602081019050612516565b60008484015250505050565b6000601f19601f8301169050919050565b6000612559826124f7565b6125638185612502565b9350612573818560208601612513565b61257c8161253d565b840191505092915050565b600060208201905081810360008301526125a1818461254e565b905092915050565b600080fd5b600080fd5b600080fd5b60008083601f8401126125ce576125cd6125a9565b5b8235905067ffffffffffffffff8111156125eb576125ea6125ae565b5b602083019150836020820283011115612607576126066125b3565b5b9250929050565b600080602083850312156126255761262461236b565b5b600083013567ffffffffffffffff81111561264357612642612370565b5b61264f858286016125b8565b92509250509250929050565b600080604083850312156126725761267161236b565b5b600061268085828601612421565b925050602061269185828601612396565b9150509250929050565b60008083601f8401126126b1576126b06125a9565b5b8235905067ffffffffffffffff8111156126ce576126cd6125ae565b5b6020830191508360208202830111156126ea576126e96125b3565b5b9250929050565b6000806000806040858703121561270b5761270a61236b565b5b600085013567ffffffffffffffff81111561272957612728612370565b5b6127358782880161269b565b9450945050602085013567ffffffffffffffff81111561275857612757612370565b5b612764878288016125b8565b925092505092959194509250565b61277b816123f8565b82525050565b60006060820190506127966000830186612772565b6127a36020830185612499565b6127b06040830184612499565b949350505050565b60006020820190506127cd6000830184612772565b92915050565b6127dc81612375565b82525050565b60a0820160008201516127f860008501826127d3565b50602082015161280b60208501826127d3565b50604082015161281e60408501826127d3565b50606082015161283160608501826127d3565b50608082015161284460808501826127d3565b50505050565b600060a08201905061285f60008301846127e2565b92915050565b61286e816123f8565b82525050565b61287d816124c3565b82525050565b600082825260208201905092915050565b600061289f826124f7565b6128a98185612883565b93506128b9818560208601612513565b6128c28161253d565b840191505092915050565b60006080830160008301516128e56000860182612865565b5060208301516128f86020860182612874565b50604083015161290b60408601826127d3565b50606083015184820360608601526129238282612894565b9150508091505092915050565b6000602082019050818103600083015261294a81846128cd565b905092915050565b6060820160008201516129686000850182612865565b50602082015161297b60208501826127d3565b50604082015161298e60408501826127d3565b50505050565b60006060820190506129a96000830184612952565b92915050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b60006129e9826124c3565b91506129f4836124c3565b925082820190508281121560008312168382126000841215161715612a1c57612a1b6129af565b5b92915050565b7f4f6e6c79207468652061646d696e2063616e2063616c6c20746869732066756e60008201527f6374696f6e2e0000000000000000000000000000000000000000000000000000602082015250565b6000612a7e602683612502565b9150612a8982612a22565b604082019050919050565b60006020820190508181036000830152612aad81612a71565b9050919050565b6000612abf82612375565b9150612aca83612375565b9250828203905081811115612ae257612ae16129af565b5b92915050565b6000604082019050612afd6000830185612499565b612b0a6020830184612499565b9392505050565b7f576974686472617720736c61736866756e6420616d6f756e742065786365656460008201527f7320736c617368656446756e6473000000000000000000000000000000000000602082015250565b6000612b6d602e83612502565b9150612b7882612b11565b604082019050919050565b60006020820190508181036000830152612b9c81612b60565b9050919050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052602260045260246000fd5b60006002820490506001821680612bea57607f821691505b602082108103612bfd57612bfc612ba3565b5b50919050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603260045260246000fd5b6000612c3d82612375565b91507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8203612c6f57612c6e6129af565b5b600182019050919050565b6000612c8582612375565b9150612c9083612375565b9250828202612c9e81612375565b91508282048414831517612cb557612cb46129af565b5b5092915050565b7f4e6f7420656e6f7567682062616c616e636520666f7220636f6c6c617465726160008201527f6c00000000000000000000000000000000000000000000000000000000000000602082015250565b6000612d18602183612502565b9150612d2382612cbc565b604082019050919050565b60006020820190508181036000830152612d4781612d0b565b9050919050565b6000612d59826124c3565b9150612d64836124c3565b9250828203905081811260008412168282136000851215161715612d8b57612d8a6129af565b5b92915050565b6000612d9c82612375565b9150612da783612375565b9250828201905080821115612dbf57612dbe6129af565b5b92915050565b6000604082019050612dda6000830185612772565b612de76020830184612499565b9392505050565b7f4172726179206c656e67746873206d757374206d617463680000000000000000600082015250565b6000612e24601883612502565b9150612e2f82612dee565b602082019050919050565b60006020820190508181036000830152612e5381612e17565b9050919050565b7f536c617368656400000000000000000000000000000000000000000000000000600082015250565b6000612e90600783612502565b9150612e9b82612e5a565b602082019050919050565b6000606082019050612ebb6000830185612499565b612ec86020830184612499565b8181036040830152612ed981612e83565b90509392505050565b600081519050919050565b600081905092915050565b6000612f0382612ee2565b612f0d8185612eed565b9350612f1d818560208601612513565b80840191505092915050565b6000612f358284612ef8565b915081905092915050565b7f4661696c656420746f2063616c6c206765744f776e65722066756e6374696f6e60008201527f206f662043504163636f756e7400000000000000000000000000000000000000602082015250565b6000612f9c602d83612502565b9150612fa782612f40565b604082019050919050565b60006020820190508181036000830152612fcb81612f8f565b9050919050565b6000612fdd826123d8565b9050919050565b612fed81612fd2565b8114612ff857600080fd5b50565b60008151905061300a81612fe4565b92915050565b6000602082840312156130265761302561236b565b5b600061303484828501612ffb565b91505092915050565b7f576974686472617720616d6f756e7420657863656564732062616c616e636500600082015250565b6000613073601f83612502565b915061307e8261303d565b602082019050919050565b600060208201905081810360008301526130a281613066565b9050919050565b7f4f6e6c792043502773206f776e65722063616e2077697468647261772074686560008201527f20636f6c6c61746572616c2066756e6473000000000000000000000000000000602082015250565b6000613105603183612502565b9150613110826130a9565b604082019050919050565b60006020820190508181036000830152613134816130f8565b9050919050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b60008190508160005260206000209050919050565b60006020601f8301049050919050565b600082821b905092915050565b6000600883026131cc7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8261318f565b6131d6868361318f565b95508019841693508086168417925050509392505050565b6000819050919050565b600061321361320e61320984612375565b6131ee565b612375565b9050919050565b6000819050919050565b61322d836131f8565b6132416132398261321a565b84845461319c565b825550505050565b600090565b613256613249565b613261818484613224565b505050565b5b818110156132855761327a60008261324e565b600181019050613267565b5050565b601f8211156132ca5761329b8161316a565b6132a48461317f565b810160208510156132b3578190505b6132c76132bf8561317f565b830182613266565b50505b505050565b600082821c905092915050565b60006132ed600019846008026132cf565b1980831691505092915050565b600061330683836132dc565b9150826002028217905092915050565b61331f826124f7565b67ffffffffffffffff8111156133385761333761313b565b5b6133428254612bd2565b61334d828285613289565b600060209050601f831160018114613380576000841561336e578287015190505b61337885826132fa565b8655506133e0565b601f19841661338e8661316a565b60005b828110156133b657848901518255600182019150602085019450602081019050613391565b868310156133d357848901516133cf601f8916826132dc565b8355505b6001600288020188555050505b50505050505056fea264697066735822122084f36d1658746b28a795a4ff5ed62b1d8ae9193e9a801aea90fa77eb2c62841764736f6c63430008140033",
 }
 
-// CollaternalABI is the input ABI used to generate the binding from.
-// Deprecated: Use CollaternalMetaData.ABI instead.
-var CollaternalABI = CollaternalMetaData.ABI
+// EcpCollaternalABI is the input ABI used to generate the binding from.
+// Deprecated: Use EcpCollaternalMetaData.ABI instead.
+var EcpCollaternalABI = EcpCollaternalMetaData.ABI
 
-// CollaternalBin is the compiled bytecode used for deploying new contracts.
-// Deprecated: Use CollaternalMetaData.Bin instead.
-var CollaternalBin = CollaternalMetaData.Bin
+// EcpCollaternalBin is the compiled bytecode used for deploying new contracts.
+// Deprecated: Use EcpCollaternalMetaData.Bin instead.
+var EcpCollaternalBin = EcpCollaternalMetaData.Bin
 
-// DeployCollaternal deploys a new Ethereum contract, binding an instance of Collaternal to it.
-func DeployCollaternal(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *Collaternal, error) {
-	parsed, err := CollaternalMetaData.GetAbi()
+// DeployEcpCollaternal deploys a new Ethereum contract, binding an instance of EcpCollaternal to it.
+func DeployEcpCollaternal(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *EcpCollaternal, error) {
+	parsed, err := EcpCollaternalMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
@@ -77,111 +77,111 @@ func DeployCollaternal(auth *bind.TransactOpts, backend bind.ContractBackend) (c
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
 
-	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(CollaternalBin), backend)
+	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(EcpCollaternalBin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
-	return address, tx, &Collaternal{CollaternalCaller: CollaternalCaller{contract: contract}, CollaternalTransactor: CollaternalTransactor{contract: contract}, CollaternalFilterer: CollaternalFilterer{contract: contract}}, nil
+	return address, tx, &EcpCollaternal{EcpCollaternalCaller: EcpCollaternalCaller{contract: contract}, EcpCollaternalTransactor: EcpCollaternalTransactor{contract: contract}, EcpCollaternalFilterer: EcpCollaternalFilterer{contract: contract}}, nil
 }
 
-// Collaternal is an auto generated Go binding around an Ethereum contract.
-type Collaternal struct {
-	CollaternalCaller     // Read-only binding to the contract
-	CollaternalTransactor // Write-only binding to the contract
-	CollaternalFilterer   // Log filterer for contract events
+// EcpCollaternal is an auto generated Go binding around an Ethereum contract.
+type EcpCollaternal struct {
+	EcpCollaternalCaller     // Read-only binding to the contract
+	EcpCollaternalTransactor // Write-only binding to the contract
+	EcpCollaternalFilterer   // Log filterer for contract events
 }
 
-// CollaternalCaller is an auto generated read-only Go binding around an Ethereum contract.
-type CollaternalCaller struct {
+// EcpCollaternalCaller is an auto generated read-only Go binding around an Ethereum contract.
+type EcpCollaternalCaller struct {
 	contract *bind.BoundContract // Generic contract wrapper for the low level calls
 }
 
-// CollaternalTransactor is an auto generated write-only Go binding around an Ethereum contract.
-type CollaternalTransactor struct {
+// EcpCollaternalTransactor is an auto generated write-only Go binding around an Ethereum contract.
+type EcpCollaternalTransactor struct {
 	contract *bind.BoundContract // Generic contract wrapper for the low level calls
 }
 
-// CollaternalFilterer is an auto generated log filtering Go binding around an Ethereum contract events.
-type CollaternalFilterer struct {
+// EcpCollaternalFilterer is an auto generated log filtering Go binding around an Ethereum contract events.
+type EcpCollaternalFilterer struct {
 	contract *bind.BoundContract // Generic contract wrapper for the low level calls
 }
 
-// CollaternalSession is an auto generated Go binding around an Ethereum contract,
+// EcpCollaternalSession is an auto generated Go binding around an Ethereum contract,
 // with pre-set call and transact options.
-type CollaternalSession struct {
-	Contract     *Collaternal      // Generic contract binding to set the session for
+type EcpCollaternalSession struct {
+	Contract     *EcpCollaternal   // Generic contract binding to set the session for
 	CallOpts     bind.CallOpts     // Call options to use throughout this session
 	TransactOpts bind.TransactOpts // Transaction auth options to use throughout this session
 }
 
-// CollaternalCallerSession is an auto generated read-only Go binding around an Ethereum contract,
+// EcpCollaternalCallerSession is an auto generated read-only Go binding around an Ethereum contract,
 // with pre-set call options.
-type CollaternalCallerSession struct {
-	Contract *CollaternalCaller // Generic contract caller binding to set the session for
-	CallOpts bind.CallOpts      // Call options to use throughout this session
+type EcpCollaternalCallerSession struct {
+	Contract *EcpCollaternalCaller // Generic contract caller binding to set the session for
+	CallOpts bind.CallOpts         // Call options to use throughout this session
 }
 
-// CollaternalTransactorSession is an auto generated write-only Go binding around an Ethereum contract,
+// EcpCollaternalTransactorSession is an auto generated write-only Go binding around an Ethereum contract,
 // with pre-set transact options.
-type CollaternalTransactorSession struct {
-	Contract     *CollaternalTransactor // Generic contract transactor binding to set the session for
-	TransactOpts bind.TransactOpts      // Transaction auth options to use throughout this session
+type EcpCollaternalTransactorSession struct {
+	Contract     *EcpCollaternalTransactor // Generic contract transactor binding to set the session for
+	TransactOpts bind.TransactOpts         // Transaction auth options to use throughout this session
 }
 
-// CollaternalRaw is an auto generated low-level Go binding around an Ethereum contract.
-type CollaternalRaw struct {
-	Contract *Collaternal // Generic contract binding to access the raw methods on
+// EcpCollaternalRaw is an auto generated low-level Go binding around an Ethereum contract.
+type EcpCollaternalRaw struct {
+	Contract *EcpCollaternal // Generic contract binding to access the raw methods on
 }
 
-// CollaternalCallerRaw is an auto generated low-level read-only Go binding around an Ethereum contract.
-type CollaternalCallerRaw struct {
-	Contract *CollaternalCaller // Generic read-only contract binding to access the raw methods on
+// EcpCollaternalCallerRaw is an auto generated low-level read-only Go binding around an Ethereum contract.
+type EcpCollaternalCallerRaw struct {
+	Contract *EcpCollaternalCaller // Generic read-only contract binding to access the raw methods on
 }
 
-// CollaternalTransactorRaw is an auto generated low-level write-only Go binding around an Ethereum contract.
-type CollaternalTransactorRaw struct {
-	Contract *CollaternalTransactor // Generic write-only contract binding to access the raw methods on
+// EcpCollaternalTransactorRaw is an auto generated low-level write-only Go binding around an Ethereum contract.
+type EcpCollaternalTransactorRaw struct {
+	Contract *EcpCollaternalTransactor // Generic write-only contract binding to access the raw methods on
 }
 
-// NewCollaternal creates a new instance of Collaternal, bound to a specific deployed contract.
-func NewCollaternal(address common.Address, backend bind.ContractBackend) (*Collaternal, error) {
-	contract, err := bindCollaternal(address, backend, backend, backend)
+// NewEcpCollaternal creates a new instance of EcpCollaternal, bound to a specific deployed contract.
+func NewEcpCollaternal(address common.Address, backend bind.ContractBackend) (*EcpCollaternal, error) {
+	contract, err := bindEcpCollaternal(address, backend, backend, backend)
 	if err != nil {
 		return nil, err
 	}
-	return &Collaternal{CollaternalCaller: CollaternalCaller{contract: contract}, CollaternalTransactor: CollaternalTransactor{contract: contract}, CollaternalFilterer: CollaternalFilterer{contract: contract}}, nil
+	return &EcpCollaternal{EcpCollaternalCaller: EcpCollaternalCaller{contract: contract}, EcpCollaternalTransactor: EcpCollaternalTransactor{contract: contract}, EcpCollaternalFilterer: EcpCollaternalFilterer{contract: contract}}, nil
 }
 
-// NewCollaternalCaller creates a new read-only instance of Collaternal, bound to a specific deployed contract.
-func NewCollaternalCaller(address common.Address, caller bind.ContractCaller) (*CollaternalCaller, error) {
-	contract, err := bindCollaternal(address, caller, nil, nil)
+// NewEcpCollaternalCaller creates a new read-only instance of EcpCollaternal, bound to a specific deployed contract.
+func NewEcpCollaternalCaller(address common.Address, caller bind.ContractCaller) (*EcpCollaternalCaller, error) {
+	contract, err := bindEcpCollaternal(address, caller, nil, nil)
 	if err != nil {
 		return nil, err
 	}
-	return &CollaternalCaller{contract: contract}, nil
+	return &EcpCollaternalCaller{contract: contract}, nil
 }
 
-// NewCollaternalTransactor creates a new write-only instance of Collaternal, bound to a specific deployed contract.
-func NewCollaternalTransactor(address common.Address, transactor bind.ContractTransactor) (*CollaternalTransactor, error) {
-	contract, err := bindCollaternal(address, nil, transactor, nil)
+// NewEcpCollaternalTransactor creates a new write-only instance of EcpCollaternal, bound to a specific deployed contract.
+func NewEcpCollaternalTransactor(address common.Address, transactor bind.ContractTransactor) (*EcpCollaternalTransactor, error) {
+	contract, err := bindEcpCollaternal(address, nil, transactor, nil)
 	if err != nil {
 		return nil, err
 	}
-	return &CollaternalTransactor{contract: contract}, nil
+	return &EcpCollaternalTransactor{contract: contract}, nil
 }
 
-// NewCollaternalFilterer creates a new log filterer instance of Collaternal, bound to a specific deployed contract.
-func NewCollaternalFilterer(address common.Address, filterer bind.ContractFilterer) (*CollaternalFilterer, error) {
-	contract, err := bindCollaternal(address, nil, nil, filterer)
+// NewEcpCollaternalFilterer creates a new log filterer instance of EcpCollaternal, bound to a specific deployed contract.
+func NewEcpCollaternalFilterer(address common.Address, filterer bind.ContractFilterer) (*EcpCollaternalFilterer, error) {
+	contract, err := bindEcpCollaternal(address, nil, nil, filterer)
 	if err != nil {
 		return nil, err
 	}
-	return &CollaternalFilterer{contract: contract}, nil
+	return &EcpCollaternalFilterer{contract: contract}, nil
 }
 
-// bindCollaternal binds a generic wrapper to an already deployed contract.
-func bindCollaternal(address common.Address, caller bind.ContractCaller, transactor bind.ContractTransactor, filterer bind.ContractFilterer) (*bind.BoundContract, error) {
-	parsed, err := CollaternalMetaData.GetAbi()
+// bindEcpCollaternal binds a generic wrapper to an already deployed contract.
+func bindEcpCollaternal(address common.Address, caller bind.ContractCaller, transactor bind.ContractTransactor, filterer bind.ContractFilterer) (*bind.BoundContract, error) {
+	parsed, err := EcpCollaternalMetaData.GetAbi()
 	if err != nil {
 		return nil, err
 	}
@@ -192,46 +192,46 @@ func bindCollaternal(address common.Address, caller bind.ContractCaller, transac
 // sets the output to result. The result type might be a single field for simple
 // returns, a slice of interfaces for anonymous returns and a struct for named
 // returns.
-func (_Collaternal *CollaternalRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
-	return _Collaternal.Contract.CollaternalCaller.contract.Call(opts, result, method, params...)
+func (_EcpCollaternal *EcpCollaternalRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
+	return _EcpCollaternal.Contract.EcpCollaternalCaller.contract.Call(opts, result, method, params...)
 }
 
 // Transfer initiates a plain transaction to move funds to the contract, calling
 // its default method if one is available.
-func (_Collaternal *CollaternalRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
-	return _Collaternal.Contract.CollaternalTransactor.contract.Transfer(opts)
+func (_EcpCollaternal *EcpCollaternalRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.EcpCollaternalTransactor.contract.Transfer(opts)
 }
 
 // Transact invokes the (paid) contract method with params as input values.
-func (_Collaternal *CollaternalRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
-	return _Collaternal.Contract.CollaternalTransactor.contract.Transact(opts, method, params...)
+func (_EcpCollaternal *EcpCollaternalRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.EcpCollaternalTransactor.contract.Transact(opts, method, params...)
 }
 
 // Call invokes the (constant) contract method with params as input values and
 // sets the output to result. The result type might be a single field for simple
 // returns, a slice of interfaces for anonymous returns and a struct for named
 // returns.
-func (_Collaternal *CollaternalCallerRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
-	return _Collaternal.Contract.contract.Call(opts, result, method, params...)
+func (_EcpCollaternal *EcpCollaternalCallerRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
+	return _EcpCollaternal.Contract.contract.Call(opts, result, method, params...)
 }
 
 // Transfer initiates a plain transaction to move funds to the contract, calling
 // its default method if one is available.
-func (_Collaternal *CollaternalTransactorRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
-	return _Collaternal.Contract.contract.Transfer(opts)
+func (_EcpCollaternal *EcpCollaternalTransactorRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.contract.Transfer(opts)
 }
 
 // Transact invokes the (paid) contract method with params as input values.
-func (_Collaternal *CollaternalTransactorRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
-	return _Collaternal.Contract.contract.Transact(opts, method, params...)
+func (_EcpCollaternal *EcpCollaternalTransactorRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.contract.Transact(opts, method, params...)
 }
 
 // Balances is a free data retrieval call binding the contract method 0x27e235e3.
 //
 // Solidity: function balances(address ) view returns(int256)
-func (_Collaternal *CollaternalCaller) Balances(opts *bind.CallOpts, arg0 common.Address) (*big.Int, error) {
+func (_EcpCollaternal *EcpCollaternalCaller) Balances(opts *bind.CallOpts, arg0 common.Address) (*big.Int, error) {
 	var out []interface{}
-	err := _Collaternal.contract.Call(opts, &out, "balances", arg0)
+	err := _EcpCollaternal.contract.Call(opts, &out, "balances", arg0)
 
 	if err != nil {
 		return *new(*big.Int), err
@@ -246,23 +246,23 @@ func (_Collaternal *CollaternalCaller) Balances(opts *bind.CallOpts, arg0 common
 // Balances is a free data retrieval call binding the contract method 0x27e235e3.
 //
 // Solidity: function balances(address ) view returns(int256)
-func (_Collaternal *CollaternalSession) Balances(arg0 common.Address) (*big.Int, error) {
-	return _Collaternal.Contract.Balances(&_Collaternal.CallOpts, arg0)
+func (_EcpCollaternal *EcpCollaternalSession) Balances(arg0 common.Address) (*big.Int, error) {
+	return _EcpCollaternal.Contract.Balances(&_EcpCollaternal.CallOpts, arg0)
 }
 
 // Balances is a free data retrieval call binding the contract method 0x27e235e3.
 //
 // Solidity: function balances(address ) view returns(int256)
-func (_Collaternal *CollaternalCallerSession) Balances(arg0 common.Address) (*big.Int, error) {
-	return _Collaternal.Contract.Balances(&_Collaternal.CallOpts, arg0)
+func (_EcpCollaternal *EcpCollaternalCallerSession) Balances(arg0 common.Address) (*big.Int, error) {
+	return _EcpCollaternal.Contract.Balances(&_EcpCollaternal.CallOpts, arg0)
 }
 
 // BaseCollateral is a free data retrieval call binding the contract method 0x9b5ddf09.
 //
 // Solidity: function baseCollateral() view returns(uint256)
-func (_Collaternal *CollaternalCaller) BaseCollateral(opts *bind.CallOpts) (*big.Int, error) {
+func (_EcpCollaternal *EcpCollaternalCaller) BaseCollateral(opts *bind.CallOpts) (*big.Int, error) {
 	var out []interface{}
-	err := _Collaternal.contract.Call(opts, &out, "baseCollateral")
+	err := _EcpCollaternal.contract.Call(opts, &out, "baseCollateral")
 
 	if err != nil {
 		return *new(*big.Int), err
@@ -277,23 +277,23 @@ func (_Collaternal *CollaternalCaller) BaseCollateral(opts *bind.CallOpts) (*big
 // BaseCollateral is a free data retrieval call binding the contract method 0x9b5ddf09.
 //
 // Solidity: function baseCollateral() view returns(uint256)
-func (_Collaternal *CollaternalSession) BaseCollateral() (*big.Int, error) {
-	return _Collaternal.Contract.BaseCollateral(&_Collaternal.CallOpts)
+func (_EcpCollaternal *EcpCollaternalSession) BaseCollateral() (*big.Int, error) {
+	return _EcpCollaternal.Contract.BaseCollateral(&_EcpCollaternal.CallOpts)
 }
 
 // BaseCollateral is a free data retrieval call binding the contract method 0x9b5ddf09.
 //
 // Solidity: function baseCollateral() view returns(uint256)
-func (_Collaternal *CollaternalCallerSession) BaseCollateral() (*big.Int, error) {
-	return _Collaternal.Contract.BaseCollateral(&_Collaternal.CallOpts)
+func (_EcpCollaternal *EcpCollaternalCallerSession) BaseCollateral() (*big.Int, error) {
+	return _EcpCollaternal.Contract.BaseCollateral(&_EcpCollaternal.CallOpts)
 }
 
 // CollateralRatio is a free data retrieval call binding the contract method 0xb4eae1cb.
 //
 // Solidity: function collateralRatio() view returns(uint256)
-func (_Collaternal *CollaternalCaller) CollateralRatio(opts *bind.CallOpts) (*big.Int, error) {
+func (_EcpCollaternal *EcpCollaternalCaller) CollateralRatio(opts *bind.CallOpts) (*big.Int, error) {
 	var out []interface{}
-	err := _Collaternal.contract.Call(opts, &out, "collateralRatio")
+	err := _EcpCollaternal.contract.Call(opts, &out, "collateralRatio")
 
 	if err != nil {
 		return *new(*big.Int), err
@@ -308,23 +308,23 @@ func (_Collaternal *CollaternalCaller) CollateralRatio(opts *bind.CallOpts) (*bi
 // CollateralRatio is a free data retrieval call binding the contract method 0xb4eae1cb.
 //
 // Solidity: function collateralRatio() view returns(uint256)
-func (_Collaternal *CollaternalSession) CollateralRatio() (*big.Int, error) {
-	return _Collaternal.Contract.CollateralRatio(&_Collaternal.CallOpts)
+func (_EcpCollaternal *EcpCollaternalSession) CollateralRatio() (*big.Int, error) {
+	return _EcpCollaternal.Contract.CollateralRatio(&_EcpCollaternal.CallOpts)
 }
 
 // CollateralRatio is a free data retrieval call binding the contract method 0xb4eae1cb.
 //
 // Solidity: function collateralRatio() view returns(uint256)
-func (_Collaternal *CollaternalCallerSession) CollateralRatio() (*big.Int, error) {
-	return _Collaternal.Contract.CollateralRatio(&_Collaternal.CallOpts)
+func (_EcpCollaternal *EcpCollaternalCallerSession) CollateralRatio() (*big.Int, error) {
+	return _EcpCollaternal.Contract.CollateralRatio(&_EcpCollaternal.CallOpts)
 }
 
 // CpInfo is a free data retrieval call binding the contract method 0xa664c216.
 //
 // Solidity: function cpInfo(address cpAddress) view returns((address,int256,uint256,string))
-func (_Collaternal *CollaternalCaller) CpInfo(opts *bind.CallOpts, cpAddress common.Address) (ECPCollateralCPInfo, error) {
+func (_EcpCollaternal *EcpCollaternalCaller) CpInfo(opts *bind.CallOpts, cpAddress common.Address) (ECPCollateralCPInfo, error) {
 	var out []interface{}
-	err := _Collaternal.contract.Call(opts, &out, "cpInfo", cpAddress)
+	err := _EcpCollaternal.contract.Call(opts, &out, "cpInfo", cpAddress)
 
 	if err != nil {
 		return *new(ECPCollateralCPInfo), err
@@ -339,23 +339,23 @@ func (_Collaternal *CollaternalCaller) CpInfo(opts *bind.CallOpts, cpAddress com
 // CpInfo is a free data retrieval call binding the contract method 0xa664c216.
 //
 // Solidity: function cpInfo(address cpAddress) view returns((address,int256,uint256,string))
-func (_Collaternal *CollaternalSession) CpInfo(cpAddress common.Address) (ECPCollateralCPInfo, error) {
-	return _Collaternal.Contract.CpInfo(&_Collaternal.CallOpts, cpAddress)
+func (_EcpCollaternal *EcpCollaternalSession) CpInfo(cpAddress common.Address) (ECPCollateralCPInfo, error) {
+	return _EcpCollaternal.Contract.CpInfo(&_EcpCollaternal.CallOpts, cpAddress)
 }
 
 // CpInfo is a free data retrieval call binding the contract method 0xa664c216.
 //
 // Solidity: function cpInfo(address cpAddress) view returns((address,int256,uint256,string))
-func (_Collaternal *CollaternalCallerSession) CpInfo(cpAddress common.Address) (ECPCollateralCPInfo, error) {
-	return _Collaternal.Contract.CpInfo(&_Collaternal.CallOpts, cpAddress)
+func (_EcpCollaternal *EcpCollaternalCallerSession) CpInfo(cpAddress common.Address) (ECPCollateralCPInfo, error) {
+	return _EcpCollaternal.Contract.CpInfo(&_EcpCollaternal.CallOpts, cpAddress)
 }
 
 // CpStatus is a free data retrieval call binding the contract method 0x3fe65177.
 //
 // Solidity: function cpStatus(address ) view returns(string)
-func (_Collaternal *CollaternalCaller) CpStatus(opts *bind.CallOpts, arg0 common.Address) (string, error) {
+func (_EcpCollaternal *EcpCollaternalCaller) CpStatus(opts *bind.CallOpts, arg0 common.Address) (string, error) {
 	var out []interface{}
-	err := _Collaternal.contract.Call(opts, &out, "cpStatus", arg0)
+	err := _EcpCollaternal.contract.Call(opts, &out, "cpStatus", arg0)
 
 	if err != nil {
 		return *new(string), err
@@ -370,23 +370,23 @@ func (_Collaternal *CollaternalCaller) CpStatus(opts *bind.CallOpts, arg0 common
 // CpStatus is a free data retrieval call binding the contract method 0x3fe65177.
 //
 // Solidity: function cpStatus(address ) view returns(string)
-func (_Collaternal *CollaternalSession) CpStatus(arg0 common.Address) (string, error) {
-	return _Collaternal.Contract.CpStatus(&_Collaternal.CallOpts, arg0)
+func (_EcpCollaternal *EcpCollaternalSession) CpStatus(arg0 common.Address) (string, error) {
+	return _EcpCollaternal.Contract.CpStatus(&_EcpCollaternal.CallOpts, arg0)
 }
 
 // CpStatus is a free data retrieval call binding the contract method 0x3fe65177.
 //
 // Solidity: function cpStatus(address ) view returns(string)
-func (_Collaternal *CollaternalCallerSession) CpStatus(arg0 common.Address) (string, error) {
-	return _Collaternal.Contract.CpStatus(&_Collaternal.CallOpts, arg0)
+func (_EcpCollaternal *EcpCollaternalCallerSession) CpStatus(arg0 common.Address) (string, error) {
+	return _EcpCollaternal.Contract.CpStatus(&_EcpCollaternal.CallOpts, arg0)
 }
 
 // FrozenBalance is a free data retrieval call binding the contract method 0x266565a9.
 //
 // Solidity: function frozenBalance(address ) view returns(uint256)
-func (_Collaternal *CollaternalCaller) FrozenBalance(opts *bind.CallOpts, arg0 common.Address) (*big.Int, error) {
+func (_EcpCollaternal *EcpCollaternalCaller) FrozenBalance(opts *bind.CallOpts, arg0 common.Address) (*big.Int, error) {
 	var out []interface{}
-	err := _Collaternal.contract.Call(opts, &out, "frozenBalance", arg0)
+	err := _EcpCollaternal.contract.Call(opts, &out, "frozenBalance", arg0)
 
 	if err != nil {
 		return *new(*big.Int), err
@@ -401,23 +401,23 @@ func (_Collaternal *CollaternalCaller) FrozenBalance(opts *bind.CallOpts, arg0 c
 // FrozenBalance is a free data retrieval call binding the contract method 0x266565a9.
 //
 // Solidity: function frozenBalance(address ) view returns(uint256)
-func (_Collaternal *CollaternalSession) FrozenBalance(arg0 common.Address) (*big.Int, error) {
-	return _Collaternal.Contract.FrozenBalance(&_Collaternal.CallOpts, arg0)
+func (_EcpCollaternal *EcpCollaternalSession) FrozenBalance(arg0 common.Address) (*big.Int, error) {
+	return _EcpCollaternal.Contract.FrozenBalance(&_EcpCollaternal.CallOpts, arg0)
 }
 
 // FrozenBalance is a free data retrieval call binding the contract method 0x266565a9.
 //
 // Solidity: function frozenBalance(address ) view returns(uint256)
-func (_Collaternal *CollaternalCallerSession) FrozenBalance(arg0 common.Address) (*big.Int, error) {
-	return _Collaternal.Contract.FrozenBalance(&_Collaternal.CallOpts, arg0)
+func (_EcpCollaternal *EcpCollaternalCallerSession) FrozenBalance(arg0 common.Address) (*big.Int, error) {
+	return _EcpCollaternal.Contract.FrozenBalance(&_EcpCollaternal.CallOpts, arg0)
 }
 
 // GetBaseCollateral is a free data retrieval call binding the contract method 0x70b72944.
 //
 // Solidity: function getBaseCollateral() view returns(uint256)
-func (_Collaternal *CollaternalCaller) GetBaseCollateral(opts *bind.CallOpts) (*big.Int, error) {
+func (_EcpCollaternal *EcpCollaternalCaller) GetBaseCollateral(opts *bind.CallOpts) (*big.Int, error) {
 	var out []interface{}
-	err := _Collaternal.contract.Call(opts, &out, "getBaseCollateral")
+	err := _EcpCollaternal.contract.Call(opts, &out, "getBaseCollateral")
 
 	if err != nil {
 		return *new(*big.Int), err
@@ -432,23 +432,23 @@ func (_Collaternal *CollaternalCaller) GetBaseCollateral(opts *bind.CallOpts) (*
 // GetBaseCollateral is a free data retrieval call binding the contract method 0x70b72944.
 //
 // Solidity: function getBaseCollateral() view returns(uint256)
-func (_Collaternal *CollaternalSession) GetBaseCollateral() (*big.Int, error) {
-	return _Collaternal.Contract.GetBaseCollateral(&_Collaternal.CallOpts)
+func (_EcpCollaternal *EcpCollaternalSession) GetBaseCollateral() (*big.Int, error) {
+	return _EcpCollaternal.Contract.GetBaseCollateral(&_EcpCollaternal.CallOpts)
 }
 
 // GetBaseCollateral is a free data retrieval call binding the contract method 0x70b72944.
 //
 // Solidity: function getBaseCollateral() view returns(uint256)
-func (_Collaternal *CollaternalCallerSession) GetBaseCollateral() (*big.Int, error) {
-	return _Collaternal.Contract.GetBaseCollateral(&_Collaternal.CallOpts)
+func (_EcpCollaternal *EcpCollaternalCallerSession) GetBaseCollateral() (*big.Int, error) {
+	return _EcpCollaternal.Contract.GetBaseCollateral(&_EcpCollaternal.CallOpts)
 }
 
 // GetECPCollateralInfo is a free data retrieval call binding the contract method 0x9939cd18.
 //
 // Solidity: function getECPCollateralInfo() view returns((uint256,uint256,uint256,uint256,uint256))
-func (_Collaternal *CollaternalCaller) GetECPCollateralInfo(opts *bind.CallOpts) (ECPCollateralContractInfo, error) {
+func (_EcpCollaternal *EcpCollaternalCaller) GetECPCollateralInfo(opts *bind.CallOpts) (ECPCollateralContractInfo, error) {
 	var out []interface{}
-	err := _Collaternal.contract.Call(opts, &out, "getECPCollateralInfo")
+	err := _EcpCollaternal.contract.Call(opts, &out, "getECPCollateralInfo")
 
 	if err != nil {
 		return *new(ECPCollateralContractInfo), err
@@ -463,23 +463,23 @@ func (_Collaternal *CollaternalCaller) GetECPCollateralInfo(opts *bind.CallOpts)
 // GetECPCollateralInfo is a free data retrieval call binding the contract method 0x9939cd18.
 //
 // Solidity: function getECPCollateralInfo() view returns((uint256,uint256,uint256,uint256,uint256))
-func (_Collaternal *CollaternalSession) GetECPCollateralInfo() (ECPCollateralContractInfo, error) {
-	return _Collaternal.Contract.GetECPCollateralInfo(&_Collaternal.CallOpts)
+func (_EcpCollaternal *EcpCollaternalSession) GetECPCollateralInfo() (ECPCollateralContractInfo, error) {
+	return _EcpCollaternal.Contract.GetECPCollateralInfo(&_EcpCollaternal.CallOpts)
 }
 
 // GetECPCollateralInfo is a free data retrieval call binding the contract method 0x9939cd18.
 //
 // Solidity: function getECPCollateralInfo() view returns((uint256,uint256,uint256,uint256,uint256))
-func (_Collaternal *CollaternalCallerSession) GetECPCollateralInfo() (ECPCollateralContractInfo, error) {
-	return _Collaternal.Contract.GetECPCollateralInfo(&_Collaternal.CallOpts)
+func (_EcpCollaternal *EcpCollaternalCallerSession) GetECPCollateralInfo() (ECPCollateralContractInfo, error) {
+	return _EcpCollaternal.Contract.GetECPCollateralInfo(&_EcpCollaternal.CallOpts)
 }
 
-// GetTaskInfo is a free data retrieval call binding the contract method 0x0b4b73d1.
+// GetTaskInfo is a free data retrieval call binding the contract method 0xd1a1b999.
 //
-// Solidity: function getTaskInfo(address taskContractAddress) view returns((address,uint256,uint256))
-func (_Collaternal *CollaternalCaller) GetTaskInfo(opts *bind.CallOpts, taskContractAddress common.Address) (ECPCollateralTask, error) {
+// Solidity: function getTaskInfo(uint256 taskID) view returns((address,uint256,uint256))
+func (_EcpCollaternal *EcpCollaternalCaller) GetTaskInfo(opts *bind.CallOpts, taskID *big.Int) (ECPCollateralTask, error) {
 	var out []interface{}
-	err := _Collaternal.contract.Call(opts, &out, "getTaskInfo", taskContractAddress)
+	err := _EcpCollaternal.contract.Call(opts, &out, "getTaskInfo", taskID)
 
 	if err != nil {
 		return *new(ECPCollateralTask), err
@@ -491,26 +491,26 @@ func (_Collaternal *CollaternalCaller) GetTaskInfo(opts *bind.CallOpts, taskCont
 
 }
 
-// GetTaskInfo is a free data retrieval call binding the contract method 0x0b4b73d1.
+// GetTaskInfo is a free data retrieval call binding the contract method 0xd1a1b999.
 //
-// Solidity: function getTaskInfo(address taskContractAddress) view returns((address,uint256,uint256))
-func (_Collaternal *CollaternalSession) GetTaskInfo(taskContractAddress common.Address) (ECPCollateralTask, error) {
-	return _Collaternal.Contract.GetTaskInfo(&_Collaternal.CallOpts, taskContractAddress)
+// Solidity: function getTaskInfo(uint256 taskID) view returns((address,uint256,uint256))
+func (_EcpCollaternal *EcpCollaternalSession) GetTaskInfo(taskID *big.Int) (ECPCollateralTask, error) {
+	return _EcpCollaternal.Contract.GetTaskInfo(&_EcpCollaternal.CallOpts, taskID)
 }
 
-// GetTaskInfo is a free data retrieval call binding the contract method 0x0b4b73d1.
+// GetTaskInfo is a free data retrieval call binding the contract method 0xd1a1b999.
 //
-// Solidity: function getTaskInfo(address taskContractAddress) view returns((address,uint256,uint256))
-func (_Collaternal *CollaternalCallerSession) GetTaskInfo(taskContractAddress common.Address) (ECPCollateralTask, error) {
-	return _Collaternal.Contract.GetTaskInfo(&_Collaternal.CallOpts, taskContractAddress)
+// Solidity: function getTaskInfo(uint256 taskID) view returns((address,uint256,uint256))
+func (_EcpCollaternal *EcpCollaternalCallerSession) GetTaskInfo(taskID *big.Int) (ECPCollateralTask, error) {
+	return _EcpCollaternal.Contract.GetTaskInfo(&_EcpCollaternal.CallOpts, taskID)
 }
 
 // IsAdmin is a free data retrieval call binding the contract method 0x24d7806c.
 //
 // Solidity: function isAdmin(address ) view returns(bool)
-func (_Collaternal *CollaternalCaller) IsAdmin(opts *bind.CallOpts, arg0 common.Address) (bool, error) {
+func (_EcpCollaternal *EcpCollaternalCaller) IsAdmin(opts *bind.CallOpts, arg0 common.Address) (bool, error) {
 	var out []interface{}
-	err := _Collaternal.contract.Call(opts, &out, "isAdmin", arg0)
+	err := _EcpCollaternal.contract.Call(opts, &out, "isAdmin", arg0)
 
 	if err != nil {
 		return *new(bool), err
@@ -525,23 +525,23 @@ func (_Collaternal *CollaternalCaller) IsAdmin(opts *bind.CallOpts, arg0 common.
 // IsAdmin is a free data retrieval call binding the contract method 0x24d7806c.
 //
 // Solidity: function isAdmin(address ) view returns(bool)
-func (_Collaternal *CollaternalSession) IsAdmin(arg0 common.Address) (bool, error) {
-	return _Collaternal.Contract.IsAdmin(&_Collaternal.CallOpts, arg0)
+func (_EcpCollaternal *EcpCollaternalSession) IsAdmin(arg0 common.Address) (bool, error) {
+	return _EcpCollaternal.Contract.IsAdmin(&_EcpCollaternal.CallOpts, arg0)
 }
 
 // IsAdmin is a free data retrieval call binding the contract method 0x24d7806c.
 //
 // Solidity: function isAdmin(address ) view returns(bool)
-func (_Collaternal *CollaternalCallerSession) IsAdmin(arg0 common.Address) (bool, error) {
-	return _Collaternal.Contract.IsAdmin(&_Collaternal.CallOpts, arg0)
+func (_EcpCollaternal *EcpCollaternalCallerSession) IsAdmin(arg0 common.Address) (bool, error) {
+	return _EcpCollaternal.Contract.IsAdmin(&_EcpCollaternal.CallOpts, arg0)
 }
 
 // Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
 //
 // Solidity: function owner() view returns(address)
-func (_Collaternal *CollaternalCaller) Owner(opts *bind.CallOpts) (common.Address, error) {
+func (_EcpCollaternal *EcpCollaternalCaller) Owner(opts *bind.CallOpts) (common.Address, error) {
 	var out []interface{}
-	err := _Collaternal.contract.Call(opts, &out, "owner")
+	err := _EcpCollaternal.contract.Call(opts, &out, "owner")
 
 	if err != nil {
 		return *new(common.Address), err
@@ -556,23 +556,23 @@ func (_Collaternal *CollaternalCaller) Owner(opts *bind.CallOpts) (common.Addres
 // Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
 //
 // Solidity: function owner() view returns(address)
-func (_Collaternal *CollaternalSession) Owner() (common.Address, error) {
-	return _Collaternal.Contract.Owner(&_Collaternal.CallOpts)
+func (_EcpCollaternal *EcpCollaternalSession) Owner() (common.Address, error) {
+	return _EcpCollaternal.Contract.Owner(&_EcpCollaternal.CallOpts)
 }
 
 // Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
 //
 // Solidity: function owner() view returns(address)
-func (_Collaternal *CollaternalCallerSession) Owner() (common.Address, error) {
-	return _Collaternal.Contract.Owner(&_Collaternal.CallOpts)
+func (_EcpCollaternal *EcpCollaternalCallerSession) Owner() (common.Address, error) {
+	return _EcpCollaternal.Contract.Owner(&_EcpCollaternal.CallOpts)
 }
 
 // SlashRatio is a free data retrieval call binding the contract method 0xd27ca89b.
 //
 // Solidity: function slashRatio() view returns(uint256)
-func (_Collaternal *CollaternalCaller) SlashRatio(opts *bind.CallOpts) (*big.Int, error) {
+func (_EcpCollaternal *EcpCollaternalCaller) SlashRatio(opts *bind.CallOpts) (*big.Int, error) {
 	var out []interface{}
-	err := _Collaternal.contract.Call(opts, &out, "slashRatio")
+	err := _EcpCollaternal.contract.Call(opts, &out, "slashRatio")
 
 	if err != nil {
 		return *new(*big.Int), err
@@ -587,23 +587,23 @@ func (_Collaternal *CollaternalCaller) SlashRatio(opts *bind.CallOpts) (*big.Int
 // SlashRatio is a free data retrieval call binding the contract method 0xd27ca89b.
 //
 // Solidity: function slashRatio() view returns(uint256)
-func (_Collaternal *CollaternalSession) SlashRatio() (*big.Int, error) {
-	return _Collaternal.Contract.SlashRatio(&_Collaternal.CallOpts)
+func (_EcpCollaternal *EcpCollaternalSession) SlashRatio() (*big.Int, error) {
+	return _EcpCollaternal.Contract.SlashRatio(&_EcpCollaternal.CallOpts)
 }
 
 // SlashRatio is a free data retrieval call binding the contract method 0xd27ca89b.
 //
 // Solidity: function slashRatio() view returns(uint256)
-func (_Collaternal *CollaternalCallerSession) SlashRatio() (*big.Int, error) {
-	return _Collaternal.Contract.SlashRatio(&_Collaternal.CallOpts)
+func (_EcpCollaternal *EcpCollaternalCallerSession) SlashRatio() (*big.Int, error) {
+	return _EcpCollaternal.Contract.SlashRatio(&_EcpCollaternal.CallOpts)
 }
 
 // SlashedFunds is a free data retrieval call binding the contract method 0x6f99f15c.
 //
 // Solidity: function slashedFunds() view returns(uint256)
-func (_Collaternal *CollaternalCaller) SlashedFunds(opts *bind.CallOpts) (*big.Int, error) {
+func (_EcpCollaternal *EcpCollaternalCaller) SlashedFunds(opts *bind.CallOpts) (*big.Int, error) {
 	var out []interface{}
-	err := _Collaternal.contract.Call(opts, &out, "slashedFunds")
+	err := _EcpCollaternal.contract.Call(opts, &out, "slashedFunds")
 
 	if err != nil {
 		return *new(*big.Int), err
@@ -618,23 +618,23 @@ func (_Collaternal *CollaternalCaller) SlashedFunds(opts *bind.CallOpts) (*big.I
 // SlashedFunds is a free data retrieval call binding the contract method 0x6f99f15c.
 //
 // Solidity: function slashedFunds() view returns(uint256)
-func (_Collaternal *CollaternalSession) SlashedFunds() (*big.Int, error) {
-	return _Collaternal.Contract.SlashedFunds(&_Collaternal.CallOpts)
+func (_EcpCollaternal *EcpCollaternalSession) SlashedFunds() (*big.Int, error) {
+	return _EcpCollaternal.Contract.SlashedFunds(&_EcpCollaternal.CallOpts)
 }
 
 // SlashedFunds is a free data retrieval call binding the contract method 0x6f99f15c.
 //
 // Solidity: function slashedFunds() view returns(uint256)
-func (_Collaternal *CollaternalCallerSession) SlashedFunds() (*big.Int, error) {
-	return _Collaternal.Contract.SlashedFunds(&_Collaternal.CallOpts)
+func (_EcpCollaternal *EcpCollaternalCallerSession) SlashedFunds() (*big.Int, error) {
+	return _EcpCollaternal.Contract.SlashedFunds(&_EcpCollaternal.CallOpts)
 }
 
 // TaskBalance is a free data retrieval call binding the contract method 0xf31cc883.
 //
 // Solidity: function taskBalance() view returns(uint256)
-func (_Collaternal *CollaternalCaller) TaskBalance(opts *bind.CallOpts) (*big.Int, error) {
+func (_EcpCollaternal *EcpCollaternalCaller) TaskBalance(opts *bind.CallOpts) (*big.Int, error) {
 	var out []interface{}
-	err := _Collaternal.contract.Call(opts, &out, "taskBalance")
+	err := _EcpCollaternal.contract.Call(opts, &out, "taskBalance")
 
 	if err != nil {
 		return *new(*big.Int), err
@@ -649,27 +649,27 @@ func (_Collaternal *CollaternalCaller) TaskBalance(opts *bind.CallOpts) (*big.In
 // TaskBalance is a free data retrieval call binding the contract method 0xf31cc883.
 //
 // Solidity: function taskBalance() view returns(uint256)
-func (_Collaternal *CollaternalSession) TaskBalance() (*big.Int, error) {
-	return _Collaternal.Contract.TaskBalance(&_Collaternal.CallOpts)
+func (_EcpCollaternal *EcpCollaternalSession) TaskBalance() (*big.Int, error) {
+	return _EcpCollaternal.Contract.TaskBalance(&_EcpCollaternal.CallOpts)
 }
 
 // TaskBalance is a free data retrieval call binding the contract method 0xf31cc883.
 //
 // Solidity: function taskBalance() view returns(uint256)
-func (_Collaternal *CollaternalCallerSession) TaskBalance() (*big.Int, error) {
-	return _Collaternal.Contract.TaskBalance(&_Collaternal.CallOpts)
+func (_EcpCollaternal *EcpCollaternalCallerSession) TaskBalance() (*big.Int, error) {
+	return _EcpCollaternal.Contract.TaskBalance(&_EcpCollaternal.CallOpts)
 }
 
-// Tasks is a free data retrieval call binding the contract method 0x77c237fd.
+// Tasks is a free data retrieval call binding the contract method 0x8d977672.
 //
-// Solidity: function tasks(address ) view returns(address cpAccountAddress, uint256 collateral, uint256 status)
-func (_Collaternal *CollaternalCaller) Tasks(opts *bind.CallOpts, arg0 common.Address) (struct {
+// Solidity: function tasks(uint256 ) view returns(address cpAccountAddress, uint256 collateral, uint256 status)
+func (_EcpCollaternal *EcpCollaternalCaller) Tasks(opts *bind.CallOpts, arg0 *big.Int) (struct {
 	CpAccountAddress common.Address
 	Collateral       *big.Int
 	Status           *big.Int
 }, error) {
 	var out []interface{}
-	err := _Collaternal.contract.Call(opts, &out, "tasks", arg0)
+	err := _EcpCollaternal.contract.Call(opts, &out, "tasks", arg0)
 
 	outstruct := new(struct {
 		CpAccountAddress common.Address
@@ -688,304 +688,409 @@ func (_Collaternal *CollaternalCaller) Tasks(opts *bind.CallOpts, arg0 common.Ad
 
 }
 
-// Tasks is a free data retrieval call binding the contract method 0x77c237fd.
+// Tasks is a free data retrieval call binding the contract method 0x8d977672.
 //
-// Solidity: function tasks(address ) view returns(address cpAccountAddress, uint256 collateral, uint256 status)
-func (_Collaternal *CollaternalSession) Tasks(arg0 common.Address) (struct {
+// Solidity: function tasks(uint256 ) view returns(address cpAccountAddress, uint256 collateral, uint256 status)
+func (_EcpCollaternal *EcpCollaternalSession) Tasks(arg0 *big.Int) (struct {
 	CpAccountAddress common.Address
 	Collateral       *big.Int
 	Status           *big.Int
 }, error) {
-	return _Collaternal.Contract.Tasks(&_Collaternal.CallOpts, arg0)
+	return _EcpCollaternal.Contract.Tasks(&_EcpCollaternal.CallOpts, arg0)
 }
 
-// Tasks is a free data retrieval call binding the contract method 0x77c237fd.
+// Tasks is a free data retrieval call binding the contract method 0x8d977672.
 //
-// Solidity: function tasks(address ) view returns(address cpAccountAddress, uint256 collateral, uint256 status)
-func (_Collaternal *CollaternalCallerSession) Tasks(arg0 common.Address) (struct {
+// Solidity: function tasks(uint256 ) view returns(address cpAccountAddress, uint256 collateral, uint256 status)
+func (_EcpCollaternal *EcpCollaternalCallerSession) Tasks(arg0 *big.Int) (struct {
 	CpAccountAddress common.Address
 	Collateral       *big.Int
 	Status           *big.Int
 }, error) {
-	return _Collaternal.Contract.Tasks(&_Collaternal.CallOpts, arg0)
+	return _EcpCollaternal.Contract.Tasks(&_EcpCollaternal.CallOpts, arg0)
 }
 
 // AddAdmin is a paid mutator transaction binding the contract method 0x70480275.
 //
 // Solidity: function addAdmin(address newAdmin) returns()
-func (_Collaternal *CollaternalTransactor) AddAdmin(opts *bind.TransactOpts, newAdmin common.Address) (*types.Transaction, error) {
-	return _Collaternal.contract.Transact(opts, "addAdmin", newAdmin)
+func (_EcpCollaternal *EcpCollaternalTransactor) AddAdmin(opts *bind.TransactOpts, newAdmin common.Address) (*types.Transaction, error) {
+	return _EcpCollaternal.contract.Transact(opts, "addAdmin", newAdmin)
 }
 
 // AddAdmin is a paid mutator transaction binding the contract method 0x70480275.
 //
 // Solidity: function addAdmin(address newAdmin) returns()
-func (_Collaternal *CollaternalSession) AddAdmin(newAdmin common.Address) (*types.Transaction, error) {
-	return _Collaternal.Contract.AddAdmin(&_Collaternal.TransactOpts, newAdmin)
+func (_EcpCollaternal *EcpCollaternalSession) AddAdmin(newAdmin common.Address) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.AddAdmin(&_EcpCollaternal.TransactOpts, newAdmin)
 }
 
 // AddAdmin is a paid mutator transaction binding the contract method 0x70480275.
 //
 // Solidity: function addAdmin(address newAdmin) returns()
-func (_Collaternal *CollaternalTransactorSession) AddAdmin(newAdmin common.Address) (*types.Transaction, error) {
-	return _Collaternal.Contract.AddAdmin(&_Collaternal.TransactOpts, newAdmin)
+func (_EcpCollaternal *EcpCollaternalTransactorSession) AddAdmin(newAdmin common.Address) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.AddAdmin(&_EcpCollaternal.TransactOpts, newAdmin)
+}
+
+// BatchLock is a paid mutator transaction binding the contract method 0x63215bb7.
+//
+// Solidity: function batchLock(address[] cpAddresses, uint256[] taskIDs) returns()
+func (_EcpCollaternal *EcpCollaternalTransactor) BatchLock(opts *bind.TransactOpts, cpAddresses []common.Address, taskIDs []*big.Int) (*types.Transaction, error) {
+	return _EcpCollaternal.contract.Transact(opts, "batchLock", cpAddresses, taskIDs)
+}
+
+// BatchLock is a paid mutator transaction binding the contract method 0x63215bb7.
+//
+// Solidity: function batchLock(address[] cpAddresses, uint256[] taskIDs) returns()
+func (_EcpCollaternal *EcpCollaternalSession) BatchLock(cpAddresses []common.Address, taskIDs []*big.Int) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.BatchLock(&_EcpCollaternal.TransactOpts, cpAddresses, taskIDs)
+}
+
+// BatchLock is a paid mutator transaction binding the contract method 0x63215bb7.
+//
+// Solidity: function batchLock(address[] cpAddresses, uint256[] taskIDs) returns()
+func (_EcpCollaternal *EcpCollaternalTransactorSession) BatchLock(cpAddresses []common.Address, taskIDs []*big.Int) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.BatchLock(&_EcpCollaternal.TransactOpts, cpAddresses, taskIDs)
+}
+
+// BatchSlash is a paid mutator transaction binding the contract method 0x436ea491.
+//
+// Solidity: function batchSlash(uint256[] taskIDs) returns()
+func (_EcpCollaternal *EcpCollaternalTransactor) BatchSlash(opts *bind.TransactOpts, taskIDs []*big.Int) (*types.Transaction, error) {
+	return _EcpCollaternal.contract.Transact(opts, "batchSlash", taskIDs)
+}
+
+// BatchSlash is a paid mutator transaction binding the contract method 0x436ea491.
+//
+// Solidity: function batchSlash(uint256[] taskIDs) returns()
+func (_EcpCollaternal *EcpCollaternalSession) BatchSlash(taskIDs []*big.Int) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.BatchSlash(&_EcpCollaternal.TransactOpts, taskIDs)
+}
+
+// BatchSlash is a paid mutator transaction binding the contract method 0x436ea491.
+//
+// Solidity: function batchSlash(uint256[] taskIDs) returns()
+func (_EcpCollaternal *EcpCollaternalTransactorSession) BatchSlash(taskIDs []*big.Int) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.BatchSlash(&_EcpCollaternal.TransactOpts, taskIDs)
+}
+
+// BatchUnlock is a paid mutator transaction binding the contract method 0x4a82942c.
+//
+// Solidity: function batchUnlock(uint256[] taskIDs) returns()
+func (_EcpCollaternal *EcpCollaternalTransactor) BatchUnlock(opts *bind.TransactOpts, taskIDs []*big.Int) (*types.Transaction, error) {
+	return _EcpCollaternal.contract.Transact(opts, "batchUnlock", taskIDs)
+}
+
+// BatchUnlock is a paid mutator transaction binding the contract method 0x4a82942c.
+//
+// Solidity: function batchUnlock(uint256[] taskIDs) returns()
+func (_EcpCollaternal *EcpCollaternalSession) BatchUnlock(taskIDs []*big.Int) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.BatchUnlock(&_EcpCollaternal.TransactOpts, taskIDs)
+}
+
+// BatchUnlock is a paid mutator transaction binding the contract method 0x4a82942c.
+//
+// Solidity: function batchUnlock(uint256[] taskIDs) returns()
+func (_EcpCollaternal *EcpCollaternalTransactorSession) BatchUnlock(taskIDs []*big.Int) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.BatchUnlock(&_EcpCollaternal.TransactOpts, taskIDs)
 }
 
 // Deposit is a paid mutator transaction binding the contract method 0xf340fa01.
 //
 // Solidity: function deposit(address cpAccount) payable returns()
-func (_Collaternal *CollaternalTransactor) Deposit(opts *bind.TransactOpts, cpAccount common.Address) (*types.Transaction, error) {
-	return _Collaternal.contract.Transact(opts, "deposit", cpAccount)
+func (_EcpCollaternal *EcpCollaternalTransactor) Deposit(opts *bind.TransactOpts, cpAccount common.Address) (*types.Transaction, error) {
+	return _EcpCollaternal.contract.Transact(opts, "deposit", cpAccount)
 }
 
 // Deposit is a paid mutator transaction binding the contract method 0xf340fa01.
 //
 // Solidity: function deposit(address cpAccount) payable returns()
-func (_Collaternal *CollaternalSession) Deposit(cpAccount common.Address) (*types.Transaction, error) {
-	return _Collaternal.Contract.Deposit(&_Collaternal.TransactOpts, cpAccount)
+func (_EcpCollaternal *EcpCollaternalSession) Deposit(cpAccount common.Address) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.Deposit(&_EcpCollaternal.TransactOpts, cpAccount)
 }
 
 // Deposit is a paid mutator transaction binding the contract method 0xf340fa01.
 //
 // Solidity: function deposit(address cpAccount) payable returns()
-func (_Collaternal *CollaternalTransactorSession) Deposit(cpAccount common.Address) (*types.Transaction, error) {
-	return _Collaternal.Contract.Deposit(&_Collaternal.TransactOpts, cpAccount)
+func (_EcpCollaternal *EcpCollaternalTransactorSession) Deposit(cpAccount common.Address) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.Deposit(&_EcpCollaternal.TransactOpts, cpAccount)
 }
 
-// LockCollateral is a paid mutator transaction binding the contract method 0xe0ed539d.
+// DisputeProof is a paid mutator transaction binding the contract method 0x43a8906c.
 //
-// Solidity: function lockCollateral(address cp, uint256 collateral, address taskContractAddress) returns()
-func (_Collaternal *CollaternalTransactor) LockCollateral(opts *bind.TransactOpts, cp common.Address, collateral *big.Int, taskContractAddress common.Address) (*types.Transaction, error) {
-	return _Collaternal.contract.Transact(opts, "lockCollateral", cp, collateral, taskContractAddress)
+// Solidity: function disputeProof(address taskContractAddress) returns()
+func (_EcpCollaternal *EcpCollaternalTransactor) DisputeProof(opts *bind.TransactOpts, taskContractAddress common.Address) (*types.Transaction, error) {
+	return _EcpCollaternal.contract.Transact(opts, "disputeProof", taskContractAddress)
 }
 
-// LockCollateral is a paid mutator transaction binding the contract method 0xe0ed539d.
+// DisputeProof is a paid mutator transaction binding the contract method 0x43a8906c.
 //
-// Solidity: function lockCollateral(address cp, uint256 collateral, address taskContractAddress) returns()
-func (_Collaternal *CollaternalSession) LockCollateral(cp common.Address, collateral *big.Int, taskContractAddress common.Address) (*types.Transaction, error) {
-	return _Collaternal.Contract.LockCollateral(&_Collaternal.TransactOpts, cp, collateral, taskContractAddress)
+// Solidity: function disputeProof(address taskContractAddress) returns()
+func (_EcpCollaternal *EcpCollaternalSession) DisputeProof(taskContractAddress common.Address) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.DisputeProof(&_EcpCollaternal.TransactOpts, taskContractAddress)
 }
 
-// LockCollateral is a paid mutator transaction binding the contract method 0xe0ed539d.
+// DisputeProof is a paid mutator transaction binding the contract method 0x43a8906c.
 //
-// Solidity: function lockCollateral(address cp, uint256 collateral, address taskContractAddress) returns()
-func (_Collaternal *CollaternalTransactorSession) LockCollateral(cp common.Address, collateral *big.Int, taskContractAddress common.Address) (*types.Transaction, error) {
-	return _Collaternal.Contract.LockCollateral(&_Collaternal.TransactOpts, cp, collateral, taskContractAddress)
+// Solidity: function disputeProof(address taskContractAddress) returns()
+func (_EcpCollaternal *EcpCollaternalTransactorSession) DisputeProof(taskContractAddress common.Address) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.DisputeProof(&_EcpCollaternal.TransactOpts, taskContractAddress)
+}
+
+// LockCollateral is a paid mutator transaction binding the contract method 0x47a7d107.
+//
+// Solidity: function lockCollateral(address cp, uint256 taskID) returns()
+func (_EcpCollaternal *EcpCollaternalTransactor) LockCollateral(opts *bind.TransactOpts, cp common.Address, taskID *big.Int) (*types.Transaction, error) {
+	return _EcpCollaternal.contract.Transact(opts, "lockCollateral", cp, taskID)
+}
+
+// LockCollateral is a paid mutator transaction binding the contract method 0x47a7d107.
+//
+// Solidity: function lockCollateral(address cp, uint256 taskID) returns()
+func (_EcpCollaternal *EcpCollaternalSession) LockCollateral(cp common.Address, taskID *big.Int) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.LockCollateral(&_EcpCollaternal.TransactOpts, cp, taskID)
+}
+
+// LockCollateral is a paid mutator transaction binding the contract method 0x47a7d107.
+//
+// Solidity: function lockCollateral(address cp, uint256 taskID) returns()
+func (_EcpCollaternal *EcpCollaternalTransactorSession) LockCollateral(cp common.Address, taskID *big.Int) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.LockCollateral(&_EcpCollaternal.TransactOpts, cp, taskID)
 }
 
 // RemoveAdmin is a paid mutator transaction binding the contract method 0x1785f53c.
 //
 // Solidity: function removeAdmin(address admin) returns()
-func (_Collaternal *CollaternalTransactor) RemoveAdmin(opts *bind.TransactOpts, admin common.Address) (*types.Transaction, error) {
-	return _Collaternal.contract.Transact(opts, "removeAdmin", admin)
+func (_EcpCollaternal *EcpCollaternalTransactor) RemoveAdmin(opts *bind.TransactOpts, admin common.Address) (*types.Transaction, error) {
+	return _EcpCollaternal.contract.Transact(opts, "removeAdmin", admin)
 }
 
 // RemoveAdmin is a paid mutator transaction binding the contract method 0x1785f53c.
 //
 // Solidity: function removeAdmin(address admin) returns()
-func (_Collaternal *CollaternalSession) RemoveAdmin(admin common.Address) (*types.Transaction, error) {
-	return _Collaternal.Contract.RemoveAdmin(&_Collaternal.TransactOpts, admin)
+func (_EcpCollaternal *EcpCollaternalSession) RemoveAdmin(admin common.Address) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.RemoveAdmin(&_EcpCollaternal.TransactOpts, admin)
 }
 
 // RemoveAdmin is a paid mutator transaction binding the contract method 0x1785f53c.
 //
 // Solidity: function removeAdmin(address admin) returns()
-func (_Collaternal *CollaternalTransactorSession) RemoveAdmin(admin common.Address) (*types.Transaction, error) {
-	return _Collaternal.Contract.RemoveAdmin(&_Collaternal.TransactOpts, admin)
+func (_EcpCollaternal *EcpCollaternalTransactorSession) RemoveAdmin(admin common.Address) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.RemoveAdmin(&_EcpCollaternal.TransactOpts, admin)
 }
 
 // RenounceOwnership is a paid mutator transaction binding the contract method 0x715018a6.
 //
 // Solidity: function renounceOwnership() returns()
-func (_Collaternal *CollaternalTransactor) RenounceOwnership(opts *bind.TransactOpts) (*types.Transaction, error) {
-	return _Collaternal.contract.Transact(opts, "renounceOwnership")
+func (_EcpCollaternal *EcpCollaternalTransactor) RenounceOwnership(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _EcpCollaternal.contract.Transact(opts, "renounceOwnership")
 }
 
 // RenounceOwnership is a paid mutator transaction binding the contract method 0x715018a6.
 //
 // Solidity: function renounceOwnership() returns()
-func (_Collaternal *CollaternalSession) RenounceOwnership() (*types.Transaction, error) {
-	return _Collaternal.Contract.RenounceOwnership(&_Collaternal.TransactOpts)
+func (_EcpCollaternal *EcpCollaternalSession) RenounceOwnership() (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.RenounceOwnership(&_EcpCollaternal.TransactOpts)
 }
 
 // RenounceOwnership is a paid mutator transaction binding the contract method 0x715018a6.
 //
 // Solidity: function renounceOwnership() returns()
-func (_Collaternal *CollaternalTransactorSession) RenounceOwnership() (*types.Transaction, error) {
-	return _Collaternal.Contract.RenounceOwnership(&_Collaternal.TransactOpts)
+func (_EcpCollaternal *EcpCollaternalTransactorSession) RenounceOwnership() (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.RenounceOwnership(&_EcpCollaternal.TransactOpts)
 }
 
 // SetBaseCollateral is a paid mutator transaction binding the contract method 0x7f58a7e5.
 //
 // Solidity: function setBaseCollateral(uint256 _baseCollateral) returns()
-func (_Collaternal *CollaternalTransactor) SetBaseCollateral(opts *bind.TransactOpts, _baseCollateral *big.Int) (*types.Transaction, error) {
-	return _Collaternal.contract.Transact(opts, "setBaseCollateral", _baseCollateral)
+func (_EcpCollaternal *EcpCollaternalTransactor) SetBaseCollateral(opts *bind.TransactOpts, _baseCollateral *big.Int) (*types.Transaction, error) {
+	return _EcpCollaternal.contract.Transact(opts, "setBaseCollateral", _baseCollateral)
 }
 
 // SetBaseCollateral is a paid mutator transaction binding the contract method 0x7f58a7e5.
 //
 // Solidity: function setBaseCollateral(uint256 _baseCollateral) returns()
-func (_Collaternal *CollaternalSession) SetBaseCollateral(_baseCollateral *big.Int) (*types.Transaction, error) {
-	return _Collaternal.Contract.SetBaseCollateral(&_Collaternal.TransactOpts, _baseCollateral)
+func (_EcpCollaternal *EcpCollaternalSession) SetBaseCollateral(_baseCollateral *big.Int) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.SetBaseCollateral(&_EcpCollaternal.TransactOpts, _baseCollateral)
 }
 
 // SetBaseCollateral is a paid mutator transaction binding the contract method 0x7f58a7e5.
 //
 // Solidity: function setBaseCollateral(uint256 _baseCollateral) returns()
-func (_Collaternal *CollaternalTransactorSession) SetBaseCollateral(_baseCollateral *big.Int) (*types.Transaction, error) {
-	return _Collaternal.Contract.SetBaseCollateral(&_Collaternal.TransactOpts, _baseCollateral)
+func (_EcpCollaternal *EcpCollaternalTransactorSession) SetBaseCollateral(_baseCollateral *big.Int) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.SetBaseCollateral(&_EcpCollaternal.TransactOpts, _baseCollateral)
 }
 
 // SetCollateralRatio is a paid mutator transaction binding the contract method 0x6060663e.
 //
 // Solidity: function setCollateralRatio(uint256 _collateralRatio) returns()
-func (_Collaternal *CollaternalTransactor) SetCollateralRatio(opts *bind.TransactOpts, _collateralRatio *big.Int) (*types.Transaction, error) {
-	return _Collaternal.contract.Transact(opts, "setCollateralRatio", _collateralRatio)
+func (_EcpCollaternal *EcpCollaternalTransactor) SetCollateralRatio(opts *bind.TransactOpts, _collateralRatio *big.Int) (*types.Transaction, error) {
+	return _EcpCollaternal.contract.Transact(opts, "setCollateralRatio", _collateralRatio)
 }
 
 // SetCollateralRatio is a paid mutator transaction binding the contract method 0x6060663e.
 //
 // Solidity: function setCollateralRatio(uint256 _collateralRatio) returns()
-func (_Collaternal *CollaternalSession) SetCollateralRatio(_collateralRatio *big.Int) (*types.Transaction, error) {
-	return _Collaternal.Contract.SetCollateralRatio(&_Collaternal.TransactOpts, _collateralRatio)
+func (_EcpCollaternal *EcpCollaternalSession) SetCollateralRatio(_collateralRatio *big.Int) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.SetCollateralRatio(&_EcpCollaternal.TransactOpts, _collateralRatio)
 }
 
 // SetCollateralRatio is a paid mutator transaction binding the contract method 0x6060663e.
 //
 // Solidity: function setCollateralRatio(uint256 _collateralRatio) returns()
-func (_Collaternal *CollaternalTransactorSession) SetCollateralRatio(_collateralRatio *big.Int) (*types.Transaction, error) {
-	return _Collaternal.Contract.SetCollateralRatio(&_Collaternal.TransactOpts, _collateralRatio)
+func (_EcpCollaternal *EcpCollaternalTransactorSession) SetCollateralRatio(_collateralRatio *big.Int) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.SetCollateralRatio(&_EcpCollaternal.TransactOpts, _collateralRatio)
 }
 
 // SetSlashRatio is a paid mutator transaction binding the contract method 0xce3518aa.
 //
 // Solidity: function setSlashRatio(uint256 _slashRatio) returns()
-func (_Collaternal *CollaternalTransactor) SetSlashRatio(opts *bind.TransactOpts, _slashRatio *big.Int) (*types.Transaction, error) {
-	return _Collaternal.contract.Transact(opts, "setSlashRatio", _slashRatio)
+func (_EcpCollaternal *EcpCollaternalTransactor) SetSlashRatio(opts *bind.TransactOpts, _slashRatio *big.Int) (*types.Transaction, error) {
+	return _EcpCollaternal.contract.Transact(opts, "setSlashRatio", _slashRatio)
 }
 
 // SetSlashRatio is a paid mutator transaction binding the contract method 0xce3518aa.
 //
 // Solidity: function setSlashRatio(uint256 _slashRatio) returns()
-func (_Collaternal *CollaternalSession) SetSlashRatio(_slashRatio *big.Int) (*types.Transaction, error) {
-	return _Collaternal.Contract.SetSlashRatio(&_Collaternal.TransactOpts, _slashRatio)
+func (_EcpCollaternal *EcpCollaternalSession) SetSlashRatio(_slashRatio *big.Int) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.SetSlashRatio(&_EcpCollaternal.TransactOpts, _slashRatio)
 }
 
 // SetSlashRatio is a paid mutator transaction binding the contract method 0xce3518aa.
 //
 // Solidity: function setSlashRatio(uint256 _slashRatio) returns()
-func (_Collaternal *CollaternalTransactorSession) SetSlashRatio(_slashRatio *big.Int) (*types.Transaction, error) {
-	return _Collaternal.Contract.SetSlashRatio(&_Collaternal.TransactOpts, _slashRatio)
+func (_EcpCollaternal *EcpCollaternalTransactorSession) SetSlashRatio(_slashRatio *big.Int) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.SetSlashRatio(&_EcpCollaternal.TransactOpts, _slashRatio)
 }
 
-// SlashCollateral is a paid mutator transaction binding the contract method 0x9d1fef81.
+// SlashCollateral is a paid mutator transaction binding the contract method 0xde2b2f53.
 //
-// Solidity: function slashCollateral(address taskContractAddress) returns()
-func (_Collaternal *CollaternalTransactor) SlashCollateral(opts *bind.TransactOpts, taskContractAddress common.Address) (*types.Transaction, error) {
-	return _Collaternal.contract.Transact(opts, "slashCollateral", taskContractAddress)
+// Solidity: function slashCollateral(uint256 taskID) returns()
+func (_EcpCollaternal *EcpCollaternalTransactor) SlashCollateral(opts *bind.TransactOpts, taskID *big.Int) (*types.Transaction, error) {
+	return _EcpCollaternal.contract.Transact(opts, "slashCollateral", taskID)
 }
 
-// SlashCollateral is a paid mutator transaction binding the contract method 0x9d1fef81.
+// SlashCollateral is a paid mutator transaction binding the contract method 0xde2b2f53.
 //
-// Solidity: function slashCollateral(address taskContractAddress) returns()
-func (_Collaternal *CollaternalSession) SlashCollateral(taskContractAddress common.Address) (*types.Transaction, error) {
-	return _Collaternal.Contract.SlashCollateral(&_Collaternal.TransactOpts, taskContractAddress)
+// Solidity: function slashCollateral(uint256 taskID) returns()
+func (_EcpCollaternal *EcpCollaternalSession) SlashCollateral(taskID *big.Int) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.SlashCollateral(&_EcpCollaternal.TransactOpts, taskID)
 }
 
-// SlashCollateral is a paid mutator transaction binding the contract method 0x9d1fef81.
+// SlashCollateral is a paid mutator transaction binding the contract method 0xde2b2f53.
 //
-// Solidity: function slashCollateral(address taskContractAddress) returns()
-func (_Collaternal *CollaternalTransactorSession) SlashCollateral(taskContractAddress common.Address) (*types.Transaction, error) {
-	return _Collaternal.Contract.SlashCollateral(&_Collaternal.TransactOpts, taskContractAddress)
+// Solidity: function slashCollateral(uint256 taskID) returns()
+func (_EcpCollaternal *EcpCollaternalTransactorSession) SlashCollateral(taskID *big.Int) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.SlashCollateral(&_EcpCollaternal.TransactOpts, taskID)
 }
 
 // TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
 //
 // Solidity: function transferOwnership(address newOwner) returns()
-func (_Collaternal *CollaternalTransactor) TransferOwnership(opts *bind.TransactOpts, newOwner common.Address) (*types.Transaction, error) {
-	return _Collaternal.contract.Transact(opts, "transferOwnership", newOwner)
+func (_EcpCollaternal *EcpCollaternalTransactor) TransferOwnership(opts *bind.TransactOpts, newOwner common.Address) (*types.Transaction, error) {
+	return _EcpCollaternal.contract.Transact(opts, "transferOwnership", newOwner)
 }
 
 // TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
 //
 // Solidity: function transferOwnership(address newOwner) returns()
-func (_Collaternal *CollaternalSession) TransferOwnership(newOwner common.Address) (*types.Transaction, error) {
-	return _Collaternal.Contract.TransferOwnership(&_Collaternal.TransactOpts, newOwner)
+func (_EcpCollaternal *EcpCollaternalSession) TransferOwnership(newOwner common.Address) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.TransferOwnership(&_EcpCollaternal.TransactOpts, newOwner)
 }
 
 // TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
 //
 // Solidity: function transferOwnership(address newOwner) returns()
-func (_Collaternal *CollaternalTransactorSession) TransferOwnership(newOwner common.Address) (*types.Transaction, error) {
-	return _Collaternal.Contract.TransferOwnership(&_Collaternal.TransactOpts, newOwner)
+func (_EcpCollaternal *EcpCollaternalTransactorSession) TransferOwnership(newOwner common.Address) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.TransferOwnership(&_EcpCollaternal.TransactOpts, newOwner)
 }
 
-// UnlockCollateral is a paid mutator transaction binding the contract method 0x3f001fd9.
+// UnlockCollateral is a paid mutator transaction binding the contract method 0x0fcc834e.
 //
-// Solidity: function unlockCollateral(address taskContractAddress) returns()
-func (_Collaternal *CollaternalTransactor) UnlockCollateral(opts *bind.TransactOpts, taskContractAddress common.Address) (*types.Transaction, error) {
-	return _Collaternal.contract.Transact(opts, "unlockCollateral", taskContractAddress)
+// Solidity: function unlockCollateral(uint256 taskID) returns()
+func (_EcpCollaternal *EcpCollaternalTransactor) UnlockCollateral(opts *bind.TransactOpts, taskID *big.Int) (*types.Transaction, error) {
+	return _EcpCollaternal.contract.Transact(opts, "unlockCollateral", taskID)
 }
 
-// UnlockCollateral is a paid mutator transaction binding the contract method 0x3f001fd9.
+// UnlockCollateral is a paid mutator transaction binding the contract method 0x0fcc834e.
 //
-// Solidity: function unlockCollateral(address taskContractAddress) returns()
-func (_Collaternal *CollaternalSession) UnlockCollateral(taskContractAddress common.Address) (*types.Transaction, error) {
-	return _Collaternal.Contract.UnlockCollateral(&_Collaternal.TransactOpts, taskContractAddress)
+// Solidity: function unlockCollateral(uint256 taskID) returns()
+func (_EcpCollaternal *EcpCollaternalSession) UnlockCollateral(taskID *big.Int) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.UnlockCollateral(&_EcpCollaternal.TransactOpts, taskID)
 }
 
-// UnlockCollateral is a paid mutator transaction binding the contract method 0x3f001fd9.
+// UnlockCollateral is a paid mutator transaction binding the contract method 0x0fcc834e.
 //
-// Solidity: function unlockCollateral(address taskContractAddress) returns()
-func (_Collaternal *CollaternalTransactorSession) UnlockCollateral(taskContractAddress common.Address) (*types.Transaction, error) {
-	return _Collaternal.Contract.UnlockCollateral(&_Collaternal.TransactOpts, taskContractAddress)
+// Solidity: function unlockCollateral(uint256 taskID) returns()
+func (_EcpCollaternal *EcpCollaternalTransactorSession) UnlockCollateral(taskID *big.Int) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.UnlockCollateral(&_EcpCollaternal.TransactOpts, taskID)
 }
 
 // Withdraw is a paid mutator transaction binding the contract method 0xf3fef3a3.
 //
 // Solidity: function withdraw(address cpAccount, uint256 amount) returns()
-func (_Collaternal *CollaternalTransactor) Withdraw(opts *bind.TransactOpts, cpAccount common.Address, amount *big.Int) (*types.Transaction, error) {
-	return _Collaternal.contract.Transact(opts, "withdraw", cpAccount, amount)
+func (_EcpCollaternal *EcpCollaternalTransactor) Withdraw(opts *bind.TransactOpts, cpAccount common.Address, amount *big.Int) (*types.Transaction, error) {
+	return _EcpCollaternal.contract.Transact(opts, "withdraw", cpAccount, amount)
 }
 
 // Withdraw is a paid mutator transaction binding the contract method 0xf3fef3a3.
 //
 // Solidity: function withdraw(address cpAccount, uint256 amount) returns()
-func (_Collaternal *CollaternalSession) Withdraw(cpAccount common.Address, amount *big.Int) (*types.Transaction, error) {
-	return _Collaternal.Contract.Withdraw(&_Collaternal.TransactOpts, cpAccount, amount)
+func (_EcpCollaternal *EcpCollaternalSession) Withdraw(cpAccount common.Address, amount *big.Int) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.Withdraw(&_EcpCollaternal.TransactOpts, cpAccount, amount)
 }
 
 // Withdraw is a paid mutator transaction binding the contract method 0xf3fef3a3.
 //
 // Solidity: function withdraw(address cpAccount, uint256 amount) returns()
-func (_Collaternal *CollaternalTransactorSession) Withdraw(cpAccount common.Address, amount *big.Int) (*types.Transaction, error) {
-	return _Collaternal.Contract.Withdraw(&_Collaternal.TransactOpts, cpAccount, amount)
+func (_EcpCollaternal *EcpCollaternalTransactorSession) Withdraw(cpAccount common.Address, amount *big.Int) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.Withdraw(&_EcpCollaternal.TransactOpts, cpAccount, amount)
+}
+
+// WithdrawSlashedFunds is a paid mutator transaction binding the contract method 0x2894493f.
+//
+// Solidity: function withdrawSlashedFunds(uint256 slashfund) returns()
+func (_EcpCollaternal *EcpCollaternalTransactor) WithdrawSlashedFunds(opts *bind.TransactOpts, slashfund *big.Int) (*types.Transaction, error) {
+	return _EcpCollaternal.contract.Transact(opts, "withdrawSlashedFunds", slashfund)
+}
+
+// WithdrawSlashedFunds is a paid mutator transaction binding the contract method 0x2894493f.
+//
+// Solidity: function withdrawSlashedFunds(uint256 slashfund) returns()
+func (_EcpCollaternal *EcpCollaternalSession) WithdrawSlashedFunds(slashfund *big.Int) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.WithdrawSlashedFunds(&_EcpCollaternal.TransactOpts, slashfund)
+}
+
+// WithdrawSlashedFunds is a paid mutator transaction binding the contract method 0x2894493f.
+//
+// Solidity: function withdrawSlashedFunds(uint256 slashfund) returns()
+func (_EcpCollaternal *EcpCollaternalTransactorSession) WithdrawSlashedFunds(slashfund *big.Int) (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.WithdrawSlashedFunds(&_EcpCollaternal.TransactOpts, slashfund)
 }
 
 // Receive is a paid mutator transaction binding the contract receive function.
 //
 // Solidity: receive() payable returns()
-func (_Collaternal *CollaternalTransactor) Receive(opts *bind.TransactOpts) (*types.Transaction, error) {
-	return _Collaternal.contract.RawTransact(opts, nil) // calldata is disallowed for receive function
+func (_EcpCollaternal *EcpCollaternalTransactor) Receive(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _EcpCollaternal.contract.RawTransact(opts, nil) // calldata is disallowed for receive function
 }
 
 // Receive is a paid mutator transaction binding the contract receive function.
 //
 // Solidity: receive() payable returns()
-func (_Collaternal *CollaternalSession) Receive() (*types.Transaction, error) {
-	return _Collaternal.Contract.Receive(&_Collaternal.TransactOpts)
+func (_EcpCollaternal *EcpCollaternalSession) Receive() (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.Receive(&_EcpCollaternal.TransactOpts)
 }
 
 // Receive is a paid mutator transaction binding the contract receive function.
 //
 // Solidity: receive() payable returns()
-func (_Collaternal *CollaternalTransactorSession) Receive() (*types.Transaction, error) {
-	return _Collaternal.Contract.Receive(&_Collaternal.TransactOpts)
+func (_EcpCollaternal *EcpCollaternalTransactorSession) Receive() (*types.Transaction, error) {
+	return _EcpCollaternal.Contract.Receive(&_EcpCollaternal.TransactOpts)
 }
 
-// CollaternalCollateralAdjustedIterator is returned from FilterCollateralAdjusted and is used to iterate over the raw logs and unpacked data for CollateralAdjusted events raised by the Collaternal contract.
-type CollaternalCollateralAdjustedIterator struct {
-	Event *CollaternalCollateralAdjusted // Event containing the contract specifics and raw log
+// EcpCollaternalCollateralAdjustedIterator is returned from FilterCollateralAdjusted and is used to iterate over the raw logs and unpacked data for CollateralAdjusted events raised by the EcpCollaternal contract.
+type EcpCollaternalCollateralAdjustedIterator struct {
+	Event *EcpCollaternalCollateralAdjusted // Event containing the contract specifics and raw log
 
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
@@ -999,7 +1104,7 @@ type CollaternalCollateralAdjustedIterator struct {
 // Next advances the iterator to the subsequent event, returning whether there
 // are any more events found. In case of a retrieval or parsing error, false is
 // returned and Error() can be queried for the exact failure.
-func (it *CollaternalCollateralAdjustedIterator) Next() bool {
+func (it *EcpCollaternalCollateralAdjustedIterator) Next() bool {
 	// If the iterator failed, stop iterating
 	if it.fail != nil {
 		return false
@@ -1008,7 +1113,7 @@ func (it *CollaternalCollateralAdjustedIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(CollaternalCollateralAdjusted)
+			it.Event = new(EcpCollaternalCollateralAdjusted)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -1023,7 +1128,7 @@ func (it *CollaternalCollateralAdjustedIterator) Next() bool {
 	// Iterator still in progress, wait for either a data or an error event
 	select {
 	case log := <-it.logs:
-		it.Event = new(CollaternalCollateralAdjusted)
+		it.Event = new(EcpCollaternalCollateralAdjusted)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -1039,19 +1144,19 @@ func (it *CollaternalCollateralAdjustedIterator) Next() bool {
 }
 
 // Error returns any retrieval or parsing error occurred during filtering.
-func (it *CollaternalCollateralAdjustedIterator) Error() error {
+func (it *EcpCollaternalCollateralAdjustedIterator) Error() error {
 	return it.fail
 }
 
 // Close terminates the iteration process, releasing any pending underlying
 // resources.
-func (it *CollaternalCollateralAdjustedIterator) Close() error {
+func (it *EcpCollaternalCollateralAdjustedIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-// CollaternalCollateralAdjusted represents a CollateralAdjusted event raised by the Collaternal contract.
-type CollaternalCollateralAdjusted struct {
+// EcpCollaternalCollateralAdjusted represents a CollateralAdjusted event raised by the EcpCollaternal contract.
+type EcpCollaternalCollateralAdjusted struct {
 	Cp            common.Address
 	FrozenAmount  *big.Int
 	BalanceAmount *big.Int
@@ -1062,31 +1167,31 @@ type CollaternalCollateralAdjusted struct {
 // FilterCollateralAdjusted is a free log retrieval operation binding the contract event 0x42f1a8a1aee108e84e4eabfaa8d51d7baaa1a02d482295297883a44b2debd3e4.
 //
 // Solidity: event CollateralAdjusted(address indexed cp, uint256 frozenAmount, uint256 balanceAmount, string operation)
-func (_Collaternal *CollaternalFilterer) FilterCollateralAdjusted(opts *bind.FilterOpts, cp []common.Address) (*CollaternalCollateralAdjustedIterator, error) {
+func (_EcpCollaternal *EcpCollaternalFilterer) FilterCollateralAdjusted(opts *bind.FilterOpts, cp []common.Address) (*EcpCollaternalCollateralAdjustedIterator, error) {
 
 	var cpRule []interface{}
 	for _, cpItem := range cp {
 		cpRule = append(cpRule, cpItem)
 	}
 
-	logs, sub, err := _Collaternal.contract.FilterLogs(opts, "CollateralAdjusted", cpRule)
+	logs, sub, err := _EcpCollaternal.contract.FilterLogs(opts, "CollateralAdjusted", cpRule)
 	if err != nil {
 		return nil, err
 	}
-	return &CollaternalCollateralAdjustedIterator{contract: _Collaternal.contract, event: "CollateralAdjusted", logs: logs, sub: sub}, nil
+	return &EcpCollaternalCollateralAdjustedIterator{contract: _EcpCollaternal.contract, event: "CollateralAdjusted", logs: logs, sub: sub}, nil
 }
 
 // WatchCollateralAdjusted is a free log subscription operation binding the contract event 0x42f1a8a1aee108e84e4eabfaa8d51d7baaa1a02d482295297883a44b2debd3e4.
 //
 // Solidity: event CollateralAdjusted(address indexed cp, uint256 frozenAmount, uint256 balanceAmount, string operation)
-func (_Collaternal *CollaternalFilterer) WatchCollateralAdjusted(opts *bind.WatchOpts, sink chan<- *CollaternalCollateralAdjusted, cp []common.Address) (event.Subscription, error) {
+func (_EcpCollaternal *EcpCollaternalFilterer) WatchCollateralAdjusted(opts *bind.WatchOpts, sink chan<- *EcpCollaternalCollateralAdjusted, cp []common.Address) (event.Subscription, error) {
 
 	var cpRule []interface{}
 	for _, cpItem := range cp {
 		cpRule = append(cpRule, cpItem)
 	}
 
-	logs, sub, err := _Collaternal.contract.WatchLogs(opts, "CollateralAdjusted", cpRule)
+	logs, sub, err := _EcpCollaternal.contract.WatchLogs(opts, "CollateralAdjusted", cpRule)
 	if err != nil {
 		return nil, err
 	}
@@ -1096,8 +1201,8 @@ func (_Collaternal *CollaternalFilterer) WatchCollateralAdjusted(opts *bind.Watc
 			select {
 			case log := <-logs:
 				// New log arrived, parse the event and forward to the user
-				event := new(CollaternalCollateralAdjusted)
-				if err := _Collaternal.contract.UnpackLog(event, "CollateralAdjusted", log); err != nil {
+				event := new(EcpCollaternalCollateralAdjusted)
+				if err := _EcpCollaternal.contract.UnpackLog(event, "CollateralAdjusted", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -1121,18 +1226,18 @@ func (_Collaternal *CollaternalFilterer) WatchCollateralAdjusted(opts *bind.Watc
 // ParseCollateralAdjusted is a log parse operation binding the contract event 0x42f1a8a1aee108e84e4eabfaa8d51d7baaa1a02d482295297883a44b2debd3e4.
 //
 // Solidity: event CollateralAdjusted(address indexed cp, uint256 frozenAmount, uint256 balanceAmount, string operation)
-func (_Collaternal *CollaternalFilterer) ParseCollateralAdjusted(log types.Log) (*CollaternalCollateralAdjusted, error) {
-	event := new(CollaternalCollateralAdjusted)
-	if err := _Collaternal.contract.UnpackLog(event, "CollateralAdjusted", log); err != nil {
+func (_EcpCollaternal *EcpCollaternalFilterer) ParseCollateralAdjusted(log types.Log) (*EcpCollaternalCollateralAdjusted, error) {
+	event := new(EcpCollaternalCollateralAdjusted)
+	if err := _EcpCollaternal.contract.UnpackLog(event, "CollateralAdjusted", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
 	return event, nil
 }
 
-// CollaternalCollateralLockedIterator is returned from FilterCollateralLocked and is used to iterate over the raw logs and unpacked data for CollateralLocked events raised by the Collaternal contract.
-type CollaternalCollateralLockedIterator struct {
-	Event *CollaternalCollateralLocked // Event containing the contract specifics and raw log
+// EcpCollaternalCollateralLockedIterator is returned from FilterCollateralLocked and is used to iterate over the raw logs and unpacked data for CollateralLocked events raised by the EcpCollaternal contract.
+type EcpCollaternalCollateralLockedIterator struct {
+	Event *EcpCollaternalCollateralLocked // Event containing the contract specifics and raw log
 
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
@@ -1146,7 +1251,7 @@ type CollaternalCollateralLockedIterator struct {
 // Next advances the iterator to the subsequent event, returning whether there
 // are any more events found. In case of a retrieval or parsing error, false is
 // returned and Error() can be queried for the exact failure.
-func (it *CollaternalCollateralLockedIterator) Next() bool {
+func (it *EcpCollaternalCollateralLockedIterator) Next() bool {
 	// If the iterator failed, stop iterating
 	if it.fail != nil {
 		return false
@@ -1155,7 +1260,7 @@ func (it *CollaternalCollateralLockedIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(CollaternalCollateralLocked)
+			it.Event = new(EcpCollaternalCollateralLocked)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -1170,7 +1275,7 @@ func (it *CollaternalCollateralLockedIterator) Next() bool {
 	// Iterator still in progress, wait for either a data or an error event
 	select {
 	case log := <-it.logs:
-		it.Event = new(CollaternalCollateralLocked)
+		it.Event = new(EcpCollaternalCollateralLocked)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -1186,53 +1291,53 @@ func (it *CollaternalCollateralLockedIterator) Next() bool {
 }
 
 // Error returns any retrieval or parsing error occurred during filtering.
-func (it *CollaternalCollateralLockedIterator) Error() error {
+func (it *EcpCollaternalCollateralLockedIterator) Error() error {
 	return it.fail
 }
 
 // Close terminates the iteration process, releasing any pending underlying
 // resources.
-func (it *CollaternalCollateralLockedIterator) Close() error {
+func (it *EcpCollaternalCollateralLockedIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-// CollaternalCollateralLocked represents a CollateralLocked event raised by the Collaternal contract.
-type CollaternalCollateralLocked struct {
-	Cp                  common.Address
-	CollateralAmount    *big.Int
-	TaskContractAddress common.Address
-	Raw                 types.Log // Blockchain specific contextual infos
+// EcpCollaternalCollateralLocked represents a CollateralLocked event raised by the EcpCollaternal contract.
+type EcpCollaternalCollateralLocked struct {
+	Cp               common.Address
+	CollateralAmount *big.Int
+	TaskID           *big.Int
+	Raw              types.Log // Blockchain specific contextual infos
 }
 
-// FilterCollateralLocked is a free log retrieval operation binding the contract event 0x56b60085244fe1afa467f92231debadc8bcb6127e9dbf35dbb58ca8406a423fe.
+// FilterCollateralLocked is a free log retrieval operation binding the contract event 0xaff82f4178df227ea409be11c927e414a908fb01481236913cec80ea866b2468.
 //
-// Solidity: event CollateralLocked(address indexed cp, uint256 collateralAmount, address taskContractAddress)
-func (_Collaternal *CollaternalFilterer) FilterCollateralLocked(opts *bind.FilterOpts, cp []common.Address) (*CollaternalCollateralLockedIterator, error) {
+// Solidity: event CollateralLocked(address indexed cp, uint256 collateralAmount, uint256 taskID)
+func (_EcpCollaternal *EcpCollaternalFilterer) FilterCollateralLocked(opts *bind.FilterOpts, cp []common.Address) (*EcpCollaternalCollateralLockedIterator, error) {
 
 	var cpRule []interface{}
 	for _, cpItem := range cp {
 		cpRule = append(cpRule, cpItem)
 	}
 
-	logs, sub, err := _Collaternal.contract.FilterLogs(opts, "CollateralLocked", cpRule)
+	logs, sub, err := _EcpCollaternal.contract.FilterLogs(opts, "CollateralLocked", cpRule)
 	if err != nil {
 		return nil, err
 	}
-	return &CollaternalCollateralLockedIterator{contract: _Collaternal.contract, event: "CollateralLocked", logs: logs, sub: sub}, nil
+	return &EcpCollaternalCollateralLockedIterator{contract: _EcpCollaternal.contract, event: "CollateralLocked", logs: logs, sub: sub}, nil
 }
 
-// WatchCollateralLocked is a free log subscription operation binding the contract event 0x56b60085244fe1afa467f92231debadc8bcb6127e9dbf35dbb58ca8406a423fe.
+// WatchCollateralLocked is a free log subscription operation binding the contract event 0xaff82f4178df227ea409be11c927e414a908fb01481236913cec80ea866b2468.
 //
-// Solidity: event CollateralLocked(address indexed cp, uint256 collateralAmount, address taskContractAddress)
-func (_Collaternal *CollaternalFilterer) WatchCollateralLocked(opts *bind.WatchOpts, sink chan<- *CollaternalCollateralLocked, cp []common.Address) (event.Subscription, error) {
+// Solidity: event CollateralLocked(address indexed cp, uint256 collateralAmount, uint256 taskID)
+func (_EcpCollaternal *EcpCollaternalFilterer) WatchCollateralLocked(opts *bind.WatchOpts, sink chan<- *EcpCollaternalCollateralLocked, cp []common.Address) (event.Subscription, error) {
 
 	var cpRule []interface{}
 	for _, cpItem := range cp {
 		cpRule = append(cpRule, cpItem)
 	}
 
-	logs, sub, err := _Collaternal.contract.WatchLogs(opts, "CollateralLocked", cpRule)
+	logs, sub, err := _EcpCollaternal.contract.WatchLogs(opts, "CollateralLocked", cpRule)
 	if err != nil {
 		return nil, err
 	}
@@ -1242,8 +1347,8 @@ func (_Collaternal *CollaternalFilterer) WatchCollateralLocked(opts *bind.WatchO
 			select {
 			case log := <-logs:
 				// New log arrived, parse the event and forward to the user
-				event := new(CollaternalCollateralLocked)
-				if err := _Collaternal.contract.UnpackLog(event, "CollateralLocked", log); err != nil {
+				event := new(EcpCollaternalCollateralLocked)
+				if err := _EcpCollaternal.contract.UnpackLog(event, "CollateralLocked", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -1264,21 +1369,21 @@ func (_Collaternal *CollaternalFilterer) WatchCollateralLocked(opts *bind.WatchO
 	}), nil
 }
 
-// ParseCollateralLocked is a log parse operation binding the contract event 0x56b60085244fe1afa467f92231debadc8bcb6127e9dbf35dbb58ca8406a423fe.
+// ParseCollateralLocked is a log parse operation binding the contract event 0xaff82f4178df227ea409be11c927e414a908fb01481236913cec80ea866b2468.
 //
-// Solidity: event CollateralLocked(address indexed cp, uint256 collateralAmount, address taskContractAddress)
-func (_Collaternal *CollaternalFilterer) ParseCollateralLocked(log types.Log) (*CollaternalCollateralLocked, error) {
-	event := new(CollaternalCollateralLocked)
-	if err := _Collaternal.contract.UnpackLog(event, "CollateralLocked", log); err != nil {
+// Solidity: event CollateralLocked(address indexed cp, uint256 collateralAmount, uint256 taskID)
+func (_EcpCollaternal *EcpCollaternalFilterer) ParseCollateralLocked(log types.Log) (*EcpCollaternalCollateralLocked, error) {
+	event := new(EcpCollaternalCollateralLocked)
+	if err := _EcpCollaternal.contract.UnpackLog(event, "CollateralLocked", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
 	return event, nil
 }
 
-// CollaternalCollateralSlashedIterator is returned from FilterCollateralSlashed and is used to iterate over the raw logs and unpacked data for CollateralSlashed events raised by the Collaternal contract.
-type CollaternalCollateralSlashedIterator struct {
-	Event *CollaternalCollateralSlashed // Event containing the contract specifics and raw log
+// EcpCollaternalCollateralSlashedIterator is returned from FilterCollateralSlashed and is used to iterate over the raw logs and unpacked data for CollateralSlashed events raised by the EcpCollaternal contract.
+type EcpCollaternalCollateralSlashedIterator struct {
+	Event *EcpCollaternalCollateralSlashed // Event containing the contract specifics and raw log
 
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
@@ -1292,7 +1397,7 @@ type CollaternalCollateralSlashedIterator struct {
 // Next advances the iterator to the subsequent event, returning whether there
 // are any more events found. In case of a retrieval or parsing error, false is
 // returned and Error() can be queried for the exact failure.
-func (it *CollaternalCollateralSlashedIterator) Next() bool {
+func (it *EcpCollaternalCollateralSlashedIterator) Next() bool {
 	// If the iterator failed, stop iterating
 	if it.fail != nil {
 		return false
@@ -1301,7 +1406,7 @@ func (it *CollaternalCollateralSlashedIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(CollaternalCollateralSlashed)
+			it.Event = new(EcpCollaternalCollateralSlashed)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -1316,7 +1421,7 @@ func (it *CollaternalCollateralSlashedIterator) Next() bool {
 	// Iterator still in progress, wait for either a data or an error event
 	select {
 	case log := <-it.logs:
-		it.Event = new(CollaternalCollateralSlashed)
+		it.Event = new(EcpCollaternalCollateralSlashed)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -1332,53 +1437,53 @@ func (it *CollaternalCollateralSlashedIterator) Next() bool {
 }
 
 // Error returns any retrieval or parsing error occurred during filtering.
-func (it *CollaternalCollateralSlashedIterator) Error() error {
+func (it *EcpCollaternalCollateralSlashedIterator) Error() error {
 	return it.fail
 }
 
 // Close terminates the iteration process, releasing any pending underlying
 // resources.
-func (it *CollaternalCollateralSlashedIterator) Close() error {
+func (it *EcpCollaternalCollateralSlashedIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-// CollaternalCollateralSlashed represents a CollateralSlashed event raised by the Collaternal contract.
-type CollaternalCollateralSlashed struct {
-	Cp                  common.Address
-	Amount              *big.Int
-	TaskContractAddress common.Address
-	Raw                 types.Log // Blockchain specific contextual infos
+// EcpCollaternalCollateralSlashed represents a CollateralSlashed event raised by the EcpCollaternal contract.
+type EcpCollaternalCollateralSlashed struct {
+	Cp     common.Address
+	Amount *big.Int
+	TaskID *big.Int
+	Raw    types.Log // Blockchain specific contextual infos
 }
 
-// FilterCollateralSlashed is a free log retrieval operation binding the contract event 0x0f51f32e6325a6b213a7e9459df2a4564f058d9dca8309ff9b2508f6a83cf593.
+// FilterCollateralSlashed is a free log retrieval operation binding the contract event 0xe23e4a65e8f09c2d92bbdfbe613a6007e35677ac2afed7f4eb690b5b93460bd9.
 //
-// Solidity: event CollateralSlashed(address indexed cp, uint256 amount, address taskContractAddress)
-func (_Collaternal *CollaternalFilterer) FilterCollateralSlashed(opts *bind.FilterOpts, cp []common.Address) (*CollaternalCollateralSlashedIterator, error) {
+// Solidity: event CollateralSlashed(address indexed cp, uint256 amount, uint256 taskID)
+func (_EcpCollaternal *EcpCollaternalFilterer) FilterCollateralSlashed(opts *bind.FilterOpts, cp []common.Address) (*EcpCollaternalCollateralSlashedIterator, error) {
 
 	var cpRule []interface{}
 	for _, cpItem := range cp {
 		cpRule = append(cpRule, cpItem)
 	}
 
-	logs, sub, err := _Collaternal.contract.FilterLogs(opts, "CollateralSlashed", cpRule)
+	logs, sub, err := _EcpCollaternal.contract.FilterLogs(opts, "CollateralSlashed", cpRule)
 	if err != nil {
 		return nil, err
 	}
-	return &CollaternalCollateralSlashedIterator{contract: _Collaternal.contract, event: "CollateralSlashed", logs: logs, sub: sub}, nil
+	return &EcpCollaternalCollateralSlashedIterator{contract: _EcpCollaternal.contract, event: "CollateralSlashed", logs: logs, sub: sub}, nil
 }
 
-// WatchCollateralSlashed is a free log subscription operation binding the contract event 0x0f51f32e6325a6b213a7e9459df2a4564f058d9dca8309ff9b2508f6a83cf593.
+// WatchCollateralSlashed is a free log subscription operation binding the contract event 0xe23e4a65e8f09c2d92bbdfbe613a6007e35677ac2afed7f4eb690b5b93460bd9.
 //
-// Solidity: event CollateralSlashed(address indexed cp, uint256 amount, address taskContractAddress)
-func (_Collaternal *CollaternalFilterer) WatchCollateralSlashed(opts *bind.WatchOpts, sink chan<- *CollaternalCollateralSlashed, cp []common.Address) (event.Subscription, error) {
+// Solidity: event CollateralSlashed(address indexed cp, uint256 amount, uint256 taskID)
+func (_EcpCollaternal *EcpCollaternalFilterer) WatchCollateralSlashed(opts *bind.WatchOpts, sink chan<- *EcpCollaternalCollateralSlashed, cp []common.Address) (event.Subscription, error) {
 
 	var cpRule []interface{}
 	for _, cpItem := range cp {
 		cpRule = append(cpRule, cpItem)
 	}
 
-	logs, sub, err := _Collaternal.contract.WatchLogs(opts, "CollateralSlashed", cpRule)
+	logs, sub, err := _EcpCollaternal.contract.WatchLogs(opts, "CollateralSlashed", cpRule)
 	if err != nil {
 		return nil, err
 	}
@@ -1388,8 +1493,8 @@ func (_Collaternal *CollaternalFilterer) WatchCollateralSlashed(opts *bind.Watch
 			select {
 			case log := <-logs:
 				// New log arrived, parse the event and forward to the user
-				event := new(CollaternalCollateralSlashed)
-				if err := _Collaternal.contract.UnpackLog(event, "CollateralSlashed", log); err != nil {
+				event := new(EcpCollaternalCollateralSlashed)
+				if err := _EcpCollaternal.contract.UnpackLog(event, "CollateralSlashed", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -1410,21 +1515,21 @@ func (_Collaternal *CollaternalFilterer) WatchCollateralSlashed(opts *bind.Watch
 	}), nil
 }
 
-// ParseCollateralSlashed is a log parse operation binding the contract event 0x0f51f32e6325a6b213a7e9459df2a4564f058d9dca8309ff9b2508f6a83cf593.
+// ParseCollateralSlashed is a log parse operation binding the contract event 0xe23e4a65e8f09c2d92bbdfbe613a6007e35677ac2afed7f4eb690b5b93460bd9.
 //
-// Solidity: event CollateralSlashed(address indexed cp, uint256 amount, address taskContractAddress)
-func (_Collaternal *CollaternalFilterer) ParseCollateralSlashed(log types.Log) (*CollaternalCollateralSlashed, error) {
-	event := new(CollaternalCollateralSlashed)
-	if err := _Collaternal.contract.UnpackLog(event, "CollateralSlashed", log); err != nil {
+// Solidity: event CollateralSlashed(address indexed cp, uint256 amount, uint256 taskID)
+func (_EcpCollaternal *EcpCollaternalFilterer) ParseCollateralSlashed(log types.Log) (*EcpCollaternalCollateralSlashed, error) {
+	event := new(EcpCollaternalCollateralSlashed)
+	if err := _EcpCollaternal.contract.UnpackLog(event, "CollateralSlashed", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
 	return event, nil
 }
 
-// CollaternalCollateralUnlockedIterator is returned from FilterCollateralUnlocked and is used to iterate over the raw logs and unpacked data for CollateralUnlocked events raised by the Collaternal contract.
-type CollaternalCollateralUnlockedIterator struct {
-	Event *CollaternalCollateralUnlocked // Event containing the contract specifics and raw log
+// EcpCollaternalCollateralUnlockedIterator is returned from FilterCollateralUnlocked and is used to iterate over the raw logs and unpacked data for CollateralUnlocked events raised by the EcpCollaternal contract.
+type EcpCollaternalCollateralUnlockedIterator struct {
+	Event *EcpCollaternalCollateralUnlocked // Event containing the contract specifics and raw log
 
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
@@ -1438,7 +1543,7 @@ type CollaternalCollateralUnlockedIterator struct {
 // Next advances the iterator to the subsequent event, returning whether there
 // are any more events found. In case of a retrieval or parsing error, false is
 // returned and Error() can be queried for the exact failure.
-func (it *CollaternalCollateralUnlockedIterator) Next() bool {
+func (it *EcpCollaternalCollateralUnlockedIterator) Next() bool {
 	// If the iterator failed, stop iterating
 	if it.fail != nil {
 		return false
@@ -1447,7 +1552,7 @@ func (it *CollaternalCollateralUnlockedIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(CollaternalCollateralUnlocked)
+			it.Event = new(EcpCollaternalCollateralUnlocked)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -1462,7 +1567,7 @@ func (it *CollaternalCollateralUnlockedIterator) Next() bool {
 	// Iterator still in progress, wait for either a data or an error event
 	select {
 	case log := <-it.logs:
-		it.Event = new(CollaternalCollateralUnlocked)
+		it.Event = new(EcpCollaternalCollateralUnlocked)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -1478,53 +1583,53 @@ func (it *CollaternalCollateralUnlockedIterator) Next() bool {
 }
 
 // Error returns any retrieval or parsing error occurred during filtering.
-func (it *CollaternalCollateralUnlockedIterator) Error() error {
+func (it *EcpCollaternalCollateralUnlockedIterator) Error() error {
 	return it.fail
 }
 
 // Close terminates the iteration process, releasing any pending underlying
 // resources.
-func (it *CollaternalCollateralUnlockedIterator) Close() error {
+func (it *EcpCollaternalCollateralUnlockedIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-// CollaternalCollateralUnlocked represents a CollateralUnlocked event raised by the Collaternal contract.
-type CollaternalCollateralUnlocked struct {
-	Cp                  common.Address
-	CollateralAmount    *big.Int
-	TaskContractAddress common.Address
-	Raw                 types.Log // Blockchain specific contextual infos
+// EcpCollaternalCollateralUnlocked represents a CollateralUnlocked event raised by the EcpCollaternal contract.
+type EcpCollaternalCollateralUnlocked struct {
+	Cp               common.Address
+	CollateralAmount *big.Int
+	TaskID           *big.Int
+	Raw              types.Log // Blockchain specific contextual infos
 }
 
-// FilterCollateralUnlocked is a free log retrieval operation binding the contract event 0x817d69f45cb0984f7141c288a3bea0d2dd7bc075758f311056d0aa31798614fa.
+// FilterCollateralUnlocked is a free log retrieval operation binding the contract event 0xe8e7440c7efbb5d2d20a061fde9c0fa35db9764f5da8475a0090ea4f23466c84.
 //
-// Solidity: event CollateralUnlocked(address indexed cp, uint256 collateralAmount, address taskContractAddress)
-func (_Collaternal *CollaternalFilterer) FilterCollateralUnlocked(opts *bind.FilterOpts, cp []common.Address) (*CollaternalCollateralUnlockedIterator, error) {
+// Solidity: event CollateralUnlocked(address indexed cp, uint256 collateralAmount, uint256 taskID)
+func (_EcpCollaternal *EcpCollaternalFilterer) FilterCollateralUnlocked(opts *bind.FilterOpts, cp []common.Address) (*EcpCollaternalCollateralUnlockedIterator, error) {
 
 	var cpRule []interface{}
 	for _, cpItem := range cp {
 		cpRule = append(cpRule, cpItem)
 	}
 
-	logs, sub, err := _Collaternal.contract.FilterLogs(opts, "CollateralUnlocked", cpRule)
+	logs, sub, err := _EcpCollaternal.contract.FilterLogs(opts, "CollateralUnlocked", cpRule)
 	if err != nil {
 		return nil, err
 	}
-	return &CollaternalCollateralUnlockedIterator{contract: _Collaternal.contract, event: "CollateralUnlocked", logs: logs, sub: sub}, nil
+	return &EcpCollaternalCollateralUnlockedIterator{contract: _EcpCollaternal.contract, event: "CollateralUnlocked", logs: logs, sub: sub}, nil
 }
 
-// WatchCollateralUnlocked is a free log subscription operation binding the contract event 0x817d69f45cb0984f7141c288a3bea0d2dd7bc075758f311056d0aa31798614fa.
+// WatchCollateralUnlocked is a free log subscription operation binding the contract event 0xe8e7440c7efbb5d2d20a061fde9c0fa35db9764f5da8475a0090ea4f23466c84.
 //
-// Solidity: event CollateralUnlocked(address indexed cp, uint256 collateralAmount, address taskContractAddress)
-func (_Collaternal *CollaternalFilterer) WatchCollateralUnlocked(opts *bind.WatchOpts, sink chan<- *CollaternalCollateralUnlocked, cp []common.Address) (event.Subscription, error) {
+// Solidity: event CollateralUnlocked(address indexed cp, uint256 collateralAmount, uint256 taskID)
+func (_EcpCollaternal *EcpCollaternalFilterer) WatchCollateralUnlocked(opts *bind.WatchOpts, sink chan<- *EcpCollaternalCollateralUnlocked, cp []common.Address) (event.Subscription, error) {
 
 	var cpRule []interface{}
 	for _, cpItem := range cp {
 		cpRule = append(cpRule, cpItem)
 	}
 
-	logs, sub, err := _Collaternal.contract.WatchLogs(opts, "CollateralUnlocked", cpRule)
+	logs, sub, err := _EcpCollaternal.contract.WatchLogs(opts, "CollateralUnlocked", cpRule)
 	if err != nil {
 		return nil, err
 	}
@@ -1534,8 +1639,8 @@ func (_Collaternal *CollaternalFilterer) WatchCollateralUnlocked(opts *bind.Watc
 			select {
 			case log := <-logs:
 				// New log arrived, parse the event and forward to the user
-				event := new(CollaternalCollateralUnlocked)
-				if err := _Collaternal.contract.UnpackLog(event, "CollateralUnlocked", log); err != nil {
+				event := new(EcpCollaternalCollateralUnlocked)
+				if err := _EcpCollaternal.contract.UnpackLog(event, "CollateralUnlocked", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -1556,21 +1661,21 @@ func (_Collaternal *CollaternalFilterer) WatchCollateralUnlocked(opts *bind.Watc
 	}), nil
 }
 
-// ParseCollateralUnlocked is a log parse operation binding the contract event 0x817d69f45cb0984f7141c288a3bea0d2dd7bc075758f311056d0aa31798614fa.
+// ParseCollateralUnlocked is a log parse operation binding the contract event 0xe8e7440c7efbb5d2d20a061fde9c0fa35db9764f5da8475a0090ea4f23466c84.
 //
-// Solidity: event CollateralUnlocked(address indexed cp, uint256 collateralAmount, address taskContractAddress)
-func (_Collaternal *CollaternalFilterer) ParseCollateralUnlocked(log types.Log) (*CollaternalCollateralUnlocked, error) {
-	event := new(CollaternalCollateralUnlocked)
-	if err := _Collaternal.contract.UnpackLog(event, "CollateralUnlocked", log); err != nil {
+// Solidity: event CollateralUnlocked(address indexed cp, uint256 collateralAmount, uint256 taskID)
+func (_EcpCollaternal *EcpCollaternalFilterer) ParseCollateralUnlocked(log types.Log) (*EcpCollaternalCollateralUnlocked, error) {
+	event := new(EcpCollaternalCollateralUnlocked)
+	if err := _EcpCollaternal.contract.UnpackLog(event, "CollateralUnlocked", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
 	return event, nil
 }
 
-// CollaternalDepositIterator is returned from FilterDeposit and is used to iterate over the raw logs and unpacked data for Deposit events raised by the Collaternal contract.
-type CollaternalDepositIterator struct {
-	Event *CollaternalDeposit // Event containing the contract specifics and raw log
+// EcpCollaternalDepositIterator is returned from FilterDeposit and is used to iterate over the raw logs and unpacked data for Deposit events raised by the EcpCollaternal contract.
+type EcpCollaternalDepositIterator struct {
+	Event *EcpCollaternalDeposit // Event containing the contract specifics and raw log
 
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
@@ -1584,7 +1689,7 @@ type CollaternalDepositIterator struct {
 // Next advances the iterator to the subsequent event, returning whether there
 // are any more events found. In case of a retrieval or parsing error, false is
 // returned and Error() can be queried for the exact failure.
-func (it *CollaternalDepositIterator) Next() bool {
+func (it *EcpCollaternalDepositIterator) Next() bool {
 	// If the iterator failed, stop iterating
 	if it.fail != nil {
 		return false
@@ -1593,7 +1698,7 @@ func (it *CollaternalDepositIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(CollaternalDeposit)
+			it.Event = new(EcpCollaternalDeposit)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -1608,7 +1713,7 @@ func (it *CollaternalDepositIterator) Next() bool {
 	// Iterator still in progress, wait for either a data or an error event
 	select {
 	case log := <-it.logs:
-		it.Event = new(CollaternalDeposit)
+		it.Event = new(EcpCollaternalDeposit)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -1624,19 +1729,19 @@ func (it *CollaternalDepositIterator) Next() bool {
 }
 
 // Error returns any retrieval or parsing error occurred during filtering.
-func (it *CollaternalDepositIterator) Error() error {
+func (it *EcpCollaternalDepositIterator) Error() error {
 	return it.fail
 }
 
 // Close terminates the iteration process, releasing any pending underlying
 // resources.
-func (it *CollaternalDepositIterator) Close() error {
+func (it *EcpCollaternalDepositIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-// CollaternalDeposit represents a Deposit event raised by the Collaternal contract.
-type CollaternalDeposit struct {
+// EcpCollaternalDeposit represents a Deposit event raised by the EcpCollaternal contract.
+type EcpCollaternalDeposit struct {
 	FundingWallet common.Address
 	CpAccount     common.Address
 	DepositAmount *big.Int
@@ -1646,7 +1751,7 @@ type CollaternalDeposit struct {
 // FilterDeposit is a free log retrieval operation binding the contract event 0x5548c837ab068cf56a2c2479df0882a4922fd203edb7517321831d95078c5f62.
 //
 // Solidity: event Deposit(address indexed fundingWallet, address indexed cpAccount, uint256 depositAmount)
-func (_Collaternal *CollaternalFilterer) FilterDeposit(opts *bind.FilterOpts, fundingWallet []common.Address, cpAccount []common.Address) (*CollaternalDepositIterator, error) {
+func (_EcpCollaternal *EcpCollaternalFilterer) FilterDeposit(opts *bind.FilterOpts, fundingWallet []common.Address, cpAccount []common.Address) (*EcpCollaternalDepositIterator, error) {
 
 	var fundingWalletRule []interface{}
 	for _, fundingWalletItem := range fundingWallet {
@@ -1657,17 +1762,17 @@ func (_Collaternal *CollaternalFilterer) FilterDeposit(opts *bind.FilterOpts, fu
 		cpAccountRule = append(cpAccountRule, cpAccountItem)
 	}
 
-	logs, sub, err := _Collaternal.contract.FilterLogs(opts, "Deposit", fundingWalletRule, cpAccountRule)
+	logs, sub, err := _EcpCollaternal.contract.FilterLogs(opts, "Deposit", fundingWalletRule, cpAccountRule)
 	if err != nil {
 		return nil, err
 	}
-	return &CollaternalDepositIterator{contract: _Collaternal.contract, event: "Deposit", logs: logs, sub: sub}, nil
+	return &EcpCollaternalDepositIterator{contract: _EcpCollaternal.contract, event: "Deposit", logs: logs, sub: sub}, nil
 }
 
 // WatchDeposit is a free log subscription operation binding the contract event 0x5548c837ab068cf56a2c2479df0882a4922fd203edb7517321831d95078c5f62.
 //
 // Solidity: event Deposit(address indexed fundingWallet, address indexed cpAccount, uint256 depositAmount)
-func (_Collaternal *CollaternalFilterer) WatchDeposit(opts *bind.WatchOpts, sink chan<- *CollaternalDeposit, fundingWallet []common.Address, cpAccount []common.Address) (event.Subscription, error) {
+func (_EcpCollaternal *EcpCollaternalFilterer) WatchDeposit(opts *bind.WatchOpts, sink chan<- *EcpCollaternalDeposit, fundingWallet []common.Address, cpAccount []common.Address) (event.Subscription, error) {
 
 	var fundingWalletRule []interface{}
 	for _, fundingWalletItem := range fundingWallet {
@@ -1678,7 +1783,7 @@ func (_Collaternal *CollaternalFilterer) WatchDeposit(opts *bind.WatchOpts, sink
 		cpAccountRule = append(cpAccountRule, cpAccountItem)
 	}
 
-	logs, sub, err := _Collaternal.contract.WatchLogs(opts, "Deposit", fundingWalletRule, cpAccountRule)
+	logs, sub, err := _EcpCollaternal.contract.WatchLogs(opts, "Deposit", fundingWalletRule, cpAccountRule)
 	if err != nil {
 		return nil, err
 	}
@@ -1688,8 +1793,8 @@ func (_Collaternal *CollaternalFilterer) WatchDeposit(opts *bind.WatchOpts, sink
 			select {
 			case log := <-logs:
 				// New log arrived, parse the event and forward to the user
-				event := new(CollaternalDeposit)
-				if err := _Collaternal.contract.UnpackLog(event, "Deposit", log); err != nil {
+				event := new(EcpCollaternalDeposit)
+				if err := _EcpCollaternal.contract.UnpackLog(event, "Deposit", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -1713,18 +1818,18 @@ func (_Collaternal *CollaternalFilterer) WatchDeposit(opts *bind.WatchOpts, sink
 // ParseDeposit is a log parse operation binding the contract event 0x5548c837ab068cf56a2c2479df0882a4922fd203edb7517321831d95078c5f62.
 //
 // Solidity: event Deposit(address indexed fundingWallet, address indexed cpAccount, uint256 depositAmount)
-func (_Collaternal *CollaternalFilterer) ParseDeposit(log types.Log) (*CollaternalDeposit, error) {
-	event := new(CollaternalDeposit)
-	if err := _Collaternal.contract.UnpackLog(event, "Deposit", log); err != nil {
+func (_EcpCollaternal *EcpCollaternalFilterer) ParseDeposit(log types.Log) (*EcpCollaternalDeposit, error) {
+	event := new(EcpCollaternalDeposit)
+	if err := _EcpCollaternal.contract.UnpackLog(event, "Deposit", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
 	return event, nil
 }
 
-// CollaternalOwnershipTransferredIterator is returned from FilterOwnershipTransferred and is used to iterate over the raw logs and unpacked data for OwnershipTransferred events raised by the Collaternal contract.
-type CollaternalOwnershipTransferredIterator struct {
-	Event *CollaternalOwnershipTransferred // Event containing the contract specifics and raw log
+// EcpCollaternalDisputeProofIterator is returned from FilterDisputeProof and is used to iterate over the raw logs and unpacked data for DisputeProof events raised by the EcpCollaternal contract.
+type EcpCollaternalDisputeProofIterator struct {
+	Event *EcpCollaternalDisputeProof // Event containing the contract specifics and raw log
 
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
@@ -1738,7 +1843,7 @@ type CollaternalOwnershipTransferredIterator struct {
 // Next advances the iterator to the subsequent event, returning whether there
 // are any more events found. In case of a retrieval or parsing error, false is
 // returned and Error() can be queried for the exact failure.
-func (it *CollaternalOwnershipTransferredIterator) Next() bool {
+func (it *EcpCollaternalDisputeProofIterator) Next() bool {
 	// If the iterator failed, stop iterating
 	if it.fail != nil {
 		return false
@@ -1747,7 +1852,7 @@ func (it *CollaternalOwnershipTransferredIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(CollaternalOwnershipTransferred)
+			it.Event = new(EcpCollaternalDisputeProof)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -1762,7 +1867,7 @@ func (it *CollaternalOwnershipTransferredIterator) Next() bool {
 	// Iterator still in progress, wait for either a data or an error event
 	select {
 	case log := <-it.logs:
-		it.Event = new(CollaternalOwnershipTransferred)
+		it.Event = new(EcpCollaternalDisputeProof)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -1778,60 +1883,60 @@ func (it *CollaternalOwnershipTransferredIterator) Next() bool {
 }
 
 // Error returns any retrieval or parsing error occurred during filtering.
-func (it *CollaternalOwnershipTransferredIterator) Error() error {
+func (it *EcpCollaternalDisputeProofIterator) Error() error {
 	return it.fail
 }
 
 // Close terminates the iteration process, releasing any pending underlying
 // resources.
-func (it *CollaternalOwnershipTransferredIterator) Close() error {
+func (it *EcpCollaternalDisputeProofIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-// CollaternalOwnershipTransferred represents a OwnershipTransferred event raised by the Collaternal contract.
-type CollaternalOwnershipTransferred struct {
-	PreviousOwner common.Address
-	NewOwner      common.Address
-	Raw           types.Log // Blockchain specific contextual infos
+// EcpCollaternalDisputeProof represents a DisputeProof event raised by the EcpCollaternal contract.
+type EcpCollaternalDisputeProof struct {
+	Challenger          common.Address
+	TaskContractAddress common.Address
+	Raw                 types.Log // Blockchain specific contextual infos
 }
 
-// FilterOwnershipTransferred is a free log retrieval operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
+// FilterDisputeProof is a free log retrieval operation binding the contract event 0x1e61a07012c23d5019cb79991ed79d73a9fc17fb89182f5830f036bd544423f3.
 //
-// Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
-func (_Collaternal *CollaternalFilterer) FilterOwnershipTransferred(opts *bind.FilterOpts, previousOwner []common.Address, newOwner []common.Address) (*CollaternalOwnershipTransferredIterator, error) {
+// Solidity: event DisputeProof(address indexed challenger, address indexed taskContractAddress)
+func (_EcpCollaternal *EcpCollaternalFilterer) FilterDisputeProof(opts *bind.FilterOpts, challenger []common.Address, taskContractAddress []common.Address) (*EcpCollaternalDisputeProofIterator, error) {
 
-	var previousOwnerRule []interface{}
-	for _, previousOwnerItem := range previousOwner {
-		previousOwnerRule = append(previousOwnerRule, previousOwnerItem)
+	var challengerRule []interface{}
+	for _, challengerItem := range challenger {
+		challengerRule = append(challengerRule, challengerItem)
 	}
-	var newOwnerRule []interface{}
-	for _, newOwnerItem := range newOwner {
-		newOwnerRule = append(newOwnerRule, newOwnerItem)
+	var taskContractAddressRule []interface{}
+	for _, taskContractAddressItem := range taskContractAddress {
+		taskContractAddressRule = append(taskContractAddressRule, taskContractAddressItem)
 	}
 
-	logs, sub, err := _Collaternal.contract.FilterLogs(opts, "OwnershipTransferred", previousOwnerRule, newOwnerRule)
+	logs, sub, err := _EcpCollaternal.contract.FilterLogs(opts, "DisputeProof", challengerRule, taskContractAddressRule)
 	if err != nil {
 		return nil, err
 	}
-	return &CollaternalOwnershipTransferredIterator{contract: _Collaternal.contract, event: "OwnershipTransferred", logs: logs, sub: sub}, nil
+	return &EcpCollaternalDisputeProofIterator{contract: _EcpCollaternal.contract, event: "DisputeProof", logs: logs, sub: sub}, nil
 }
 
-// WatchOwnershipTransferred is a free log subscription operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
+// WatchDisputeProof is a free log subscription operation binding the contract event 0x1e61a07012c23d5019cb79991ed79d73a9fc17fb89182f5830f036bd544423f3.
 //
-// Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
-func (_Collaternal *CollaternalFilterer) WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *CollaternalOwnershipTransferred, previousOwner []common.Address, newOwner []common.Address) (event.Subscription, error) {
+// Solidity: event DisputeProof(address indexed challenger, address indexed taskContractAddress)
+func (_EcpCollaternal *EcpCollaternalFilterer) WatchDisputeProof(opts *bind.WatchOpts, sink chan<- *EcpCollaternalDisputeProof, challenger []common.Address, taskContractAddress []common.Address) (event.Subscription, error) {
 
-	var previousOwnerRule []interface{}
-	for _, previousOwnerItem := range previousOwner {
-		previousOwnerRule = append(previousOwnerRule, previousOwnerItem)
+	var challengerRule []interface{}
+	for _, challengerItem := range challenger {
+		challengerRule = append(challengerRule, challengerItem)
 	}
-	var newOwnerRule []interface{}
-	for _, newOwnerItem := range newOwner {
-		newOwnerRule = append(newOwnerRule, newOwnerItem)
+	var taskContractAddressRule []interface{}
+	for _, taskContractAddressItem := range taskContractAddress {
+		taskContractAddressRule = append(taskContractAddressRule, taskContractAddressItem)
 	}
 
-	logs, sub, err := _Collaternal.contract.WatchLogs(opts, "OwnershipTransferred", previousOwnerRule, newOwnerRule)
+	logs, sub, err := _EcpCollaternal.contract.WatchLogs(opts, "DisputeProof", challengerRule, taskContractAddressRule)
 	if err != nil {
 		return nil, err
 	}
@@ -1841,8 +1946,161 @@ func (_Collaternal *CollaternalFilterer) WatchOwnershipTransferred(opts *bind.Wa
 			select {
 			case log := <-logs:
 				// New log arrived, parse the event and forward to the user
-				event := new(CollaternalOwnershipTransferred)
-				if err := _Collaternal.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
+				event := new(EcpCollaternalDisputeProof)
+				if err := _EcpCollaternal.contract.UnpackLog(event, "DisputeProof", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ParseDisputeProof is a log parse operation binding the contract event 0x1e61a07012c23d5019cb79991ed79d73a9fc17fb89182f5830f036bd544423f3.
+//
+// Solidity: event DisputeProof(address indexed challenger, address indexed taskContractAddress)
+func (_EcpCollaternal *EcpCollaternalFilterer) ParseDisputeProof(log types.Log) (*EcpCollaternalDisputeProof, error) {
+	event := new(EcpCollaternalDisputeProof)
+	if err := _EcpCollaternal.contract.UnpackLog(event, "DisputeProof", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+// EcpCollaternalOwnershipTransferredIterator is returned from FilterOwnershipTransferred and is used to iterate over the raw logs and unpacked data for OwnershipTransferred events raised by the EcpCollaternal contract.
+type EcpCollaternalOwnershipTransferredIterator struct {
+	Event *EcpCollaternalOwnershipTransferred // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *EcpCollaternalOwnershipTransferredIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(EcpCollaternalOwnershipTransferred)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(EcpCollaternalOwnershipTransferred)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *EcpCollaternalOwnershipTransferredIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *EcpCollaternalOwnershipTransferredIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// EcpCollaternalOwnershipTransferred represents a OwnershipTransferred event raised by the EcpCollaternal contract.
+type EcpCollaternalOwnershipTransferred struct {
+	PreviousOwner common.Address
+	NewOwner      common.Address
+	Raw           types.Log // Blockchain specific contextual infos
+}
+
+// FilterOwnershipTransferred is a free log retrieval operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
+//
+// Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
+func (_EcpCollaternal *EcpCollaternalFilterer) FilterOwnershipTransferred(opts *bind.FilterOpts, previousOwner []common.Address, newOwner []common.Address) (*EcpCollaternalOwnershipTransferredIterator, error) {
+
+	var previousOwnerRule []interface{}
+	for _, previousOwnerItem := range previousOwner {
+		previousOwnerRule = append(previousOwnerRule, previousOwnerItem)
+	}
+	var newOwnerRule []interface{}
+	for _, newOwnerItem := range newOwner {
+		newOwnerRule = append(newOwnerRule, newOwnerItem)
+	}
+
+	logs, sub, err := _EcpCollaternal.contract.FilterLogs(opts, "OwnershipTransferred", previousOwnerRule, newOwnerRule)
+	if err != nil {
+		return nil, err
+	}
+	return &EcpCollaternalOwnershipTransferredIterator{contract: _EcpCollaternal.contract, event: "OwnershipTransferred", logs: logs, sub: sub}, nil
+}
+
+// WatchOwnershipTransferred is a free log subscription operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
+//
+// Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
+func (_EcpCollaternal *EcpCollaternalFilterer) WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *EcpCollaternalOwnershipTransferred, previousOwner []common.Address, newOwner []common.Address) (event.Subscription, error) {
+
+	var previousOwnerRule []interface{}
+	for _, previousOwnerItem := range previousOwner {
+		previousOwnerRule = append(previousOwnerRule, previousOwnerItem)
+	}
+	var newOwnerRule []interface{}
+	for _, newOwnerItem := range newOwner {
+		newOwnerRule = append(newOwnerRule, newOwnerItem)
+	}
+
+	logs, sub, err := _EcpCollaternal.contract.WatchLogs(opts, "OwnershipTransferred", previousOwnerRule, newOwnerRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(EcpCollaternalOwnershipTransferred)
+				if err := _EcpCollaternal.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -1866,18 +2124,18 @@ func (_Collaternal *CollaternalFilterer) WatchOwnershipTransferred(opts *bind.Wa
 // ParseOwnershipTransferred is a log parse operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
 //
 // Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
-func (_Collaternal *CollaternalFilterer) ParseOwnershipTransferred(log types.Log) (*CollaternalOwnershipTransferred, error) {
-	event := new(CollaternalOwnershipTransferred)
-	if err := _Collaternal.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
+func (_EcpCollaternal *EcpCollaternalFilterer) ParseOwnershipTransferred(log types.Log) (*EcpCollaternalOwnershipTransferred, error) {
+	event := new(EcpCollaternalOwnershipTransferred)
+	if err := _EcpCollaternal.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
 	return event, nil
 }
 
-// CollaternalTaskCreatedIterator is returned from FilterTaskCreated and is used to iterate over the raw logs and unpacked data for TaskCreated events raised by the Collaternal contract.
-type CollaternalTaskCreatedIterator struct {
-	Event *CollaternalTaskCreated // Event containing the contract specifics and raw log
+// EcpCollaternalTaskCreatedIterator is returned from FilterTaskCreated and is used to iterate over the raw logs and unpacked data for TaskCreated events raised by the EcpCollaternal contract.
+type EcpCollaternalTaskCreatedIterator struct {
+	Event *EcpCollaternalTaskCreated // Event containing the contract specifics and raw log
 
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
@@ -1891,7 +2149,7 @@ type CollaternalTaskCreatedIterator struct {
 // Next advances the iterator to the subsequent event, returning whether there
 // are any more events found. In case of a retrieval or parsing error, false is
 // returned and Error() can be queried for the exact failure.
-func (it *CollaternalTaskCreatedIterator) Next() bool {
+func (it *EcpCollaternalTaskCreatedIterator) Next() bool {
 	// If the iterator failed, stop iterating
 	if it.fail != nil {
 		return false
@@ -1900,7 +2158,7 @@ func (it *CollaternalTaskCreatedIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(CollaternalTaskCreated)
+			it.Event = new(EcpCollaternalTaskCreated)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -1915,7 +2173,7 @@ func (it *CollaternalTaskCreatedIterator) Next() bool {
 	// Iterator still in progress, wait for either a data or an error event
 	select {
 	case log := <-it.logs:
-		it.Event = new(CollaternalTaskCreated)
+		it.Event = new(EcpCollaternalTaskCreated)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -1931,53 +2189,53 @@ func (it *CollaternalTaskCreatedIterator) Next() bool {
 }
 
 // Error returns any retrieval or parsing error occurred during filtering.
-func (it *CollaternalTaskCreatedIterator) Error() error {
+func (it *EcpCollaternalTaskCreatedIterator) Error() error {
 	return it.fail
 }
 
 // Close terminates the iteration process, releasing any pending underlying
 // resources.
-func (it *CollaternalTaskCreatedIterator) Close() error {
+func (it *EcpCollaternalTaskCreatedIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-// CollaternalTaskCreated represents a TaskCreated event raised by the Collaternal contract.
-type CollaternalTaskCreated struct {
-	TaskContractAddress common.Address
-	CpAccountAddress    common.Address
-	Collateral          *big.Int
-	Raw                 types.Log // Blockchain specific contextual infos
+// EcpCollaternalTaskCreated represents a TaskCreated event raised by the EcpCollaternal contract.
+type EcpCollaternalTaskCreated struct {
+	TaskID           *big.Int
+	CpAccountAddress common.Address
+	Collateral       *big.Int
+	Raw              types.Log // Blockchain specific contextual infos
 }
 
-// FilterTaskCreated is a free log retrieval operation binding the contract event 0x3f9b921f6bb5d577cdf49122202d27f7c50e3cc981c47543dc4a59c00dee5229.
+// FilterTaskCreated is a free log retrieval operation binding the contract event 0x6cf53aa7292e664152c2ea948c3b3c95d4b05c36daeb2626d0293473c4a4a153.
 //
-// Solidity: event TaskCreated(address indexed taskContractAddress, address cpAccountAddress, uint256 collateral)
-func (_Collaternal *CollaternalFilterer) FilterTaskCreated(opts *bind.FilterOpts, taskContractAddress []common.Address) (*CollaternalTaskCreatedIterator, error) {
+// Solidity: event TaskCreated(uint256 indexed taskID, address cpAccountAddress, uint256 collateral)
+func (_EcpCollaternal *EcpCollaternalFilterer) FilterTaskCreated(opts *bind.FilterOpts, taskID []*big.Int) (*EcpCollaternalTaskCreatedIterator, error) {
 
-	var taskContractAddressRule []interface{}
-	for _, taskContractAddressItem := range taskContractAddress {
-		taskContractAddressRule = append(taskContractAddressRule, taskContractAddressItem)
+	var taskIDRule []interface{}
+	for _, taskIDItem := range taskID {
+		taskIDRule = append(taskIDRule, taskIDItem)
 	}
 
-	logs, sub, err := _Collaternal.contract.FilterLogs(opts, "TaskCreated", taskContractAddressRule)
+	logs, sub, err := _EcpCollaternal.contract.FilterLogs(opts, "TaskCreated", taskIDRule)
 	if err != nil {
 		return nil, err
 	}
-	return &CollaternalTaskCreatedIterator{contract: _Collaternal.contract, event: "TaskCreated", logs: logs, sub: sub}, nil
+	return &EcpCollaternalTaskCreatedIterator{contract: _EcpCollaternal.contract, event: "TaskCreated", logs: logs, sub: sub}, nil
 }
 
-// WatchTaskCreated is a free log subscription operation binding the contract event 0x3f9b921f6bb5d577cdf49122202d27f7c50e3cc981c47543dc4a59c00dee5229.
+// WatchTaskCreated is a free log subscription operation binding the contract event 0x6cf53aa7292e664152c2ea948c3b3c95d4b05c36daeb2626d0293473c4a4a153.
 //
-// Solidity: event TaskCreated(address indexed taskContractAddress, address cpAccountAddress, uint256 collateral)
-func (_Collaternal *CollaternalFilterer) WatchTaskCreated(opts *bind.WatchOpts, sink chan<- *CollaternalTaskCreated, taskContractAddress []common.Address) (event.Subscription, error) {
+// Solidity: event TaskCreated(uint256 indexed taskID, address cpAccountAddress, uint256 collateral)
+func (_EcpCollaternal *EcpCollaternalFilterer) WatchTaskCreated(opts *bind.WatchOpts, sink chan<- *EcpCollaternalTaskCreated, taskID []*big.Int) (event.Subscription, error) {
 
-	var taskContractAddressRule []interface{}
-	for _, taskContractAddressItem := range taskContractAddress {
-		taskContractAddressRule = append(taskContractAddressRule, taskContractAddressItem)
+	var taskIDRule []interface{}
+	for _, taskIDItem := range taskID {
+		taskIDRule = append(taskIDRule, taskIDItem)
 	}
 
-	logs, sub, err := _Collaternal.contract.WatchLogs(opts, "TaskCreated", taskContractAddressRule)
+	logs, sub, err := _EcpCollaternal.contract.WatchLogs(opts, "TaskCreated", taskIDRule)
 	if err != nil {
 		return nil, err
 	}
@@ -1987,8 +2245,8 @@ func (_Collaternal *CollaternalFilterer) WatchTaskCreated(opts *bind.WatchOpts, 
 			select {
 			case log := <-logs:
 				// New log arrived, parse the event and forward to the user
-				event := new(CollaternalTaskCreated)
-				if err := _Collaternal.contract.UnpackLog(event, "TaskCreated", log); err != nil {
+				event := new(EcpCollaternalTaskCreated)
+				if err := _EcpCollaternal.contract.UnpackLog(event, "TaskCreated", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -2009,21 +2267,21 @@ func (_Collaternal *CollaternalFilterer) WatchTaskCreated(opts *bind.WatchOpts, 
 	}), nil
 }
 
-// ParseTaskCreated is a log parse operation binding the contract event 0x3f9b921f6bb5d577cdf49122202d27f7c50e3cc981c47543dc4a59c00dee5229.
+// ParseTaskCreated is a log parse operation binding the contract event 0x6cf53aa7292e664152c2ea948c3b3c95d4b05c36daeb2626d0293473c4a4a153.
 //
-// Solidity: event TaskCreated(address indexed taskContractAddress, address cpAccountAddress, uint256 collateral)
-func (_Collaternal *CollaternalFilterer) ParseTaskCreated(log types.Log) (*CollaternalTaskCreated, error) {
-	event := new(CollaternalTaskCreated)
-	if err := _Collaternal.contract.UnpackLog(event, "TaskCreated", log); err != nil {
+// Solidity: event TaskCreated(uint256 indexed taskID, address cpAccountAddress, uint256 collateral)
+func (_EcpCollaternal *EcpCollaternalFilterer) ParseTaskCreated(log types.Log) (*EcpCollaternalTaskCreated, error) {
+	event := new(EcpCollaternalTaskCreated)
+	if err := _EcpCollaternal.contract.UnpackLog(event, "TaskCreated", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
 	return event, nil
 }
 
-// CollaternalTaskStatusChangedIterator is returned from FilterTaskStatusChanged and is used to iterate over the raw logs and unpacked data for TaskStatusChanged events raised by the Collaternal contract.
-type CollaternalTaskStatusChangedIterator struct {
-	Event *CollaternalTaskStatusChanged // Event containing the contract specifics and raw log
+// EcpCollaternalTaskStatusChangedIterator is returned from FilterTaskStatusChanged and is used to iterate over the raw logs and unpacked data for TaskStatusChanged events raised by the EcpCollaternal contract.
+type EcpCollaternalTaskStatusChangedIterator struct {
+	Event *EcpCollaternalTaskStatusChanged // Event containing the contract specifics and raw log
 
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
@@ -2037,7 +2295,7 @@ type CollaternalTaskStatusChangedIterator struct {
 // Next advances the iterator to the subsequent event, returning whether there
 // are any more events found. In case of a retrieval or parsing error, false is
 // returned and Error() can be queried for the exact failure.
-func (it *CollaternalTaskStatusChangedIterator) Next() bool {
+func (it *EcpCollaternalTaskStatusChangedIterator) Next() bool {
 	// If the iterator failed, stop iterating
 	if it.fail != nil {
 		return false
@@ -2046,7 +2304,7 @@ func (it *CollaternalTaskStatusChangedIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(CollaternalTaskStatusChanged)
+			it.Event = new(EcpCollaternalTaskStatusChanged)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -2061,7 +2319,7 @@ func (it *CollaternalTaskStatusChangedIterator) Next() bool {
 	// Iterator still in progress, wait for either a data or an error event
 	select {
 	case log := <-it.logs:
-		it.Event = new(CollaternalTaskStatusChanged)
+		it.Event = new(EcpCollaternalTaskStatusChanged)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -2077,52 +2335,52 @@ func (it *CollaternalTaskStatusChangedIterator) Next() bool {
 }
 
 // Error returns any retrieval or parsing error occurred during filtering.
-func (it *CollaternalTaskStatusChangedIterator) Error() error {
+func (it *EcpCollaternalTaskStatusChangedIterator) Error() error {
 	return it.fail
 }
 
 // Close terminates the iteration process, releasing any pending underlying
 // resources.
-func (it *CollaternalTaskStatusChangedIterator) Close() error {
+func (it *EcpCollaternalTaskStatusChangedIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-// CollaternalTaskStatusChanged represents a TaskStatusChanged event raised by the Collaternal contract.
-type CollaternalTaskStatusChanged struct {
-	TaskContractAddress common.Address
-	NewStatus           *big.Int
-	Raw                 types.Log // Blockchain specific contextual infos
+// EcpCollaternalTaskStatusChanged represents a TaskStatusChanged event raised by the EcpCollaternal contract.
+type EcpCollaternalTaskStatusChanged struct {
+	TaskID    *big.Int
+	NewStatus *big.Int
+	Raw       types.Log // Blockchain specific contextual infos
 }
 
-// FilterTaskStatusChanged is a free log retrieval operation binding the contract event 0x43a64df649a51c960307a3b5a4ec25a67c76629f0881669a214d162ae4ad2b5f.
+// FilterTaskStatusChanged is a free log retrieval operation binding the contract event 0x857a475dc812e506ac81a9f3ffc00638593b96a880e2543da02a1a6b38f51f39.
 //
-// Solidity: event TaskStatusChanged(address indexed taskContractAddress, uint256 newStatus)
-func (_Collaternal *CollaternalFilterer) FilterTaskStatusChanged(opts *bind.FilterOpts, taskContractAddress []common.Address) (*CollaternalTaskStatusChangedIterator, error) {
+// Solidity: event TaskStatusChanged(uint256 indexed taskID, uint256 newStatus)
+func (_EcpCollaternal *EcpCollaternalFilterer) FilterTaskStatusChanged(opts *bind.FilterOpts, taskID []*big.Int) (*EcpCollaternalTaskStatusChangedIterator, error) {
 
-	var taskContractAddressRule []interface{}
-	for _, taskContractAddressItem := range taskContractAddress {
-		taskContractAddressRule = append(taskContractAddressRule, taskContractAddressItem)
+	var taskIDRule []interface{}
+	for _, taskIDItem := range taskID {
+		taskIDRule = append(taskIDRule, taskIDItem)
 	}
 
-	logs, sub, err := _Collaternal.contract.FilterLogs(opts, "TaskStatusChanged", taskContractAddressRule)
+	logs, sub, err := _EcpCollaternal.contract.FilterLogs(opts, "TaskStatusChanged", taskIDRule)
 	if err != nil {
 		return nil, err
 	}
-	return &CollaternalTaskStatusChangedIterator{contract: _Collaternal.contract, event: "TaskStatusChanged", logs: logs, sub: sub}, nil
+	return &EcpCollaternalTaskStatusChangedIterator{contract: _EcpCollaternal.contract, event: "TaskStatusChanged", logs: logs, sub: sub}, nil
 }
 
-// WatchTaskStatusChanged is a free log subscription operation binding the contract event 0x43a64df649a51c960307a3b5a4ec25a67c76629f0881669a214d162ae4ad2b5f.
+// WatchTaskStatusChanged is a free log subscription operation binding the contract event 0x857a475dc812e506ac81a9f3ffc00638593b96a880e2543da02a1a6b38f51f39.
 //
-// Solidity: event TaskStatusChanged(address indexed taskContractAddress, uint256 newStatus)
-func (_Collaternal *CollaternalFilterer) WatchTaskStatusChanged(opts *bind.WatchOpts, sink chan<- *CollaternalTaskStatusChanged, taskContractAddress []common.Address) (event.Subscription, error) {
+// Solidity: event TaskStatusChanged(uint256 indexed taskID, uint256 newStatus)
+func (_EcpCollaternal *EcpCollaternalFilterer) WatchTaskStatusChanged(opts *bind.WatchOpts, sink chan<- *EcpCollaternalTaskStatusChanged, taskID []*big.Int) (event.Subscription, error) {
 
-	var taskContractAddressRule []interface{}
-	for _, taskContractAddressItem := range taskContractAddress {
-		taskContractAddressRule = append(taskContractAddressRule, taskContractAddressItem)
+	var taskIDRule []interface{}
+	for _, taskIDItem := range taskID {
+		taskIDRule = append(taskIDRule, taskIDItem)
 	}
 
-	logs, sub, err := _Collaternal.contract.WatchLogs(opts, "TaskStatusChanged", taskContractAddressRule)
+	logs, sub, err := _EcpCollaternal.contract.WatchLogs(opts, "TaskStatusChanged", taskIDRule)
 	if err != nil {
 		return nil, err
 	}
@@ -2132,8 +2390,8 @@ func (_Collaternal *CollaternalFilterer) WatchTaskStatusChanged(opts *bind.Watch
 			select {
 			case log := <-logs:
 				// New log arrived, parse the event and forward to the user
-				event := new(CollaternalTaskStatusChanged)
-				if err := _Collaternal.contract.UnpackLog(event, "TaskStatusChanged", log); err != nil {
+				event := new(EcpCollaternalTaskStatusChanged)
+				if err := _EcpCollaternal.contract.UnpackLog(event, "TaskStatusChanged", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -2154,21 +2412,21 @@ func (_Collaternal *CollaternalFilterer) WatchTaskStatusChanged(opts *bind.Watch
 	}), nil
 }
 
-// ParseTaskStatusChanged is a log parse operation binding the contract event 0x43a64df649a51c960307a3b5a4ec25a67c76629f0881669a214d162ae4ad2b5f.
+// ParseTaskStatusChanged is a log parse operation binding the contract event 0x857a475dc812e506ac81a9f3ffc00638593b96a880e2543da02a1a6b38f51f39.
 //
-// Solidity: event TaskStatusChanged(address indexed taskContractAddress, uint256 newStatus)
-func (_Collaternal *CollaternalFilterer) ParseTaskStatusChanged(log types.Log) (*CollaternalTaskStatusChanged, error) {
-	event := new(CollaternalTaskStatusChanged)
-	if err := _Collaternal.contract.UnpackLog(event, "TaskStatusChanged", log); err != nil {
+// Solidity: event TaskStatusChanged(uint256 indexed taskID, uint256 newStatus)
+func (_EcpCollaternal *EcpCollaternalFilterer) ParseTaskStatusChanged(log types.Log) (*EcpCollaternalTaskStatusChanged, error) {
+	event := new(EcpCollaternalTaskStatusChanged)
+	if err := _EcpCollaternal.contract.UnpackLog(event, "TaskStatusChanged", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
 	return event, nil
 }
 
-// CollaternalWithdrawIterator is returned from FilterWithdraw and is used to iterate over the raw logs and unpacked data for Withdraw events raised by the Collaternal contract.
-type CollaternalWithdrawIterator struct {
-	Event *CollaternalWithdraw // Event containing the contract specifics and raw log
+// EcpCollaternalWithdrawIterator is returned from FilterWithdraw and is used to iterate over the raw logs and unpacked data for Withdraw events raised by the EcpCollaternal contract.
+type EcpCollaternalWithdrawIterator struct {
+	Event *EcpCollaternalWithdraw // Event containing the contract specifics and raw log
 
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
@@ -2182,7 +2440,7 @@ type CollaternalWithdrawIterator struct {
 // Next advances the iterator to the subsequent event, returning whether there
 // are any more events found. In case of a retrieval or parsing error, false is
 // returned and Error() can be queried for the exact failure.
-func (it *CollaternalWithdrawIterator) Next() bool {
+func (it *EcpCollaternalWithdrawIterator) Next() bool {
 	// If the iterator failed, stop iterating
 	if it.fail != nil {
 		return false
@@ -2191,7 +2449,7 @@ func (it *CollaternalWithdrawIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(CollaternalWithdraw)
+			it.Event = new(EcpCollaternalWithdraw)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -2206,7 +2464,7 @@ func (it *CollaternalWithdrawIterator) Next() bool {
 	// Iterator still in progress, wait for either a data or an error event
 	select {
 	case log := <-it.logs:
-		it.Event = new(CollaternalWithdraw)
+		it.Event = new(EcpCollaternalWithdraw)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -2222,19 +2480,19 @@ func (it *CollaternalWithdrawIterator) Next() bool {
 }
 
 // Error returns any retrieval or parsing error occurred during filtering.
-func (it *CollaternalWithdrawIterator) Error() error {
+func (it *EcpCollaternalWithdrawIterator) Error() error {
 	return it.fail
 }
 
 // Close terminates the iteration process, releasing any pending underlying
 // resources.
-func (it *CollaternalWithdrawIterator) Close() error {
+func (it *EcpCollaternalWithdrawIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-// CollaternalWithdraw represents a Withdraw event raised by the Collaternal contract.
-type CollaternalWithdraw struct {
+// EcpCollaternalWithdraw represents a Withdraw event raised by the EcpCollaternal contract.
+type EcpCollaternalWithdraw struct {
 	CpOwner        common.Address
 	CpAccount      common.Address
 	WithdrawAmount *big.Int
@@ -2244,7 +2502,7 @@ type CollaternalWithdraw struct {
 // FilterWithdraw is a free log retrieval operation binding the contract event 0x9b1bfa7fa9ee420a16e124f794c35ac9f90472acc99140eb2f6447c714cad8eb.
 //
 // Solidity: event Withdraw(address indexed cpOwner, address indexed cpAccount, uint256 withdrawAmount)
-func (_Collaternal *CollaternalFilterer) FilterWithdraw(opts *bind.FilterOpts, cpOwner []common.Address, cpAccount []common.Address) (*CollaternalWithdrawIterator, error) {
+func (_EcpCollaternal *EcpCollaternalFilterer) FilterWithdraw(opts *bind.FilterOpts, cpOwner []common.Address, cpAccount []common.Address) (*EcpCollaternalWithdrawIterator, error) {
 
 	var cpOwnerRule []interface{}
 	for _, cpOwnerItem := range cpOwner {
@@ -2255,17 +2513,17 @@ func (_Collaternal *CollaternalFilterer) FilterWithdraw(opts *bind.FilterOpts, c
 		cpAccountRule = append(cpAccountRule, cpAccountItem)
 	}
 
-	logs, sub, err := _Collaternal.contract.FilterLogs(opts, "Withdraw", cpOwnerRule, cpAccountRule)
+	logs, sub, err := _EcpCollaternal.contract.FilterLogs(opts, "Withdraw", cpOwnerRule, cpAccountRule)
 	if err != nil {
 		return nil, err
 	}
-	return &CollaternalWithdrawIterator{contract: _Collaternal.contract, event: "Withdraw", logs: logs, sub: sub}, nil
+	return &EcpCollaternalWithdrawIterator{contract: _EcpCollaternal.contract, event: "Withdraw", logs: logs, sub: sub}, nil
 }
 
 // WatchWithdraw is a free log subscription operation binding the contract event 0x9b1bfa7fa9ee420a16e124f794c35ac9f90472acc99140eb2f6447c714cad8eb.
 //
 // Solidity: event Withdraw(address indexed cpOwner, address indexed cpAccount, uint256 withdrawAmount)
-func (_Collaternal *CollaternalFilterer) WatchWithdraw(opts *bind.WatchOpts, sink chan<- *CollaternalWithdraw, cpOwner []common.Address, cpAccount []common.Address) (event.Subscription, error) {
+func (_EcpCollaternal *EcpCollaternalFilterer) WatchWithdraw(opts *bind.WatchOpts, sink chan<- *EcpCollaternalWithdraw, cpOwner []common.Address, cpAccount []common.Address) (event.Subscription, error) {
 
 	var cpOwnerRule []interface{}
 	for _, cpOwnerItem := range cpOwner {
@@ -2276,7 +2534,7 @@ func (_Collaternal *CollaternalFilterer) WatchWithdraw(opts *bind.WatchOpts, sin
 		cpAccountRule = append(cpAccountRule, cpAccountItem)
 	}
 
-	logs, sub, err := _Collaternal.contract.WatchLogs(opts, "Withdraw", cpOwnerRule, cpAccountRule)
+	logs, sub, err := _EcpCollaternal.contract.WatchLogs(opts, "Withdraw", cpOwnerRule, cpAccountRule)
 	if err != nil {
 		return nil, err
 	}
@@ -2286,8 +2544,8 @@ func (_Collaternal *CollaternalFilterer) WatchWithdraw(opts *bind.WatchOpts, sin
 			select {
 			case log := <-logs:
 				// New log arrived, parse the event and forward to the user
-				event := new(CollaternalWithdraw)
-				if err := _Collaternal.contract.UnpackLog(event, "Withdraw", log); err != nil {
+				event := new(EcpCollaternalWithdraw)
+				if err := _EcpCollaternal.contract.UnpackLog(event, "Withdraw", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -2311,9 +2569,154 @@ func (_Collaternal *CollaternalFilterer) WatchWithdraw(opts *bind.WatchOpts, sin
 // ParseWithdraw is a log parse operation binding the contract event 0x9b1bfa7fa9ee420a16e124f794c35ac9f90472acc99140eb2f6447c714cad8eb.
 //
 // Solidity: event Withdraw(address indexed cpOwner, address indexed cpAccount, uint256 withdrawAmount)
-func (_Collaternal *CollaternalFilterer) ParseWithdraw(log types.Log) (*CollaternalWithdraw, error) {
-	event := new(CollaternalWithdraw)
-	if err := _Collaternal.contract.UnpackLog(event, "Withdraw", log); err != nil {
+func (_EcpCollaternal *EcpCollaternalFilterer) ParseWithdraw(log types.Log) (*EcpCollaternalWithdraw, error) {
+	event := new(EcpCollaternalWithdraw)
+	if err := _EcpCollaternal.contract.UnpackLog(event, "Withdraw", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+// EcpCollaternalWithdrawSlashIterator is returned from FilterWithdrawSlash and is used to iterate over the raw logs and unpacked data for WithdrawSlash events raised by the EcpCollaternal contract.
+type EcpCollaternalWithdrawSlashIterator struct {
+	Event *EcpCollaternalWithdrawSlash // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *EcpCollaternalWithdrawSlashIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(EcpCollaternalWithdrawSlash)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(EcpCollaternalWithdrawSlash)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *EcpCollaternalWithdrawSlashIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *EcpCollaternalWithdrawSlashIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// EcpCollaternalWithdrawSlash represents a WithdrawSlash event raised by the EcpCollaternal contract.
+type EcpCollaternalWithdrawSlash struct {
+	CollateralContratOwner common.Address
+	Slashfund              *big.Int
+	Raw                    types.Log // Blockchain specific contextual infos
+}
+
+// FilterWithdrawSlash is a free log retrieval operation binding the contract event 0xbfd9c82485e2178fcfd5c40379d8e66fe60acc50aa1ef4c50966431eb1e381cd.
+//
+// Solidity: event WithdrawSlash(address indexed collateralContratOwner, uint256 slashfund)
+func (_EcpCollaternal *EcpCollaternalFilterer) FilterWithdrawSlash(opts *bind.FilterOpts, collateralContratOwner []common.Address) (*EcpCollaternalWithdrawSlashIterator, error) {
+
+	var collateralContratOwnerRule []interface{}
+	for _, collateralContratOwnerItem := range collateralContratOwner {
+		collateralContratOwnerRule = append(collateralContratOwnerRule, collateralContratOwnerItem)
+	}
+
+	logs, sub, err := _EcpCollaternal.contract.FilterLogs(opts, "WithdrawSlash", collateralContratOwnerRule)
+	if err != nil {
+		return nil, err
+	}
+	return &EcpCollaternalWithdrawSlashIterator{contract: _EcpCollaternal.contract, event: "WithdrawSlash", logs: logs, sub: sub}, nil
+}
+
+// WatchWithdrawSlash is a free log subscription operation binding the contract event 0xbfd9c82485e2178fcfd5c40379d8e66fe60acc50aa1ef4c50966431eb1e381cd.
+//
+// Solidity: event WithdrawSlash(address indexed collateralContratOwner, uint256 slashfund)
+func (_EcpCollaternal *EcpCollaternalFilterer) WatchWithdrawSlash(opts *bind.WatchOpts, sink chan<- *EcpCollaternalWithdrawSlash, collateralContratOwner []common.Address) (event.Subscription, error) {
+
+	var collateralContratOwnerRule []interface{}
+	for _, collateralContratOwnerItem := range collateralContratOwner {
+		collateralContratOwnerRule = append(collateralContratOwnerRule, collateralContratOwnerItem)
+	}
+
+	logs, sub, err := _EcpCollaternal.contract.WatchLogs(opts, "WithdrawSlash", collateralContratOwnerRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(EcpCollaternalWithdrawSlash)
+				if err := _EcpCollaternal.contract.UnpackLog(event, "WithdrawSlash", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ParseWithdrawSlash is a log parse operation binding the contract event 0xbfd9c82485e2178fcfd5c40379d8e66fe60acc50aa1ef4c50966431eb1e381cd.
+//
+// Solidity: event WithdrawSlash(address indexed collateralContratOwner, uint256 slashfund)
+func (_EcpCollaternal *EcpCollaternalFilterer) ParseWithdrawSlash(log types.Log) (*EcpCollaternalWithdrawSlash, error) {
+	event := new(EcpCollaternalWithdrawSlash)
+	if err := _EcpCollaternal.contract.UnpackLog(event, "WithdrawSlash", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log

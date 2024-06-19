@@ -17,7 +17,7 @@ import (
 
 type Stub struct {
 	client           *ethclient.Client
-	collateral       *Collaternal
+	collateral       *EcpCollaternal
 	privateK         string
 	publicK          string
 	cpAccountAddress string
@@ -50,7 +50,7 @@ func NewCollateralStub(client *ethclient.Client, options ...Option) (*Stub, erro
 	}
 
 	collateralAddress := common.HexToAddress(conf.GetConfig().CONTRACT.ZkCollateral)
-	collateralClient, err := NewCollaternal(collateralAddress, client)
+	collateralClient, err := NewEcpCollaternal(collateralAddress, client)
 	if err != nil {
 		return nil, fmt.Errorf("ECP create collateral contract client, error: %+v", err)
 	}
