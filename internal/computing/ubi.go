@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"math/rand"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -208,19 +209,15 @@ func DoUbiTaskForK8s(c *gin.Context) {
 		var namespace = "ubi-task-" + strconv.Itoa(ubiTask.ID)
 		var err error
 		defer func() {
+			if err := recover(); err != nil {
+				logs.GetLogger().Errorf("do zk task painc, error: %+v", err)
+				return
+			}
+
 			ubiTaskRun, err := NewTaskService().GetTaskEntity(int64(ubiTask.ID))
 			if err != nil {
 				logs.GetLogger().Errorf("get ubi task detail from db failed, ubiTaskId: %d, error: %+v", ubiTask.ID, err)
 				return
-			}
-			if ubiTaskRun.Id == 0 {
-				ubiTaskRun = new(models.TaskEntity)
-				ubiTaskRun.Id = int64(ubiTask.ID)
-				ubiTaskRun.Type = ubiTask.Type
-				ubiTaskRun.Name = ubiTask.Name
-				ubiTaskRun.ResourceType = ubiTask.ResourceType
-				ubiTaskRun.InputParam = ubiTask.InputParam
-				ubiTaskRun.CreateTime = time.Now().Unix()
 			}
 
 			if ubiTaskRun.TxHash != "" {
@@ -232,6 +229,11 @@ func DoUbiTaskForK8s(c *gin.Context) {
 			}
 			err = NewTaskService().SaveTaskEntity(ubiTaskRun)
 		}()
+
+		if ubiTaskImage == "" {
+			logs.GetLogger().Errorf("please check the log output of the resource-exporter pod to see if cpu_name is intel or amd")
+			return
+		}
 
 		k8sService := NewK8sService()
 		if _, err = k8sService.GetNameSpace(context.TODO(), namespace, metaV1.GetOptions{}); err != nil {
@@ -372,13 +374,15 @@ func DoUbiTaskForK8s(c *gin.Context) {
 			podName = pod.Name
 			break
 		}
+		if podName == "" {
+			return
+		}
 
 		req := k8sService.k8sClient.CoreV1().Pods(namespace).GetLogs(podName, &v1.PodLogOptions{
 			Container: "",
 			Follow:    true,
 		})
 
-		time.Sleep(2 * time.Second)
 		podLogs, err := req.Stream(context.Background())
 		if err != nil {
 			logs.GetLogger().Errorf("Error opening log stream: %v", err)
@@ -526,7 +530,6 @@ func DoUbiTaskForDocker(c *gin.Context) {
 	if err != nil {
 		taskEntity.Status = models.TASK_FAILED_STATUS
 		NewTaskService().SaveTaskEntity(taskEntity)
-		logs.GetLogger().Errorf("check resource failed, error: %v", err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
 		return
 	}
@@ -553,7 +556,8 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		}()
 
 		if ubiTaskImage == "" {
-			logs.GetLogger().Errorf("please check the log output of the resource-exporter container")
+			logs.GetLogger().Errorf("please check the log output of the resource-exporter container to see if cpu_name is intel or amd")
+			return
 		}
 
 		if err := NewDockerService().PullImage(ubiTaskImage); err != nil {
@@ -619,6 +623,11 @@ func DoUbiTaskForDocker(c *gin.Context) {
 			return
 		}
 
+		time.Sleep(3 * time.Second)
+		if !dockerService.IsExistContainer(containerName) {
+			return
+		}
+
 		containerLogStream, err := dockerService.GetContainerLogStream(containerName)
 		if err != nil {
 			logs.GetLogger().Errorf("get docker container log stream failed, error: %v", err)
@@ -651,7 +660,6 @@ func checkResourceForUbi(resource *models.TaskResource, gpuName string, resource
 
 	var nodeResource models.NodeResource
 	if err := json.Unmarshal([]byte(containerLogStr), &nodeResource); err != nil {
-		logs.GetLogger().Error("collect host hardware resource failed, error: %+v", err)
 		return false, "", 0, 0, err
 	}
 
@@ -751,7 +759,6 @@ func GetCpResource(c *gin.Context) {
 	dockerService := NewDockerService()
 	containerLogStr, err := dockerService.ContainerLogs("resource-exporter")
 	if err != nil {
-		logs.GetLogger().Errorf("collect host hardware resource failed, error: %v", err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ServerError, err.Error()))
 		return
 	}
@@ -821,8 +828,28 @@ func submitUBIProof(c2Proof models.UbiC2Proof, task *models.TaskEntity) error {
 		return err
 	}
 
+	var taskInfo ecp.ECPTaskTaskInfo
+
+loopTask:
+	for {
+		select {
+		case <-time.After(30 * time.Second):
+			logs.GetLogger().Errorf("get ubi task info, taskId: %s timeout", c2Proof.TaskId)
+			break loopTask
+		default:
+			taskInfo, err = taskStub.GetTaskInfo()
+			if err != nil {
+				logs.GetLogger().Warnf("get ubi task info failed, taskId: %s, msg: %s, retrying", c2Proof.TaskId, err.Error())
+				time.Sleep(3 * time.Second)
+				continue
+			} else {
+				break loopTask
+			}
+		}
+	}
+
 	receiveProofTime := time.Now().Unix()
-	finallyTime := task.CreateTime + task.Deadline*2
+	finallyTime := task.CreateTime + taskInfo.Deadline.Int64()*2
 	deadlineTime := finallyTime - receiveProofTime
 
 	if deadlineTime < 0 {
@@ -831,7 +858,7 @@ func submitUBIProof(c2Proof models.UbiC2Proof, task *models.TaskEntity) error {
 		task.Error = fmt.Sprintf("Proof submission deadline has passed")
 		return NewTaskService().SaveTaskEntity(task)
 	}
-	submitUBIProofTx, err := taskStub.CreateTaskContract(c2Proof.Proof, task, deadlineTime)
+	submitUBIProofTx, err := taskStub.SubmitUBIProof(c2Proof.TaskId, c2Proof.Proof, deadlineTime)
 
 	if submitUBIProofTx != "" {
 		task.Status = models.TASK_SUCCESS_STATUS
@@ -957,6 +984,26 @@ func CronTaskForEcp() {
 			}
 		}
 	}()
+
+	go func() {
+		ticker := time.NewTicker(10 * time.Minute)
+		for range ticker.C {
+			taskList, err := NewTaskService().GetTaskListNoReward()
+			if err != nil {
+				logs.GetLogger().Errorf("get task list failed, error: %+v", err)
+				return
+			}
+
+			for _, entity := range taskList {
+				ubiTask := entity
+				err = getReward(ubiTask)
+				if err != nil {
+					logs.GetLogger().Errorf("taskId: %d, %v", ubiTask.Id, err)
+					continue
+				}
+			}
+		}
+	}()
 }
 
 func SyncCpAccountInfo() {
@@ -1025,6 +1072,46 @@ func RestartResourceExporter() error {
 	}, nil, resourceExporterContainerName)
 	if err != nil {
 		return fmt.Errorf("create resource-exporter container failed, error: %v", err)
+	}
+	return nil
+}
+
+func getReward(task *models.TaskEntity) error {
+	chainUrl, err := conf.GetRpcByName(conf.DefaultRpc)
+	if err != nil {
+		return fmt.Errorf("get rpc url failed, error: %s", err.Error())
+	}
+
+	client, err := ethclient.Dial(chainUrl)
+	if err != nil {
+		return fmt.Errorf("dial rpc connect failed, error: %s", err.Error())
+	}
+	defer client.Close()
+
+	taskStub, err := ecp.NewTaskStub(client, ecp.WithTaskContractAddress(task.Contract))
+	if err != nil {
+		return fmt.Errorf("create ubi task client failed, error: %s", err.Error())
+	}
+
+	var status int
+	var rewardTx, challengeTx, slashTx, reward string
+	for i := 0; i < 5; i++ {
+		status, rewardTx, challengeTx, slashTx, reward, err = taskStub.GetReward()
+		if err != nil {
+			logs.GetLogger().Errorf("use task contract to get reward failed, error: %s", ecp.ParseError(err))
+			rand.Seed(time.Now().UnixNano())
+			time.Sleep(time.Duration(rand.Intn(3)+1) * time.Second)
+			continue
+		}
+	}
+
+	if status != models.REWARD_UNCLAIMED {
+		task.Reward = reward
+		task.RewardStatus = status
+		task.RewardTx = rewardTx
+		task.ChallengeTx = challengeTx
+		task.SlashTx = slashTx
+		return NewTaskService().SaveTaskEntity(task)
 	}
 	return nil
 }
