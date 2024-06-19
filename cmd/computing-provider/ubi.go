@@ -79,7 +79,7 @@ var listCmd = &cli.Command{
 				createTime := time.Unix(task.CreateTime, 0).Format("2006-01-02 15:04:05")
 				taskData = append(taskData,
 					[]string{strconv.Itoa(int(task.Id)), task.Contract, models.GetResourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type),
-						task.TxHash, models.TaskStatusStr(task.Status), createTime, errorMsg})
+						models.TaskStatusStr(task.Status), createTime, errorMsg})
 
 				var rowColor []tablewriter.Colors
 				if task.Status == models.TASK_RECEIVED_STATUS {
@@ -103,14 +103,13 @@ var listCmd = &cli.Command{
 			for i, task := range taskList {
 				createTime := time.Unix(task.CreateTime, 0).Format("2006-01-02 15:04:05")
 				contract := shortenAddress(task.Contract)
-				proofHash := shortenAddress(task.TxHash)
 
 				var errorMsg string
 				if showFailed {
 					errorMsg = task.Error
 				}
 				taskData = append(taskData,
-					[]string{strconv.Itoa(int(task.Id)), contract, models.GetResourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type), proofHash,
+					[]string{strconv.Itoa(int(task.Id)), contract, models.GetResourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type),
 						models.TaskStatusStr(task.Status), createTime, errorMsg})
 
 				var rowColor []tablewriter.Colors
@@ -133,7 +132,7 @@ var listCmd = &cli.Command{
 
 		}
 
-		header := []string{"TASK ID", "Task Contract", "TASK TYPE", "ZK TYPE", "PROOF HASH", "STATUS", "CREATE TIME", "ERROR"}
+		header := []string{"TASK ID", "Task Contract", "TASK TYPE", "ZK TYPE", "STATUS", "CREATE TIME", "ERROR"}
 		NewVisualTable(header, taskData, rowColorList).Generate(false)
 
 		return nil
