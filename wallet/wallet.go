@@ -338,6 +338,16 @@ func (w *LocalWallet) WalletCollateral(ctx context.Context, chainName string, fr
 	}
 	defer client.Close()
 
+	cpAccount := common.HexToAddress(cpAccountAddress)
+	bytecode, err := client.CodeAt(context.Background(), cpAccount, nil)
+	if err != nil {
+		return "", fmt.Errorf("check cp account contract address failed, error: %v", err)
+	}
+
+	if len(bytecode) > 0 {
+		return "", fmt.Errorf("the account parameter must be a CpAccount contract address")
+	}
+
 	if collateralType == "fcp" {
 		tokenStub, err := token.NewTokenStub(client, token.WithPrivateKey(ki.PrivateKey))
 		if err != nil {
