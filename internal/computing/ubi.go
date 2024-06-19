@@ -459,8 +459,8 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		return
 	}
 
-	logs.GetLogger().Infof("ubi task received: id: %d, resource_type: %d, type: %s, input_param: %s, signature: %s, contract: %s",
-		ubiTask.ID, ubiTask.ResourceType, models.UbiTaskTypeStr(ubiTask.Type), ubiTask.InputParam, ubiTask.Signature)
+	logs.GetLogger().Infof("ubi task received: id: %d, deadline: %d,resource_type: %d, type: %s, input_param: %s, signature: %s",
+		ubiTask.ID, ubiTask.DeadLine, ubiTask.ResourceType, models.UbiTaskTypeStr(ubiTask.Type), ubiTask.InputParam, ubiTask.Signature)
 
 	if ubiTask.ID == 0 {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: id"))
