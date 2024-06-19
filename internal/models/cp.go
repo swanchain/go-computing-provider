@@ -111,6 +111,7 @@ type UBITaskReq struct {
 	Resource     *TaskResource `json:"resource"`
 	ResourceType int           `json:"resource_type"`
 	DeadLine     int64         `json:"deadline"`
+	CheckCode    string        `json:"check_code"`
 }
 
 type UbiC2Proof struct {

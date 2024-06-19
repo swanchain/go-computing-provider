@@ -78,8 +78,8 @@ var listCmd = &cli.Command{
 				}
 				createTime := time.Unix(task.CreateTime, 0).Format("2006-01-02 15:04:05")
 				taskData = append(taskData,
-					[]string{strconv.Itoa(int(task.Id)), task.Contract, models.GetResourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type), task.TxHash, models.TaskStatusStr(task.Status),
-						fmt.Sprintf("%s", task.Reward), createTime, errorMsg})
+					[]string{strconv.Itoa(int(task.Id)), task.Contract, models.GetResourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type),
+						task.TxHash, models.TaskStatusStr(task.Status), createTime, errorMsg})
 
 				var rowColor []tablewriter.Colors
 				if task.Status == models.TASK_RECEIVED_STATUS {
@@ -110,8 +110,8 @@ var listCmd = &cli.Command{
 					errorMsg = task.Error
 				}
 				taskData = append(taskData,
-					[]string{strconv.Itoa(int(task.Id)), contract, models.GetResourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type), proofHash, models.TaskStatusStr(task.Status),
-						fmt.Sprintf("%s", task.Reward), createTime, errorMsg})
+					[]string{strconv.Itoa(int(task.Id)), contract, models.GetResourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type), proofHash,
+						models.TaskStatusStr(task.Status), createTime, errorMsg})
 
 				var rowColor []tablewriter.Colors
 				if task.Status == models.TASK_RECEIVED_STATUS {
@@ -133,7 +133,7 @@ var listCmd = &cli.Command{
 
 		}
 
-		header := []string{"TASK ID", "Task Contract", "TASK TYPE", "ZK TYPE", "PROOF HASH", "STATUS", "REWARD", "CREATE TIME", "ERROR"}
+		header := []string{"TASK ID", "Task Contract", "TASK TYPE", "ZK TYPE", "PROOF HASH", "STATUS", "CREATE TIME", "ERROR"}
 		NewVisualTable(header, taskData, rowColorList).Generate(false)
 
 		return nil
@@ -183,7 +183,7 @@ var daemonCmd = &cli.Command{
 
 		router.GET("/cp", computing.GetCpResource)
 		router.POST("/cp/ubi", computing.DoUbiTaskForDocker)
-		router.POST("/cp/docker/receive/ubi", computing.ReceiveUbiProofForDocker)
+		router.POST("/cp/docker/receive/ubi", computing.ReceiveUbiProof)
 
 		shutdownChan := make(chan struct{})
 		httpStopper, err := util.ServeHttp(r, "cp-api", ":"+strconv.Itoa(conf.GetConfig().API.Port), false)

@@ -5,8 +5,10 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/filswan/go-swan-lib/logs"
@@ -61,7 +63,7 @@ outerLoop:
 	for {
 		select {
 		case <-timeOutCh:
-			err = fmt.Errorf("create task contract timed out")
+			err = fmt.Errorf("create contract timed out")
 			break outerLoop
 		default:
 			time.Sleep(3 * time.Second)
@@ -93,11 +95,15 @@ outerLoop:
 						continue
 					}
 				} else {
-					logs.GetLogger().Warnf("taskId: %d create contract failed, error: %s", task.Id, ParseError(err))
+					logs.GetLogger().Warnf("taskId: %d create task contract failed, error: %s", task.Id, ParseError(err))
 					continue
 				}
 			}
 			if transaction != nil {
+				if err = checkTransaction(s.client, transaction); err != nil {
+					logs.GetLogger().Warnf("taskId: %d checked create task contract failed, error: %s", task.Id, ParseError(err))
+					continue
+				}
 				taskContractAddress = contractAddress.Hex()
 				break outerLoop
 			} else {
@@ -187,6 +193,29 @@ func (s *TaskStub) IncrementNonce() {
 	s.taskL.Lock()
 	defer s.taskL.Unlock()
 	s.nonceX++
+}
+
+func checkTransaction(client *ethclient.Client, tx *types.Transaction) error {
+	timeout := time.After(10 * time.Second)
+	ticker := time.Tick(2 * time.Second)
+	for {
+		select {
+		case <-timeout:
+			return fmt.Errorf("timeout waiting for transaction confirmation, tx: %s", tx.Hash().Hex())
+		case <-ticker:
+			receipt, err := client.TransactionReceipt(context.Background(), tx.Hash())
+			if err != nil {
+				if errors.Is(err, ethereum.NotFound) {
+					continue
+				}
+				return err
+			}
+
+			if receipt != nil && receipt.Status == types.ReceiptStatusSuccessful {
+				return nil
+			}
+		}
+	}
 }
 
 func ParseError(err error) string {

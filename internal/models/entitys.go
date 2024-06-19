@@ -80,12 +80,7 @@ type TaskEntity struct {
 	InputParam   string `json:"input_param" gorm:"input_param"`
 	VerifyParam  string `json:"verify_param" gorm:"verify_param"`
 	TxHash       string `json:"tx_hash" gorm:"tx_hash"`
-	RewardTx     string `json:"reward_tx"`
-	ChallengeTx  string `json:"challenge_tx"`
-	SlashTx      string `json:"slash_tx"`
 	Status       int    `json:"status" gorm:"status"`
-	RewardStatus int    `json:"reward_status" gorm:"status"` // 0: unclaimed; 1: challenged; 2: slashed; 3: claimed
-	Reward       string `json:"reward" gorm:"column:reward; default:0.0000"`
 	CreateTime   int64  `json:"create_time" gorm:"create_time"`
 	EndTime      int64  `json:"end_time" gorm:"end_time"`
 	Error        string `json:"error" gorm:"error"`
