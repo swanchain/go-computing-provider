@@ -344,7 +344,7 @@ func (w *LocalWallet) WalletCollateral(ctx context.Context, chainName string, fr
 		return "", fmt.Errorf("check cp account contract address failed, error: %v", err)
 	}
 
-	if len(bytecode) > 0 {
+	if len(bytecode) <= 0 {
 		return "", fmt.Errorf("the account parameter must be a CpAccount contract address")
 	}
 
