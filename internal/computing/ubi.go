@@ -847,7 +847,7 @@ loopTask:
 
 	remainingTime := task.Deadline - int64(blockNumber)
 	if remainingTime < 0 {
-		logs.GetLogger().Warnf("taskId: %s proof submission deadline has passed,current: %d, deadline: %d, , deadlineTime: %d", c2Proof.TaskId, blockNumber, task.Deadline)
+		logs.GetLogger().Warnf("taskId: %s proof submission deadline has passed,current: %d, deadline: %d, , deadlineTime: %d", c2Proof.TaskId, blockNumber, task.Deadline, remainingTime)
 		task.Status = models.TASK_FAILED_STATUS
 		task.Error = fmt.Sprintf("create contract deadline has passed")
 		return NewTaskService().SaveTaskEntity(task)
