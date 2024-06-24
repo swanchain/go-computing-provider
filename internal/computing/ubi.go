@@ -505,25 +505,25 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		return
 	}
 
-	//cpAccountAddress, err := contract.GetCpAccountAddress()
-	//if err != nil {
-	//	logs.GetLogger().Errorf("get cp account contract address failed, error: %v", err)
-	//	c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.GetCpAccountError))
-	//	return
-	//}
-	//
-	//signature, err := verifySignature(conf.GetConfig().UBI.UbiEnginePk, fmt.Sprintf("%s%d", cpAccountAddress, ubiTask.ID), ubiTask.Signature)
-	//if err != nil {
-	//	logs.GetLogger().Errorf("verifySignature for ubi task failed, error: %+v", err)
-	//	c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
-	//	return
-	//}
-	//
-	//logs.GetLogger().Infof("ubi task sign verifing, task_id: %d, verify: %v", ubiTask.ID, signature)
-	//if !signature {
-	//	c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "signature verify failed"))
-	//	return
-	//}
+	cpAccountAddress, err := contract.GetCpAccountAddress()
+	if err != nil {
+		logs.GetLogger().Errorf("get cp account contract address failed, error: %v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.GetCpAccountError))
+		return
+	}
+
+	signature, err := verifySignature(conf.GetConfig().UBI.UbiEnginePk, fmt.Sprintf("%s%d", cpAccountAddress, ubiTask.ID), ubiTask.Signature)
+	if err != nil {
+		logs.GetLogger().Errorf("verifySignature for ubi task failed, error: %+v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
+		return
+	}
+
+	logs.GetLogger().Infof("ubi task sign verifing, task_id: %d, verify: %v", ubiTask.ID, signature)
+	if !signature {
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "signature verify failed"))
+		return
+	}
 
 	var gpuFlag = "0"
 	if ubiTask.ResourceType == 1 {
@@ -541,7 +541,7 @@ func DoUbiTaskForDocker(c *gin.Context) {
 	taskEntity.CreateTime = time.Now().Unix()
 	taskEntity.Deadline = ubiTask.DeadLine
 	taskEntity.CheckCode = ubiTask.CheckCode
-	err := NewTaskService().SaveTaskEntity(taskEntity)
+	err = NewTaskService().SaveTaskEntity(taskEntity)
 	if err != nil {
 		logs.GetLogger().Errorf("save task entity failed, error: %v", err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SaveTaskEntityError))
