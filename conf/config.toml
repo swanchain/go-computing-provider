@@ -36,7 +36,7 @@ SWAN_MAINNET= ""                                   # Swan mainnet RPC
 
 [CONTRACT]
 SWAN_CONTRACT = "0x91B25A65b295F0405552A4bbB77879ab5e38166c"              # Swan token's contract address
-SWAN_COLLATERAL_CONTRACT = "0xC7980d5a69e8AA9797934aCf18e483EB4C986e01"   # Swan's collateral address
-REGISTER_CP_CONTRACT = "0x6EDf891B53ba2c6Fade6Ae373682ED48dEa5AF48"       # The CP registration contract address
+SWAN_COLLATERAL_CONTRACT = "0xfD9190027cd42Fc4f653Dfd9c4c45aeBAf0ae063"   # Swan's collateral address
+REGISTER_CP_CONTRACT = "0x0c5ff16ecac04d89413aaa3ebf904ac0ea440675"       # The CP registration contract address
 REGISTER_TASK_CONTRACT = "0xE8b7f7A65C945F39514c535A35Fcb55Ff77DabeE"     # The ZK task's registration contract address
-ZK_COLLATERAL_CONTRACT = "0xe43718f1e04ffef6596be34591ce904f2c0dccd9"     # The ZK task's collateral contract address
+ZK_COLLATERAL_CONTRACT = "0x7cb131b22eca6ba9e38f9d9c1887e083a256e67e"     # The ZK task's collateral contract address
