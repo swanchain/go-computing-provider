@@ -444,11 +444,18 @@ func ReceiveUbiProof(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
 		return
 	}
-	err = submitUBIProof(c2Proof, ubiTask)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
-		return
-	}
+	go func() {
+		defer func() {
+			if err := recover(); err != nil {
+				logs.GetLogger().Errorf("taskId: %d, submit zk-task proof catch painc error: %v", taskId, err)
+			}
+		}()
+		err = submitUBIProof(c2Proof, ubiTask)
+		if err != nil {
+			return
+		}
+	}()
+
 	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
 }
 
