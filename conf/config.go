@@ -14,7 +14,8 @@ import (
 var config *ComputeNode
 
 const (
-	DefaultRpc = "swan"
+	MainnetNetwork = "mainnet"
+	TestnetNetwork = "testnet"
 )
 
 // ComputeNode is a compute node config
@@ -67,8 +68,7 @@ type Registry struct {
 }
 
 type RPC struct {
-	SwanTestnet string `toml:"SWAN_TESTNET"`
-	SwanMainnet string `toml:"SWAN_MAINNET"`
+	SwanNetwork string `toml:"SWAN_NETWORK"`
 }
 
 type CONTRACT struct {
@@ -78,18 +78,36 @@ type CONTRACT struct {
 	ZkCollateral string `toml:"ZK_COLLATERAL_CONTRACT"`
 }
 
-func GetRpcByName(rpcName string) (string, error) {
+func GetRpcByNetWorkName(netWorkName ...string) (string, error) {
+	var netWork string
 	var rpc string
-	switch rpcName {
-	case DefaultRpc:
-		rpc = GetConfig().RPC.SwanTestnet
-		break
+	if len(netWorkName) > 0 && netWorkName[0] != "" {
+		netWork = netWorkName[0]
+	} else {
+		netWork, _ = os.LookupEnv("CP_NETWORK")
+		if netWork == "" {
+			netWork = MainnetNetwork
+		}
+	}
+
+	switch netWork {
+	case MainnetNetwork:
+		rpc = GetConfig().RPC.SwanNetwork
+	case TestnetNetwork:
+		rpc = GetConfig().RPC.SwanNetwork
+	default:
+		return "", fmt.Errorf("not support network: %s", netWorkName[0])
 	}
 	return rpc, nil
 }
 
 func InitConfig(cpRepoPath string, standalone bool) error {
-	configFile := filepath.Join(cpRepoPath, "config.toml")
+	netWork, ok := os.LookupEnv("CP_NETWORK")
+	if !ok {
+		netWork = MainnetNetwork
+	}
+
+	configFile := filepath.Join(cpRepoPath, fmt.Sprintf("config-%s.toml", netWork))
 	metaData, err := toml.DecodeFile(configFile, &config)
 	if err != nil {
 		return fmt.Errorf("failed load config file, path: %s, error: %w", configFile, err)
@@ -137,7 +155,7 @@ func requiredFieldsAreGiven(metaData toml.MetaData) bool {
 		{"MCS", "BucketName"},
 		{"MCS", "Network"},
 
-		{"RPC", "SWAN_TESTNET"},
+		{"RPC", "SWAN_NETWORK"},
 
 		{"CONTRACT", "SWAN_CONTRACT"},
 		{"CONTRACT", "SWAN_COLLATERAL_CONTRACT"},
@@ -163,7 +181,7 @@ func requiredFieldsAreGivenForSeparate(metaData toml.MetaData) bool {
 
 		{"UBI", "UbiEnginePk"},
 
-		{"RPC", "SWAN_TESTNET"},
+		{"RPC", "SWAN_NETWORK"},
 
 		{"CONTRACT", "SWAN_CONTRACT"},
 		{"CONTRACT", "SWAN_COLLATERAL_CONTRACT"},
@@ -178,17 +196,35 @@ func requiredFieldsAreGivenForSeparate(metaData toml.MetaData) bool {
 	return true
 }
 
-//go:embed config.toml
-var configFileContent string
+//go:embed config-testnet.toml.sample
+var testnetConfigContent string
+
+//go:embed config-mainnet.toml.sample
+var mainnetConfigContent string
 
 func GenerateRepo(cpRepoPath string) error {
 	var configTmpl ComputeNode
 	var configFile *os.File
 	var err error
 
+	netWork, ok := os.LookupEnv("CP_NETWORK")
+	if !ok {
+		netWork = MainnetNetwork
+	}
+
+	var configContent string
+	switch netWork {
+	case MainnetNetwork:
+		configContent = mainnetConfigContent
+	case TestnetNetwork:
+		configContent = testnetConfigContent
+	default:
+		return fmt.Errorf("not support network: %s", netWork)
+	}
+
 	configFilePath := path.Join(cpRepoPath, "config.toml")
 	if _, err = os.Stat(configFilePath); os.IsNotExist(err) {
-		if _, err = toml.Decode(configFileContent, &configTmpl); err != nil {
+		if _, err = toml.Decode(configContent, &configTmpl); err != nil {
 			return fmt.Errorf("parse toml data failed, error: %v", err)
 		}
 		configFile, err = os.Create(configFilePath)

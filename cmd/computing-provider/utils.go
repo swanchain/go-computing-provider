@@ -21,7 +21,7 @@ import (
 )
 
 func createAccount(cpRepoPath, ownerAddress, beneficiaryAddress string, workerAddress string, taskTypes []uint8) error {
-	chainUrl, err := conf.GetRpcByName(conf.DefaultRpc)
+	chainUrl, err := conf.GetRpcByNetWorkName()
 	if err != nil {
 		return fmt.Errorf("get rpc url failed, error: %v", err)
 	}
@@ -116,7 +116,7 @@ func createAccount(cpRepoPath, ownerAddress, beneficiaryAddress string, workerAd
 }
 
 func getVerifyAccountClient(ownerAddress string) (*ethclient.Client, *account2.CpStub, error) {
-	chainUrl, err := conf.GetRpcByName(conf.DefaultRpc)
+	chainUrl, err := conf.GetRpcByNetWorkName()
 	if err != nil {
 		return nil, nil, fmt.Errorf("get rpc url failed, error: %v", err)
 	}

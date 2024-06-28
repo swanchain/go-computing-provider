@@ -110,7 +110,7 @@ var infoCmd = &cli.Command{
 			count, _ = k8sService.GetDeploymentActiveCount()
 		}
 
-		chainRpc, err := conf.GetRpcByName(conf.DefaultRpc)
+		chainRpc, err := conf.GetRpcByNetWorkName()
 		if err != nil {
 			return err
 		}
@@ -237,9 +237,9 @@ var stateInfoCmd = &cli.Command{
 	ArgsUsage: "[cp_account_contract_address]",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
-			Name:  "chain",
-			Usage: "Specify which rpc connection chain to use",
-			Value: conf.DefaultRpc,
+			Name:  "network",
+			Usage: "Specify which rpc connection network to use",
+			Value: conf.MainnetNetwork,
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -251,12 +251,12 @@ var stateInfoCmd = &cli.Command{
 			return fmt.Errorf("load config file failed, error: %+v", err)
 		}
 
-		chain := cctx.String("chain")
-		if strings.TrimSpace(chain) == "" {
-			return fmt.Errorf("the chain is required")
+		networkName := cctx.String("network")
+		if strings.TrimSpace(networkName) == "" {
+			return fmt.Errorf("the network is required")
 		}
 
-		chainRpc, err := conf.GetRpcByName(conf.DefaultRpc)
+		chainRpc, err := conf.GetRpcByNetWorkName(networkName)
 		if err != nil {
 			return err
 		}
@@ -362,9 +362,9 @@ var taskInfoCmd = &cli.Command{
 	ArgsUsage: "[task_contract_address]",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
-			Name:  "chain",
+			Name:  "network",
 			Usage: "Specify which rpc connection chain to use",
-			Value: conf.DefaultRpc,
+			Value: conf.MainnetNetwork,
 		},
 		&cli.BoolFlag{
 			Name:     "ecp",
@@ -387,17 +387,17 @@ var taskInfoCmd = &cli.Command{
 			return fmt.Errorf("load config file failed, error: %+v", err)
 		}
 
-		chain := cctx.String("chain")
-		if strings.TrimSpace(chain) == "" {
-			return fmt.Errorf("the chain is required")
+		networkName := cctx.String("network")
+		if strings.TrimSpace(networkName) == "" {
+			return fmt.Errorf("the network is required")
 		}
 
-		chainRpc, err := conf.GetRpcByName(chain)
+		chainRpc, err := conf.GetRpcByNetWorkName(networkName)
 		if err != nil {
 			return err
 		}
 
-		taskInfo, err := computing.GetTaskInfoOnChain(chain, taskContract)
+		taskInfo, err := computing.GetTaskInfoOnChain(networkName, taskContract)
 		if err != nil {
 			return fmt.Errorf("get task info on the chain failed, error: %v", err)
 		}

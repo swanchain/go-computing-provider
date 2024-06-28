@@ -423,7 +423,7 @@ func reportJobStatus(jobUuid string, deployStatus int) bool {
 
 func checkFcpCollateralBalance() (string, error) {
 
-	chainRpc, err := conf.GetRpcByName(conf.DefaultRpc)
+	chainRpc, err := conf.GetRpcByNetWorkName()
 	if err != nil {
 		return "", err
 	}
