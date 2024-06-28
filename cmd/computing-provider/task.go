@@ -197,7 +197,7 @@ var taskDelete = &cli.Command{
 		if err := k8sService.DeleteDeployment(context.TODO(), namespace, deployName); err != nil && !errors.IsNotFound(err) {
 			return err
 		}
-		time.Sleep(6 * time.Second)
+		time.Sleep(3 * time.Second)
 
 		if err := k8sService.DeleteDeployRs(context.TODO(), namespace, spaceUuid); err != nil && !errors.IsNotFound(err) {
 			return err
