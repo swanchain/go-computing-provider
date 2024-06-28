@@ -219,17 +219,18 @@ func GenerateRepo(cpRepoPath string) error {
 		return fmt.Errorf("not support network: %s", netWork)
 	}
 
-	configFilePath := path.Join(cpRepoPath, fmt.Sprintf("config-%s.toml", netWork))
+	var configName = fmt.Sprintf("config-%s.toml", netWork)
+	configFilePath := path.Join(cpRepoPath, configName)
 	if _, err = os.Stat(configFilePath); os.IsNotExist(err) {
 		if _, err = toml.Decode(configContent, &configTmpl); err != nil {
 			return fmt.Errorf("parse toml data failed, error: %v", err)
 		}
 		configFile, err = os.Create(configFilePath)
 		if err != nil {
-			return fmt.Errorf("create config.toml file failed, error: %v", err)
+			return fmt.Errorf("create %s file failed, error: %v", configName, err)
 		}
 		if err = toml.NewEncoder(configFile).Encode(configTmpl); err != nil {
-			return fmt.Errorf("write data to config.toml file failed, error: %v", err)
+			return fmt.Errorf("write data to %s file failed, error: %v", configName, err)
 		}
 	}
 	return nil

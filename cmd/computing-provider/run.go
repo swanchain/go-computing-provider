@@ -667,7 +667,7 @@ var changeMultiAddressCmd = &cli.Command{
 			return fmt.Errorf("update multi_addresses of cp to db failed, error: %v", err)
 		}
 		fmt.Printf("changeMultiAddress Transaction hash: %s\n", changeMultiAddressTx)
-		fmt.Printf("Multi-Address is changed successfully! please manually update the `MultiAddress` in the config.toml file \n")
+		fmt.Printf("Multi-Address is changed successfully! please manually update the `MultiAddress` in the config file \n")
 
 		return nil
 	},

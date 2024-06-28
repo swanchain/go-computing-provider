@@ -80,7 +80,7 @@ func createAccount(cpRepoPath, ownerAddress, beneficiaryAddress string, workerAd
 	multiAddresses := conf.GetConfig().API.MultiAddress
 
 	if strings.Contains(conf.GetConfig().API.MultiAddress, "<") || strings.Contains(conf.GetConfig().API.MultiAddress, "PUBLIC") {
-		return fmt.Errorf("the multi-address field needs to be configured, by modify config.toml or computing-provider init")
+		return fmt.Errorf("the multi-address field needs to be configured, by modify config file or computing-provider init")
 	}
 
 	contractAddress, tx, _, err := account2.DeployAccount(auth, client, nodeID, []string{multiAddresses}, common.HexToAddress(beneficiaryAddress),
