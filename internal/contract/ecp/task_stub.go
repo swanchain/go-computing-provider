@@ -210,11 +210,11 @@ func (s *TaskStub) GetReward() (status int, rewardTx string, challengeTx string,
 	if taskInfo.RewardTx != "" {
 		receipt, err := s.client.TransactionReceipt(context.Background(), common.HexToHash(taskInfo.RewardTx))
 		if err != nil {
-			return 0, "", "", "", reward, err
+			return 0, taskInfo.RewardTx, "", "", reward, err
 		}
 		contractAbi, err := abi.JSON(strings.NewReader(token.MainMetaData.ABI))
 		if err != nil {
-			return 0, "", "", "", reward, err
+			return 0, taskInfo.RewardTx, "", "", reward, err
 		}
 
 		for _, l := range receipt.Logs {

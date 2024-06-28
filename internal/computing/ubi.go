@@ -1115,7 +1115,14 @@ func getReward(task *models.TaskEntity) error {
 	for i := 0; i < 5; i++ {
 		status, rewardTx, challengeTx, slashTx, reward, err = taskStub.GetReward()
 		if err != nil {
-			logs.GetLogger().Errorf("use task contract to get reward failed, error: %s", ecp.ParseError(err))
+			var errMsg string
+			if strings.Contains(err.Error(), "not found") {
+				errMsg = fmt.Sprintf("rewardTx %s not found on chain", rewardTx)
+			} else {
+				errMsg = ecp.ParseError(err)
+			}
+
+			logs.GetLogger().Errorf("use %s task contract to get reward failed, error: %s", task.Contract, errMsg)
 			rand.Seed(time.Now().UnixNano())
 			time.Sleep(time.Duration(rand.Intn(3)+1) * time.Second)
 			continue
