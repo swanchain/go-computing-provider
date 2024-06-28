@@ -31,7 +31,7 @@ UserName = ""                                 # The login username, if only a si
 Password = ""                                 # The login password, if only a single node, you can ignore
 
 [RPC]
-SWAN_NETWORK = "https://rpc-proxima.swanchain.io"  # Swan network RPC
+SWAN_CHAIN_RPC = "https://rpc-proxima.swanchain.io"  # Swan chain RPC
 
 [CONTRACT]
 SWAN_CONTRACT = "0x91B25A65b295F0405552A4bbB77879ab5e38166c"              # Swan token's contract address

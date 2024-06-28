@@ -68,7 +68,7 @@ type Registry struct {
 }
 
 type RPC struct {
-	SwanNetwork string `toml:"SWAN_NETWORK"`
+	SwanChainRpc string `toml:"SWAN_CHAIN_RPC"`
 }
 
 type CONTRACT struct {
@@ -80,7 +80,6 @@ type CONTRACT struct {
 
 func GetRpcByNetWorkName(netWorkName ...string) (string, error) {
 	var netWork string
-	var rpc string
 	if len(netWorkName) > 0 && netWorkName[0] != "" {
 		netWork = netWorkName[0]
 	} else {
@@ -90,21 +89,19 @@ func GetRpcByNetWorkName(netWorkName ...string) (string, error) {
 		}
 	}
 
-	switch netWork {
-	case MainnetNetwork:
-		rpc = GetConfig().RPC.SwanNetwork
-	case TestnetNetwork:
-		rpc = GetConfig().RPC.SwanNetwork
-	default:
+	if netWork != MainnetNetwork && netWork != TestnetNetwork {
 		return "", fmt.Errorf("not support network: %s", netWorkName[0])
 	}
-	return rpc, nil
+	return GetConfig().RPC.SwanChainRpc, nil
 }
 
 func InitConfig(cpRepoPath string, standalone bool) error {
 	netWork, ok := os.LookupEnv("CP_NETWORK")
 	if !ok {
 		netWork = MainnetNetwork
+	}
+	if netWork != MainnetNetwork && netWork != TestnetNetwork {
+		return fmt.Errorf("not support network: %s", netWork)
 	}
 
 	configFile := filepath.Join(cpRepoPath, fmt.Sprintf("config-%s.toml", netWork))
@@ -155,7 +152,7 @@ func requiredFieldsAreGiven(metaData toml.MetaData) bool {
 		{"MCS", "BucketName"},
 		{"MCS", "Network"},
 
-		{"RPC", "SWAN_NETWORK"},
+		{"RPC", "SWAN_CHAIN_RPC"},
 
 		{"CONTRACT", "SWAN_CONTRACT"},
 		{"CONTRACT", "SWAN_COLLATERAL_CONTRACT"},
@@ -181,7 +178,7 @@ func requiredFieldsAreGivenForSeparate(metaData toml.MetaData) bool {
 
 		{"UBI", "UbiEnginePk"},
 
-		{"RPC", "SWAN_NETWORK"},
+		{"RPC", "SWAN_CHAIN_RPC"},
 
 		{"CONTRACT", "SWAN_CONTRACT"},
 		{"CONTRACT", "SWAN_COLLATERAL_CONTRACT"},
@@ -222,7 +219,7 @@ func GenerateRepo(cpRepoPath string) error {
 		return fmt.Errorf("not support network: %s", netWork)
 	}
 
-	configFilePath := path.Join(cpRepoPath, "config.toml")
+	configFilePath := path.Join(cpRepoPath, fmt.Sprintf("config-%s.toml", netWork))
 	if _, err = os.Stat(configFilePath); os.IsNotExist(err) {
 		if _, err = toml.Decode(configContent, &configTmpl); err != nil {
 			return fmt.Errorf("parse toml data failed, error: %v", err)
@@ -243,7 +240,15 @@ func UpdateConfigFile(cpRepoPath string, multiAddress, nodeName string, port int
 	var configFile *os.File
 	var err error
 
-	configFilePath := path.Join(cpRepoPath, "config.toml")
+	netWork, ok := os.LookupEnv("CP_NETWORK")
+	if !ok {
+		netWork = MainnetNetwork
+	}
+	if netWork != MainnetNetwork && netWork != TestnetNetwork {
+		return fmt.Errorf("not support network: %s", netWork)
+	}
+
+	configFilePath := path.Join(cpRepoPath, fmt.Sprintf("config-%s.toml", netWork))
 	if _, err = toml.DecodeFile(configFilePath, &configTmpl); err != nil {
 		return err
 	}
