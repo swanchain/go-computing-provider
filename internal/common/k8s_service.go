@@ -1,4 +1,4 @@
-package computing
+package common
 
 import "C"
 import (
@@ -262,33 +262,6 @@ func (s *K8sService) GetPods(namespace, spaceUuid string) (bool, error) {
 		return true, nil
 	}
 	return false, nil
-}
-
-func (s *K8sService) CreateNetworkPolicy(ctx context.Context, namespace string) (*networkingv1.NetworkPolicy, error) {
-	networkPolicy := &networkingv1.NetworkPolicy{
-		ObjectMeta: metaV1.ObjectMeta{
-			Name:      namespace + "-" + generateString(4),
-			Namespace: namespace,
-		},
-		Spec: networkingv1.NetworkPolicySpec{
-			PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress},
-			Ingress: []networkingv1.NetworkPolicyIngressRule{
-				{
-					From: []networkingv1.NetworkPolicyPeer{
-						{
-							NamespaceSelector: &metaV1.LabelSelector{
-								MatchLabels: map[string]string{
-									"kubernetes.io/metadata.name": "ingress-nginx",
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	return s.k8sClient.NetworkingV1().NetworkPolicies(namespace).Create(ctx, networkPolicy, metaV1.CreateOptions{})
 }
 
 func (s *K8sService) CreateNameSpace(ctx context.Context, nameSpace *coreV1.Namespace, opts metaV1.CreateOptions) (result *coreV1.Namespace, err error) {

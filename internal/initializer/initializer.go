@@ -3,15 +3,15 @@ package initializer
 import (
 	"github.com/filswan/go-swan-lib/logs"
 	"github.com/swanchain/go-computing-provider/conf"
-	"github.com/swanchain/go-computing-provider/internal/computing"
+	"github.com/swanchain/go-computing-provider/internal/common"
 )
 
 func ProjectInit(cpRepoPath string) {
 	if err := conf.InitConfig(cpRepoPath, false); err != nil {
 		logs.GetLogger().Fatal(err)
 	}
-	nodeID := computing.InitComputingProvider(cpRepoPath)
+	nodeID := common.InitComputingProvider(cpRepoPath)
 
-	computing.NewCronTask(nodeID).RunTask()
+	common.NewCronTask(nodeID).RunTask()
 
 }

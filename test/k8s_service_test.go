@@ -4,7 +4,7 @@ import (
 	"archive/tar"
 	"context"
 	"fmt"
-	computing2 "github.com/swanchain/go-computing-provider/internal/computing"
+	"github.com/swanchain/go-computing-provider/internal/common"
 	"github.com/swanchain/go-computing-provider/internal/yaml"
 	"io"
 	"log"
@@ -14,7 +14,7 @@ import (
 )
 
 func TestNewK8sService(t *testing.T) {
-	service := computing2.NewK8sService()
+	service := common.NewK8sService()
 	service.GetPods("kube-system", "")
 }
 
@@ -70,16 +70,16 @@ func TestTar(t *testing.T) {
 }
 
 func TestDockerBuild(t *testing.T) {
-	dockerService := computing2.NewDockerService()
+	dockerService := common.NewDockerService()
 	dockerService.CleanResource()
 }
 
 func TestNewStorageService(t *testing.T) {
-	service := computing2.NewStorageService()
-	service.McsApiKey = "wxE8QdLUANzq6zAwosEUOw"
-	service.McsAccessToken = "4efvcH9opkLp0pS3QDACbI0hpCO5lTcp"
-	service.NetWork = "polygon.mainnet"
-	service.BucketName = "Test002"
+	service, err := common.NewStorageService()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
 	path := "/Users/sonic/Documents/python_space/go-computing-provider/cp-cache/jobs/ea015a0d-c78b-4c0e-9103-99fbc8818d89.json"
 	ossFile, err := service.UploadFileToBucket("demo.json", path, false)
@@ -106,7 +106,7 @@ func TestYamlToK8s(t *testing.T) {
 }
 
 func TestStatisticalSources(t *testing.T) {
-	service := computing2.NewK8sService()
+	service := common.NewK8sService()
 	_, err := service.StatisticalSources(context.TODO())
 	if err != nil {
 		log.Fatalln(err)

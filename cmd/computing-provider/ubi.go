@@ -9,8 +9,9 @@ import (
 	cors "github.com/itsjamie/gin-cors"
 	"github.com/olekukonko/tablewriter"
 	"github.com/swanchain/go-computing-provider/conf"
-	"github.com/swanchain/go-computing-provider/internal/computing"
+	"github.com/swanchain/go-computing-provider/internal/common"
 	"github.com/swanchain/go-computing-provider/internal/models"
+	"github.com/swanchain/go-computing-provider/internal/v2/services"
 	"github.com/swanchain/go-computing-provider/util"
 	"github.com/urfave/cli/v2"
 	"os"
@@ -59,12 +60,12 @@ var listCmd = &cli.Command{
 		var taskList []*models.TaskEntity
 		var err error
 		if showFailed {
-			taskList, err = computing.NewTaskService().GetAllTask(tailNum)
+			taskList, err = services.NewTaskService().GetAllTask(tailNum)
 			if err != nil {
 				return fmt.Errorf("failed get ubi task, error: %+v", err)
 			}
 		} else {
-			taskList, err = computing.NewTaskService().GetTaskList(models.TASK_SUCCESS_STATUS, tailNum)
+			taskList, err = services.NewTaskService().GetTaskList(models.TASK_SUCCESS_STATUS, tailNum)
 			if err != nil {
 				return fmt.Errorf("failed get ubi task, error: %+v", err)
 			}
@@ -149,13 +150,13 @@ var daemonCmd = &cli.Command{
 		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 
 		resourceExporterContainerName := "resource-exporter"
-		rsExist, err := computing.NewDockerService().CheckRunningContainer(resourceExporterContainerName)
+		rsExist, err := common.NewDockerService().CheckRunningContainer(resourceExporterContainerName)
 		if err != nil {
 			return fmt.Errorf("check %s container failed, error: %v", resourceExporterContainerName, err)
 		}
 
 		if !rsExist {
-			if err = computing.RestartResourceExporter(); err != nil {
+			if err = common.RestartResourceExporter(); err != nil {
 				logs.GetLogger().Errorf("restartResourceExporter failed, error: %v", err)
 			}
 		}
@@ -163,8 +164,8 @@ var daemonCmd = &cli.Command{
 			logs.GetLogger().Fatal(err)
 		}
 
-		computing.SyncCpAccountInfo()
-		computing.CronTaskForEcp()
+		common.SyncCpAccountInfo()
+		common.CronTaskForEcp()
 
 		r := gin.Default()
 		r.Use(cors.Middleware(cors.Config{
@@ -180,9 +181,9 @@ var daemonCmd = &cli.Command{
 		v1 := r.Group("/api/v1")
 		router := v1.Group("/computing")
 
-		router.GET("/cp", computing.GetCpResource)
-		router.POST("/cp/ubi", computing.DoUbiTaskForDocker)
-		router.POST("/cp/docker/receive/ubi", computing.ReceiveUbiProof)
+		router.GET("/cp", common.GetCpResource)
+		router.POST("/cp/ubi", common.DoUbiTaskForDocker)
+		router.POST("/cp/docker/receive/ubi", common.ReceiveUbiProof)
 
 		shutdownChan := make(chan struct{})
 		httpStopper, err := util.ServeHttp(r, "cp-api", ":"+strconv.Itoa(conf.GetConfig().API.Port), false)

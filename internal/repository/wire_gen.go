@@ -4,38 +4,34 @@
 //go:build !wireinject
 // +build !wireinject
 
-package computing
+package repository
 
 import (
 	"github.com/swanchain/go-computing-provider/internal/db"
 )
 
-import (
-	_ "unsafe"
-)
-
 // Injectors from wire.go:
 
-func NewTaskService() TaskService {
+func NewJob() Job {
 	gormDB := db.NewDbService()
-	taskService := TaskService{
+	job := Job{
 		DB: gormDB,
 	}
-	return taskService
+	return job
 }
 
-func NewJobService() JobService {
+func NewTask() Task {
 	gormDB := db.NewDbService()
-	jobService := JobService{
+	task := Task{
 		DB: gormDB,
 	}
-	return jobService
+	return task
 }
 
-func NewCpInfoService() CpInfoService {
+func NewProvider() Provider {
 	gormDB := db.NewDbService()
-	cpInfoService := CpInfoService{
+	provider := Provider{
 		DB: gormDB,
 	}
-	return cpInfoService
+	return provider
 }

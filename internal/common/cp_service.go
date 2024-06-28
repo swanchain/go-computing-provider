@@ -1,4 +1,4 @@
-package computing
+package common
 
 import (
 	"bufio"
@@ -16,6 +16,7 @@ import (
 	"github.com/swanchain/go-computing-provider/constants"
 	"github.com/swanchain/go-computing-provider/internal/contract"
 	"github.com/swanchain/go-computing-provider/internal/models"
+	"github.com/swanchain/go-computing-provider/internal/v2/services"
 	"github.com/swanchain/go-computing-provider/util"
 	"io"
 	batchv1 "k8s.io/api/batch/v1"
@@ -118,13 +119,13 @@ func ReceiveJob(c *gin.Context) {
 	jobData.JobRealUri = fmt.Sprintf("https://%s", hostName)
 	jobData.NodeIdJobSourceUriSignature = ""
 	go func() {
-		job, err := NewJobService().GetJobEntityBySpaceUuid(spaceUuid)
+		job, err := services.NewJobService().GetJobEntityBySpaceUuid(spaceUuid)
 		if err != nil {
 			logs.GetLogger().Errorf("get job failed, error: %+v", err)
 			return
 		}
 		if job.SpaceUuid != "" {
-			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid)
+			services.NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid)
 		}
 
 		var jobEntity = new(models.JobEntity)
@@ -139,7 +140,7 @@ func ReceiveJob(c *gin.Context) {
 		jobEntity.JobUuid = jobData.UUID
 		jobEntity.DeployStatus = models.DEPLOY_RECEIVE_JOB
 		jobEntity.CreateTime = time.Now().Unix()
-		NewJobService().SaveJobEntity(jobEntity)
+		services.NewJobService().SaveJobEntity(jobEntity)
 
 		go func() {
 			if err = submitJob(&jobData); err != nil {
@@ -184,7 +185,11 @@ func submitJob(jobData *models.JobData) error {
 
 	var resultMcsUrl string
 	for i := 0; i < 5; i++ {
-		storageService := NewStorageService()
+		storageService, err := NewStorageService()
+		if err != nil {
+			logs.GetLogger().Errorln(err)
+			continue
+		}
 		mcsOssFile, err := storageService.UploadFileToBucket(jobDetailFile, taskDetailFilePath, true)
 		if err != nil {
 			logs.GetLogger().Errorf("upload file to bucket failed, error: %v", err)
@@ -203,7 +208,7 @@ func submitJob(jobData *models.JobData) error {
 		resultMcsUrl = *gatewayUrl + "/ipfs/" + mcsOssFile.PayloadCid
 		break
 	}
-	return NewJobService().UpdateJobResultUrlByJobUuid(jobData.UUID, resultMcsUrl)
+	return services.NewJobService().UpdateJobResultUrlByJobUuid(jobData.UUID, resultMcsUrl)
 }
 
 func RedeployJob(c *gin.Context) {
@@ -272,13 +277,13 @@ func RedeployJob(c *gin.Context) {
 
 	go func() {
 		spaceUuid := jobData.JobSourceURI[strings.LastIndex(jobData.JobSourceURI, "/")+1:]
-		job, err := NewJobService().GetJobEntityBySpaceUuid(spaceUuid)
+		job, err := services.NewJobService().GetJobEntityBySpaceUuid(spaceUuid)
 		if err != nil {
 			logs.GetLogger().Errorf("get job failed, error: %+v", err)
 			return
 		}
 		if job.SpaceUuid != "" {
-			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid)
+			services.NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid)
 		}
 
 		var jobEntity = new(models.JobEntity)
@@ -292,7 +297,7 @@ func RedeployJob(c *gin.Context) {
 		jobEntity.Duration = jobData.Duration
 		jobEntity.DeployStatus = models.DEPLOY_RECEIVE_JOB
 		jobEntity.CreateTime = time.Now().Unix()
-		NewJobService().SaveJobEntity(jobEntity)
+		services.NewJobService().SaveJobEntity(jobEntity)
 
 		go func() {
 			if err = submitJob(&jobData); err != nil {
@@ -331,7 +336,7 @@ func ReNewJob(c *gin.Context) {
 		return
 	}
 
-	jobEntity, err := NewJobService().GetJobEntityByTaskUuid(jobData.TaskUuid)
+	jobEntity, err := services.NewJobService().GetJobEntityByTaskUuid(jobData.TaskUuid)
 	if err != nil {
 		logs.GetLogger().Errorf("Failed get job from db, taskUuid: %s, error: %+v", jobData.TaskUuid, err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.FoundJobEntityError))
@@ -344,7 +349,7 @@ func ReNewJob(c *gin.Context) {
 		return
 	} else {
 		jobEntity.ExpireTime = time.Now().Unix() + leftTime + int64(jobData.Duration)
-		err = NewJobService().SaveJobEntity(&jobEntity)
+		err = services.NewJobService().SaveJobEntity(&jobEntity)
 		if err != nil {
 			logs.GetLogger().Errorf("update job expireTime failed, taskUuid: %s, error: %+v", jobData.TaskUuid, err)
 			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SaveJobEntityError))
@@ -386,7 +391,7 @@ func CancelJob(c *gin.Context) {
 		}
 	}
 
-	jobEntity, err := NewJobService().GetJobEntityByTaskUuid(taskUuid)
+	jobEntity, err := services.NewJobService().GetJobEntityByTaskUuid(taskUuid)
 	if err != nil {
 		logs.GetLogger().Errorf("Failed get job from db, taskUuid: %s, error: %+v", taskUuid, err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.FoundJobEntityError))
@@ -406,7 +411,7 @@ func CancelJob(c *gin.Context) {
 		}()
 		k8sNameSpace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(jobEntity.WalletAddress)
 		deleteJob(k8sNameSpace, jobEntity.SpaceUuid)
-		NewJobService().DeleteJobEntityBySpaceUuId(jobEntity.SpaceUuid)
+		services.NewJobService().DeleteJobEntityBySpaceUuId(jobEntity.SpaceUuid)
 	}()
 
 	c.JSON(http.StatusOK, util.CreateSuccessResponse("deleted success"))
@@ -452,7 +457,7 @@ func GetJobStatus(c *gin.Context) {
 		return
 	}
 
-	jobEntity, err := NewJobService().GetJobEntityByJobUuid(jobUuId)
+	jobEntity, err := services.NewJobService().GetJobEntityByJobUuid(jobUuId)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.FoundJobEntityError))
 		return
@@ -528,7 +533,7 @@ func GetSpaceLog(c *gin.Context) {
 		return
 	}
 
-	jobEntity, err := NewJobService().GetJobEntityBySpaceUuid(spaceUuid)
+	jobEntity, err := services.NewJobService().GetJobEntityBySpaceUuid(spaceUuid)
 	if err != nil {
 		logs.GetLogger().Error(err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.FoundJobEntityError))
@@ -751,7 +756,7 @@ func DeploySpaceTask(jobSourceURI, hostName string, duration int, jobUuid string
 		if !success {
 			k8sNameSpace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(walletAddress)
 			deleteJob(k8sNameSpace, spaceUuid)
-			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid)
+			services.NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid)
 		}
 
 		if err := recover(); err != nil {
@@ -782,7 +787,7 @@ func DeploySpaceTask(jobSourceURI, hostName string, duration int, jobUuid string
 	job.SpaceUuid = spaceDetail.Data.Space.Uuid
 	job.Hardware = spaceHardware.Description
 	job.SpaceType = 0
-	if err = NewJobService().UpdateJobEntityBySpaceUuid(job); err != nil {
+	if err = services.NewJobService().UpdateJobEntityBySpaceUuid(job); err != nil {
 		logs.GetLogger().Errorf("update job info failed, error: %v", err)
 		return ""
 	}

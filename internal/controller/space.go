@@ -2,15 +2,15 @@ package controller
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/swanchain/go-computing-provider/internal/service"
+	"github.com/swanchain/go-computing-provider/internal/v2/services"
 )
 
 type SpaceHandler struct {
-	spaceService service.SpaceService
+	jobService services.JobService
 }
 
-func NewSpaceHandler(spaceService service.SpaceService) *SpaceHandler {
-	return &SpaceHandler{spaceService: spaceService}
+func NewSpaceHandler(jobService services.JobService) *SpaceHandler {
+	return &SpaceHandler{jobService: jobService}
 }
 
 func (sh *SpaceHandler) DeployJob(c *gin.Context) {

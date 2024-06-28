@@ -1,4 +1,4 @@
-package computing
+package common
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/swanchain/go-computing-provider/constants"
 	"github.com/swanchain/go-computing-provider/internal/models"
+	"github.com/swanchain/go-computing-provider/internal/v2/services"
 	"github.com/swanchain/go-computing-provider/internal/yaml"
 	"github.com/swanchain/go-computing-provider/util"
 	appV1 "k8s.io/api/apps/v1"
@@ -570,7 +571,7 @@ func (d *Deploy) watchContainerRunningTime() {
 	job.ImageName = d.image
 	job.K8sResourceType = "deployment"
 	job.ResourceType = d.TaskType
-	if err := NewJobService().UpdateJobEntityBySpaceUuid(job); err != nil {
+	if err := services.NewJobService().UpdateJobEntityBySpaceUuid(job); err != nil {
 		logs.GetLogger().Errorf("update job info failed, error: %v", err)
 		return
 	}

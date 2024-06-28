@@ -1,4 +1,4 @@
-package computing
+package common
 
 import (
 	"bufio"

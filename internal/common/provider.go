@@ -1,4 +1,4 @@
-package computing
+package common
 
 import (
 	"crypto/ecdsa"
@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/swanchain/go-computing-provider/internal/contract"
+	"github.com/swanchain/go-computing-provider/internal/v2/services"
 	"log"
 	"os"
 	"path/filepath"
@@ -77,7 +78,7 @@ func GetOwnerAddressAndWorkerAddress() (string, string, error) {
 		return "", "", fmt.Errorf("get cp account contract address failed, error: %v", err)
 	}
 
-	cpInfoEntity, err := NewCpInfoService().GetCpInfoEntityByAccountAddress(cpAccountAddress)
+	cpInfoEntity, err := services.NewCpInfoService().GetCpInfoEntityByAccountAddress(cpAccountAddress)
 	if err != nil {
 		return "", "", fmt.Errorf("get cp info failed, account address: %s, error: %v", cpAccountAddress, err)
 	}

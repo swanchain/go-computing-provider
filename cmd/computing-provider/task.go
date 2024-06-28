@@ -6,7 +6,8 @@ import (
 	"github.com/olekukonko/tablewriter"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/constants"
-	"github.com/swanchain/go-computing-provider/internal/computing"
+	"github.com/swanchain/go-computing-provider/internal/common"
+	"github.com/swanchain/go-computing-provider/internal/v2/services"
 	"github.com/urfave/cli/v2"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"os"
@@ -47,12 +48,12 @@ var taskList = &cli.Command{
 		var taskData [][]string
 		var rowColorList []RowColor
 
-		list, err := computing.NewJobService().GetJobList()
+		list, err := services.NewJobService().GetJobList()
 		if err != nil {
 			return fmt.Errorf("get jobs failed, error: %+v", err)
 		}
 		for i, job := range list {
-			k8sService := computing.NewK8sService()
+			k8sService := common.NewK8sService()
 			status, err := k8sService.GetDeploymentStatus(job.WalletAddress, job.SpaceUuid)
 			if err != nil {
 				return fmt.Errorf("failed get job status: %s, error: %+v", job.JobUuid, err)
@@ -127,12 +128,12 @@ var taskDetail = &cli.Command{
 		}
 
 		taskUuid := cctx.Args().First()
-		job, err := computing.NewJobService().GetJobEntityByTaskUuid(taskUuid)
+		job, err := services.NewJobService().GetJobEntityByTaskUuid(taskUuid)
 		if err != nil {
 			return fmt.Errorf("task_uuid: %s, get job detail failed, error: %+v", taskUuid, err)
 		}
 
-		k8sService := computing.NewK8sService()
+		k8sService := common.NewK8sService()
 		status, err := k8sService.GetDeploymentStatus(job.WalletAddress, job.SpaceUuid)
 		if err != nil {
 			return fmt.Errorf("failed get job status: %s, error: %+v", job.JobUuid, err)
@@ -186,14 +187,14 @@ var taskDelete = &cli.Command{
 		}
 
 		taskUuid := strings.ToLower(cctx.Args().First())
-		job, err := computing.NewJobService().GetJobEntityByTaskUuid(taskUuid)
+		job, err := services.NewJobService().GetJobEntityByTaskUuid(taskUuid)
 		if err != nil {
 			return fmt.Errorf("failed get job detail: %s, error: %+v", taskUuid, err)
 		}
 
 		deployName := constants.K8S_DEPLOY_NAME_PREFIX + job.SpaceUuid
 		namespace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(job.WalletAddress)
-		k8sService := computing.NewK8sService()
+		k8sService := common.NewK8sService()
 		if err := k8sService.DeleteDeployment(context.TODO(), namespace, deployName); err != nil && !errors.IsNotFound(err) {
 			return err
 		}
@@ -203,7 +204,7 @@ var taskDelete = &cli.Command{
 			return err
 		}
 
-		computing.NewJobService().DeleteJobEntityBySpaceUuId(job.SpaceUuid)
+		services.NewJobService().DeleteJobEntityBySpaceUuId(job.SpaceUuid)
 		return nil
 	},
 }

@@ -1,6 +1,7 @@
-package computing
+package common
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 
@@ -21,31 +22,24 @@ type StorageService struct {
 	mcsClient      *user.McsClient
 }
 
-func NewStorageService() *StorageService {
+func NewStorageService() (*StorageService, error) {
+	var err error
+	var mcsClient *user.McsClient
+
 	storageOnce.Do(func() {
 		storage = &StorageService{
-			McsApiKey:      conf.GetConfig().MCS.ApiKey,
-			McsAccessToken: conf.GetConfig().MCS.AccessToken,
-			NetWork:        conf.GetConfig().MCS.Network,
-			BucketName:     conf.GetConfig().MCS.BucketName,
+			McsApiKey:  conf.GetConfig().MCS.ApiKey,
+			NetWork:    conf.GetConfig().MCS.Network,
+			BucketName: conf.GetConfig().MCS.BucketName,
 		}
-		var err error
-		var mcsClient *user.McsClient
-
-		if storage.McsAccessToken != "" {
-			mcsClient, err = user.LoginByApikey(storage.McsApiKey, storage.McsAccessToken, storage.NetWork)
-		} else {
-			mcsClient, err = user.LoginByApikeyV2(storage.McsApiKey, storage.NetWork)
-		}
-
-		if err != nil {
-			logs.GetLogger().Errorf("Failed creating mcsClient, error: %v", err)
-			return
-		}
-		storage.mcsClient = mcsClient
+		mcsClient, err = user.LoginByApikeyV2(storage.McsApiKey, storage.NetWork)
 	})
 
-	return storage
+	if err != nil {
+		return nil, fmt.Errorf("create mcsClient failed, please check MCS.ApiKey, error: %v", err)
+	}
+	storage.mcsClient = mcsClient
+	return storage, nil
 }
 
 func (storage *StorageService) UploadFileToBucket(objectName, filePath string, replace bool) (*bucket.OssFile, error) {

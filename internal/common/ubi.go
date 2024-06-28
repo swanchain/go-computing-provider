@@ -1,4 +1,4 @@
-package computing
+package common
 
 import (
 	"context"
@@ -17,6 +17,7 @@ import (
 	account2 "github.com/swanchain/go-computing-provider/internal/contract/account"
 	"github.com/swanchain/go-computing-provider/internal/contract/ecp"
 	"github.com/swanchain/go-computing-provider/internal/models"
+	"github.com/swanchain/go-computing-provider/internal/v2/services"
 	"github.com/swanchain/go-computing-provider/util"
 	"github.com/swanchain/go-computing-provider/wallet"
 	"io"
@@ -123,7 +124,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 	taskEntity.CreateTime = time.Now().Unix()
 	taskEntity.Deadline = ubiTask.DeadLine
 	taskEntity.CheckCode = ubiTask.CheckCode
-	err = NewTaskService().SaveTaskEntity(taskEntity)
+	err = services.NewTaskService().SaveTaskEntity(taskEntity)
 	if err != nil {
 		logs.GetLogger().Errorf("save task entity failed, error: %v", err)
 		return
@@ -142,7 +143,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 	nodeName, architecture, needCpu, needMemory, needStorage, err := checkResourceAvailableForUbi(ubiTask.ResourceType, c2GpuName, ubiTask.Resource)
 	if err != nil {
 		taskEntity.Status = models.TASK_FAILED_STATUS
-		NewTaskService().SaveTaskEntity(taskEntity)
+		services.NewTaskService().SaveTaskEntity(taskEntity)
 		logs.GetLogger().Errorf("check resource failed, error: %v", err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
 		return
@@ -151,7 +152,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 	if nodeName == "" {
 		taskEntity.Status = models.TASK_FAILED_STATUS
 		taskEntity.Error = "No resources available"
-		NewTaskService().SaveTaskEntity(taskEntity)
+		services.NewTaskService().SaveTaskEntity(taskEntity)
 		logs.GetLogger().Warnf("ubi task id: %d, type: %s, not found a resources available", ubiTask.ID, models.GetResourceTypeStr(ubiTask.ResourceType))
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError))
 		return
@@ -177,7 +178,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 	memQuantity, err := resource.ParseQuantity(fmt.Sprintf("%d%s", needMemory, memUnit))
 	if err != nil {
 		taskEntity.Status = models.TASK_FAILED_STATUS
-		NewTaskService().SaveTaskEntity(taskEntity)
+		services.NewTaskService().SaveTaskEntity(taskEntity)
 		logs.GetLogger().Error("get memory failed, error: %+v", err)
 		return
 	}
@@ -185,7 +186,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 	storageQuantity, err := resource.ParseQuantity(fmt.Sprintf("%d%s", needStorage, diskUnit))
 	if err != nil {
 		taskEntity.Status = models.TASK_FAILED_STATUS
-		NewTaskService().SaveTaskEntity(taskEntity)
+		services.NewTaskService().SaveTaskEntity(taskEntity)
 		logs.GetLogger().Error("get storage failed, error: %+v", err)
 		return
 	}
@@ -193,7 +194,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 	maxMemQuantity, err := resource.ParseQuantity(fmt.Sprintf("%d%s", needMemory*2, memUnit))
 	if err != nil {
 		taskEntity.Status = models.TASK_FAILED_STATUS
-		NewTaskService().SaveTaskEntity(taskEntity)
+		services.NewTaskService().SaveTaskEntity(taskEntity)
 		logs.GetLogger().Error("get memory failed, error: %+v", err)
 		return
 	}
@@ -201,7 +202,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 	maxStorageQuantity, err := resource.ParseQuantity(fmt.Sprintf("%d%s", needStorage*2, diskUnit))
 	if err != nil {
 		taskEntity.Status = models.TASK_FAILED_STATUS
-		NewTaskService().SaveTaskEntity(taskEntity)
+		services.NewTaskService().SaveTaskEntity(taskEntity)
 		logs.GetLogger().Error("get storage failed, error: %+v", err)
 		return
 	}
@@ -230,7 +231,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 				return
 			}
 
-			ubiTaskRun, err := NewTaskService().GetTaskEntity(int64(ubiTask.ID))
+			ubiTaskRun, err := services.NewTaskService().GetTaskEntity(int64(ubiTask.ID))
 			if err != nil {
 				logs.GetLogger().Errorf("get ubi task detail from db failed, ubiTaskId: %d, error: %+v", ubiTask.ID, err)
 				return
@@ -243,7 +244,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 				k8sService := NewK8sService()
 				k8sService.k8sClient.CoreV1().Namespaces().Delete(context.TODO(), namespace, metaV1.DeleteOptions{})
 			}
-			err = NewTaskService().SaveTaskEntity(ubiTaskRun)
+			err = services.NewTaskService().SaveTaskEntity(ubiTaskRun)
 		}()
 
 		if ubiTaskImage == "" {
@@ -439,7 +440,7 @@ func ReceiveUbiProof(c *gin.Context) {
 		return
 	}
 
-	ubiTask, err := NewTaskService().GetTaskEntity(int64(taskId))
+	ubiTask, err := services.NewTaskService().GetTaskEntity(int64(taskId))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
 		return
@@ -548,7 +549,7 @@ func DoUbiTaskForDocker(c *gin.Context) {
 	taskEntity.CreateTime = time.Now().Unix()
 	taskEntity.Deadline = ubiTask.DeadLine
 	taskEntity.CheckCode = ubiTask.CheckCode
-	err = NewTaskService().SaveTaskEntity(taskEntity)
+	err = services.NewTaskService().SaveTaskEntity(taskEntity)
 	if err != nil {
 		logs.GetLogger().Errorf("save task entity failed, error: %v", err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SaveTaskEntityError))
@@ -564,7 +565,7 @@ func DoUbiTaskForDocker(c *gin.Context) {
 	_, architecture, _, needMemory, err := checkResourceForUbi(ubiTask.Resource, gpuName, ubiTask.ResourceType)
 	if err != nil {
 		taskEntity.Status = models.TASK_FAILED_STATUS
-		NewTaskService().SaveTaskEntity(taskEntity)
+		services.NewTaskService().SaveTaskEntity(taskEntity)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
 		return
 	}
@@ -857,7 +858,7 @@ loopTask:
 		logs.GetLogger().Warnf("taskId: %s proof submission deadline has passed,current: %d, deadline: %d, , deadlineTime: %d", c2Proof.TaskId, blockNumber, task.Deadline, remainingTime)
 		task.Status = models.TASK_FAILED_STATUS
 		task.Error = fmt.Sprintf("create contract deadline has passed")
-		return NewTaskService().SaveTaskEntity(task)
+		return services.NewTaskService().SaveTaskEntity(task)
 	}
 	taskContractAddress, err := taskStub.CreateTaskContract(c2Proof.Proof, task, remainingTime)
 	if taskContractAddress != "" {
@@ -869,7 +870,7 @@ loopTask:
 		task.Error = fmt.Sprintf("%s", err.Error())
 		logs.GetLogger().Errorf("taskId: %s, create task contract failed, error: %v", c2Proof.TaskId, err)
 	}
-	return NewTaskService().SaveTaskEntity(task)
+	return services.NewTaskService().SaveTaskEntity(task)
 }
 
 func GetTaskInfoOnChain(rpcName string, taskContract string) (models.EcpTaskInfo, error) {
@@ -966,7 +967,7 @@ func CronTaskForEcp() {
 		for range ticker.C {
 			var taskList []models.TaskEntity
 			oneHourAgo := time.Now().Add(-1 * time.Hour).Unix()
-			err := NewTaskService().Model(&models.TaskEntity{}).Where("status !=? and status !=? and create_time <?", models.TASK_SUCCESS_STATUS, models.TASK_FAILED_STATUS, oneHourAgo).
+			err := services.NewTaskService().Model(&models.TaskEntity{}).Where("status !=? and status !=? and create_time <?", models.TASK_SUCCESS_STATUS, models.TASK_FAILED_STATUS, oneHourAgo).
 				Or("tx_hash !='' and status =?", models.TASK_FAILED_STATUS).Find(&taskList).Error
 			if err != nil {
 				logs.GetLogger().Errorf("Failed get task list, error: %+v", err)
@@ -980,7 +981,7 @@ func CronTaskForEcp() {
 				} else {
 					ubiTask.Status = models.TASK_FAILED_STATUS
 				}
-				NewTaskService().SaveTaskEntity(&ubiTask)
+				services.NewTaskService().SaveTaskEntity(&ubiTask)
 			}
 		}
 	}()
@@ -1029,7 +1030,7 @@ func SyncCpAccountInfo() {
 	cpInfo.MultiAddresses = cpAccount.MultiAddresses
 	cpInfo.Version = cpAccount.Version
 	cpInfo.TaskTypes = cpAccount.TaskTypes
-	if err = NewCpInfoService().SaveCpInfoEntity(cpInfo); err != nil {
+	if err = services.NewCpInfoService().SaveCpInfoEntity(cpInfo); err != nil {
 		logs.GetLogger().Errorf("save cp info to db failed, error: %v", err)
 		return
 	}

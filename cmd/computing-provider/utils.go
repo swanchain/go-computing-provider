@@ -9,9 +9,10 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/swanchain/go-computing-provider/conf"
-	"github.com/swanchain/go-computing-provider/internal/computing"
+	common2 "github.com/swanchain/go-computing-provider/internal/common"
 	"github.com/swanchain/go-computing-provider/internal/contract/account"
 	"github.com/swanchain/go-computing-provider/internal/models"
+	"github.com/swanchain/go-computing-provider/internal/v2/services"
 	"github.com/swanchain/go-computing-provider/wallet"
 	"math/big"
 	"os"
@@ -76,7 +77,7 @@ func createAccount(cpRepoPath, ownerAddress, beneficiaryAddress string, workerAd
 	auth.GasFeeCap = suggestGasPrice
 	auth.Context = context.Background()
 
-	nodeID := computing.GetNodeId(cpRepoPath)
+	nodeID := common2.GetNodeId(cpRepoPath)
 	multiAddresses := conf.GetConfig().API.MultiAddress
 
 	if strings.Contains(conf.GetConfig().API.MultiAddress, "<") || strings.Contains(conf.GetConfig().API.MultiAddress, "PUBLIC") {
@@ -105,7 +106,7 @@ func createAccount(cpRepoPath, ownerAddress, beneficiaryAddress string, workerAd
 	cpInfo.UpdateAt = time.Now().Format("2006-01-02 15:04:05")
 	cpInfo.MultiAddresses = []string{multiAddresses}
 	cpInfo.TaskTypes = taskTypes
-	if err = computing.NewCpInfoService().SaveCpInfoEntity(cpInfo); err != nil {
+	if err = services.NewCpInfoService().SaveCpInfoEntity(cpInfo); err != nil {
 		return fmt.Errorf("save cp info to db failed, error: %v", err)
 	}
 

@@ -11,12 +11,13 @@ import (
 	"github.com/itsjamie/gin-cors"
 	"github.com/olekukonko/tablewriter"
 	"github.com/swanchain/go-computing-provider/conf"
-	"github.com/swanchain/go-computing-provider/internal/computing"
+	common2 "github.com/swanchain/go-computing-provider/internal/common"
 	account2 "github.com/swanchain/go-computing-provider/internal/contract/account"
 	"github.com/swanchain/go-computing-provider/internal/contract/ecp"
 	"github.com/swanchain/go-computing-provider/internal/contract/fcp"
 	"github.com/swanchain/go-computing-provider/internal/initializer"
 	"github.com/swanchain/go-computing-provider/internal/models"
+	"github.com/swanchain/go-computing-provider/internal/v2/services"
 	"github.com/swanchain/go-computing-provider/util"
 	"github.com/swanchain/go-computing-provider/wallet"
 	"github.com/urfave/cli/v2"
@@ -69,19 +70,19 @@ var runCmd = &cli.Command{
 }
 
 func cpManager(router *gin.RouterGroup) {
-	router.GET("/cp", computing.StatisticalSources)
-	router.GET("/host/info", computing.GetServiceProviderInfo)
-	router.POST("/lagrange/jobs", computing.ReceiveJob)
-	router.POST("/lagrange/jobs/redeploy", computing.RedeployJob)
-	router.DELETE("/lagrange/jobs", computing.CancelJob)
-	router.POST("/lagrange/jobs/renew", computing.ReNewJob)
-	router.GET("/lagrange/spaces/log", computing.GetSpaceLog)
-	router.POST("/lagrange/cp/proof", computing.DoProof)
-	router.GET("/lagrange/cp/whitelist", computing.WhiteList)
-	router.GET("/lagrange/job/:job_uuid", computing.GetJobStatus)
+	router.GET("/cp", common2.StatisticalSources)
+	router.GET("/host/info", common2.GetServiceProviderInfo)
+	router.POST("/lagrange/jobs", common2.ReceiveJob)
+	router.POST("/lagrange/jobs/redeploy", common2.RedeployJob)
+	router.DELETE("/lagrange/jobs", common2.CancelJob)
+	router.POST("/lagrange/jobs/renew", common2.ReNewJob)
+	router.GET("/lagrange/spaces/log", common2.GetSpaceLog)
+	router.POST("/lagrange/cp/proof", common2.DoProof)
+	router.GET("/lagrange/cp/whitelist", common2.WhiteList)
+	router.GET("/lagrange/job/:job_uuid", common2.GetJobStatus)
 
-	router.POST("/cp/ubi", computing.DoUbiTaskForK8s)
-	router.POST("/cp/receive/ubi", computing.ReceiveUbiProof)
+	router.POST("/cp/ubi", common2.DoUbiTaskForK8s)
+	router.POST("/cp/receive/ubi", common2.ReceiveUbiProof)
 
 }
 
@@ -97,9 +98,9 @@ var infoCmd = &cli.Command{
 			return fmt.Errorf("load config file failed, error: %+v", err)
 		}
 
-		localNodeId := computing.GetNodeId(cpRepoPath)
+		localNodeId := common2.GetNodeId(cpRepoPath)
 
-		k8sService := computing.NewK8sService()
+		k8sService := common2.NewK8sService()
 		var count int
 		if k8sService.Version == "" {
 			count = 0
@@ -395,7 +396,7 @@ var taskInfoCmd = &cli.Command{
 			return fmt.Errorf("the chain is required")
 		}
 
-		taskInfo, err := computing.GetTaskInfoOnChain(chain, taskContract)
+		taskInfo, err := common2.GetTaskInfoOnChain(chain, taskContract)
 		if err != nil {
 			return fmt.Errorf("get task info on the chain failed, error: %v", err)
 		}
@@ -600,8 +601,8 @@ var changeMultiAddressCmd = &cli.Command{
 			return fmt.Errorf("changeMultiAddress tx failed, error: %v", err)
 		}
 
-		nodeId := computing.GetNodeId(cpRepoPath)
-		if err = computing.NewCpInfoService().UpdateCpInfoByNodeId(&models.CpInfoEntity{NodeId: nodeId, MultiAddresses: newMultiAddress}); err != nil {
+		nodeId := common2.GetNodeId(cpRepoPath)
+		if err = services.NewCpInfoService().UpdateCpInfoByNodeId(&models.CpInfoEntity{NodeId: nodeId, MultiAddresses: newMultiAddress}); err != nil {
 			return fmt.Errorf("update multi_addresses of cp to db failed, error: %v", err)
 		}
 		fmt.Printf("changeMultiAddress Transaction hash: %s\n", changeMultiAddressTx)
@@ -661,8 +662,8 @@ var changeOwnerAddressCmd = &cli.Command{
 			return err
 		}
 
-		nodeId := computing.GetNodeId(cpRepoPath)
-		if err = computing.NewCpInfoService().UpdateCpInfoByNodeId(&models.CpInfoEntity{NodeId: nodeId, OwnerAddress: newOwnerAddr}); err != nil {
+		nodeId := common2.GetNodeId(cpRepoPath)
+		if err = services.NewCpInfoService().UpdateCpInfoByNodeId(&models.CpInfoEntity{NodeId: nodeId, OwnerAddress: newOwnerAddr}); err != nil {
 			return fmt.Errorf("update owner_address of cp to db failed, error: %v", err)
 		}
 
@@ -722,8 +723,8 @@ var changeBeneficiaryAddressCmd = &cli.Command{
 			return err
 		}
 
-		nodeId := computing.GetNodeId(cpRepoPath)
-		if err = computing.NewCpInfoService().UpdateCpInfoByNodeId(&models.CpInfoEntity{NodeId: nodeId, Beneficiary: beneficiaryAddress}); err != nil {
+		nodeId := common2.GetNodeId(cpRepoPath)
+		if err = services.NewCpInfoService().UpdateCpInfoByNodeId(&models.CpInfoEntity{NodeId: nodeId, Beneficiary: beneficiaryAddress}); err != nil {
 			return fmt.Errorf("update beneficiary_address of cp to db failed, error: %v", err)
 		}
 
@@ -783,8 +784,8 @@ var changeWorkerAddressCmd = &cli.Command{
 			return err
 		}
 
-		nodeId := computing.GetNodeId(cpRepoPath)
-		if err = computing.NewCpInfoService().UpdateCpInfoByNodeId(&models.CpInfoEntity{NodeId: nodeId, WorkerAddress: workerAddress}); err != nil {
+		nodeId := common2.GetNodeId(cpRepoPath)
+		if err = services.NewCpInfoService().UpdateCpInfoByNodeId(&models.CpInfoEntity{NodeId: nodeId, WorkerAddress: workerAddress}); err != nil {
 			return fmt.Errorf("update worker_address of cp to db failed, error: %v", err)
 		}
 
@@ -857,8 +858,8 @@ var changeTaskTypesCmd = &cli.Command{
 			return err
 		}
 
-		nodeId := computing.GetNodeId(cpRepoPath)
-		if err = computing.NewCpInfoService().UpdateCpInfoByNodeId(&models.CpInfoEntity{NodeId: nodeId, TaskTypes: taskTypesUint}); err != nil {
+		nodeId := common2.GetNodeId(cpRepoPath)
+		if err = services.NewCpInfoService().UpdateCpInfoByNodeId(&models.CpInfoEntity{NodeId: nodeId, TaskTypes: taskTypesUint}); err != nil {
 			return fmt.Errorf("update task_types of cp to db failed, error: %v", err)
 		}
 

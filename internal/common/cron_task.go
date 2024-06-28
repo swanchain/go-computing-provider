@@ -1,4 +1,4 @@
-package computing
+package common
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"github.com/swanchain/go-computing-provider/constants"
 	"github.com/swanchain/go-computing-provider/internal/contract/fcp"
 	"github.com/swanchain/go-computing-provider/internal/models"
+	"github.com/swanchain/go-computing-provider/internal/v2/services"
 	"io"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -137,7 +138,7 @@ func (task *CronTask) watchExpiredTask() {
 			}
 		}()
 
-		jobList, err := NewJobService().GetJobList()
+		jobList, err := services.NewJobService().GetJobList()
 		if err != nil {
 			logs.GetLogger().Errorf("Failed watchExpiredTask get job data, error: %+v", err)
 			return
@@ -185,7 +186,7 @@ func (task *CronTask) watchExpiredTask() {
 		}
 
 		for _, spaceUuid := range deleteSpaceIds {
-			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid)
+			services.NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid)
 		}
 
 	})
@@ -279,7 +280,7 @@ func (task *CronTask) setFailedUbiTaskStatus() {
 
 		var taskList []models.TaskEntity
 		oneHourAgo := time.Now().Add(-1 * time.Hour).Unix()
-		err := NewTaskService().Model(&models.TaskEntity{}).Where("status in (?,?)", models.TASK_RECEIVED_STATUS, models.TASK_RUNNING_STATUS).
+		err := services.NewTaskService().Model(&models.TaskEntity{}).Where("status in (?,?)", models.TASK_RECEIVED_STATUS, models.TASK_RUNNING_STATUS).
 			Or("status ==? and tx_hash !=''", models.TASK_FAILED_STATUS).
 			Or("status=? and tx_hash==''", models.TASK_SUCCESS_STATUS).Find(&taskList).Error
 		if err != nil {
@@ -303,7 +304,7 @@ func (task *CronTask) setFailedUbiTaskStatus() {
 				ubiTask.Status = models.TASK_FAILED_STATUS
 			}
 
-			NewTaskService().SaveTaskEntity(&ubiTask)
+			services.NewTaskService().SaveTaskEntity(&ubiTask)
 		}
 	})
 	c.Start()
@@ -387,7 +388,7 @@ func reportJobStatus(jobUuid string, deployStatus int) bool {
 	var job = new(models.JobEntity)
 	job.JobUuid = jobUuid
 	job.DeployStatus = deployStatus
-	if err := NewJobService().UpdateJobEntityByJobUuid(job); err != nil {
+	if err := services.NewJobService().UpdateJobEntityByJobUuid(job); err != nil {
 		logs.GetLogger().Errorf("update job info by jobUuid failed, error: %v", err)
 	}
 	return true
