@@ -205,8 +205,9 @@ var testnetConfigContent string
 //go:embed config-mainnet.toml.sample
 var mainnetConfigContent string
 
-func GenerateRepo(cpRepoPath string) error {
+func GenerateAndUpdateConfigFile(cpRepoPath string, multiAddress, nodeName string, port int) error {
 	var configTmpl ComputeNode
+	var configContent string
 	var configFile *os.File
 	var err error
 
@@ -214,8 +215,10 @@ func GenerateRepo(cpRepoPath string) error {
 	if !ok {
 		netWork = MainnetNetwork
 	}
+	if netWork != MainnetNetwork && netWork != TestnetNetwork {
+		return fmt.Errorf("not support network: %s", netWork)
+	}
 
-	var configContent string
 	switch netWork {
 	case MainnetNetwork:
 		configContent = mainnetConfigContent
@@ -225,7 +228,7 @@ func GenerateRepo(cpRepoPath string) error {
 		return fmt.Errorf("not support network: %s", netWork)
 	}
 
-	var configName = fmt.Sprintf("config-%s.toml", netWork)
+	configName := fmt.Sprintf("config-%s.toml", netWork)
 	configFilePath := path.Join(cpRepoPath, configName)
 	if _, err = os.Stat(configFilePath); os.IsNotExist(err) {
 		logs.GetLogger().Warnf("The configuration file %s not found, generating this configuration file", configFilePath)
@@ -239,25 +242,8 @@ func GenerateRepo(cpRepoPath string) error {
 		if err = toml.NewEncoder(configFile).Encode(configTmpl); err != nil {
 			return fmt.Errorf("write data to %s file failed, error: %v", configName, err)
 		}
-		logs.GetLogger().Fatalf("You need to manually change the configuration in %s", configFilePath)
-	}
-	return nil
-}
-
-func UpdateConfigFile(cpRepoPath string, multiAddress, nodeName string, port int) error {
-	var configTmpl ComputeNode
-	var configFile *os.File
-	var err error
-
-	netWork, ok := os.LookupEnv("CP_NETWORK")
-	if !ok {
-		netWork = MainnetNetwork
-	}
-	if netWork != MainnetNetwork && netWork != TestnetNetwork {
-		return fmt.Errorf("not support network: %s", netWork)
 	}
 
-	configFilePath := path.Join(cpRepoPath, fmt.Sprintf("config-%s.toml", netWork))
 	if _, err = toml.DecodeFile(configFilePath, &configTmpl); err != nil {
 		return err
 	}
