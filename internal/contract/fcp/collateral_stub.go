@@ -31,12 +31,6 @@ func WithPrivateKey(pk string) Option {
 	}
 }
 
-func WithPublicKey(pk string) Option {
-	return func(obj *Stub) {
-		obj.publicK = pk
-	}
-}
-
 func WithCpAccountAddress(cpAccountAddress string) Option {
 	return func(obj *Stub) {
 		obj.cpAccountAddress = cpAccountAddress
