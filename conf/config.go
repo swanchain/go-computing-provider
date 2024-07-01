@@ -228,6 +228,7 @@ func GenerateRepo(cpRepoPath string) error {
 	var configName = fmt.Sprintf("config-%s.toml", netWork)
 	configFilePath := path.Join(cpRepoPath, configName)
 	if _, err = os.Stat(configFilePath); os.IsNotExist(err) {
+		logs.GetLogger().Warnf("The configuration file %s not found, generating this configuration file", configFilePath)
 		if _, err = toml.Decode(configContent, &configTmpl); err != nil {
 			return fmt.Errorf("parse toml data failed, error: %v", err)
 		}
@@ -238,7 +239,7 @@ func GenerateRepo(cpRepoPath string) error {
 		if err = toml.NewEncoder(configFile).Encode(configTmpl); err != nil {
 			return fmt.Errorf("write data to %s file failed, error: %v", configName, err)
 		}
-		logs.GetLogger().Warnf("You need to manually change the configuration in %s", configFilePath)
+		logs.GetLogger().Fatalf("You need to manually change the configuration in %s", configFilePath)
 	}
 	return nil
 }
