@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"fmt"
 	"github.com/BurntSushi/toml"
+	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"log"
 	"os"
 	"path"
@@ -237,6 +238,7 @@ func GenerateRepo(cpRepoPath string) error {
 		if err = toml.NewEncoder(configFile).Encode(configTmpl); err != nil {
 			return fmt.Errorf("write data to %s file failed, error: %v", configName, err)
 		}
+		logs.GetLogger().Warnf("You need to manually change the configuration in %s", configFilePath)
 	}
 	return nil
 }
