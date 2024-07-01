@@ -435,7 +435,7 @@ var taskInfoCmd = &cli.Command{
 				defer client.Close()
 				receipt, err := client.TransactionReceipt(context.Background(), common.HexToHash(taskInfo.RewardTx))
 				if err == nil {
-					contractAbi, err := abi.JSON(strings.NewReader(token.MainMetaData.ABI))
+					contractAbi, err := abi.JSON(strings.NewReader(token.TokenMetaData.ABI))
 					if err == nil {
 						for _, l := range receipt.Logs {
 							event := struct {
