@@ -105,6 +105,11 @@ func InitConfig(cpRepoPath string, standalone bool) error {
 	}
 
 	configFile := filepath.Join(cpRepoPath, fmt.Sprintf("config-%s.toml", netWork))
+
+	if _, err := os.Stat(configFile); err != nil {
+		return fmt.Errorf("not found %s config file", configFile)
+	}
+
 	metaData, err := toml.DecodeFile(configFile, &config)
 	if err != nil {
 		return fmt.Errorf("failed load config file, path: %s, error: %w", configFile, err)
