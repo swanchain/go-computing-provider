@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/mitchellh/go-homedir"
 	"github.com/swanchain/go-computing-provider/build"
-	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/db"
 	"github.com/urfave/cli/v2"
 	"os"
@@ -52,9 +51,7 @@ func main() {
 					return fmt.Errorf("create cp repo failed, error: %v", cpRepoPath)
 				}
 			}
-			if err = conf.GenerateRepo(cpRepoPath); err != nil {
-				return fmt.Errorf("init repo failed, error: %v", err)
-			}
+
 			os.Setenv("CP_PATH", cpRepoPath)
 			db.InitDb(cpRepoPath)
 

@@ -514,9 +514,11 @@ var initCmd = &cli.Command{
 		if !ok {
 			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
 		}
-		if err := conf.InitConfig(cpRepoPath, true); err != nil {
-			logs.GetLogger().Fatal(err)
+
+		if err := conf.GenerateRepo(cpRepoPath); err != nil {
+			return fmt.Errorf("init repo failed, error: %v", err)
 		}
+
 		return conf.UpdateConfigFile(cpRepoPath, strings.TrimSpace(multiAddr), nodeName, port)
 	},
 }
