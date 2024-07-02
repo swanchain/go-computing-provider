@@ -477,7 +477,7 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		return
 	}
 
-	if _, err := GetTaskInfoOnChain(conf.MainnetNetwork, ubiTask.ContractAddr); err != nil {
+	if _, err := GetTaskInfoOnChain(ubiTask.ContractAddr); err != nil {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskContractError))
 		return
 	}
@@ -889,10 +889,10 @@ loopTask:
 	return NewTaskService().SaveTaskEntity(task)
 }
 
-func GetTaskInfoOnChain(networkName string, taskContract string) (ecp.ECPTaskTaskInfo, error) {
+func GetTaskInfoOnChain(taskContract string) (ecp.ECPTaskTaskInfo, error) {
 	var taskInfo ecp.ECPTaskTaskInfo
 
-	chainRpc, err := conf.GetRpcByNetWorkName(networkName)
+	chainRpc, err := conf.GetRpcByNetWorkName()
 	if err != nil {
 		return taskInfo, err
 	}

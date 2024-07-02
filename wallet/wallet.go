@@ -161,7 +161,7 @@ func (w *LocalWallet) WalletImport(ctx context.Context, ki *KeyInfo) (string, er
 	return "", nil
 }
 
-func (w *LocalWallet) WalletList(ctx context.Context, networkName string, contractFlag bool) error {
+func (w *LocalWallet) WalletList(ctx context.Context, contractFlag bool) error {
 	defer w.keystore.Close()
 	addressList, err := w.addressList(ctx)
 	if err != nil {
@@ -173,7 +173,7 @@ func (w *LocalWallet) WalletList(ctx context.Context, networkName string, contra
 	nonceKey := "Nonce"
 	errorKey := "Error"
 
-	chainRpc, err := conf.GetRpcByNetWorkName(networkName)
+	chainRpc, err := conf.GetRpcByNetWorkName()
 	if err != nil {
 		return err
 	}
@@ -281,9 +281,9 @@ func (w *LocalWallet) WalletDelete(ctx context.Context, addr string) error {
 	return nil
 }
 
-func (w *LocalWallet) WalletSend(ctx context.Context, networkName string, from, to string, amount string) (string, error) {
+func (w *LocalWallet) WalletSend(ctx context.Context, from, to string, amount string) (string, error) {
 	defer w.keystore.Close()
-	chainUrl, err := conf.GetRpcByNetWorkName(networkName)
+	chainUrl, err := conf.GetRpcByNetWorkName()
 	if err != nil {
 		return "", err
 	}
@@ -313,14 +313,14 @@ func (w *LocalWallet) WalletSend(ctx context.Context, networkName string, from, 
 	return txHash, nil
 }
 
-func (w *LocalWallet) WalletCollateral(ctx context.Context, networkName string, from string, amount string, cpAccountAddress string, collateralType string) (string, error) {
+func (w *LocalWallet) WalletCollateral(ctx context.Context, from string, amount string, cpAccountAddress string, collateralType string) (string, error) {
 	defer w.keystore.Close()
 	sendAmount, err := convertToWei(amount)
 	if err != nil {
 		return "", err
 	}
 
-	chainUrl, err := conf.GetRpcByNetWorkName(networkName)
+	chainUrl, err := conf.GetRpcByNetWorkName()
 	if err != nil {
 		return "", err
 	}
@@ -414,14 +414,14 @@ func (w *LocalWallet) WalletCollateral(ctx context.Context, networkName string, 
 	}
 }
 
-func (w *LocalWallet) CollateralWithdraw(ctx context.Context, networkName string, address string, amount string, cpAccountAddress string, collateralType string) (string, error) {
+func (w *LocalWallet) CollateralWithdraw(ctx context.Context, address string, amount string, cpAccountAddress string, collateralType string) (string, error) {
 	defer w.keystore.Close()
 	withDrawAmount, err := convertToWei(amount)
 	if err != nil {
 		return "", err
 	}
 
-	chainUrl, err := conf.GetRpcByNetWorkName(networkName)
+	chainUrl, err := conf.GetRpcByNetWorkName()
 	if err != nil {
 		return "", err
 	}
@@ -455,14 +455,14 @@ func (w *LocalWallet) CollateralWithdraw(ctx context.Context, networkName string
 	}
 }
 
-func (w *LocalWallet) CollateralSend(ctx context.Context, networkName, from, to string, amount string) (string, error) {
+func (w *LocalWallet) CollateralSend(ctx context.Context, from, to string, amount string) (string, error) {
 	defer w.keystore.Close()
 	withDrawAmount, err := convertToWei(amount)
 	if err != nil {
 		return "", err
 	}
 
-	chainUrl, err := conf.GetRpcByNetWorkName(networkName)
+	chainUrl, err := conf.GetRpcByNetWorkName()
 	if err != nil {
 		return "", err
 	}

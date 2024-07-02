@@ -235,13 +235,6 @@ var stateInfoCmd = &cli.Command{
 	Name:      "cp-info",
 	Usage:     "Print computing-provider chain info",
 	ArgsUsage: "[cp_account_contract_address]",
-	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:  "network",
-			Usage: "Specify which rpc connection network to use",
-			Value: conf.MainnetNetwork,
-		},
-	},
 	Action: func(cctx *cli.Context) error {
 		cpRepoPath, ok := os.LookupEnv("CP_PATH")
 		if !ok {
@@ -251,12 +244,7 @@ var stateInfoCmd = &cli.Command{
 			return fmt.Errorf("load config file failed, error: %+v", err)
 		}
 
-		networkName := cctx.String("network")
-		if strings.TrimSpace(networkName) == "" {
-			return fmt.Errorf("the network is required")
-		}
-
-		chainRpc, err := conf.GetRpcByNetWorkName(networkName)
+		chainRpc, err := conf.GetRpcByNetWorkName()
 		if err != nil {
 			return err
 		}
@@ -361,11 +349,6 @@ var taskInfoCmd = &cli.Command{
 	Usage:     "Print task info on the chain",
 	ArgsUsage: "[task_contract_address]",
 	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:  "network",
-			Usage: "Specify which rpc connection chain to use",
-			Value: conf.MainnetNetwork,
-		},
 		&cli.BoolFlag{
 			Name:     "ecp",
 			Usage:    "Check ECP task on the chain",
@@ -387,17 +370,12 @@ var taskInfoCmd = &cli.Command{
 			return fmt.Errorf("load config file failed, error: %+v", err)
 		}
 
-		networkName := cctx.String("network")
-		if strings.TrimSpace(networkName) == "" {
-			return fmt.Errorf("the network is required")
-		}
-
-		chainRpc, err := conf.GetRpcByNetWorkName(networkName)
+		chainRpc, err := conf.GetRpcByNetWorkName()
 		if err != nil {
 			return err
 		}
 
-		taskInfo, err := computing.GetTaskInfoOnChain(networkName, taskContract)
+		taskInfo, err := computing.GetTaskInfoOnChain(taskContract)
 		if err != nil {
 			return fmt.Errorf("get task info on the chain failed, error: %v", err)
 		}
