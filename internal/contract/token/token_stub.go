@@ -15,7 +15,7 @@ import (
 
 type Stub struct {
 	client   *ethclient.Client
-	token    *Main
+	token    *Token
 	privateK string
 	publicK  string
 }
@@ -41,7 +41,7 @@ func NewTokenStub(client *ethclient.Client, options ...Option) (*Stub, error) {
 	}
 
 	tokenAddress := common.HexToAddress(conf.GetConfig().CONTRACT.SwanToken)
-	tokenClient, err := NewMain(tokenAddress, client)
+	tokenClient, err := NewToken(tokenAddress, client)
 	if err != nil {
 		return nil, fmt.Errorf("create collateral contract client, error: %+v", err)
 	}

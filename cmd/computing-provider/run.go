@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
@@ -15,11 +16,13 @@ import (
 	account2 "github.com/swanchain/go-computing-provider/internal/contract/account"
 	"github.com/swanchain/go-computing-provider/internal/contract/ecp"
 	"github.com/swanchain/go-computing-provider/internal/contract/fcp"
+	"github.com/swanchain/go-computing-provider/internal/contract/token"
 	"github.com/swanchain/go-computing-provider/internal/initializer"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"github.com/swanchain/go-computing-provider/util"
 	"github.com/swanchain/go-computing-provider/wallet"
 	"github.com/urfave/cli/v2"
+	"math/big"
 	"os"
 	"regexp"
 	"strconv"
@@ -107,7 +110,7 @@ var infoCmd = &cli.Command{
 			count, _ = k8sService.GetDeploymentActiveCount()
 		}
 
-		chainRpc, err := conf.GetRpcByName(conf.DefaultRpc)
+		chainRpc, err := conf.GetRpcByNetWorkName()
 		if err != nil {
 			return err
 		}
@@ -211,13 +214,17 @@ var infoCmd = &cli.Command{
 
 		var rowColorList []RowColor
 		if taskTypes != "" {
-			var rowColor []tablewriter.Colors
-			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
-			rowColorList = append(rowColorList, RowColor{
-				row:    11,
-				column: []int{1},
-				color:  rowColor,
-			})
+			rowColorList = append(rowColorList,
+				RowColor{
+					row:    0,
+					column: []int{1},
+					color:  []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgBlueColor}},
+				},
+				RowColor{
+					row:    11,
+					column: []int{1},
+					color:  []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}},
+				})
 		}
 		header := []string{"CP Account Info:"}
 		NewVisualTable(header, taskData, rowColorList).Generate(false)
@@ -244,13 +251,6 @@ var stateInfoCmd = &cli.Command{
 	Name:      "cp-info",
 	Usage:     "Print computing-provider chain info",
 	ArgsUsage: "[cp_account_contract_address]",
-	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:  "chain",
-			Usage: "Specify which rpc connection chain to use",
-			Value: conf.DefaultRpc,
-		},
-	},
 	Action: func(cctx *cli.Context) error {
 		cpRepoPath, ok := os.LookupEnv("CP_PATH")
 		if !ok {
@@ -260,12 +260,7 @@ var stateInfoCmd = &cli.Command{
 			return fmt.Errorf("load config file failed, error: %+v", err)
 		}
 
-		chain := cctx.String("chain")
-		if strings.TrimSpace(chain) == "" {
-			return fmt.Errorf("the chain is required")
-		}
-
-		chainRpc, err := conf.GetRpcByName(conf.DefaultRpc)
+		chainRpc, err := conf.GetRpcByNetWorkName()
 		if err != nil {
 			return err
 		}
@@ -370,11 +365,6 @@ var taskInfoCmd = &cli.Command{
 	Usage:     "Print task info on the chain",
 	ArgsUsage: "[task_contract_address]",
 	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:  "chain",
-			Usage: "Specify which rpc connection chain to use",
-			Value: conf.DefaultRpc,
-		},
 		&cli.BoolFlag{
 			Name:     "ecp",
 			Usage:    "Check ECP task on the chain",
@@ -402,12 +392,12 @@ var taskInfoCmd = &cli.Command{
 			return fmt.Errorf("load config file failed, error: %+v", err)
 		}
 
-		chain := cctx.String("chain")
-		if strings.TrimSpace(chain) == "" {
-			return fmt.Errorf("the chain is required")
+		chainRpc, err := conf.GetRpcByNetWorkName()
+		if err != nil {
+			return err
 		}
 
-		taskInfo, err := computing.GetTaskInfoOnChain(chain, taskContract)
+		taskInfo, err := computing.GetTaskInfoOnChain(taskContract)
 		if err != nil {
 			return fmt.Errorf("get task info on the chain failed, error: %v", err)
 		}
@@ -464,10 +454,15 @@ var initCmd = &cli.Command{
 		if !ok {
 			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
 		}
-		if err := conf.InitConfig(cpRepoPath, true); err != nil {
-			logs.GetLogger().Fatal(err)
+
+		if _, err := os.Stat(cpRepoPath); os.IsNotExist(err) {
+			err := os.MkdirAll(cpRepoPath, 0755)
+			if err != nil {
+				return fmt.Errorf("create cp repo failed, error: %v", cpRepoPath)
+			}
 		}
-		return conf.UpdateConfigFile(cpRepoPath, strings.TrimSpace(multiAddr), nodeName, port)
+
+		return conf.GenerateAndUpdateConfigFile(cpRepoPath, strings.TrimSpace(multiAddr), nodeName, port)
 	},
 }
 
@@ -617,7 +612,7 @@ var changeMultiAddressCmd = &cli.Command{
 			return fmt.Errorf("update multi_addresses of cp to db failed, error: %v", err)
 		}
 		fmt.Printf("changeMultiAddress Transaction hash: %s\n", changeMultiAddressTx)
-		fmt.Printf("Multi-Address is changed successfully! please manually update the `MultiAddress` in the config.toml file \n")
+		fmt.Printf("Multi-Address is changed successfully! please manually update the `MultiAddress` in the config file \n")
 
 		return nil
 	},

@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"fmt"
 	"github.com/BurntSushi/toml"
+	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"log"
 	"os"
 	"path"
@@ -14,7 +15,8 @@ import (
 var config *ComputeNode
 
 const (
-	DefaultRpc = "swan"
+	MainnetNetwork = "mainnet"
+	TestnetNetwork = "testnet"
 )
 
 // ComputeNode is a compute node config
@@ -67,8 +69,7 @@ type Registry struct {
 }
 
 type RPC struct {
-	SwanTestnet string `toml:"SWAN_TESTNET"`
-	SwanMainnet string `toml:"SWAN_MAINNET"`
+	SwanChainRpc string `toml:"SWAN_CHAIN_RPC"`
 }
 
 type CONTRACT struct {
@@ -79,18 +80,38 @@ type CONTRACT struct {
 	ZkCollateral      string `toml:"ZK_COLLATERAL_CONTRACT"`
 }
 
-func GetRpcByName(rpcName string) (string, error) {
-	var rpc string
-	switch rpcName {
-	case DefaultRpc:
-		rpc = GetConfig().RPC.SwanTestnet
-		break
+func GetRpcByNetWorkName(netWorkName ...string) (string, error) {
+	var netWork string
+	if len(netWorkName) > 0 && netWorkName[0] != "" {
+		netWork = netWorkName[0]
+	} else {
+		netWork, _ = os.LookupEnv("CP_NETWORK")
+		if netWork == "" {
+			netWork = MainnetNetwork
+		}
 	}
-	return rpc, nil
+
+	if netWork != MainnetNetwork && netWork != TestnetNetwork {
+		return "", fmt.Errorf("not support network: %s", netWorkName[0])
+	}
+	return GetConfig().RPC.SwanChainRpc, nil
 }
 
 func InitConfig(cpRepoPath string, standalone bool) error {
-	configFile := filepath.Join(cpRepoPath, "config.toml")
+	netWork, ok := os.LookupEnv("CP_NETWORK")
+	if !ok {
+		netWork = MainnetNetwork
+	}
+	if netWork != MainnetNetwork && netWork != TestnetNetwork {
+		return fmt.Errorf("not support network: %s", netWork)
+	}
+
+	configFile := filepath.Join(cpRepoPath, fmt.Sprintf("config-%s.toml", netWork))
+
+	if _, err := os.Stat(configFile); err != nil {
+		return fmt.Errorf("not found %s config file", configFile)
+	}
+
 	metaData, err := toml.DecodeFile(configFile, &config)
 	if err != nil {
 		return fmt.Errorf("failed load config file, path: %s, error: %w", configFile, err)
@@ -138,7 +159,7 @@ func requiredFieldsAreGiven(metaData toml.MetaData) bool {
 		{"MCS", "BucketName"},
 		{"MCS", "Network"},
 
-		{"RPC", "SWAN_TESTNET"},
+		{"RPC", "SWAN_CHAIN_RPC"},
 
 		{"CONTRACT", "SWAN_CONTRACT"},
 		{"CONTRACT", "SWAN_COLLATERAL_CONTRACT"},
@@ -164,7 +185,7 @@ func requiredFieldsAreGivenForSeparate(metaData toml.MetaData) bool {
 
 		{"UBI", "UbiEnginePk"},
 
-		{"RPC", "SWAN_TESTNET"},
+		{"RPC", "SWAN_CHAIN_RPC"},
 
 		{"CONTRACT", "SWAN_CONTRACT"},
 		{"CONTRACT", "SWAN_COLLATERAL_CONTRACT"},
@@ -179,36 +200,51 @@ func requiredFieldsAreGivenForSeparate(metaData toml.MetaData) bool {
 	return true
 }
 
-//go:embed config.toml
-var configFileContent string
+//go:embed config-testnet.toml.sample
+var testnetConfigContent string
 
-func GenerateRepo(cpRepoPath string) error {
+//go:embed config-mainnet.toml.sample
+var mainnetConfigContent string
+
+func GenerateAndUpdateConfigFile(cpRepoPath string, multiAddress, nodeName string, port int) error {
 	var configTmpl ComputeNode
+	var configContent string
 	var configFile *os.File
 	var err error
 
-	configFilePath := path.Join(cpRepoPath, "config.toml")
+	netWork, ok := os.LookupEnv("CP_NETWORK")
+	if !ok {
+		netWork = MainnetNetwork
+	}
+	if netWork != MainnetNetwork && netWork != TestnetNetwork {
+		return fmt.Errorf("not support network: %s", netWork)
+	}
+
+	switch netWork {
+	case MainnetNetwork:
+		configContent = mainnetConfigContent
+	case TestnetNetwork:
+		configContent = testnetConfigContent
+	default:
+		return fmt.Errorf("not support network: %s", netWork)
+	}
+
+	configName := fmt.Sprintf("config-%s.toml", netWork)
+	configFilePath := path.Join(cpRepoPath, configName)
 	if _, err = os.Stat(configFilePath); os.IsNotExist(err) {
-		if _, err = toml.Decode(configFileContent, &configTmpl); err != nil {
+		logs.GetLogger().Warnf("The configuration file %s not found, generating this configuration file", configFilePath)
+		if _, err = toml.Decode(configContent, &configTmpl); err != nil {
 			return fmt.Errorf("parse toml data failed, error: %v", err)
 		}
 		configFile, err = os.Create(configFilePath)
 		if err != nil {
-			return fmt.Errorf("create config.toml file failed, error: %v", err)
+			return fmt.Errorf("create %s file failed, error: %v", configName, err)
 		}
 		if err = toml.NewEncoder(configFile).Encode(configTmpl); err != nil {
-			return fmt.Errorf("write data to config.toml file failed, error: %v", err)
+			return fmt.Errorf("write data to %s file failed, error: %v", configName, err)
 		}
 	}
-	return nil
-}
 
-func UpdateConfigFile(cpRepoPath string, multiAddress, nodeName string, port int) error {
-	var configTmpl ComputeNode
-	var configFile *os.File
-	var err error
-
-	configFilePath := path.Join(cpRepoPath, "config.toml")
 	if _, err = toml.DecodeFile(configFilePath, &configTmpl); err != nil {
 		return err
 	}

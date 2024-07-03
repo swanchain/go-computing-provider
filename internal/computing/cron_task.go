@@ -12,6 +12,7 @@ import (
 	"github.com/swanchain/go-computing-provider/internal/contract/fcp"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"io"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net/http"
@@ -54,6 +55,7 @@ func (task *CronTask) RunTask() {
 	task.watchNameSpaceForDeleted()
 	task.reportClusterResourceToHub()
 	task.watchExpiredTask()
+	task.checkResourceExporter()
 }
 
 func checkJobStatus() {
@@ -140,6 +142,22 @@ func (task *CronTask) watchExpiredTask() {
 		jobList, err := NewJobService().GetJobList()
 		if err != nil {
 			logs.GetLogger().Errorf("Failed watchExpiredTask get job data, error: %+v", err)
+			return
+		}
+
+		if len(jobList) == 0 {
+			service := NewK8sService()
+			namespaces, err := service.ListNamespace(context.TODO())
+			if err != nil {
+				logs.GetLogger().Errorf("Failed get all namespace, error: %+v", err)
+				return
+			}
+
+			for _, namespace := range namespaces {
+				if strings.HasPrefix(namespace, constants.K8S_NAMESPACE_NAME_PREFIX) {
+					service.DeleteNameSpace(context.TODO(), namespace)
+				}
+			}
 			return
 		}
 
@@ -395,7 +413,7 @@ func reportJobStatus(jobUuid string, deployStatus int) bool {
 
 func checkFcpCollateralBalance() (string, error) {
 
-	chainRpc, err := conf.GetRpcByName(conf.DefaultRpc)
+	chainRpc, err := conf.GetRpcByNetWorkName()
 	if err != nil {
 		return "", err
 	}
@@ -415,4 +433,46 @@ func checkFcpCollateralBalance() (string, error) {
 		return "", err
 	}
 	return fcpCollateralInfo.AvailableBalance, nil
+}
+
+func (task *CronTask) checkResourceExporter() {
+	c := cron.New(cron.WithSeconds())
+	c.AddFunc("0 0/3 * * * ?", func() {
+		defer func() {
+			if err := recover(); err != nil {
+				logs.GetLogger().Errorf("task job: [checkResourceExporter], error: %+v", err)
+			}
+		}()
+
+		namespace := "kube-system"
+		service := NewK8sService()
+		var num int64 = 1
+		podLogOptions := corev1.PodLogOptions{
+			Container:  "",
+			TailLines:  &num,
+			Timestamps: false,
+		}
+		pods, err := service.k8sClient.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: "app=resource-exporter",
+		})
+		if err != nil {
+			logs.GetLogger().Errorf("get resource-exporter pods failed, error: %+v", err)
+			return
+		}
+
+		for _, pod := range pods.Items {
+			if pod.Status.Phase != corev1.PodRunning {
+				service.k8sClient.CoreV1().Pods(namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
+				continue
+			}
+			podLog, err := service.GetPodLogByPodName(namespace, pod.Name, &podLogOptions)
+			if err != nil {
+				continue
+			}
+			if strings.Contains(podLog, "ERROR::") {
+				service.k8sClient.CoreV1().Pods(namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
+			}
+		}
+	})
+	c.Start()
 }

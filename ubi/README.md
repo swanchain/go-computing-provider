@@ -29,14 +29,14 @@ curl -fsSL https://raw.githubusercontent.com/swanchain/go-computing-provider/rel
 ## Install ECP and Init CP Account
 - Download `computing-provider`
 ```bash
-wget https://github.com/swanchain/go-computing-provider/releases/download/v0.5.1/computing-provider
+wget https://github.com/swanchain/go-computing-provider/releases/download/v0.6.0/computing-provider
 ```
 
 - Initialize ECP repo
 ```bash
  ./computing-provider init --multi-address=/ip4/<YOUR_PUBLIC_IP>/tcp/<YOUR_PORT> --node-name=<YOUR_NODE_NAME>
 ```
-- Generate a new wallet address and deposit the `SWAN-ETH`, refer [here](https://docs.swanchain.io/swan-testnet/atom-accelerator-race/before-you-get-started/claim-sepoliaeth):
+- Generate a new wallet address and deposit the `SWAN-ETH`, refer [here](https://docs.swanchain.io/swan-mainnet/getting-started-guide):
 ```bash
 ./computing-provider wallet new
 ```
@@ -77,7 +77,8 @@ Output:
 ```bash
 #!/bin/bash
 export FIL_PROOFS_PARAMETER_CACHE=$PARENT_PATH
-export RUST_GPU_TOOLS_CUSTOM_GPU="GeForce RTX 4090:16384"   
+export RUST_GPU_TOOLS_CUSTOM_GPU="GeForce RTX 4090:16384"
+export CP_NETWORK="mainnet"   
         
 nohup ./computing-provider ubi daemon >> cp.log 2>&1 &
 ```

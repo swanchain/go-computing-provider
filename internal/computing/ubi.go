@@ -794,7 +794,7 @@ func GetCpResource(c *gin.Context) {
 }
 
 func submitUBIProof(c2Proof models.UbiC2Proof, task *models.TaskEntity) error {
-	chainUrl, err := conf.GetRpcByName(conf.DefaultRpc)
+	chainUrl, err := conf.GetRpcByNetWorkName()
 	if err != nil {
 		logs.GetLogger().Errorf("get rpc url failed, taskId: %s, error: %v", c2Proof.TaskId, err)
 		return err
@@ -875,7 +875,7 @@ loopTask:
 func GetTaskInfoOnChain(rpcName string, taskContract string) (models.EcpTaskInfo, error) {
 	var taskInfo models.EcpTaskInfo
 
-	chainRpc, err := conf.GetRpcByName(rpcName)
+	chainRpc, err := conf.GetRpcByNetWorkName()
 	if err != nil {
 		return taskInfo, err
 	}
@@ -993,7 +993,7 @@ func SyncCpAccountInfo() {
 		return
 	}
 
-	chainUrl, err := conf.GetRpcByName(conf.DefaultRpc)
+	chainUrl, err := conf.GetRpcByNetWorkName()
 	if err != nil {
 		logs.GetLogger().Errorf("get rpc url failed, error: %v", err)
 		return
