@@ -493,6 +493,13 @@ var initCmd = &cli.Command{
 			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
 		}
 
+		if _, err := os.Stat(cpRepoPath); os.IsNotExist(err) {
+			err := os.MkdirAll(cpRepoPath, 0755)
+			if err != nil {
+				return fmt.Errorf("create cp repo failed, error: %v", cpRepoPath)
+			}
+		}
+
 		return conf.GenerateAndUpdateConfigFile(cpRepoPath, strings.TrimSpace(multiAddr), nodeName, port)
 	},
 }
