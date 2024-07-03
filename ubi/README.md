@@ -36,7 +36,7 @@ wget https://github.com/swanchain/go-computing-provider/releases/download/v0.6.0
 ```bash
  ./computing-provider init --multi-address=/ip4/<YOUR_PUBLIC_IP>/tcp/<YOUR_PORT> --node-name=<YOUR_NODE_NAME>
 ```
-- Generate a new wallet address and deposit the `SWAN-ETH`, refer [here](https://docs.swanchain.io/swan-testnet/atom-accelerator-race/before-you-get-started/claim-sepoliaeth):
+- Generate a new wallet address and deposit the `SWAN-ETH`, refer [here](https://docs.swanchain.io/swan-mainnet/getting-started-guide):
 ```bash
 ./computing-provider wallet new
 ```

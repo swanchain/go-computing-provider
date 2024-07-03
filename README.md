@@ -394,7 +394,7 @@ ZK_COLLATERAL_CONTRACT = "0x1d2557C9d14882D9eE291BB66eaC6c1C4a587054"     # The 
 computing-provider wallet send --from 0xFbc1d38a2127D81BFe3EA347bec7310a1cfa2373 0x7791f48931DB81668854921fA70bFf0eB85B8211 0.001
 ```
 
-**Note:** Follow [the guideline](https://docs.swanchain.io/swan-testnet/atom-accelerator-race/before-you-get-started/claim-sepoliaeth) to claim Swan-ETH and bridge it to Swan Proxima Chain.
+**Note:** Follow [the guideline](https://docs.swanchain.io/swan-mainnet/getting-started-guide) to claim Swan-ETH and bridge it to Swan Proxima Chain.
 
 ## Initialization CP Account
 Deploy a CP account contract:
