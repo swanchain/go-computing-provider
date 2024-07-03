@@ -15,7 +15,7 @@ KeyFile = "/YOUR_DOMAIN_NAME_KEY_PATH/server.key"            # Your domain name 
 
 [HUB]
 ServerUrl = "https://orchestrator-api.swanchain.io"           # The Orchestrator's API address
-AccessToken = "<YOUR_Access_Token>"                            # The Orchestrator's access token, Acquired from "https://orchestrator.swanchain.io"
+AccessToken = "<YOUR_Access_Token>"                           # The Orchestrator's access token, switch to the proxima network and acquired from "https://orchestrator.swanchain.io/provider-status"
 BalanceThreshold= 1                                           # The cp’s collateral balance threshold
 OrchestratorPk = "0x29eD49c8E973696D07E7927f748F6E5Eacd5516D" # Orchestrator's public key, CP only accept the task from this Orchestrator
 VerifySign = true                                             # Verify that the task signature is from Orchestrator

@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/wallet"
 	"github.com/urfave/cli/v2"
 	"os"
@@ -52,11 +51,6 @@ var walletList = &cli.Command{
 	Name:  "list",
 	Usage: "List wallet address",
 	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:  "network",
-			Usage: "Specify which rpc connection chain to use",
-			Value: conf.MainnetNetwork,
-		},
 		&cli.BoolFlag{
 			Name:  "contract",
 			Usage: "Specify the token contract",
@@ -65,11 +59,6 @@ var walletList = &cli.Command{
 	},
 	Action: func(cctx *cli.Context) error {
 		ctx := reqContext(cctx)
-		networkName := cctx.String("network")
-		if strings.TrimSpace(networkName) == "" {
-			return fmt.Errorf("failed to parse network: %s", networkName)
-		}
-
 		contractFlag := cctx.Bool("contract")
 
 		localWallet, err := wallet.SetupWallet(wallet.WalletRepo)
@@ -77,7 +66,7 @@ var walletList = &cli.Command{
 			return err
 		}
 
-		return localWallet.WalletList(ctx, networkName, contractFlag)
+		return localWallet.WalletList(ctx, contractFlag)
 	},
 }
 
@@ -252,11 +241,6 @@ var walletSend = &cli.Command{
 	ArgsUsage: "[targetAddress] [amount]",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
-			Name:  "network",
-			Usage: "Specify which rpc connection network to use",
-			Value: conf.MainnetNetwork,
-		},
-		&cli.StringFlag{
 			Name:  "from",
 			Usage: "Optionally specify the account to send funds from",
 		},
@@ -270,11 +254,6 @@ var walletSend = &cli.Command{
 		ctx := reqContext(cctx)
 		if cctx.NArg() != 2 {
 			return fmt.Errorf(" need two params: the target address and amount")
-		}
-
-		networkName := cctx.String("network")
-		if strings.TrimSpace(networkName) == "" {
-			return fmt.Errorf("failed to parse network: %s", networkName)
 		}
 
 		from := cctx.String("from")
@@ -295,7 +274,7 @@ var walletSend = &cli.Command{
 		if err != nil {
 			return err
 		}
-		txHash, err := localWallet.WalletSend(ctx, networkName, from, to, amount)
+		txHash, err := localWallet.WalletSend(ctx, from, to, amount)
 		if err != nil {
 			return err
 		}
@@ -308,13 +287,6 @@ var collateralCmd = &cli.Command{
 	Name:      "collateral",
 	Usage:     "Manage the collateral amount",
 	ArgsUsage: "[fromAddress] [amount]",
-	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:  "network",
-			Usage: "Specify which rpc connection network to use",
-			Value: conf.MainnetNetwork,
-		},
-	},
 	Subcommands: []*cli.Command{
 		collateralAddCmd,
 		collateralSendCmd,
@@ -346,10 +318,6 @@ var collateralAddCmd = &cli.Command{
 	ArgsUsage: "[amount]",
 	Action: func(cctx *cli.Context) error {
 		ctx := reqContext(cctx)
-		networkName := cctx.String("network")
-		if strings.TrimSpace(networkName) == "" {
-			return fmt.Errorf("the network is required")
-		}
 
 		fcpCollateral := cctx.Bool("fcp")
 		ecpCollateral := cctx.Bool("ecp")
@@ -380,7 +348,7 @@ var collateralAddCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		txHash, err := localWallet.WalletCollateral(ctx, networkName, fromAddress, amount, cpAccountAddress, collateralType)
+		txHash, err := localWallet.WalletCollateral(ctx, fromAddress, amount, cpAccountAddress, collateralType)
 		if err != nil {
 			return err
 		}
@@ -413,10 +381,6 @@ var collateralWithdrawCmd = &cli.Command{
 	ArgsUsage: "[amount]",
 	Action: func(cctx *cli.Context) error {
 		ctx := reqContext(cctx)
-		networkName := cctx.String("network")
-		if strings.TrimSpace(networkName) == "" {
-			return fmt.Errorf("the network is required")
-		}
 
 		fcpCollateral := cctx.Bool("fcp")
 		ecpCollateral := cctx.Bool("ecp")
@@ -446,7 +410,7 @@ var collateralWithdrawCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		txHash, err := localWallet.CollateralWithdraw(ctx, networkName, ownerAddress, amount, cpAccountAddress, collateralType)
+		txHash, err := localWallet.CollateralWithdraw(ctx, ownerAddress, amount, cpAccountAddress, collateralType)
 		if err != nil {
 			return err
 		}
@@ -472,11 +436,6 @@ var collateralSendCmd = &cli.Command{
 			return fmt.Errorf(" need two params: the target address and amount")
 		}
 
-		networkName := cctx.String("network")
-		if strings.TrimSpace(networkName) == "" {
-			return fmt.Errorf("the network is required")
-		}
-
 		from := cctx.String("from")
 		if strings.TrimSpace(from) == "" {
 			return fmt.Errorf("the from address param is required")
@@ -495,7 +454,7 @@ var collateralSendCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		txHash, err := localWallet.CollateralSend(ctx, networkName, from, to, amount)
+		txHash, err := localWallet.CollateralSend(ctx, from, to, amount)
 		if err != nil {
 			return err
 		}

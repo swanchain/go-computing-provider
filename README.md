@@ -314,10 +314,10 @@ make install
 ```
  - Update Configuration
 
-The computing provider's configuration sample locate in `./go-computing-provider/config.toml.sample`
+The computing provider's `mainnet` configuration sample locate in `./go-computing-provider/conf/config-mainnet.toml.sample`
 
 ```
-cp config.toml.sample config.toml
+cp config-mainnet.toml.sample config-mainnet.toml
 ```
 
 Edit the necessary configuration files according to your deployment requirements. These files may include settings for the computing-provider components, container runtime, Kubernetes, and other services.
@@ -331,18 +331,18 @@ NodeName = ""                                  # The computing-provider node nam
 WalletWhiteList = ""                           # CP only accepts user addresses from this whitelist for space deployment
 
 [UBI]
-UbiEnginePk = "0xB5aeb540B4895cd024c1625E146684940A849ED9"     # UBI Engine's public key, CP only accept the task from this UBI engine
+UbiEnginePk = "0xB5aeb540B4895cd024c1625E146684940A849ED9"              # UBI Engine's public key, CP only accept the task from this UBI engine
 
 [LOG]
-CrtFile = "/YOUR_DOMAIN_NAME_CRT_PATH/server.crt"              # Your domain name SSL .crt file path
-KeyFile = "/YOUR_DOMAIN_NAME_KEY_PATH/server.key"              # Your domain name SSL .key file path
+CrtFile = "/YOUR_DOMAIN_NAME_CRT_PATH/server.crt"                       # Your domain name SSL .crt file path
+KeyFile = "/YOUR_DOMAIN_NAME_KEY_PATH/server.key"                       # Your domain name SSL .key file path
 
 [HUB]
-ServerUrl = "https://orchestrator-api.swanchain.io"            # The Orchestrator's API address
-AccessToken = ""                                               # The Orchestrator's access token, Use the owner address Acquired from "https://orchestrator.swanchain.io"
-BalanceThreshold= 1                                            # The cp’s collateral balance threshold
-OrchestratorPk = "0x29eD49c8E973696D07E7927f748F6E5Eacd5516D"  # Orchestrator's public key, CP only accept the task from this Orchestrator
-VerifySign = true                                              # Verify that the task signature is from Orchestrator
+ServerUrl = "https://orchestrator-mainnet-api.swanchain.io"             # The Orchestrator's API address
+AccessToken = ""                                               	        # The Orchestrator's access token, switch to the mainnet network and use the owner address Acquired from "https://orchestrator.swanchain.io"
+BalanceThreshold= 0.1                                                     # The cp’s collateral balance threshold
+OrchestratorPk = "0x4B98086A20f3C19530AF32D21F85Bc6399358e20"           # Orchestrator's public key, CP only accept the task from this Orchestrator
+VerifySign = true                                                       # Verify that the task signature is from Orchestrator
 
 [MCS]
 ApiKey = ""                                   # Acquired from "https://www.multichain.storage" -> setting -> Create API Key
@@ -355,13 +355,12 @@ UserName = ""                                 # The login username, if only a si
 Password = ""                                 # The login password, if only a single node, you can ignore
 
 [RPC]
-SWAN_TESTNET ="https://rpc-proxima.swanchain.io"  # Swan testnet RPC
-SWAN_MAINNET= ""	                          # Swan mainnet RPC
+SWAN_CHAIN_RPC = "https://mainnet-internal.swanchain.io"                  # Swan chain RPC
 
 [CONTRACT]
-SWAN_CONTRACT = "0x91B25A65b295F0405552A4bbB77879ab5e38166c"              # Swan token's contract address
-SWAN_COLLATERAL_CONTRACT = "0xC7980d5a69e8AA9797934aCf18e483EB4C986e01"   # Swan's collateral address
-REGISTER_CP_CONTRACT = "0x6EDf891B53ba2c6Fade6Ae373682ED48dEa5AF48"       # The CP registration contract address
+SWAN_CONTRACT = "0xAF90ac6428775E1Be06BAFA932c2d80119a7bd02"              # Swan token's contract address
+SWAN_COLLATERAL_CONTRACT = "0x48966A3eb8C1b584Ac9E7767bC9607e235245C81"   # Swan's collateral address
+REGISTER_CP_CONTRACT = "0xbef1ec33e5Ac3a491fFeE1600e0b00eac97cb138"       # The CP registration contract address
 ZK_COLLATERAL_CONTRACT = "0x1d2557C9d14882D9eE291BB66eaC6c1C4a587054"     # The ZK task's collateral contract address
 ```
 *Note:*  Example WalletWhiteList hosted on GitHub can be found [here](https://raw.githubusercontent.com/swanchain/market-providers/main/clients/whitelist.txt).
@@ -395,7 +394,7 @@ ZK_COLLATERAL_CONTRACT = "0x1d2557C9d14882D9eE291BB66eaC6c1C4a587054"     # The 
 computing-provider wallet send --from 0xFbc1d38a2127D81BFe3EA347bec7310a1cfa2373 0x7791f48931DB81668854921fA70bFf0eB85B8211 0.001
 ```
 
-**Note:** Follow [the guideline](https://docs.swanchain.io/swan-testnet/atom-accelerator-race/before-you-get-started/claim-sepoliaeth) to claim Swan-ETH and bridge it to Swan Proxima Chain.
+**Note:** Follow [the guideline](https://docs.swanchain.io/swan-mainnet/getting-started-guide) to claim Swan-ETH and bridge it to Swan Proxima Chain.
 
 ## Initialization CP Account
 Deploy a CP account contract:
@@ -423,6 +422,7 @@ Transaction hash: 0xb8fd9cc9bfac2b2890230b4f14999b9d449e050339b252273379ab11fac1
 You can run `computing-provider` using the following command
 ```bash
 export CP_PATH=<YOUR_CP_PATH>
+export CP_NETWORK="mainnet"
 nohup computing-provider run >> cp.log 2>&1 & 
 ```
 ---
@@ -522,6 +522,7 @@ TASK ID TASK TYPE       ZK TYPE         TRANSACTION HASH                        
 You can run `computing-provider` using the following command
 ```bash
 export CP_PATH=<YOUR_CP_PATH>
+export CP_NETWORK="mainnet"
 nohup computing-provider run >> cp.log 2>&1 & 
 ```
 
@@ -530,13 +531,13 @@ nohup computing-provider run >> cp.log 2>&1 &
 ```
 computing-provider task list 
 ```
-* Retrieve detailed information for a specific task using `space_uuid`
+* Retrieve detailed information for a specific task using `task_uuid`
 ```
-computing-provider task get [space_uuid]
+computing-provider task get [task_uuid]
 ```
-* Delete task by `space_uuid`
+* Delete task by `task_uuid`
 ```
-computing-provider task delete [space_uuid]
+computing-provider task delete [task_uuid]
 ```
 
 ## Getting Help

@@ -120,6 +120,17 @@ var infoCmd = &cli.Command{
 		}
 		defer client.Close()
 
+		var netWork = ""
+		chainId, err := client.ChainID(context.Background())
+		if err != nil {
+			return err
+		}
+		if chainId.Int64() == 254 {
+			netWork = fmt.Sprintf("Mainnet(%d)", chainId.Int64())
+		} else {
+			netWork = fmt.Sprintf("Testnet(%d)", chainId.Int64())
+		}
+
 		var fcpCollateralBalance = "0.0000"
 		var fcpEscrowBalance = "0.0000"
 		var ecpCollateralBalance = "0.0000"
@@ -177,6 +188,7 @@ var infoCmd = &cli.Command{
 		}
 		var taskData [][]string
 
+		taskData = append(taskData, []string{"   Network:", netWork})
 		taskData = append(taskData, []string{fmt.Sprintf("   CP Account Address(%s):", version), contractAddress})
 		taskData = append(taskData, []string{"   Name:", conf.GetConfig().API.NodeName})
 		taskData = append(taskData, []string{"   Owner:", ownerAddress})
@@ -202,13 +214,17 @@ var infoCmd = &cli.Command{
 
 		var rowColorList []RowColor
 		if taskTypes != "" {
-			var rowColor []tablewriter.Colors
-			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
-			rowColorList = append(rowColorList, RowColor{
-				row:    10,
-				column: []int{1},
-				color:  rowColor,
-			})
+			rowColorList = append(rowColorList,
+				RowColor{
+					row:    0,
+					column: []int{1},
+					color:  []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgBlueColor}},
+				},
+				RowColor{
+					row:    11,
+					column: []int{1},
+					color:  []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}},
+				})
 		}
 		header := []string{"CP Account Info:"}
 		NewVisualTable(header, taskData, rowColorList).Generate(false)
@@ -235,13 +251,6 @@ var stateInfoCmd = &cli.Command{
 	Name:      "cp-info",
 	Usage:     "Print computing-provider chain info",
 	ArgsUsage: "[cp_account_contract_address]",
-	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:  "network",
-			Usage: "Specify which rpc connection network to use",
-			Value: conf.MainnetNetwork,
-		},
-	},
 	Action: func(cctx *cli.Context) error {
 		cpRepoPath, ok := os.LookupEnv("CP_PATH")
 		if !ok {
@@ -251,12 +260,7 @@ var stateInfoCmd = &cli.Command{
 			return fmt.Errorf("load config file failed, error: %+v", err)
 		}
 
-		networkName := cctx.String("network")
-		if strings.TrimSpace(networkName) == "" {
-			return fmt.Errorf("the network is required")
-		}
-
-		chainRpc, err := conf.GetRpcByNetWorkName(networkName)
+		chainRpc, err := conf.GetRpcByNetWorkName()
 		if err != nil {
 			return err
 		}
@@ -361,11 +365,6 @@ var taskInfoCmd = &cli.Command{
 	Usage:     "Print task info on the chain",
 	ArgsUsage: "[task_contract_address]",
 	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:  "network",
-			Usage: "Specify which rpc connection chain to use",
-			Value: conf.MainnetNetwork,
-		},
 		&cli.BoolFlag{
 			Name:     "ecp",
 			Usage:    "Check ECP task on the chain",
@@ -387,17 +386,12 @@ var taskInfoCmd = &cli.Command{
 			return fmt.Errorf("load config file failed, error: %+v", err)
 		}
 
-		networkName := cctx.String("network")
-		if strings.TrimSpace(networkName) == "" {
-			return fmt.Errorf("the network is required")
-		}
-
-		chainRpc, err := conf.GetRpcByNetWorkName(networkName)
+		chainRpc, err := conf.GetRpcByNetWorkName()
 		if err != nil {
 			return err
 		}
 
-		taskInfo, err := computing.GetTaskInfoOnChain(networkName, taskContract)
+		taskInfo, err := computing.GetTaskInfoOnChain(taskContract)
 		if err != nil {
 			return fmt.Errorf("get task info on the chain failed, error: %v", err)
 		}
@@ -513,6 +507,13 @@ var initCmd = &cli.Command{
 		cpRepoPath, ok := os.LookupEnv("CP_PATH")
 		if !ok {
 			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
+		}
+
+		if _, err := os.Stat(cpRepoPath); os.IsNotExist(err) {
+			err := os.MkdirAll(cpRepoPath, 0755)
+			if err != nil {
+				return fmt.Errorf("create cp repo failed, error: %v", cpRepoPath)
+			}
 		}
 
 		return conf.GenerateAndUpdateConfigFile(cpRepoPath, strings.TrimSpace(multiAddr), nodeName, port)

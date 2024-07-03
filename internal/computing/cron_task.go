@@ -146,6 +146,22 @@ func (task *CronTask) watchExpiredTask() {
 			return
 		}
 
+		if len(jobList) == 0 {
+			service := NewK8sService()
+			namespaces, err := service.ListNamespace(context.TODO())
+			if err != nil {
+				logs.GetLogger().Errorf("Failed get all namespace, error: %+v", err)
+				return
+			}
+
+			for _, namespace := range namespaces {
+				if strings.HasPrefix(namespace, constants.K8S_NAMESPACE_NAME_PREFIX) {
+					service.DeleteNameSpace(context.TODO(), namespace)
+				}
+			}
+			return
+		}
+
 		var deleteSpaceIds []string
 		for _, job := range jobList {
 			namespace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(job.WalletAddress)
