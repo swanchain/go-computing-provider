@@ -120,6 +120,17 @@ var infoCmd = &cli.Command{
 		}
 		defer client.Close()
 
+		var netWork = ""
+		chainId, err := client.ChainID(context.Background())
+		if err != nil {
+			return err
+		}
+		if chainId.Int64() == 254 {
+			netWork = fmt.Sprintf("Mainnet(%d)", chainId.Int64())
+		} else {
+			netWork = fmt.Sprintf("Testnet(%d)", chainId.Int64())
+		}
+
 		var fcpCollateralBalance = "0.0000"
 		var fcpEscrowBalance = "0.0000"
 		var ecpCollateralBalance = "0.0000"
@@ -177,6 +188,7 @@ var infoCmd = &cli.Command{
 		}
 		var taskData [][]string
 
+		taskData = append(taskData, []string{"   Network:", netWork})
 		taskData = append(taskData, []string{fmt.Sprintf("   CP Account Address(%s):", version), contractAddress})
 		taskData = append(taskData, []string{"   Name:", conf.GetConfig().API.NodeName})
 		taskData = append(taskData, []string{"   Owner:", ownerAddress})
@@ -205,7 +217,7 @@ var infoCmd = &cli.Command{
 			var rowColor []tablewriter.Colors
 			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
 			rowColorList = append(rowColorList, RowColor{
-				row:    10,
+				row:    11,
 				column: []int{1},
 				color:  rowColor,
 			})
