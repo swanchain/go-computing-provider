@@ -216,7 +216,7 @@ var infoCmd = &cli.Command{
 		if taskTypes != "" {
 			rowColorList = append(rowColorList,
 				RowColor{
-					row:    1,
+					row:    0,
 					column: []int{1},
 					color:  []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgBlueColor}},
 				},
