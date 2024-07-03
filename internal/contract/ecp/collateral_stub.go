@@ -3,21 +3,27 @@ package ecp
 import (
 	"context"
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/contract"
+	"github.com/swanchain/go-computing-provider/internal/contract/token"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"math/big"
 	"strings"
+	"time"
 )
 
 type Stub struct {
 	client           *ethclient.Client
-	collateral       *Collaternal
+	collateral       *EcpCollateral
 	privateK         string
 	publicK          string
 	cpAccountAddress string
@@ -50,7 +56,7 @@ func NewCollateralStub(client *ethclient.Client, options ...Option) (*Stub, erro
 	}
 
 	collateralAddress := common.HexToAddress(conf.GetConfig().CONTRACT.ZkCollateral)
-	collateralClient, err := NewCollaternal(collateralAddress, client)
+	collateralClient, err := NewEcpCollateral(collateralAddress, client)
 	if err != nil {
 		return nil, fmt.Errorf("ECP create collateral contract client, error: %+v", err)
 	}
@@ -66,11 +72,6 @@ func (s *Stub) Deposit(cpAccountAddress string, amount *big.Int) (string, error)
 		return "", err
 	}
 
-	txOptions, err := s.createTransactOpts(amount, true)
-	if err != nil {
-		return "", fmt.Errorf("address: %s, ECP collateral client create transaction, error: %+v", publicAddress, err)
-	}
-
 	if cpAccountAddress == "" || len(strings.TrimSpace(cpAccountAddress)) == 0 {
 		cpAccountAddress, err = contract.GetCpAccountAddress()
 		if err != nil {
@@ -78,11 +79,53 @@ func (s *Stub) Deposit(cpAccountAddress string, amount *big.Int) (string, error)
 		}
 	}
 
-	transaction, err := s.collateral.Deposit(txOptions, common.HexToAddress(cpAccountAddress))
+	txOptions, err := s.createTransactOpts()
 	if err != nil {
-		return "", fmt.Errorf("address: %s, ECP collateral client create deposit tx error: %+v", publicAddress, err)
+		return "", fmt.Errorf("address: %s, ECP collateral client create transaction, error: %+v", publicAddress, err)
 	}
-	return transaction.Hash().String(), nil
+
+	tokenClient, err := token.NewToken(common.HexToAddress(conf.GetConfig().CONTRACT.SwanToken), s.client)
+	if err != nil {
+		return "", fmt.Errorf("create token client failed, error: %v", err)
+	}
+
+	approveTx, err := tokenClient.Approve(txOptions, common.HexToAddress(conf.GetConfig().CONTRACT.Collateral), amount)
+	if err != nil {
+		return "", fmt.Errorf("token approve failed, error: %v", err)
+	}
+
+	timeout := time.After(3 * time.Minute)
+	ticker := time.Tick(3 * time.Second)
+	for {
+		select {
+		case <-timeout:
+			return "", fmt.Errorf("timeout waiting for token approve transaction confirmation, tx: %s", approveTx.Hash().String())
+		case <-ticker:
+			receipt, err := s.client.TransactionReceipt(context.Background(), approveTx.Hash())
+			if err != nil {
+				if errors.Is(err, ethereum.NotFound) {
+					continue
+				}
+			}
+
+			if receipt != nil && receipt.Status == types.ReceiptStatusSuccessful {
+				logs.GetLogger().Infof("token approve transaction hash: %s", approveTx.Hash().String())
+				depositTxOptions, err := s.createTransactOpts()
+				if err != nil {
+					return "", fmt.Errorf("address: %s, ECP collateral client create transaction, error: %+v", publicAddress, err)
+				}
+
+				transaction, err := s.collateral.Deposit(depositTxOptions, common.HexToAddress(cpAccountAddress), amount)
+				if err != nil {
+					return "", fmt.Errorf("address: %s, ECP collateral client create deposit tx error: %+v", publicAddress, err)
+				}
+				return transaction.Hash().String(), nil
+
+			} else if receipt != nil && receipt.Status == 0 {
+				return "", fmt.Errorf("swan token approve transaction execution failed, tx: %s", approveTx.Hash().String())
+			}
+		}
+	}
 }
 
 func (s *Stub) Withdraw(cpAccountAddress string, amount *big.Int) (string, error) {
@@ -91,7 +134,7 @@ func (s *Stub) Withdraw(cpAccountAddress string, amount *big.Int) (string, error
 		return "", err
 	}
 
-	txOptions, err := s.createTransactOpts(nil, false)
+	txOptions, err := s.createTransactOpts()
 	if err != nil {
 		return "", fmt.Errorf("address: %s, ECP collateral client create transaction, error: %+v", publicAddress, err)
 	}
@@ -151,7 +194,7 @@ func (s *Stub) privateKeyToPublicKey() (common.Address, error) {
 	return crypto.PubkeyToAddress(*publicKeyECDSA), nil
 }
 
-func (s *Stub) createTransactOpts(amount *big.Int, isDeposit bool) (*bind.TransactOpts, error) {
+func (s *Stub) createTransactOpts() (*bind.TransactOpts, error) {
 	publicAddress, err := s.privateKeyToPublicKey()
 	if err != nil {
 		return nil, err
@@ -178,9 +221,6 @@ func (s *Stub) createTransactOpts(amount *big.Int, isDeposit bool) (*bind.Transa
 	}
 
 	txOptions, err := bind.NewKeyedTransactorWithChainID(privateKey, chainId)
-	if isDeposit {
-		txOptions.Value = amount
-	}
 
 	if err != nil {
 		return nil, fmt.Errorf("address: %s, collateral client create transaction, error: %+v", publicAddress, err)

@@ -37,4 +37,4 @@ SWAN_CHAIN_RPC = "https://rpc-proxima.swanchain.io"  # Swan chain RPC
 SWAN_CONTRACT = "0x91B25A65b295F0405552A4bbB77879ab5e38166c"              # Swan token's contract address
 SWAN_COLLATERAL_CONTRACT = "0xC7980d5a69e8AA9797934aCf18e483EB4C986e01"   # Swan's collateral address
 REGISTER_CP_CONTRACT = "0x6EDf891B53ba2c6Fade6Ae373682ED48dEa5AF48"       # The CP registration contract address
-ZK_COLLATERAL_CONTRACT = "0x1d2557C9d14882D9eE291BB66eaC6c1C4a587054"     # The ZK task's collateral contract address
+ZK_COLLATERAL_CONTRACT = "0x988f78dd326dc90537951cd84de405d111bf8e73"     # The ZK task's collateral contract address
