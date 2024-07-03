@@ -214,13 +214,17 @@ var infoCmd = &cli.Command{
 
 		var rowColorList []RowColor
 		if taskTypes != "" {
-			var rowColor []tablewriter.Colors
-			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
-			rowColorList = append(rowColorList, RowColor{
-				row:    11,
-				column: []int{1},
-				color:  rowColor,
-			})
+			rowColorList = append(rowColorList,
+				RowColor{
+					row:    1,
+					column: []int{1},
+					color:  []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgBlueColor}},
+				},
+				RowColor{
+					row:    11,
+					column: []int{1},
+					color:  []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}},
+				})
 		}
 		header := []string{"CP Account Info:"}
 		NewVisualTable(header, taskData, rowColorList).Generate(false)
