@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
@@ -16,13 +15,11 @@ import (
 	account2 "github.com/swanchain/go-computing-provider/internal/contract/account"
 	"github.com/swanchain/go-computing-provider/internal/contract/ecp"
 	"github.com/swanchain/go-computing-provider/internal/contract/fcp"
-	"github.com/swanchain/go-computing-provider/internal/contract/token"
 	"github.com/swanchain/go-computing-provider/internal/initializer"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"github.com/swanchain/go-computing-provider/util"
 	"github.com/swanchain/go-computing-provider/wallet"
 	"github.com/urfave/cli/v2"
-	"math/big"
 	"os"
 	"regexp"
 	"strconv"
@@ -84,7 +81,7 @@ func cpManager(router *gin.RouterGroup) {
 	router.GET("/lagrange/job/:job_uuid", computing.GetJobStatus)
 
 	router.POST("/cp/ubi", computing.DoUbiTaskForK8s)
-	router.POST("/cp/receive/ubi", computing.ReceiveUbiProofForK8s)
+	router.POST("/cp/receive/ubi", computing.ReceiveUbiProof)
 
 }
 
@@ -370,8 +367,14 @@ var taskInfoCmd = &cli.Command{
 			Usage:    "Check ECP task on the chain",
 			Required: true,
 		},
+		&cli.BoolFlag{
+			Name:  "show-proof",
+			Usage: "show proof of ZK task",
+			Value: false,
+		},
 	},
 	Action: func(cctx *cli.Context) error {
+		showProof := cctx.Bool("show-proof")
 
 		taskContract := cctx.Args().Get(0)
 		if strings.TrimSpace(taskContract) == "" {
@@ -386,92 +389,27 @@ var taskInfoCmd = &cli.Command{
 			return fmt.Errorf("load config file failed, error: %+v", err)
 		}
 
-		chainRpc, err := conf.GetRpcByNetWorkName()
-		if err != nil {
-			return err
-		}
-
 		taskInfo, err := computing.GetTaskInfoOnChain(taskContract)
 		if err != nil {
 			return fmt.Errorf("get task info on the chain failed, error: %v", err)
 		}
 
-		var lockFundTx, unlockFundTx, rewardTx, challengeTx, slashTx, reward string
-		if taskInfo.LockFundTx != "" {
-			lockFundTx = taskInfo.LockFundTx
-		} else {
-			lockFundTx = "-"
-		}
-		if taskInfo.UnlockFundTx != "" {
-			unlockFundTx = taskInfo.UnlockFundTx
-		} else {
-			unlockFundTx = "-"
-		}
-		if taskInfo.RewardTx != "" {
-			rewardTx = taskInfo.RewardTx
-		} else {
-			rewardTx = "-"
-		}
-		if taskInfo.ChallengeTx != "" {
-			challengeTx = taskInfo.ChallengeTx
-		} else {
-			challengeTx = "-"
-		}
-		if taskInfo.SlashTx != "" {
-			slashTx = taskInfo.SlashTx
-		} else {
-			slashTx = "-"
-		}
-
-		if taskInfo.RewardTx != "" {
-			client, err := ethclient.Dial(chainRpc)
-			if err == nil {
-				defer client.Close()
-				receipt, err := client.TransactionReceipt(context.Background(), common.HexToHash(taskInfo.RewardTx))
-				if err == nil {
-					contractAbi, err := abi.JSON(strings.NewReader(token.TokenMetaData.ABI))
-					if err == nil {
-						for _, l := range receipt.Logs {
-							event := struct {
-								From  common.Address
-								To    common.Address
-								Value *big.Int
-							}{}
-							if err := contractAbi.UnpackIntoInterface(&event, "Transfer", l.Data); err != nil {
-								continue
-							}
-
-							if len(l.Topics) == 3 && l.Topics[0] == contractAbi.Events["Transfer"].ID {
-								balance := event.Value
-								if balance.String() == "0" {
-									reward = "0.0000"
-								} else {
-									fbalance := new(big.Float)
-									fbalance.SetString(balance.String())
-									etherQuotient := new(big.Float).Quo(fbalance, new(big.Float).SetInt(big.NewInt(1e18)))
-									reward = etherQuotient.Text('f', 4)
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-
 		var taskData [][]string
+		taskData = append(taskData, []string{"Task Id:", taskInfo.TaskID.String()})
 		taskData = append(taskData, []string{"ZK Type:", models.TaskTypeStr(int(taskInfo.TaskType.Int64()))})
-		taskData = append(taskData, []string{"Resource Type:", models.GetSourceTypeStr(int(taskInfo.ResourceType.Int64()))})
-		taskData = append(taskData, []string{"CP Account:", taskInfo.CpContractAddress.Hex()})
-		taskData = append(taskData, []string{"Task Status:", taskInfo.Status})
+		taskData = append(taskData, []string{"Resource Type:", models.GetResourceTypeStr(int(taskInfo.ResourceType.Int64()))})
+		taskData = append(taskData, []string{"Owner:", taskInfo.Owner.Hex()})
+		taskData = append(taskData, []string{"CP Account:", taskInfo.CpAccount.Hex()})
 		taskData = append(taskData, []string{"Deadline:", taskInfo.Deadline.String()})
-		taskData = append(taskData, []string{"Reward(SWAN):", reward})
-		taskData = append(taskData, []string{"LockFund TxHash:", lockFundTx})
-		taskData = append(taskData, []string{"UnLockFund TxHash:", unlockFundTx})
-		taskData = append(taskData, []string{"Reward TxHash:", rewardTx})
-		taskData = append(taskData, []string{"Challenge TxHash:", challengeTx})
-		taskData = append(taskData, []string{"Slash TxHash:", slashTx})
+		taskData = append(taskData, []string{"Input Param:", taskInfo.InputParam})
+		taskData = append(taskData, []string{"Verify Param:", taskInfo.VerifyParam})
+		taskData = append(taskData, []string{"Check Code:", taskInfo.CheckCode})
 
-		header := []string{"Task Contract:", taskContract}
+		if showProof {
+			taskData = append(taskData, []string{"Proof:", taskInfo.Proof})
+		}
+
+		header := []string{fmt.Sprintf("Task Contract(%s):", taskInfo.Version), taskContract}
 		NewVisualTable(header, taskData, []RowColor{}).Generate(false)
 		return nil
 

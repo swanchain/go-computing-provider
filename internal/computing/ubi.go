@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"math/rand"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -54,7 +53,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 		return
 	}
 
-	if ubiTask.ResourceType != 0 && ubiTask.ResourceType != 1 {
+	if ubiTask.ResourceType != models.RESOURCE_TYPE_CPU && ubiTask.ResourceType != models.RESOURCE_TYPE_GPU {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "the value of resource_type is 0 or 1"))
 		return
 	}
@@ -68,19 +67,34 @@ func DoUbiTaskForK8s(c *gin.Context) {
 		return
 	}
 
+	if strings.TrimSpace(ubiTask.VerifyParam) == "" {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: verify_param"))
+		return
+	}
+
+	if strings.TrimSpace(ubiTask.CheckCode) == "" {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: check_code"))
+		return
+	}
+
 	if strings.TrimSpace(ubiTask.Signature) == "" {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: signature"))
 		return
 	}
-	if strings.TrimSpace(ubiTask.ContractAddr) == "" {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: contract_addr"))
+
+	if ubiTask.DeadLine == 0 {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: deadline"))
 		return
 	}
 
-	cpRepoPath, _ := os.LookupEnv("CP_PATH")
-	nodeID := GetNodeId(cpRepoPath)
+	cpAccountAddress, err := contract.GetCpAccountAddress()
+	if err != nil {
+		logs.GetLogger().Errorf("get cp account contract address failed, error: %v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.GetCpAccountError))
+		return
+	}
 
-	signature, err := verifySignature(conf.GetConfig().UBI.UbiEnginePk, fmt.Sprintf("%s%s", nodeID, ubiTask.ContractAddr), ubiTask.Signature)
+	signature, err := verifySignature(conf.GetConfig().UBI.UbiEnginePk, fmt.Sprintf("%s%d", cpAccountAddress, ubiTask.ID), ubiTask.Signature)
 	if err != nil {
 		logs.GetLogger().Errorf("verifySignature for ubi task failed, error: %+v", err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.UbiTaskParamError, "sign data failed"))
@@ -102,11 +116,13 @@ func DoUbiTaskForK8s(c *gin.Context) {
 	taskEntity.Id = int64(ubiTask.ID)
 	taskEntity.Type = ubiTask.Type
 	taskEntity.Name = ubiTask.Name
-	taskEntity.Contract = ubiTask.ContractAddr
 	taskEntity.ResourceType = ubiTask.ResourceType
 	taskEntity.InputParam = ubiTask.InputParam
+	taskEntity.VerifyParam = ubiTask.VerifyParam
 	taskEntity.Status = models.TASK_RECEIVED_STATUS
 	taskEntity.CreateTime = time.Now().Unix()
+	taskEntity.Deadline = ubiTask.DeadLine
+	taskEntity.CheckCode = ubiTask.CheckCode
 	err = NewTaskService().SaveTaskEntity(taskEntity)
 	if err != nil {
 		logs.GetLogger().Errorf("save task entity failed, error: %v", err)
@@ -136,7 +152,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 		taskEntity.Status = models.TASK_FAILED_STATUS
 		taskEntity.Error = "No resources available"
 		NewTaskService().SaveTaskEntity(taskEntity)
-		logs.GetLogger().Warnf("ubi task id: %d, type: %s, not found a resources available", ubiTask.ID, models.GetSourceTypeStr(ubiTask.ResourceType))
+		logs.GetLogger().Warnf("ubi task id: %d, type: %s, not found a resources available", ubiTask.ID, models.GetResourceTypeStr(ubiTask.ResourceType))
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError))
 		return
 	}
@@ -390,6 +406,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 		}
 		defer podLogs.Close()
 
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 		ubiLogFileName := filepath.Join(cpRepoPath, "ubi-fcp.log")
 		logFile, err := os.OpenFile(ubiLogFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
@@ -407,7 +424,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
 }
 
-func ReceiveUbiProofForK8s(c *gin.Context) {
+func ReceiveUbiProof(c *gin.Context) {
 	var c2Proof models.UbiC2Proof
 	var err error
 	if err := c.ShouldBindJSON(&c2Proof); err != nil {
@@ -427,11 +444,18 @@ func ReceiveUbiProofForK8s(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
 		return
 	}
-	err = submitUBIProof(c2Proof, ubiTask)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
-		return
-	}
+	go func() {
+		defer func() {
+			if err := recover(); err != nil {
+				logs.GetLogger().Errorf("taskId: %d, submit zk-task proof catch painc error: %v", taskId, err)
+			}
+		}()
+		err = submitUBIProof(c2Proof, ubiTask)
+		if err != nil {
+			return
+		}
+	}()
+
 	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
 }
 
@@ -442,8 +466,8 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		return
 	}
 
-	logs.GetLogger().Infof("ubi task received: id: %d, type: %d, zk_type: %s, input_param: %s, signature: %s, contract: %s",
-		ubiTask.ID, ubiTask.ResourceType, models.UbiTaskTypeStr(ubiTask.Type), ubiTask.InputParam, ubiTask.Signature, ubiTask.ContractAddr)
+	logs.GetLogger().Infof("ubi task received: id: %d, deadline: %d,resource_type: %d, type: %s, input_param: %s, signature: %s",
+		ubiTask.ID, ubiTask.DeadLine, ubiTask.ResourceType, models.UbiTaskTypeStr(ubiTask.Type), ubiTask.InputParam, ubiTask.Signature)
 
 	if ubiTask.ID == 0 {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: id"))
@@ -454,7 +478,7 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		return
 	}
 
-	if ubiTask.ResourceType != 0 && ubiTask.ResourceType != 1 {
+	if ubiTask.ResourceType != models.RESOURCE_TYPE_CPU && ubiTask.ResourceType != models.RESOURCE_TYPE_GPU {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "the value of resource_type is 0 or 1"))
 		return
 	}
@@ -468,24 +492,34 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		return
 	}
 
+	if strings.TrimSpace(ubiTask.VerifyParam) == "" {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: verify_param"))
+		return
+	}
+
+	if strings.TrimSpace(ubiTask.CheckCode) == "" {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: check_code"))
+		return
+	}
+
 	if strings.TrimSpace(ubiTask.Signature) == "" {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: signature"))
 		return
 	}
-	if strings.TrimSpace(ubiTask.ContractAddr) == "" {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: contract_addr"))
+
+	if ubiTask.DeadLine == 0 {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: deadline"))
 		return
 	}
 
-	if _, err := GetTaskInfoOnChain(ubiTask.ContractAddr); err != nil {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskContractError))
+	cpAccountAddress, err := contract.GetCpAccountAddress()
+	if err != nil {
+		logs.GetLogger().Errorf("get cp account contract address failed, error: %v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.GetCpAccountError))
 		return
 	}
 
-	cpRepoPath, _ := os.LookupEnv("CP_PATH")
-	nodeID := GetNodeId(cpRepoPath)
-
-	signature, err := verifySignature(conf.GetConfig().UBI.UbiEnginePk, fmt.Sprintf("%s%s", nodeID, ubiTask.ContractAddr), ubiTask.Signature)
+	signature, err := verifySignature(conf.GetConfig().UBI.UbiEnginePk, fmt.Sprintf("%s%d", cpAccountAddress, ubiTask.ID), ubiTask.Signature)
 	if err != nil {
 		logs.GetLogger().Errorf("verifySignature for ubi task failed, error: %+v", err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
@@ -507,11 +541,13 @@ func DoUbiTaskForDocker(c *gin.Context) {
 	taskEntity.Id = int64(ubiTask.ID)
 	taskEntity.Type = ubiTask.Type
 	taskEntity.Name = ubiTask.Name
-	taskEntity.Contract = ubiTask.ContractAddr
 	taskEntity.ResourceType = ubiTask.ResourceType
 	taskEntity.InputParam = ubiTask.InputParam
+	taskEntity.VerifyParam = ubiTask.VerifyParam
 	taskEntity.Status = models.TASK_RECEIVED_STATUS
 	taskEntity.CreateTime = time.Now().Unix()
+	taskEntity.Deadline = ubiTask.DeadLine
+	taskEntity.CheckCode = ubiTask.CheckCode
 	err = NewTaskService().SaveTaskEntity(taskEntity)
 	if err != nil {
 		logs.GetLogger().Errorf("save task entity failed, error: %v", err)
@@ -551,24 +587,6 @@ func DoUbiTaskForDocker(c *gin.Context) {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("do zk task painc, error: %+v", err)
 				return
-			}
-
-			ubiTaskRun, err := NewTaskService().GetTaskEntity(int64(ubiTask.ID))
-			if err != nil {
-				logs.GetLogger().Errorf("get ubi task detail from db failed, ubiTaskId: %d, error: %+v", ubiTask.ID, err)
-				return
-			}
-			if ubiTaskRun.Id == 0 {
-				ubiTaskRun = new(models.TaskEntity)
-				ubiTaskRun.Id = int64(ubiTask.ID)
-				ubiTaskRun.Type = ubiTask.Type
-				ubiTaskRun.Name = ubiTask.Name
-				ubiTaskRun.Contract = ubiTask.ContractAddr
-				ubiTaskRun.ResourceType = ubiTask.ResourceType
-				ubiTaskRun.InputParam = ubiTask.InputParam
-				ubiTaskRun.CreateTime = time.Now().Unix()
-				ubiTaskRun.Contract = ubiTask.ContractAddr
-				NewTaskService().SaveTaskEntity(ubiTaskRun)
 			}
 		}()
 
@@ -652,6 +670,7 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		}
 		defer containerLogStream.Close()
 
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 		ubiLogFileName := filepath.Join(cpRepoPath, "ubi-ecp.log")
 		logFile, err := os.OpenFile(ubiLogFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
@@ -733,38 +752,6 @@ func checkResourceForUbi(resource *models.TaskResource, gpuName string, resource
 	return false, nodeResource.CpuName, needCpu, int64(needMemory), nil
 }
 
-func ReceiveUbiProofForDocker(c *gin.Context) {
-	var err error
-	var c2Proof models.UbiC2Proof
-
-	if err := c.ShouldBindJSON(&c2Proof); err != nil {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
-		return
-	}
-	logs.GetLogger().Infof("task_id: %s, c2 proof out received: %+v", c2Proof.TaskId, c2Proof)
-
-	taskId, err := strconv.Atoi(c2Proof.TaskId)
-	if err != nil {
-		logs.GetLogger().Errorf("ubi task id: %s str parse to int failed, error: %v", c2Proof.TaskId, err)
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
-		return
-	}
-	ubiTask, err := NewTaskService().GetTaskEntity(int64(taskId))
-	if err != nil {
-		logs.GetLogger().Errorf("ubi task id: %d, get task info failed, error: %v", taskId, err)
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.FoundTaskEntityError))
-		return
-	}
-
-	err = submitUBIProof(c2Proof, ubiTask)
-	if err != nil {
-		logs.GetLogger().Warnf("ubi task id: %d, submit proof failed, error: %v", taskId, err)
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SubmitProofError))
-		return
-	}
-	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
-}
-
 func GetCpResource(c *gin.Context) {
 	location, err := getLocation()
 	if err != nil {
@@ -841,11 +828,11 @@ func submitUBIProof(c2Proof models.UbiC2Proof, task *models.TaskEntity) error {
 
 	taskStub, err := ecp.NewTaskStub(client, ecp.WithTaskContractAddress(task.Contract), ecp.WithTaskPrivateKey(workerPrivateKey))
 	if err != nil {
-		logs.GetLogger().Errorf("create ubi task client failed,  taskId: %s, contract: %s, error: %v", c2Proof.TaskId, task.Contract, err)
+		logs.GetLogger().Errorf("create ubi task client failed, taskId: %s, contract: %s, error: %v", c2Proof.TaskId, task.Contract, err)
 		return err
 	}
 
-	var taskInfo ecp.ECPTaskTaskInfo
+	var blockNumber uint64
 
 loopTask:
 	for {
@@ -854,7 +841,7 @@ loopTask:
 			logs.GetLogger().Errorf("get ubi task info, taskId: %s timeout", c2Proof.TaskId)
 			break loopTask
 		default:
-			taskInfo, err = taskStub.GetTaskInfo()
+			blockNumber, err = client.BlockNumber(context.Background())
 			if err != nil {
 				logs.GetLogger().Warnf("get ubi task info failed, taskId: %s, msg: %s, retrying", c2Proof.TaskId, err.Error())
 				time.Sleep(3 * time.Second)
@@ -865,32 +852,28 @@ loopTask:
 		}
 	}
 
-	receiveProofTime := time.Now().Unix()
-	finallyTime := task.CreateTime + taskInfo.Deadline.Int64()*2
-	deadlineTime := finallyTime - receiveProofTime
-
-	if deadlineTime < 0 {
-		logs.GetLogger().Warnf("taskId: %s proof submission deadline has passed, receiveProofTime: %d, finallyTime: %d, deadlineTime: %d", c2Proof.TaskId, receiveProofTime, finallyTime, deadlineTime)
+	remainingTime := task.Deadline - int64(blockNumber)
+	if remainingTime < 0 {
+		logs.GetLogger().Warnf("taskId: %s proof submission deadline has passed,current: %d, deadline: %d, , deadlineTime: %d", c2Proof.TaskId, blockNumber, task.Deadline, remainingTime)
 		task.Status = models.TASK_FAILED_STATUS
-		task.Error = fmt.Sprintf("Proof submission deadline has passed")
+		task.Error = fmt.Sprintf("create contract deadline has passed")
 		return NewTaskService().SaveTaskEntity(task)
 	}
-	submitUBIProofTx, err := taskStub.SubmitUBIProof(c2Proof.TaskId, c2Proof.Proof, deadlineTime)
-
-	if submitUBIProofTx != "" {
+	taskContractAddress, err := taskStub.CreateTaskContract(c2Proof.Proof, task, remainingTime)
+	if taskContractAddress != "" {
 		task.Status = models.TASK_SUCCESS_STATUS
-		task.TxHash = submitUBIProofTx
-		logs.GetLogger().Infof("taskId: %s, submitUBIProofTx: %s", c2Proof.TaskId, submitUBIProofTx)
+		task.Contract = taskContractAddress
+		logs.GetLogger().Infof("taskId: %s, taskContractAddress: %s", c2Proof.TaskId, taskContractAddress)
 	} else if err != nil {
 		task.Status = models.TASK_FAILED_STATUS
 		task.Error = fmt.Sprintf("%s", err.Error())
-		logs.GetLogger().Errorf("taskId: %s, submitUBIProofTx failed, error: %v", c2Proof.TaskId, err)
+		logs.GetLogger().Errorf("taskId: %s, create task contract failed, error: %v", c2Proof.TaskId, err)
 	}
 	return NewTaskService().SaveTaskEntity(task)
 }
 
-func GetTaskInfoOnChain(taskContract string) (ecp.ECPTaskTaskInfo, error) {
-	var taskInfo ecp.ECPTaskTaskInfo
+func GetTaskInfoOnChain(taskContract string) (models.EcpTaskInfo, error) {
+	var taskInfo models.EcpTaskInfo
 
 	chainRpc, err := conf.GetRpcByNetWorkName()
 	if err != nil {
@@ -1001,26 +984,6 @@ func CronTaskForEcp() {
 			}
 		}
 	}()
-
-	go func() {
-		ticker := time.NewTicker(10 * time.Minute)
-		for range ticker.C {
-			taskList, err := NewTaskService().GetTaskListNoReward()
-			if err != nil {
-				logs.GetLogger().Errorf("get task list failed, error: %+v", err)
-				return
-			}
-
-			for _, entity := range taskList {
-				ubiTask := entity
-				err = getReward(ubiTask)
-				if err != nil {
-					logs.GetLogger().Errorf("taskId: %d, %v", ubiTask.Id, err)
-					continue
-				}
-			}
-		}
-	}()
 }
 
 func SyncCpAccountInfo() {
@@ -1089,53 +1052,6 @@ func RestartResourceExporter() error {
 	}, nil, resourceExporterContainerName)
 	if err != nil {
 		return fmt.Errorf("create resource-exporter container failed, error: %v", err)
-	}
-	return nil
-}
-
-func getReward(task *models.TaskEntity) error {
-	chainUrl, err := conf.GetRpcByNetWorkName()
-	if err != nil {
-		return fmt.Errorf("get rpc url failed, error: %s", err.Error())
-	}
-
-	client, err := ethclient.Dial(chainUrl)
-	if err != nil {
-		return fmt.Errorf("dial rpc connect failed, error: %s", err.Error())
-	}
-	defer client.Close()
-
-	taskStub, err := ecp.NewTaskStub(client, ecp.WithTaskContractAddress(task.Contract))
-	if err != nil {
-		return fmt.Errorf("create ubi task client failed, error: %s", err.Error())
-	}
-
-	var status int
-	var rewardTx, challengeTx, slashTx, reward string
-	for i := 0; i < 5; i++ {
-		status, rewardTx, challengeTx, slashTx, reward, err = taskStub.GetReward()
-		if err != nil {
-			var errMsg string
-			if strings.Contains(err.Error(), "not found") {
-				errMsg = fmt.Sprintf("rewardTx %s not found on chain", rewardTx)
-			} else {
-				errMsg = ecp.ParseError(err)
-			}
-
-			logs.GetLogger().Errorf("use %s task contract to get reward failed, error: %s", task.Contract, errMsg)
-			rand.Seed(time.Now().UnixNano())
-			time.Sleep(time.Duration(rand.Intn(3)+1) * time.Second)
-			continue
-		}
-	}
-
-	if status != models.REWARD_UNCLAIMED {
-		task.Reward = reward
-		task.RewardStatus = status
-		task.RewardTx = rewardTx
-		task.ChallengeTx = challengeTx
-		task.SlashTx = slashTx
-		return NewTaskService().SaveTaskEntity(task)
 	}
 	return nil
 }
