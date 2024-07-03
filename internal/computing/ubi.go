@@ -872,7 +872,7 @@ loopTask:
 	return NewTaskService().SaveTaskEntity(task)
 }
 
-func GetTaskInfoOnChain(rpcName string, taskContract string) (models.EcpTaskInfo, error) {
+func GetTaskInfoOnChain(taskContract string) (models.EcpTaskInfo, error) {
 	var taskInfo models.EcpTaskInfo
 
 	chainRpc, err := conf.GetRpcByNetWorkName()
