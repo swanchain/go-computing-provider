@@ -108,7 +108,7 @@ func InitConfig(cpRepoPath string, standalone bool) error {
 	configFile := filepath.Join(cpRepoPath, fmt.Sprintf("config-%s.toml", netWork))
 
 	if _, err := os.Stat(configFile); err != nil {
-		return fmt.Errorf("not found %s config file", configFile)
+		return fmt.Errorf("not found %s config file, please use `computing-provider init` to initialize a repo", configFile)
 	}
 
 	metaData, err := toml.DecodeFile(configFile, &config)
