@@ -21,7 +21,7 @@ import (
 	"time"
 )
 
-type Stub struct {
+type CollateralStub struct {
 	client           *ethclient.Client
 	collateral       *EcpCollateral
 	privateK         string
@@ -29,28 +29,28 @@ type Stub struct {
 	cpAccountAddress string
 }
 
-type Option func(*Stub)
+type CollateralOption func(*CollateralStub)
 
-func WithPrivateKey(pk string) Option {
-	return func(obj *Stub) {
+func WithPrivateKey(pk string) CollateralOption {
+	return func(obj *CollateralStub) {
 		obj.privateK = pk
 	}
 }
 
-func WithPublicKey(pk string) Option {
-	return func(obj *Stub) {
+func WithPublicKey(pk string) CollateralOption {
+	return func(obj *CollateralStub) {
 		obj.publicK = pk
 	}
 }
 
-func WithCpAccountAddress(cpAccountAddress string) Option {
-	return func(obj *Stub) {
+func WithCpAccountAddress(cpAccountAddress string) CollateralOption {
+	return func(obj *CollateralStub) {
 		obj.cpAccountAddress = cpAccountAddress
 	}
 }
 
-func NewCollateralStub(client *ethclient.Client, options ...Option) (*Stub, error) {
-	stub := &Stub{}
+func NewCollateralStub(client *ethclient.Client, options ...CollateralOption) (*CollateralStub, error) {
+	stub := &CollateralStub{}
 	for _, option := range options {
 		option(stub)
 	}
@@ -66,7 +66,7 @@ func NewCollateralStub(client *ethclient.Client, options ...Option) (*Stub, erro
 	return stub, nil
 }
 
-func (s *Stub) Deposit(cpAccountAddress string, amount *big.Int) (string, error) {
+func (s *CollateralStub) Deposit(cpAccountAddress string, amount *big.Int) (string, error) {
 	publicAddress, err := s.privateKeyToPublicKey()
 	if err != nil {
 		return "", err
@@ -128,7 +128,7 @@ func (s *Stub) Deposit(cpAccountAddress string, amount *big.Int) (string, error)
 	}
 }
 
-func (s *Stub) Withdraw(cpAccountAddress string, amount *big.Int) (string, error) {
+func (s *CollateralStub) Withdraw(cpAccountAddress string, amount *big.Int) (string, error) {
 	publicAddress, err := s.privateKeyToPublicKey()
 	if err != nil {
 		return "", err
@@ -153,7 +153,7 @@ func (s *Stub) Withdraw(cpAccountAddress string, amount *big.Int) (string, error
 	return transaction.Hash().String(), nil
 }
 
-func (s *Stub) CpInfo() (models.EcpCollateralInfo, error) {
+func (s *CollateralStub) CpInfo() (models.EcpCollateralInfo, error) {
 	var cpInfo models.EcpCollateralInfo
 
 	if s.cpAccountAddress == "" || len(strings.TrimSpace(s.cpAccountAddress)) == 0 {
@@ -176,7 +176,7 @@ func (s *Stub) CpInfo() (models.EcpCollateralInfo, error) {
 	return cpInfo, nil
 }
 
-func (s *Stub) privateKeyToPublicKey() (common.Address, error) {
+func (s *CollateralStub) privateKeyToPublicKey() (common.Address, error) {
 	if len(strings.TrimSpace(s.privateK)) == 0 {
 		return common.Address{}, fmt.Errorf("wallet address private key must be not empty")
 	}
@@ -194,7 +194,7 @@ func (s *Stub) privateKeyToPublicKey() (common.Address, error) {
 	return crypto.PubkeyToAddress(*publicKeyECDSA), nil
 }
 
-func (s *Stub) createTransactOpts() (*bind.TransactOpts, error) {
+func (s *CollateralStub) createTransactOpts() (*bind.TransactOpts, error) {
 	publicAddress, err := s.privateKeyToPublicKey()
 	if err != nil {
 		return nil, err

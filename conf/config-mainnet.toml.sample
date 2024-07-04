@@ -8,6 +8,7 @@ WalletWhiteList=""                              # CP only accepts user addresses
 
 [UBI]
 UbiEnginePk = "0xB5aeb540B4895cd024c1625E146684940A849ED9"   # UBI Engine's public key, CP only accept the task from this UBI engine
+AggregateCommits = true                                      # Batch submission of proof messages through Sequencer service
 
 [LOG]
 CrtFile = "/YOUR_DOMAIN_NAME_CRT_PATH/server.crt"            # Your domain name SSL .crt file path
@@ -38,3 +39,4 @@ SWAN_CONTRACT = "0xAF90ac6428775E1Be06BAFA932c2d80119a7bd02"              # Swan
 SWAN_COLLATERAL_CONTRACT = "0x48966A3eb8C1b584Ac9E7767bC9607e235245C81"   # Swan's collateral address
 REGISTER_CP_CONTRACT = "0xbef1ec33e5Ac3a491fFeE1600e0b00eac97cb138"       # The CP registration contract address
 ZK_COLLATERAL_CONTRACT = "0x1d2557C9d14882D9eE291BB66eaC6c1C4a587054"     # The ZK task's collateral contract address
+SEQUENCER_CONTRACT = "0xd6e2ecff0166cedd8611f856f0d57b512e0ca1c1"         # The ZK task's sequencer contract address

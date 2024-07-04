@@ -77,6 +77,7 @@ type CONTRACT struct {
 	Collateral   string `toml:"SWAN_COLLATERAL_CONTRACT"`
 	Register     string `toml:"REGISTER_CP_CONTRACT"`
 	ZkCollateral string `toml:"ZK_COLLATERAL_CONTRACT"`
+	Sequencer    string `toml:"SEQUENCER_CONTRACT"`
 }
 
 func GetRpcByNetWorkName(netWorkName ...string) (string, error) {
