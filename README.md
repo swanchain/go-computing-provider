@@ -355,7 +355,7 @@ UserName = ""                                 # The login username, if only a si
 Password = ""                                 # The login password, if only a single node, you can ignore
 
 [RPC]
-SWAN_CHAIN_RPC = "https://mainnet-internal.swanchain.io"                  # Swan chain RPC
+SWAN_CHAIN_RPC = "https://mainnet-rpc01.swanchain.io"                     # Swan chain RPC
 
 [CONTRACT]
 SWAN_CONTRACT = "0xAF90ac6428775E1Be06BAFA932c2d80119a7bd02"              # Swan token's contract address
