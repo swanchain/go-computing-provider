@@ -1,6 +1,7 @@
 package computing
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -859,15 +860,20 @@ loopTask:
 		task.Error = fmt.Sprintf("create contract deadline has passed")
 		return NewTaskService().SaveTaskEntity(task)
 	}
-	taskContractAddress, err := taskStub.CreateTaskContract(c2Proof.Proof, task, remainingTime)
-	if taskContractAddress != "" {
-		task.Status = models.TASK_SUCCESS_STATUS
-		task.Contract = taskContractAddress
-		logs.GetLogger().Infof("taskId: %s, taskContractAddress: %s", c2Proof.TaskId, taskContractAddress)
-	} else if err != nil {
-		task.Status = models.TASK_FAILED_STATUS
-		task.Error = fmt.Sprintf("%s", err.Error())
-		logs.GetLogger().Errorf("taskId: %s, create task contract failed, error: %v", c2Proof.TaskId, err)
+
+	if conf.GetConfig().UBI.AggregateCommits {
+		err = submitTaskToSequencer(c2Proof.Proof, task, remainingTime)
+	} else {
+		taskContractAddress, err := taskStub.CreateTaskContract(c2Proof.Proof, task, remainingTime)
+		if taskContractAddress != "" {
+			task.Status = models.TASK_SUCCESS_STATUS
+			task.Contract = taskContractAddress
+			logs.GetLogger().Infof("taskId: %s, taskContractAddress: %s", c2Proof.TaskId, taskContractAddress)
+		} else if err != nil {
+			task.Status = models.TASK_FAILED_STATUS
+			task.Error = fmt.Sprintf("%s", err.Error())
+			logs.GetLogger().Errorf("taskId: %s, create task contract failed, error: %v", c2Proof.TaskId, err)
+		}
 	}
 	return NewTaskService().SaveTaskEntity(task)
 }
@@ -1052,6 +1058,85 @@ func RestartResourceExporter() error {
 	}, nil, resourceExporterContainerName)
 	if err != nil {
 		return fmt.Errorf("create resource-exporter container failed, error: %v", err)
+	}
+	return nil
+}
+
+func submitTaskToSequencer(proof string, task *models.TaskEntity, timeOut int64) error {
+	var err error
+	var taskReq struct {
+		Contract     string `json:"contract"`
+		Id           int64  `json:"id"`
+		Type         int    `json:"type"`
+		ResourceType int    `json:"resource_type"`
+		InputParam   string `json:"input_param"`
+		VerifyParam  string `json:"verify_param"`
+		Deadline     int64  `json:"deadline"`
+		CheckCode    string `json:"check_code"`
+		Proof        string `json:"proof"`
+		Version      string `json:"version"`
+		Status       int    `json:"status"`
+		StartAt      int64  `json:"start_at"`
+		EndedAt      int64  `json:"ended_at"`
+		Lock         string `json:"lock"`
+		Reward       string `json:"reward"`
+	}
+
+	data, err := json.Marshal(&taskReq)
+	if err != nil {
+		return err
+	}
+
+	timeOutCh := time.After(time.Second * time.Duration(timeOut))
+outerLoop:
+	for {
+		select {
+		case <-timeOutCh:
+			err = fmt.Errorf("submit task to sequencer timed out")
+			break outerLoop
+		default:
+			if err = doSend(data); err != nil {
+				logs.GetLogger().Warnf("taskId: %d submit task to sequencer failed, error: %v, retrying", task.Id, err)
+				continue
+			}
+			time.Sleep(2 * time.Second)
+		}
+	}
+
+	return err
+}
+
+func doSend(data []byte) error {
+	req, err := http.NewRequest("POST", conf.GetConfig().UBI.SequencerUrl, bytes.NewBuffer(data))
+	if err != nil {
+		return fmt.Errorf("error creating request: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("error sending request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var resultResp struct {
+		Code int    `json:"code"`
+		Msg  string `json:"msg"`
+		Data any    `json:"data,omitempty"`
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("error reading response: %v", err)
+	}
+	err = json.Unmarshal(body, &resultResp)
+	if err != nil {
+		return fmt.Errorf("response convert to json failed: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf(resultResp.Msg)
 	}
 	return nil
 }

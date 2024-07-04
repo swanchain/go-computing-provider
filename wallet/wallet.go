@@ -391,8 +391,7 @@ func (w *LocalWallet) WalletCollateral(ctx context.Context, from string, amount 
 				}
 			}
 		}
-	} else {
-
+	} else if collateralType == "ecp" {
 		cpStub, err := account2.NewAccountStub(client, account2.WithContractAddress(cpAccountAddress))
 		if err != nil {
 			return "", err
@@ -411,6 +410,12 @@ func (w *LocalWallet) WalletCollateral(ctx context.Context, from string, amount 
 			return "", err
 		}
 		return collateralTxHash, nil
+	} else {
+		sequencerStub, err := ecp.NewSequencerStub(client, ecp.WithSequencerPrivateKey(ki.PrivateKey))
+		if err != nil {
+			return "", err
+		}
+		return sequencerStub.Deposit(cpAccountAddress, sendAmount)
 	}
 }
 
@@ -458,12 +463,18 @@ func (w *LocalWallet) CollateralWithdraw(ctx context.Context, address string, am
 			return "", err
 		}
 		return collateralStub.Withdraw(withDrawAmount)
-	} else {
+	} else if collateralType == "ecp" {
 		zkCollateral, err := ecp.NewCollateralStub(client, ecp.WithPrivateKey(ki.PrivateKey))
 		if err != nil {
 			return "", err
 		}
 		return zkCollateral.Withdraw(cpAccountAddress, withDrawAmount)
+	} else {
+		sequencerStub, err := ecp.NewSequencerStub(client, ecp.WithSequencerPrivateKey(ki.PrivateKey))
+		if err != nil {
+			return "", err
+		}
+		return sequencerStub.Withdraw(cpAccountAddress, withDrawAmount)
 	}
 }
 

@@ -39,7 +39,9 @@ type API struct {
 	WalletWhiteList string
 }
 type UBI struct {
-	UbiEnginePk string
+	UbiEnginePk      string
+	AggregateCommits bool
+	SequencerUrl     string
 }
 
 type LOG struct {
@@ -76,6 +78,7 @@ type CONTRACT struct {
 	SwanToken    string `toml:"SWAN_CONTRACT"`
 	Collateral   string `toml:"SWAN_COLLATERAL_CONTRACT"`
 	Register     string `toml:"REGISTER_CP_CONTRACT"`
+	TaskRegister string `toml:"REGISTER_TASK_CONTRACT"`
 	ZkCollateral string `toml:"ZK_COLLATERAL_CONTRACT"`
 	Sequencer    string `toml:"SEQUENCER_CONTRACT"`
 }

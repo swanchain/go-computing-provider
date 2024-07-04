@@ -76,7 +76,7 @@ outerLoop:
 			if !flag {
 				err = s.getNonce()
 				if err != nil {
-					logs.GetLogger().Warnf("taskId: %s, get nonce: %s, retrying", task.Id, ParseError(err))
+					logs.GetLogger().Warnf("taskId: %d, get nonce: %s, retrying", task.Id, ParseError(err))
 					continue
 				}
 			}

@@ -306,6 +306,10 @@ var collateralAddCmd = &cli.Command{
 			Name:  "ecp",
 			Usage: "Specify the ecp collateral",
 		},
+		&cli.BoolFlag{
+			Name:  "sequencer",
+			Usage: "Specify the sequencer collateral",
+		},
 		&cli.StringFlag{
 			Name:  "from",
 			Usage: "Specify the wallet address, if the fcp is true, --form must specify the owner wallet address",
@@ -321,8 +325,10 @@ var collateralAddCmd = &cli.Command{
 
 		fcpCollateral := cctx.Bool("fcp")
 		ecpCollateral := cctx.Bool("ecp")
-		if !fcpCollateral && !ecpCollateral {
-			return fmt.Errorf("must specify one of fcp or ecp")
+		sequencerCollateral := cctx.Bool("sequencer")
+
+		if !fcpCollateral && !ecpCollateral && !sequencerCollateral {
+			return fmt.Errorf("must specify one of fcp or ecp or sequencer")
 		}
 		var collateralType string
 		if fcpCollateral {
@@ -330,6 +336,9 @@ var collateralAddCmd = &cli.Command{
 		}
 		if ecpCollateral {
 			collateralType = "ecp"
+		}
+		if sequencerCollateral {
+			collateralType = "sequencer"
 		}
 
 		fromAddress := cctx.String("from")
@@ -369,6 +378,10 @@ var collateralWithdrawCmd = &cli.Command{
 			Name:  "ecp",
 			Usage: "Specify the ecp collateral",
 		},
+		&cli.BoolFlag{
+			Name:  "sequencer",
+			Usage: "Specify the sequencer collateral",
+		},
 		&cli.StringFlag{
 			Name:  "owner",
 			Usage: "Specify the owner address",
@@ -384,8 +397,10 @@ var collateralWithdrawCmd = &cli.Command{
 
 		fcpCollateral := cctx.Bool("fcp")
 		ecpCollateral := cctx.Bool("ecp")
-		if !fcpCollateral && !ecpCollateral {
-			return fmt.Errorf("must specify one of fcp or ecp")
+		sequencerCollateral := cctx.Bool("sequencer")
+
+		if !fcpCollateral && !ecpCollateral && !sequencerCollateral {
+			return fmt.Errorf("must specify one of fcp or ecp or sequencer")
 		}
 		var collateralType string
 		if fcpCollateral {
@@ -393,6 +408,9 @@ var collateralWithdrawCmd = &cli.Command{
 		}
 		if ecpCollateral {
 			collateralType = "ecp"
+		}
+		if sequencerCollateral {
+			collateralType = "sequencer"
 		}
 
 		ownerAddress := cctx.String("owner")
