@@ -4,7 +4,6 @@ import (
 	_ "embed"
 	"fmt"
 	"github.com/BurntSushi/toml"
-	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/swanchain/go-computing-provider/build"
 	"log"
 	"os"
@@ -178,12 +177,9 @@ func requiredFieldsAreGivenForSeparate(metaData toml.MetaData) bool {
 
 func GenerateAndUpdateConfigFile(cpRepoPath string, multiAddress, nodeName string, port int) error {
 	var configTmpl ComputeNode
-	var networkName = build.NetWorkTag
 
 	configFilePath := path.Join(cpRepoPath, "config.toml")
 	if _, err := os.Stat(configFilePath); os.IsNotExist(err) {
-		logs.GetLogger().Warnf("The configuration file %s not found, generating %s default configuration file", configFilePath, networkName)
-
 		defaultComputeNode := generateDefaultConfig()
 		networkConfig := build.LoadParam()
 		for _, nc := range networkConfig {
