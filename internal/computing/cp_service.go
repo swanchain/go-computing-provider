@@ -56,6 +56,12 @@ func ReceiveJob(c *gin.Context) {
 		return
 	}
 
+	if CheckWalletBlackList(jobData.JobSourceURI) {
+		logs.GetLogger().Errorf("This cp does not accept tasks from wallet addresses inside the blacklist")
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SpaceCheckBlackListError))
+		return
+	}
+
 	if conf.GetConfig().HUB.VerifySign {
 		if len(jobData.NodeIdJobSourceUriSignature) == 0 {
 			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BadParamError, "missing node_id_job_source_uri_signature field"))
@@ -64,7 +70,14 @@ func ReceiveJob(c *gin.Context) {
 		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 		nodeID := GetNodeId(cpRepoPath)
 
-		signature, err := verifySignatureForHub(conf.GetConfig().HUB.OrchestratorPk, fmt.Sprintf("%s%s", nodeID, jobData.JobSourceURI), jobData.NodeIdJobSourceUriSignature)
+		cpAccountAddress, err := contract.GetCpAccountAddress()
+		if err != nil {
+			logs.GetLogger().Errorf("get cp account contract address failed, error: %v", err)
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.GetCpAccountError))
+			return
+		}
+
+		signature, err := verifySignatureForHub(conf.GetConfig().HUB.OrchestratorPk, fmt.Sprintf("%s%s%s", cpAccountAddress, nodeID, jobData.JobSourceURI), jobData.NodeIdJobSourceUriSignature)
 		if err != nil {
 			logs.GetLogger().Errorf("verifySignature for space job failed, error: %+v", err)
 			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
@@ -372,7 +385,14 @@ func CancelJob(c *gin.Context) {
 		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 		nodeID := GetNodeId(cpRepoPath)
 
-		signature, err := verifySignatureForHub(conf.GetConfig().HUB.OrchestratorPk, fmt.Sprintf("%s%s", nodeID, taskUuid), nodeIdAndTaskUuidSignature)
+		cpAccountAddress, err := contract.GetCpAccountAddress()
+		if err != nil {
+			logs.GetLogger().Errorf("get cp account contract address failed, error: %v", err)
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.GetCpAccountError))
+			return
+		}
+
+		signature, err := verifySignatureForHub(conf.GetConfig().HUB.OrchestratorPk, fmt.Sprintf("%s%s%s", cpAccountAddress, nodeID, taskUuid), nodeIdAndTaskUuidSignature)
 		if err != nil {
 			logs.GetLogger().Errorf("verifySignature for space job failed, error: %+v", err)
 			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ServerError, "verify sign data failed"))
@@ -414,10 +434,21 @@ func CancelJob(c *gin.Context) {
 
 func WhiteList(c *gin.Context) {
 	walletWhiteListUrl := conf.GetConfig().API.WalletWhiteList
-	list, err := getWhiteList(walletWhiteListUrl)
+	list, err := getWalletList(walletWhiteListUrl)
 	if err != nil {
 		logs.GetLogger().Errorf("Failed get whiteList, error: %+v", err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.FoundWhiteListError))
+		return
+	}
+	c.JSON(http.StatusOK, util.CreateSuccessResponse(list))
+}
+
+func BlackList(c *gin.Context) {
+	walletBlackListUrl := conf.GetConfig().API.WalletBlackList
+	list, err := getWalletList(walletBlackListUrl)
+	if err != nil {
+		logs.GetLogger().Errorf("Failed get blackList, error: %+v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.FoundBlackListError))
 		return
 	}
 	c.JSON(http.StatusOK, util.CreateSuccessResponse(list))
@@ -436,21 +467,28 @@ func GetJobStatus(c *gin.Context) {
 		return
 	}
 
+	cpAccountAddress, err := contract.GetCpAccountAddress()
+	if err != nil {
+		logs.GetLogger().Errorf("get cp account contract address failed, error: %v", err)
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.GetCpAccountError))
+		return
+	}
+
 	logs.GetLogger().Infof("job_uuid: %s, signatureMsg: %s", jobUuId, signatureMsg)
-	//cpRepoPath, _ := os.LookupEnv("CP_PATH")
-	//nodeID := GetNodeId(cpRepoPath)
-	//signature, err := verifySignatureForHub(conf.GetConfig().HUB.OrchestratorPk, fmt.Sprintf("%s%s", nodeID, jobUuId), signatureMsg)
-	//if err != nil {
-	//	logs.GetLogger().Errorf("verifySignature for space job failed, error: %+v", err)
-	//	c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
-	//	return
-	//}
-	//
-	//if !signature {
-	//	logs.GetLogger().Errorf("get job status sign verifing, jobUuid: %s, verify: %t", jobUuId, signature)
-	//	c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError))
-	//	return
-	//}
+	cpRepoPath, _ := os.LookupEnv("CP_PATH")
+	nodeID := GetNodeId(cpRepoPath)
+	signature, err := verifySignatureForHub(conf.GetConfig().HUB.OrchestratorPk, fmt.Sprintf("%s%s%s", cpAccountAddress, nodeID, jobUuId), signatureMsg)
+	if err != nil {
+		logs.GetLogger().Errorf("verifySignature for space job failed, error: %+v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
+		return
+	}
+
+	if !signature {
+		logs.GetLogger().Errorf("get job status sign verifing, jobUuid: %s, verify: %t", jobUuId, signature)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError))
+		return
+	}
 
 	jobEntity, err := NewJobService().GetJobEntityByJobUuid(jobUuId)
 	if err != nil {
@@ -1239,15 +1277,15 @@ func convertGpuName(name string) string {
 	return strings.ToUpper(name)
 }
 
-func getWhiteList(whiteListUrl string) ([]string, error) {
-	if whiteListUrl == "" {
+func getWalletList(walletUrl string) ([]string, error) {
+	if walletUrl == "" {
 		return nil, nil
 	}
 
 	var walletMap = make(map[string]struct{})
-	resp, err := http.Get(whiteListUrl)
+	resp, err := http.Get(walletUrl)
 	if err != nil {
-		logs.GetLogger().Errorf("send wallet whitelist failed, error: %v", err)
+		logs.GetLogger().Errorf("send wallet url: %s, failed, error: %v", walletUrl, err)
 		return nil, err
 	}
 	defer resp.Body.Close()
@@ -1283,7 +1321,7 @@ func CheckWalletWhiteList(jobSourceURI string) bool {
 	if walletWhiteListUrl == "" {
 		return true
 	}
-	whiteList, err := getWhiteList(walletWhiteListUrl)
+	whiteList, err := getWalletList(walletWhiteListUrl)
 	if err != nil {
 		logs.GetLogger().Errorf("get whiteList By url failed, url: %s, error: %v", err)
 		return false
@@ -1297,6 +1335,32 @@ func CheckWalletWhiteList(jobSourceURI string) bool {
 	userWalletAddress := spaceDetail.Data.Owner.PublicAddress
 
 	for _, address := range whiteList {
+		if userWalletAddress == address {
+			return true
+		}
+	}
+	return false
+}
+
+func CheckWalletBlackList(jobSourceURI string) bool {
+	walletBlackListUrl := conf.GetConfig().API.WalletBlackList
+	if walletBlackListUrl == "" {
+		return true
+	}
+	blackList, err := getWalletList(walletBlackListUrl)
+	if err != nil {
+		logs.GetLogger().Errorf("get blacklist By url failed, url: %s, error: %v", err)
+		return false
+	}
+
+	spaceDetail, err := getSpaceDetail(jobSourceURI)
+	if err != nil {
+		logs.GetLogger().Errorln(err)
+		return false
+	}
+	userWalletAddress := spaceDetail.Data.Owner.PublicAddress
+
+	for _, address := range blackList {
 		if userWalletAddress == address {
 			return true
 		}

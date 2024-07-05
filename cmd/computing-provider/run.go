@@ -81,6 +81,7 @@ func cpManager(router *gin.RouterGroup) {
 	router.GET("/lagrange/spaces/log", computing.GetSpaceLog)
 	router.POST("/lagrange/cp/proof", computing.DoProof)
 	router.GET("/lagrange/cp/whitelist", computing.WhiteList)
+	router.GET("/lagrange/cp/blackList", computing.BlackList)
 	router.GET("/lagrange/job/:job_uuid", computing.GetJobStatus)
 
 	router.POST("/cp/ubi", computing.DoUbiTaskForK8s)
@@ -101,7 +102,6 @@ var infoCmd = &cli.Command{
 		}
 
 		localNodeId := computing.GetNodeId(cpRepoPath)
-
 		k8sService := computing.NewK8sService()
 		var count int
 		if k8sService.Version == "" {
@@ -507,13 +507,6 @@ var initCmd = &cli.Command{
 		cpRepoPath, ok := os.LookupEnv("CP_PATH")
 		if !ok {
 			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
-		}
-
-		if _, err := os.Stat(cpRepoPath); os.IsNotExist(err) {
-			err := os.MkdirAll(cpRepoPath, 0755)
-			if err != nil {
-				return fmt.Errorf("create cp repo failed, error: %v", cpRepoPath)
-			}
 		}
 
 		return conf.GenerateAndUpdateConfigFile(cpRepoPath, strings.TrimSpace(multiAddr), nodeName, port)
@@ -925,6 +918,69 @@ var changeTaskTypesCmd = &cli.Command{
 
 		fmt.Printf("changeTaskTypes Transaction hash: %s \n", changeTaskTypesTx)
 		return nil
+	},
+}
+
+var contractCmd = &cli.Command{
+	Name:  "contract",
+	Usage: "Manage contract info of CP",
+	Subcommands: []*cli.Command{
+		{
+			Name:  "info",
+			Usage: "Print the contract info that the current network CP is using",
+			Action: func(c *cli.Context) error {
+				cpRepoPath, ok := os.LookupEnv("CP_PATH")
+				if !ok {
+					return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
+				}
+				if err := conf.InitConfig(cpRepoPath, true); err != nil {
+					return fmt.Errorf("load config file failed, error: %+v", err)
+				}
+
+				chainRpc, err := conf.GetRpcByNetWorkName()
+				if err != nil {
+					return err
+				}
+				client, err := ethclient.Dial(chainRpc)
+				if err != nil {
+					return err
+				}
+				defer client.Close()
+
+				var netWork = ""
+				chainId, err := client.ChainID(context.Background())
+				if err != nil {
+					return err
+				}
+				if chainId.Int64() == 254 {
+					netWork = fmt.Sprintf("Mainnet(%d)", chainId.Int64())
+				} else {
+					netWork = fmt.Sprintf("Testnet(%d)", chainId.Int64())
+				}
+
+				contract := conf.GetConfig().CONTRACT
+				var taskData [][]string
+
+				taskData = append(taskData, []string{"Network:", netWork})
+				taskData = append(taskData, []string{"Swan Token Contract:", contract.SwanToken})
+				taskData = append(taskData, []string{"Orchestrator Collateral Contract:", contract.Collateral})
+				taskData = append(taskData, []string{"Register Cp Contract:", contract.Register})
+				taskData = append(taskData, []string{"ZK Collateral Contract:", contract.ZkCollateral})
+
+				var rowColorList []RowColor
+				rowColorList = append(rowColorList,
+					RowColor{
+						row:    0,
+						column: []int{1},
+						color:  []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgBlueColor}},
+					})
+
+				header := []string{"CP Contract Info:"}
+				NewVisualTable(header, taskData, rowColorList).Generate(false)
+				return nil
+
+			},
+		},
 	},
 }
 

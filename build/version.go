@@ -1,6 +1,14 @@
 package build
 
+import (
+	_ "embed"
+	"encoding/json"
+	"log"
+)
+
 var CurrentCommit string
+
+var NetWorkTag string
 
 const BuildVersion = "0.6.0"
 
@@ -11,5 +19,31 @@ const UBITaskImageAmdGpu = "filswan/ubi-worker-gpu-amd:v2.0"
 const UBIResourceExporterDockerImage = "filswan/hardware-exporter:v2.0"
 
 func UserVersion() string {
-	return BuildVersion + CurrentCommit
+	return BuildVersion + "+" + NetWorkTag + CurrentCommit
+}
+
+//go:embed parameters.json
+var netWorkConfig string
+
+func LoadParam() []NetworkConfig {
+	var config []NetworkConfig
+	err := json.Unmarshal([]byte(netWorkConfig), &config)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	return config
+}
+
+type NetworkConfig struct {
+	Network string `json:"network"`
+	Config  struct {
+		ZkEnginePk                     string `json:"zk_engine_pk"`
+		OrchestratorUrl                string `json:"orchestrator_url"`
+		OrchestratorPk                 string `json:"orchestrator_pk"`
+		ChainRpc                       string `json:"chain_rpc"`
+		SwanTokenContract              string `json:"swan_token_contract"`
+		OrchestratorCollateralContract string `json:"orchestrator_collateral_contract"`
+		RegisterCpContract             string `json:"register_cp_contract"`
+		ZkCollateralContract           string `json:"zk_collateral_contract"`
+	} `json:"config"`
 }
