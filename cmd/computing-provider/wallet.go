@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/wallet"
 	"github.com/urfave/cli/v2"
 	"os"
@@ -25,6 +26,17 @@ var walletCmd = &cli.Command{
 		walletSign,
 		walletVerify,
 		walletSend,
+	},
+	Before: func(c *cli.Context) error {
+		if c.Args().Present() {
+			if strings.EqualFold(c.Args().First(), walletList.Name) || strings.EqualFold(c.Args().First(), walletSend.Name) {
+				cpRepoPath, _ := os.LookupEnv("CP_PATH")
+				if err := conf.InitConfig(cpRepoPath, true); err != nil {
+					return fmt.Errorf("load config file failed, error: %+v", err)
+				}
+			}
+		}
+		return nil
 	},
 }
 
