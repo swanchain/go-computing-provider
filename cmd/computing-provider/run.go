@@ -962,10 +962,10 @@ var contractCmd = &cli.Command{
 				var taskData [][]string
 
 				taskData = append(taskData, []string{"Network:", netWork})
-				taskData = append(taskData, []string{"Swan Token Contract:", contract.SwanToken})
-				taskData = append(taskData, []string{"Orchestrator Collateral Contract:", contract.Collateral})
-				taskData = append(taskData, []string{"Register Cp Contract:", contract.Register})
-				taskData = append(taskData, []string{"ZK Collateral Contract:", contract.ZkCollateral})
+				taskData = append(taskData, []string{"Swan Token:", contract.SwanToken})
+				taskData = append(taskData, []string{"Orchestrator Collateral:", contract.Collateral})
+				taskData = append(taskData, []string{"Register Cp:", contract.Register})
+				taskData = append(taskData, []string{"ZK Collateral:", contract.ZkCollateral})
 
 				var rowColorList []RowColor
 				rowColorList = append(rowColorList,
