@@ -32,7 +32,7 @@ var walletCmd = &cli.Command{
 			if strings.EqualFold(c.Args().First(), walletList.Name) || strings.EqualFold(c.Args().First(), walletSend.Name) {
 				cpRepoPath, _ := os.LookupEnv("CP_PATH")
 				if err := conf.InitConfig(cpRepoPath, true); err != nil {
-					return fmt.Errorf("load config file failed, error: %+v", err)
+					return err
 				}
 			}
 		}
