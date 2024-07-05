@@ -736,7 +736,8 @@ func handleConnection(conn *websocket.Conn, jobDetail models.JobEntity, logType 
 	client := NewWsClient(conn)
 
 	if logType == "build" {
-		buildLogPath := filepath.Join("build", jobDetail.WalletAddress, "spaces", jobDetail.Name, BuildFileName)
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
+		buildLogPath := filepath.Join(cpRepoPath, "build", jobDetail.WalletAddress, "spaces", jobDetail.Name, BuildFileName)
 		if _, err := os.Stat(buildLogPath); err != nil {
 			client.HandleLogs(strings.NewReader("This space is deployed starting from a image."))
 		} else {

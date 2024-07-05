@@ -52,10 +52,9 @@ type HUB struct {
 }
 
 type MCS struct {
-	ApiKey      string
-	AccessToken string
-	BucketName  string
-	Network     string
+	ApiKey     string
+	BucketName string
+	Network    string
 }
 
 type Registry struct {
