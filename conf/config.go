@@ -126,7 +126,6 @@ func requiredFieldsAreGiven(metaData toml.MetaData) bool {
 		{"MCS"},
 		{"Registry"},
 		{"RPC"},
-		{"CONTRACT"},
 
 		{"API", "MultiAddress"},
 		{"API", "Domain"},
