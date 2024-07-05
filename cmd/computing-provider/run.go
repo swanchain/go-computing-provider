@@ -93,10 +93,7 @@ var infoCmd = &cli.Command{
 	Name:  "info",
 	Usage: "Print computing-provider info",
 	Action: func(cctx *cli.Context) error {
-		cpRepoPath, ok := os.LookupEnv("CP_PATH")
-		if !ok {
-			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
-		}
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 		if err := conf.InitConfig(cpRepoPath, true); err != nil {
 			return fmt.Errorf("load config file failed, error: %+v", err)
 		}
@@ -245,6 +242,13 @@ var stateCmd = &cli.Command{
 		stateInfoCmd,
 		taskInfoCmd,
 	},
+	Before: func(c *cli.Context) error {
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
+		if err := conf.InitConfig(cpRepoPath, true); err != nil {
+			return fmt.Errorf("load config file failed, error: %+v", err)
+		}
+		return nil
+	},
 }
 
 var stateInfoCmd = &cli.Command{
@@ -252,14 +256,6 @@ var stateInfoCmd = &cli.Command{
 	Usage:     "Print computing-provider chain info",
 	ArgsUsage: "[cp_account_contract_address]",
 	Action: func(cctx *cli.Context) error {
-		cpRepoPath, ok := os.LookupEnv("CP_PATH")
-		if !ok {
-			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
-		}
-		if err := conf.InitConfig(cpRepoPath, true); err != nil {
-			return fmt.Errorf("load config file failed, error: %+v", err)
-		}
-
 		chainRpc, err := conf.GetRpcByNetWorkName()
 		if err != nil {
 			return err
@@ -376,14 +372,6 @@ var taskInfoCmd = &cli.Command{
 		taskContract := cctx.Args().Get(0)
 		if strings.TrimSpace(taskContract) == "" {
 			return fmt.Errorf("the task contract address is required")
-		}
-
-		cpRepoPath, ok := os.LookupEnv("CP_PATH")
-		if !ok {
-			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
-		}
-		if err := conf.InitConfig(cpRepoPath, true); err != nil {
-			return fmt.Errorf("load config file failed, error: %+v", err)
 		}
 
 		chainRpc, err := conf.GetRpcByNetWorkName()
@@ -504,11 +492,7 @@ var initCmd = &cli.Command{
 		}
 		nodeName := cctx.String("node-name")
 
-		cpRepoPath, ok := os.LookupEnv("CP_PATH")
-		if !ok {
-			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
-		}
-
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 		return conf.GenerateAndUpdateConfigFile(cpRepoPath, strings.TrimSpace(multiAddr), nodeName, port)
 	},
 }
