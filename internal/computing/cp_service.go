@@ -467,28 +467,29 @@ func GetJobStatus(c *gin.Context) {
 		return
 	}
 
-	cpAccountAddress, err := contract.GetCpAccountAddress()
-	if err != nil {
-		logs.GetLogger().Errorf("get cp account contract address failed, error: %v", err)
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.GetCpAccountError))
-		return
-	}
-
 	logs.GetLogger().Infof("job_uuid: %s, signatureMsg: %s", jobUuId, signatureMsg)
-	cpRepoPath, _ := os.LookupEnv("CP_PATH")
-	nodeID := GetNodeId(cpRepoPath)
-	signature, err := verifySignatureForHub(conf.GetConfig().HUB.OrchestratorPk, fmt.Sprintf("%s%s%s", cpAccountAddress, nodeID, jobUuId), signatureMsg)
-	if err != nil {
-		logs.GetLogger().Errorf("verifySignature for space job failed, error: %+v", err)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
-		return
-	}
 
-	if !signature {
-		logs.GetLogger().Errorf("get job status sign verifing, jobUuid: %s, verify: %t", jobUuId, signature)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError))
-		return
-	}
+	//cpAccountAddress, err := contract.GetCpAccountAddress()
+	//if err != nil {
+	//	logs.GetLogger().Errorf("get cp account contract address failed, error: %v", err)
+	//	c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.GetCpAccountError))
+	//	return
+	//}
+	//
+	//cpRepoPath, _ := os.LookupEnv("CP_PATH")
+	//nodeID := GetNodeId(cpRepoPath)
+	//signature, err := verifySignatureForHub(conf.GetConfig().HUB.OrchestratorPk, fmt.Sprintf("%s%s%s", cpAccountAddress, nodeID, jobUuId), signatureMsg)
+	//if err != nil {
+	//	logs.GetLogger().Errorf("verifySignature for space job failed, error: %+v", err)
+	//	c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
+	//	return
+	//}
+	//
+	//if !signature {
+	//	logs.GetLogger().Errorf("get job status sign verifing, jobUuid: %s, verify: %t", jobUuId, signature)
+	//	c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError))
+	//	return
+	//}
 
 	jobEntity, err := NewJobService().GetJobEntityByJobUuid(jobUuId)
 	if err != nil {
