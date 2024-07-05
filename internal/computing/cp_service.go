@@ -152,7 +152,10 @@ func ReceiveJob(c *gin.Context) {
 		jobEntity.JobUuid = jobData.UUID
 		jobEntity.DeployStatus = models.DEPLOY_RECEIVE_JOB
 		jobEntity.CreateTime = time.Now().Unix()
-		NewJobService().SaveJobEntity(jobEntity)
+		err = NewJobService().SaveJobEntity(jobEntity)
+		if err != nil {
+			logs.GetLogger().Errorf("spaceUuid: %s, save job to db failed, error: %+v", spaceUuid, err)
+		}
 
 		go func() {
 			if err = submitJob(&jobData); err != nil {
