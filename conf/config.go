@@ -99,6 +99,17 @@ func InitConfig(cpRepoPath string, standalone bool) error {
 			log.Fatal("Required fields not given")
 		}
 	}
+
+	networkConfig := build.LoadParam()
+	for _, nc := range networkConfig {
+		ncCopy := nc
+		if ncCopy.Network == build.NetWorkTag {
+			config.CONTRACT.SwanToken = ncCopy.Config.SwanTokenContract
+			config.CONTRACT.Collateral = ncCopy.Config.OrchestratorCollateralContract
+			config.CONTRACT.Register = ncCopy.Config.RegisterCpContract
+			config.CONTRACT.ZkCollateral = ncCopy.Config.ZkCollateralContract
+		}
+	}
 	return nil
 }
 
@@ -190,11 +201,6 @@ func GenerateAndUpdateConfigFile(cpRepoPath string, multiAddress, nodeName strin
 				defaultComputeNode.HUB.OrchestratorPk = ncCopy.Config.OrchestratorPk
 
 				defaultComputeNode.RPC.SwanChainRpc = ncCopy.Config.ChainRpc
-
-				defaultComputeNode.CONTRACT.SwanToken = ncCopy.Config.SwanTokenContract
-				defaultComputeNode.CONTRACT.Collateral = ncCopy.Config.OrchestratorCollateralContract
-				defaultComputeNode.CONTRACT.Register = ncCopy.Config.RegisterCpContract
-				defaultComputeNode.CONTRACT.ZkCollateral = ncCopy.Config.ZkCollateralContract
 			}
 		}
 
