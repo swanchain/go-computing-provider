@@ -1346,7 +1346,7 @@ func CheckWalletWhiteList(jobSourceURI string) bool {
 func CheckWalletBlackList(jobSourceURI string) bool {
 	walletBlackListUrl := conf.GetConfig().API.WalletBlackList
 	if walletBlackListUrl == "" {
-		return true
+		return false
 	}
 	blackList, err := getWalletList(walletBlackListUrl)
 	if err != nil {
