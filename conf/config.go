@@ -145,9 +145,6 @@ func requiredFieldsAreGiven(metaData toml.MetaData) bool {
 		{"MCS", "Network"},
 
 		{"RPC", "SWAN_CHAIN_RPC"},
-
-		{"CONTRACT", "SWAN_CONTRACT"},
-		{"CONTRACT", "SWAN_COLLATERAL_CONTRACT"},
 	}
 
 	for _, v := range requiredFields {
@@ -171,9 +168,6 @@ func requiredFieldsAreGivenForSeparate(metaData toml.MetaData) bool {
 		{"UBI", "UbiEnginePk"},
 
 		{"RPC", "SWAN_CHAIN_RPC"},
-
-		{"CONTRACT", "SWAN_CONTRACT"},
-		{"CONTRACT", "SWAN_COLLATERAL_CONTRACT"},
 	}
 
 	for _, v := range requiredFields {
