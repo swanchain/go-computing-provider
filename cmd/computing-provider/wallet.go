@@ -304,6 +304,13 @@ var collateralCmd = &cli.Command{
 		collateralSendCmd,
 		collateralWithdrawCmd,
 	},
+	Before: func(c *cli.Context) error {
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
+		if err := conf.InitConfig(cpRepoPath, true); err != nil {
+			return err
+		}
+		return nil
+	},
 }
 
 var collateralAddCmd = &cli.Command{

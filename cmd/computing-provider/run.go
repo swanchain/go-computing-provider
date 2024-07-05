@@ -524,6 +524,13 @@ var accountCmd = &cli.Command{
 		changeBeneficiaryAddressCmd,
 		changeTaskTypesCmd,
 	},
+	Before: func(c *cli.Context) error {
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
+		if err := conf.InitConfig(cpRepoPath, true); err != nil {
+			return fmt.Errorf("load config file failed, error: %+v", err)
+		}
+		return nil
+	},
 }
 
 var createAccountCmd = &cli.Command{
@@ -597,13 +604,7 @@ var createAccountCmd = &cli.Command{
 			taskTypesUint = append(taskTypesUint, uint8(tt))
 		}
 
-		cpRepoPath, ok := os.LookupEnv("CP_PATH")
-		if !ok {
-			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
-		}
-		if err := conf.InitConfig(cpRepoPath, true); err != nil {
-			logs.GetLogger().Fatal(err)
-		}
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 		return createAccount(cpRepoPath, ownerAddress, beneficiaryAddress, workerAddress, taskTypesUint)
 	},
 }
@@ -634,13 +635,7 @@ var changeMultiAddressCmd = &cli.Command{
 			return fmt.Errorf("multiAddress is required")
 		}
 
-		cpRepoPath, ok := os.LookupEnv("CP_PATH")
-		if !ok {
-			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
-		}
-		if err := conf.InitConfig(cpRepoPath, false); err != nil {
-			logs.GetLogger().Fatal(err)
-		}
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 
 		client, cpStub, err := getVerifyAccountClient(ownerAddress)
 		if err != nil {
@@ -695,13 +690,7 @@ var changeOwnerAddressCmd = &cli.Command{
 			return fmt.Errorf("the target newOwnerAddress is invalid wallet address")
 		}
 
-		cpRepoPath, ok := os.LookupEnv("CP_PATH")
-		if !ok {
-			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
-		}
-		if err := conf.InitConfig(cpRepoPath, false); err != nil {
-			logs.GetLogger().Fatal(err)
-		}
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 
 		client, cpStub, err := getVerifyAccountClient(ownerAddress)
 		if err != nil {
@@ -756,13 +745,7 @@ var changeBeneficiaryAddressCmd = &cli.Command{
 			return fmt.Errorf("the target beneficiary address is invalid wallet address")
 		}
 
-		cpRepoPath, ok := os.LookupEnv("CP_PATH")
-		if !ok {
-			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
-		}
-		if err := conf.InitConfig(cpRepoPath, false); err != nil {
-			logs.GetLogger().Fatal(err)
-		}
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 
 		client, cpStub, err := getVerifyAccountClient(ownerAddress)
 		if err != nil {
@@ -817,13 +800,7 @@ var changeWorkerAddressCmd = &cli.Command{
 			return fmt.Errorf("the target worker address is invalid wallet address")
 		}
 
-		cpRepoPath, ok := os.LookupEnv("CP_PATH")
-		if !ok {
-			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
-		}
-		if err := conf.InitConfig(cpRepoPath, false); err != nil {
-			logs.GetLogger().Fatal(err)
-		}
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 
 		client, cpStub, err := getVerifyAccountClient(ownerAddress)
 		if err != nil {
@@ -929,10 +906,7 @@ var contractCmd = &cli.Command{
 			Name:  "info",
 			Usage: "Print the contract info that the current network CP is using",
 			Action: func(c *cli.Context) error {
-				cpRepoPath, ok := os.LookupEnv("CP_PATH")
-				if !ok {
-					return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
-				}
+				cpRepoPath, _ := os.LookupEnv("CP_PATH")
 				if err := conf.InitConfig(cpRepoPath, true); err != nil {
 					return fmt.Errorf("load config file failed, error: %+v", err)
 				}
