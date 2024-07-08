@@ -1109,9 +1109,10 @@ outerLoop:
 		default:
 			if err = doSend(data); err != nil {
 				logs.GetLogger().Warnf("taskId: %d submit task to sequencer failed, error: %v, retrying", task.Id, err)
+				time.Sleep(2 * time.Second)
 				continue
 			}
-			time.Sleep(2 * time.Second)
+			break outerLoop
 		}
 	}
 
