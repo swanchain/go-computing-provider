@@ -1082,6 +1082,18 @@ func submitTaskToSequencer(proof string, task *models.TaskEntity, timeOut int64)
 		Reward       string `json:"reward"`
 	}
 
+	taskReq.Id = task.Id
+	taskReq.Type = task.Type
+	taskReq.ResourceType = task.ResourceType
+
+	taskReq.InputParam = task.InputParam
+	taskReq.VerifyParam = task.VerifyParam
+	taskReq.Deadline = task.Deadline
+	taskReq.CheckCode = task.CheckCode
+	taskReq.Proof = proof
+	taskReq.StartAt = task.CreateTime
+	taskReq.EndedAt = time.Now().Unix()
+
 	data, err := json.Marshal(&taskReq)
 	if err != nil {
 		return err
