@@ -159,7 +159,7 @@ func requiredFieldsAreGivenForSeparate(metaData toml.MetaData) bool {
 	requiredFields := [][]string{
 		{"API"},
 		{"UBI"},
-		{"HUB"},
+		{"RPC"},
 
 		{"API", "MultiAddress"},
 		{"API", "NodeName"},
