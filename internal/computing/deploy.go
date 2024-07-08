@@ -574,7 +574,7 @@ func (d *Deploy) watchContainerRunningTime() {
 		logs.GetLogger().Errorf("update job info failed, error: %v", err)
 		return
 	}
-	logs.GetLogger().Infof("space service deployed, spaceUuid: %s, spaceName: %s", d.spaceUuid, d.spaceName)
+	logs.GetLogger().Infof("space service deployed, jobuuid: %s, spaceUuid: %s, spaceName: %s", d.jobUuid, d.spaceUuid, d.spaceName)
 }
 
 func getHardwareDetail(description string) (string, models.Resource) {
