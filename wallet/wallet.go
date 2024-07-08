@@ -370,10 +370,11 @@ func (w *LocalWallet) WalletCollateral(ctx context.Context, from string, amount 
 					if errors.Is(err, ethereum.NotFound) {
 						continue
 					}
-					return "", fmt.Errorf("mintor swan token Approve tx, error: %+v", err)
+					return "", fmt.Errorf("check swan token Approve tx, error: %+v", err)
 				}
 
 				if receipt != nil && receipt.Status == types.ReceiptStatusSuccessful {
+					fmt.Printf("swan token approve TX: %s", swanTokenTxHash)
 					collateralStub, err := fcp.NewCollateralStub(client, fcp.WithPrivateKey(ki.PrivateKey), fcp.WithCpAccountAddress(cpAccountAddress))
 					if err != nil {
 						return "", err
