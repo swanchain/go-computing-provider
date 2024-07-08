@@ -17,7 +17,7 @@ import (
 
 type Stub struct {
 	client           *ethclient.Client
-	collateral       *Collateral
+	collateral       *FcpCollateral
 	privateK         string
 	publicK          string
 	cpAccountAddress string
@@ -44,9 +44,9 @@ func NewCollateralStub(client *ethclient.Client, options ...Option) (*Stub, erro
 	}
 
 	collateralAddress := common.HexToAddress(conf.GetConfig().CONTRACT.Collateral)
-	collateralClient, err := NewCollateral(collateralAddress, client)
+	collateralClient, err := NewFcpCollateral(collateralAddress, client)
 	if err != nil {
-		return nil, fmt.Errorf("create collateral contract client, error: %+v", err)
+		return nil, fmt.Errorf("create fcp collateral contract client, error: %+v", err)
 	}
 
 	stub.collateral = collateralClient
@@ -60,7 +60,7 @@ func (s *Stub) Deposit(amount *big.Int) (string, error) {
 		return "", err
 	}
 
-	txOptions, err := s.createTransactOpts(amount, true)
+	txOptions, err := s.createTransactOpts()
 	if err != nil {
 		return "", fmt.Errorf("address: %s, FCP collateral client create transaction, error: %+v", publicAddress, err)
 	}
@@ -72,7 +72,7 @@ func (s *Stub) Deposit(amount *big.Int) (string, error) {
 		}
 		s.cpAccountAddress = cpAccountAddress
 	}
-	transaction, err := s.collateral.Deposit(txOptions, common.HexToAddress(s.cpAccountAddress))
+	transaction, err := s.collateral.Deposit(txOptions, common.HexToAddress(s.cpAccountAddress), amount)
 	if err != nil {
 		return "", fmt.Errorf("address: %s, FCP collateral client create deposit tx error: %+v", publicAddress, err)
 	}
@@ -108,7 +108,7 @@ func (s *Stub) Withdraw(amount *big.Int) (string, error) {
 		return "", err
 	}
 
-	txOptions, err := s.createTransactOpts(nil, false)
+	txOptions, err := s.createTransactOpts()
 	if err != nil {
 		return "", fmt.Errorf("address: %s, FCP collateral client create transaction, error: %+v", publicAddress, err)
 	}
@@ -143,7 +143,7 @@ func (s *Stub) privateKeyToPublicKey() (common.Address, error) {
 	return crypto.PubkeyToAddress(*publicKeyECDSA), nil
 }
 
-func (s *Stub) createTransactOpts(amount *big.Int, isDeposit bool) (*bind.TransactOpts, error) {
+func (s *Stub) createTransactOpts() (*bind.TransactOpts, error) {
 	publicAddress, err := s.privateKeyToPublicKey()
 	if err != nil {
 		return nil, err
@@ -170,9 +170,6 @@ func (s *Stub) createTransactOpts(amount *big.Int, isDeposit bool) (*bind.Transa
 	}
 
 	txOptions, err := bind.NewKeyedTransactorWithChainID(privateKey, chainId)
-	if isDeposit {
-		txOptions.Value = amount
-	}
 
 	if err != nil {
 		return nil, fmt.Errorf("address: %s, collateral client create transaction, error: %+v", publicAddress, err)

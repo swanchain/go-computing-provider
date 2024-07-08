@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/swanchain/go-computing-provider/conf"
-	account2 "github.com/swanchain/go-computing-provider/internal/contract/account"
+	"github.com/swanchain/go-computing-provider/internal/contract/account"
 	"github.com/swanchain/go-computing-provider/internal/contract/ecp"
 	"github.com/swanchain/go-computing-provider/internal/contract/fcp"
 	"github.com/swanchain/go-computing-provider/internal/contract/token"
@@ -390,7 +390,7 @@ func (w *LocalWallet) WalletCollateral(ctx context.Context, from string, amount 
 		}
 	} else {
 
-		cpStub, err := account2.NewAccountStub(client, account2.WithContractAddress(cpAccountAddress))
+		cpStub, err := account.NewAccountStub(client, account.WithContractAddress(cpAccountAddress))
 		if err != nil {
 			return "", err
 		}
