@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"fmt"
 	"github.com/BurntSushi/toml"
+	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/swanchain/go-computing-provider/build"
 	"log"
 	"os"
@@ -90,6 +91,8 @@ func InitConfig(cpRepoPath string, standalone bool) error {
 	if err != nil {
 		return fmt.Errorf("failed load config file, path: %s, error: %w", configFile, err)
 	}
+	logs.GetLogger().Infof("metaData: %+v", metaData)
+
 	if standalone {
 		if !requiredFieldsAreGivenForSeparate(metaData) {
 			log.Fatal("Required fields not given")
