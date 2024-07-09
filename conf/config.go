@@ -4,7 +4,7 @@ import (
 	_ "embed"
 	"fmt"
 	"github.com/BurntSushi/toml"
-	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
+	"github.com/swanchain/go-computing-provider/build"
 	"log"
 	"os"
 	"path"
@@ -13,11 +13,6 @@ import (
 )
 
 var config *ComputeNode
-
-const (
-	MainnetNetwork = "mainnet"
-	TestnetNetwork = "testnet"
-)
 
 // ComputeNode is a compute node config
 type ComputeNode struct {
@@ -37,6 +32,7 @@ type API struct {
 	Domain          string
 	NodeName        string
 	WalletWhiteList string
+	WalletBlackList string
 }
 type UBI struct {
 	UbiEnginePk string
@@ -56,10 +52,9 @@ type HUB struct {
 }
 
 type MCS struct {
-	ApiKey      string
-	AccessToken string
-	BucketName  string
-	Network     string
+	ApiKey     string
+	BucketName string
+	Network    string
 }
 
 type Registry struct {
@@ -79,36 +74,16 @@ type CONTRACT struct {
 	ZkCollateral string `toml:"ZK_COLLATERAL_CONTRACT"`
 }
 
-func GetRpcByNetWorkName(netWorkName ...string) (string, error) {
-	var netWork string
-	if len(netWorkName) > 0 && netWorkName[0] != "" {
-		netWork = netWorkName[0]
-	} else {
-		netWork, _ = os.LookupEnv("CP_NETWORK")
-		if netWork == "" {
-			netWork = MainnetNetwork
-		}
-	}
-
-	if netWork != MainnetNetwork && netWork != TestnetNetwork {
-		return "", fmt.Errorf("not support network: %s", netWorkName[0])
-	}
+func GetRpcByNetWorkName() (string, error) {
 	return GetConfig().RPC.SwanChainRpc, nil
 }
 
 func InitConfig(cpRepoPath string, standalone bool) error {
-	netWork, ok := os.LookupEnv("CP_NETWORK")
-	if !ok {
-		netWork = MainnetNetwork
-	}
-	if netWork != MainnetNetwork && netWork != TestnetNetwork {
-		return fmt.Errorf("not support network: %s", netWork)
-	}
-
-	configFile := filepath.Join(cpRepoPath, fmt.Sprintf("config-%s.toml", netWork))
+	configFile := filepath.Join(cpRepoPath, "config.toml")
 
 	if _, err := os.Stat(configFile); err != nil {
-		return fmt.Errorf("not found %s config file", configFile)
+		return fmt.Errorf("not found %s repo, "+
+			"please use `computing-provider init` to initialize the repo ", cpRepoPath)
 	}
 
 	metaData, err := toml.DecodeFile(configFile, &config)
@@ -122,6 +97,17 @@ func InitConfig(cpRepoPath string, standalone bool) error {
 	} else {
 		if !requiredFieldsAreGiven(metaData) {
 			log.Fatal("Required fields not given")
+		}
+	}
+
+	networkConfig := build.LoadParam()
+	for _, nc := range networkConfig {
+		ncCopy := nc
+		if ncCopy.Network == build.NetWorkTag {
+			config.CONTRACT.SwanToken = ncCopy.Config.SwanTokenContract
+			config.CONTRACT.Collateral = ncCopy.Config.OrchestratorCollateralContract
+			config.CONTRACT.Register = ncCopy.Config.RegisterCpContract
+			config.CONTRACT.ZkCollateral = ncCopy.Config.ZkCollateralContract
 		}
 	}
 	return nil
@@ -140,7 +126,6 @@ func requiredFieldsAreGiven(metaData toml.MetaData) bool {
 		{"MCS"},
 		{"Registry"},
 		{"RPC"},
-		{"CONTRACT"},
 
 		{"API", "MultiAddress"},
 		{"API", "Domain"},
@@ -159,9 +144,6 @@ func requiredFieldsAreGiven(metaData toml.MetaData) bool {
 		{"MCS", "Network"},
 
 		{"RPC", "SWAN_CHAIN_RPC"},
-
-		{"CONTRACT", "SWAN_CONTRACT"},
-		{"CONTRACT", "SWAN_COLLATERAL_CONTRACT"},
 	}
 
 	for _, v := range requiredFields {
@@ -185,9 +167,6 @@ func requiredFieldsAreGivenForSeparate(metaData toml.MetaData) bool {
 		{"UBI", "UbiEnginePk"},
 
 		{"RPC", "SWAN_CHAIN_RPC"},
-
-		{"CONTRACT", "SWAN_CONTRACT"},
-		{"CONTRACT", "SWAN_COLLATERAL_CONTRACT"},
 	}
 
 	for _, v := range requiredFields {
@@ -199,57 +178,42 @@ func requiredFieldsAreGivenForSeparate(metaData toml.MetaData) bool {
 	return true
 }
 
-//go:embed config-testnet.toml.sample
-var testnetConfigContent string
-
-//go:embed config-mainnet.toml.sample
-var mainnetConfigContent string
-
 func GenerateAndUpdateConfigFile(cpRepoPath string, multiAddress, nodeName string, port int) error {
 	var configTmpl ComputeNode
-	var configContent string
-	var configFile *os.File
-	var err error
 
-	netWork, ok := os.LookupEnv("CP_NETWORK")
-	if !ok {
-		netWork = MainnetNetwork
-	}
-	if netWork != MainnetNetwork && netWork != TestnetNetwork {
-		return fmt.Errorf("not support network: %s", netWork)
-	}
+	configFilePath := path.Join(cpRepoPath, "config.toml")
+	if _, err := os.Stat(configFilePath); os.IsNotExist(err) {
+		defaultComputeNode := generateDefaultConfig()
+		networkConfig := build.LoadParam()
+		for _, nc := range networkConfig {
+			ncCopy := nc
+			if ncCopy.Network == build.NetWorkTag {
+				defaultComputeNode.UBI.UbiEnginePk = ncCopy.Config.ZkEnginePk
 
-	switch netWork {
-	case MainnetNetwork:
-		configContent = mainnetConfigContent
-	case TestnetNetwork:
-		configContent = testnetConfigContent
-	default:
-		return fmt.Errorf("not support network: %s", netWork)
-	}
+				defaultComputeNode.HUB.ServerUrl = ncCopy.Config.OrchestratorUrl
+				defaultComputeNode.HUB.OrchestratorPk = ncCopy.Config.OrchestratorPk
 
-	configName := fmt.Sprintf("config-%s.toml", netWork)
-	configFilePath := path.Join(cpRepoPath, configName)
-	if _, err = os.Stat(configFilePath); os.IsNotExist(err) {
-		logs.GetLogger().Warnf("The configuration file %s not found, generating this configuration file", configFilePath)
-		if _, err = toml.Decode(configContent, &configTmpl); err != nil {
-			return fmt.Errorf("parse toml data failed, error: %v", err)
+				defaultComputeNode.RPC.SwanChainRpc = ncCopy.Config.ChainRpc
+			}
 		}
-		configFile, err = os.Create(configFilePath)
+
+		configFile, err := os.Create(configFilePath)
 		if err != nil {
-			return fmt.Errorf("create %s file failed, error: %v", configName, err)
+			return fmt.Errorf("create %s file failed, error: %v", configFilePath, err)
 		}
-		if err = toml.NewEncoder(configFile).Encode(configTmpl); err != nil {
-			return fmt.Errorf("write data to %s file failed, error: %v", configName, err)
+		if err = toml.NewEncoder(configFile).Encode(defaultComputeNode); err != nil {
+			return fmt.Errorf("write data to %s file failed, error: %v", configFilePath, err)
+		}
+
+		configTmpl = defaultComputeNode
+	} else {
+		if _, err = toml.DecodeFile(configFilePath, &configTmpl); err != nil {
+			return err
 		}
 	}
 
-	if _, err = toml.DecodeFile(configFilePath, &configTmpl); err != nil {
-		return err
-	}
 	os.Remove(configFilePath)
-
-	configFile, err = os.Create(configFilePath)
+	configFile, err := os.Create(configFilePath)
 	if err != nil {
 		return err
 	}
@@ -275,5 +239,52 @@ func GenerateAndUpdateConfigFile(cpRepoPath string, multiAddress, nodeName strin
 	if err = toml.NewEncoder(configFile).Encode(configTmpl); err != nil {
 		return err
 	}
+	fmt.Printf("CP repo successfully created, you can now update it. \n")
 	return nil
+}
+
+func generateDefaultConfig() ComputeNode {
+	return ComputeNode{
+		API: API{
+			Port:            8085,
+			MultiAddress:    "/ip4/<PUBLIC_IP>/tcp/<PORT>",
+			Domain:          "",
+			NodeName:        "<YOUR_CP_Node_Name>",
+			WalletWhiteList: "",
+			WalletBlackList: "",
+		},
+		UBI: UBI{
+			UbiEnginePk: "",
+		},
+		LOG: LOG{
+			CrtFile: "",
+			KeyFile: "",
+		},
+		HUB: HUB{
+			ServerUrl:        "",
+			AccessToken:      "",
+			BalanceThreshold: 0.1,
+			OrchestratorPk:   "",
+			VerifySign:       true,
+		},
+		MCS: MCS{
+			ApiKey:     "",
+			BucketName: "",
+			Network:    "polygon.mainnet",
+		},
+		Registry: Registry{
+			ServerAddress: "",
+			UserName:      "",
+			Password:      "",
+		},
+		RPC: RPC{
+			SwanChainRpc: "",
+		},
+		CONTRACT: CONTRACT{
+			SwanToken:    "",
+			Collateral:   "",
+			Register:     "",
+			ZkCollateral: "",
+		},
+	}
 }

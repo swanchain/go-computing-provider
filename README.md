@@ -314,10 +314,10 @@ make install
 ```
  - Update Configuration
 
-The computing provider's `mainnet` configuration sample locate in `./go-computing-provider/conf/config-mainnet.toml.sample`
+The computing provider's `mainnet` configuration sample locate in `./go-computing-provider/conf/config.toml.sample`
 
 ```
-cp config-mainnet.toml.sample config-mainnet.toml
+cp config.toml.sample config.toml
 ```
 
 Edit the necessary configuration files according to your deployment requirements. These files may include settings for the computing-provider components, container runtime, Kubernetes, and other services.
@@ -422,7 +422,6 @@ Transaction hash: 0xb8fd9cc9bfac2b2890230b4f14999b9d449e050339b252273379ab11fac1
 You can run `computing-provider` using the following command
 ```bash
 export CP_PATH=<YOUR_CP_PATH>
-export CP_NETWORK="mainnet"
 nohup computing-provider run >> cp.log 2>&1 & 
 ```
 ---
@@ -522,7 +521,6 @@ TASK ID TASK TYPE       ZK TYPE         TRANSACTION HASH                        
 You can run `computing-provider` using the following command
 ```bash
 export CP_PATH=<YOUR_CP_PATH>
-export CP_NETWORK="mainnet"
 nohup computing-provider run >> cp.log 2>&1 & 
 ```
 

@@ -81,6 +81,7 @@ func cpManager(router *gin.RouterGroup) {
 	router.GET("/lagrange/spaces/log", computing.GetSpaceLog)
 	router.POST("/lagrange/cp/proof", computing.DoProof)
 	router.GET("/lagrange/cp/whitelist", computing.WhiteList)
+	router.GET("/lagrange/cp/blacklist", computing.BlackList)
 	router.GET("/lagrange/job/:job_uuid", computing.GetJobStatus)
 
 	router.POST("/cp/ubi", computing.DoUbiTaskForK8s)
@@ -92,16 +93,12 @@ var infoCmd = &cli.Command{
 	Name:  "info",
 	Usage: "Print computing-provider info",
 	Action: func(cctx *cli.Context) error {
-		cpRepoPath, ok := os.LookupEnv("CP_PATH")
-		if !ok {
-			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
-		}
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 		if err := conf.InitConfig(cpRepoPath, true); err != nil {
 			return fmt.Errorf("load config file failed, error: %+v", err)
 		}
 
 		localNodeId := computing.GetNodeId(cpRepoPath)
-
 		k8sService := computing.NewK8sService()
 		var count int
 		if k8sService.Version == "" {
@@ -245,6 +242,13 @@ var stateCmd = &cli.Command{
 		stateInfoCmd,
 		taskInfoCmd,
 	},
+	Before: func(c *cli.Context) error {
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
+		if err := conf.InitConfig(cpRepoPath, true); err != nil {
+			return fmt.Errorf("load config file failed, error: %+v", err)
+		}
+		return nil
+	},
 }
 
 var stateInfoCmd = &cli.Command{
@@ -252,14 +256,6 @@ var stateInfoCmd = &cli.Command{
 	Usage:     "Print computing-provider chain info",
 	ArgsUsage: "[cp_account_contract_address]",
 	Action: func(cctx *cli.Context) error {
-		cpRepoPath, ok := os.LookupEnv("CP_PATH")
-		if !ok {
-			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
-		}
-		if err := conf.InitConfig(cpRepoPath, true); err != nil {
-			return fmt.Errorf("load config file failed, error: %+v", err)
-		}
-
 		chainRpc, err := conf.GetRpcByNetWorkName()
 		if err != nil {
 			return err
@@ -376,14 +372,6 @@ var taskInfoCmd = &cli.Command{
 		taskContract := cctx.Args().Get(0)
 		if strings.TrimSpace(taskContract) == "" {
 			return fmt.Errorf("the task contract address is required")
-		}
-
-		cpRepoPath, ok := os.LookupEnv("CP_PATH")
-		if !ok {
-			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
-		}
-		if err := conf.InitConfig(cpRepoPath, true); err != nil {
-			return fmt.Errorf("load config file failed, error: %+v", err)
 		}
 
 		chainRpc, err := conf.GetRpcByNetWorkName()
@@ -504,18 +492,7 @@ var initCmd = &cli.Command{
 		}
 		nodeName := cctx.String("node-name")
 
-		cpRepoPath, ok := os.LookupEnv("CP_PATH")
-		if !ok {
-			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
-		}
-
-		if _, err := os.Stat(cpRepoPath); os.IsNotExist(err) {
-			err := os.MkdirAll(cpRepoPath, 0755)
-			if err != nil {
-				return fmt.Errorf("create cp repo failed, error: %v", cpRepoPath)
-			}
-		}
-
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 		return conf.GenerateAndUpdateConfigFile(cpRepoPath, strings.TrimSpace(multiAddr), nodeName, port)
 	},
 }
@@ -530,6 +507,13 @@ var accountCmd = &cli.Command{
 		changeWorkerAddressCmd,
 		changeBeneficiaryAddressCmd,
 		changeTaskTypesCmd,
+	},
+	Before: func(c *cli.Context) error {
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
+		if err := conf.InitConfig(cpRepoPath, true); err != nil {
+			return fmt.Errorf("load config file failed, error: %+v", err)
+		}
+		return nil
 	},
 }
 
@@ -604,13 +588,7 @@ var createAccountCmd = &cli.Command{
 			taskTypesUint = append(taskTypesUint, uint8(tt))
 		}
 
-		cpRepoPath, ok := os.LookupEnv("CP_PATH")
-		if !ok {
-			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
-		}
-		if err := conf.InitConfig(cpRepoPath, true); err != nil {
-			logs.GetLogger().Fatal(err)
-		}
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 		return createAccount(cpRepoPath, ownerAddress, beneficiaryAddress, workerAddress, taskTypesUint)
 	},
 }
@@ -641,13 +619,7 @@ var changeMultiAddressCmd = &cli.Command{
 			return fmt.Errorf("multiAddress is required")
 		}
 
-		cpRepoPath, ok := os.LookupEnv("CP_PATH")
-		if !ok {
-			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
-		}
-		if err := conf.InitConfig(cpRepoPath, false); err != nil {
-			logs.GetLogger().Fatal(err)
-		}
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 
 		client, cpStub, err := getVerifyAccountClient(ownerAddress)
 		if err != nil {
@@ -702,13 +674,7 @@ var changeOwnerAddressCmd = &cli.Command{
 			return fmt.Errorf("the target newOwnerAddress is invalid wallet address")
 		}
 
-		cpRepoPath, ok := os.LookupEnv("CP_PATH")
-		if !ok {
-			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
-		}
-		if err := conf.InitConfig(cpRepoPath, false); err != nil {
-			logs.GetLogger().Fatal(err)
-		}
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 
 		client, cpStub, err := getVerifyAccountClient(ownerAddress)
 		if err != nil {
@@ -763,13 +729,7 @@ var changeBeneficiaryAddressCmd = &cli.Command{
 			return fmt.Errorf("the target beneficiary address is invalid wallet address")
 		}
 
-		cpRepoPath, ok := os.LookupEnv("CP_PATH")
-		if !ok {
-			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
-		}
-		if err := conf.InitConfig(cpRepoPath, false); err != nil {
-			logs.GetLogger().Fatal(err)
-		}
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 
 		client, cpStub, err := getVerifyAccountClient(ownerAddress)
 		if err != nil {
@@ -824,13 +784,7 @@ var changeWorkerAddressCmd = &cli.Command{
 			return fmt.Errorf("the target worker address is invalid wallet address")
 		}
 
-		cpRepoPath, ok := os.LookupEnv("CP_PATH")
-		if !ok {
-			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
-		}
-		if err := conf.InitConfig(cpRepoPath, false); err != nil {
-			logs.GetLogger().Fatal(err)
-		}
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 
 		client, cpStub, err := getVerifyAccountClient(ownerAddress)
 		if err != nil {
@@ -925,6 +879,66 @@ var changeTaskTypesCmd = &cli.Command{
 
 		fmt.Printf("changeTaskTypes Transaction hash: %s \n", changeTaskTypesTx)
 		return nil
+	},
+}
+
+var contractCmd = &cli.Command{
+	Name:  "contract",
+	Usage: "Manage contract info of CP",
+	Subcommands: []*cli.Command{
+		{
+			Name:  "info",
+			Usage: "Print the contract info that the current network CP is using",
+			Action: func(c *cli.Context) error {
+				cpRepoPath, _ := os.LookupEnv("CP_PATH")
+				if err := conf.InitConfig(cpRepoPath, true); err != nil {
+					return fmt.Errorf("load config file failed, error: %+v", err)
+				}
+
+				chainRpc, err := conf.GetRpcByNetWorkName()
+				if err != nil {
+					return err
+				}
+				client, err := ethclient.Dial(chainRpc)
+				if err != nil {
+					return err
+				}
+				defer client.Close()
+
+				var netWork = ""
+				chainId, err := client.ChainID(context.Background())
+				if err != nil {
+					return err
+				}
+				if chainId.Int64() == 254 {
+					netWork = fmt.Sprintf("Mainnet(%d)", chainId.Int64())
+				} else {
+					netWork = fmt.Sprintf("Testnet(%d)", chainId.Int64())
+				}
+
+				contract := conf.GetConfig().CONTRACT
+				var taskData [][]string
+
+				taskData = append(taskData, []string{"Network:", netWork})
+				taskData = append(taskData, []string{"Swan Token:", contract.SwanToken})
+				taskData = append(taskData, []string{"Orchestrator Collateral:", contract.Collateral})
+				taskData = append(taskData, []string{"Register Cp:", contract.Register})
+				taskData = append(taskData, []string{"ZK Collateral:", contract.ZkCollateral})
+
+				var rowColorList []RowColor
+				rowColorList = append(rowColorList,
+					RowColor{
+						row:    0,
+						column: []int{1},
+						color:  []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgBlueColor}},
+					})
+
+				header := []string{"CP Contract Info:"}
+				NewVisualTable(header, taskData, rowColorList).Generate(false)
+				return nil
+
+			},
+		},
 	},
 }
 

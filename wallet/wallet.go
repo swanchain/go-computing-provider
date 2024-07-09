@@ -43,9 +43,6 @@ func SetupWallet(dir string) (*LocalWallet, error) {
 	if !exit {
 		return nil, fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
 	}
-	if err := conf.InitConfig(cpPath, true); err != nil {
-		return nil, fmt.Errorf("load config file failed, error: %+v", err)
-	}
 
 	var resultErr error
 	timeOutCh := time.After(10 * time.Second)
