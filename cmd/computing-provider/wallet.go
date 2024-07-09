@@ -64,21 +64,21 @@ var walletList = &cli.Command{
 	Usage: "List wallet address",
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
-			Name:  "contract",
-			Usage: "Specify the token contract",
+			Name:  "swan",
+			Usage: "Specify the swan token contract",
 			Value: false,
 		},
 	},
 	Action: func(cctx *cli.Context) error {
 		ctx := reqContext(cctx)
-		contractFlag := cctx.Bool("contract")
+		swanContractFlag := cctx.Bool("swan")
 
 		localWallet, err := wallet.SetupWallet(wallet.WalletRepo)
 		if err != nil {
 			return err
 		}
 
-		return localWallet.WalletList(ctx, contractFlag)
+		return localWallet.WalletList(ctx, swanContractFlag)
 	},
 }
 
