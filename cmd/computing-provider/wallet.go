@@ -361,7 +361,7 @@ var collateralAddCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		fmt.Println(txHash)
+		fmt.Printf("collateral transaction hash: %s \n", txHash)
 		return nil
 	},
 }

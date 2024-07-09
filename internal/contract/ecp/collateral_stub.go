@@ -11,7 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/contract"
 	"github.com/swanchain/go-computing-provider/internal/contract/token"
@@ -109,7 +108,7 @@ func (s *CollateralStub) Deposit(cpAccountAddress string, amount *big.Int) (stri
 			}
 
 			if receipt != nil && receipt.Status == types.ReceiptStatusSuccessful {
-				logs.GetLogger().Infof("token approve transaction hash: %s", approveTx.Hash().String())
+				fmt.Printf("token approve transaction hash: %s \n", approveTx.Hash().String())
 				depositTxOptions, err := s.createTransactOpts()
 				if err != nil {
 					return "", fmt.Errorf("address: %s, ECP collateral client create transaction, error: %+v", publicAddress, err)

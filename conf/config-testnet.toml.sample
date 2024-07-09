@@ -3,7 +3,6 @@ Port = 8085                                     # The port number that the web s
 MultiAddress = "/ip4/<PUBLIC_IP>/tcp/<PORT>"    # The multiAddress for libp2p
 Domain = ""                                     # The domain name
 NodeName = "<YOUR_CP_Node_Name>"                 # The computing-provider node name
-
 WalletWhiteList=""                              # CP only accepts user addresses from this whitelist for space deployment
 
 [UBI]
