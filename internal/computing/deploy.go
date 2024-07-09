@@ -122,8 +122,6 @@ func (d *Deploy) DockerfileToK8s() {
 		return
 	}
 
-	deleteJob(d.k8sNameSpace, d.spaceUuid)
-
 	if err := d.deployNamespace(); err != nil {
 		logs.GetLogger().Error(err)
 		return
@@ -190,8 +188,6 @@ func (d *Deploy) YamlToK8s() {
 		logs.GetLogger().Error(err)
 		return
 	}
-
-	deleteJob(d.k8sNameSpace, d.spaceUuid)
 
 	if err := d.deployNamespace(); err != nil {
 		logs.GetLogger().Error(err)
@@ -376,7 +372,6 @@ func (d *Deploy) ModelInferenceToK8s() error {
 		return err
 	}
 
-	deleteJob(d.k8sNameSpace, d.spaceUuid)
 	imageName := "lagrange/" + modelInfo.Framework + ":v1.0"
 
 	logFile := filepath.Join(d.SpacePath, BuildFileName)

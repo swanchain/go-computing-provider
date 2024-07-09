@@ -790,11 +790,17 @@ func DeploySpaceTask(jobSourceURI, hostName string, duration int, jobUuid string
 	var success bool
 	var spaceUuid string
 	var walletAddress string
+	var spacePath string
 	defer func() {
 		if !success {
 			k8sNameSpace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(walletAddress)
+			logs.GetLogger().Warnf("deploy space failed, deleting space_uuid: %s", spaceUuid)
 			deleteJob(k8sNameSpace, spaceUuid)
 			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid)
+		}
+
+		if spacePath != "" {
+			os.RemoveAll(spacePath)
 		}
 
 		if err := recover(); err != nil {
@@ -834,15 +840,16 @@ func DeploySpaceTask(jobSourceURI, hostName string, duration int, jobUuid string
 	deploy.WithSpaceInfo(spaceUuid, spaceName)
 	deploy.WithGpuProductName(gpuProductName)
 
-	cpRepoPath, _ := os.LookupEnv("CP_PATH")
-	spacePath := filepath.Join(cpRepoPath, "build", walletAddress, "spaces", spaceName)
-	os.RemoveAll(spacePath)
 	updateJobStatus(jobUuid, models.DEPLOY_DOWNLOAD_SOURCE)
 	containsYaml, yamlPath, imagePath, modelsSettingFile, _, err := BuildSpaceTaskImage(spaceUuid, spaceDetail.Data.Files)
 	if err != nil {
 		logs.GetLogger().Error(err)
 		return ""
 	}
+	spacePath = imagePath
+
+	logs.GetLogger().Warnf("Start deploying new space service and delete previous service, space_uuid: %s", spaceUuid)
+	deleteJob(constants.K8S_NAMESPACE_NAME_PREFIX+strings.ToLower(walletAddress), spaceUuid)
 
 	deploy.WithSpacePath(imagePath)
 	if len(modelsSettingFile) > 0 {
@@ -851,6 +858,7 @@ func DeploySpaceTask(jobSourceURI, hostName string, duration int, jobUuid string
 			logs.GetLogger().Error(err)
 			return ""
 		}
+		success = true
 		return hostName
 	}
 
@@ -870,7 +878,6 @@ func deleteJob(namespace, spaceUuid string) error {
 	serviceName := constants.K8S_SERVICE_NAME_PREFIX + spaceUuid
 	ingressName := constants.K8S_INGRESS_NAME_PREFIX + spaceUuid
 
-	logs.GetLogger().Infof("deleting space service, space_uuid: %s", spaceUuid)
 	k8sService := NewK8sService()
 	if err := k8sService.DeleteIngress(context.TODO(), namespace, ingressName); err != nil && !errors.IsNotFound(err) {
 		logs.GetLogger().Errorf("Failed delete ingress, ingressName: %s, error: %+v", ingressName, err)
@@ -926,6 +933,8 @@ func deleteJob(namespace, spaceUuid string) error {
 			break
 		}
 	}
+
+	logs.GetLogger().Infof("delete space service finished, space_uuid: %s", spaceUuid)
 	return nil
 }
 

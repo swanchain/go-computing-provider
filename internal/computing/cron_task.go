@@ -164,10 +164,7 @@ func (task *CronTask) watchExpiredTask() {
 
 		var deleteSpaceIds []string
 		for _, job := range jobList {
-			namespace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(job.WalletAddress)
-			deployName := constants.K8S_DEPLOY_NAME_PREFIX + job.SpaceUuid
-
-			if _, err = NewK8sService().k8sClient.AppsV1().Deployments(namespace).Get(context.TODO(), deployName, metav1.GetOptions{}); err != nil && errors.IsNotFound(err) {
+			if _, err = NewK8sService().k8sClient.AppsV1().Deployments(job.NameSpace).Get(context.TODO(), job.K8sDeployName, metav1.GetOptions{}); err != nil && errors.IsNotFound(err) {
 				deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
 				continue
 			}
@@ -180,14 +177,14 @@ func (task *CronTask) watchExpiredTask() {
 				}
 				if strings.Contains(taskStatus, "no task found") {
 					logs.GetLogger().Infof("task_uuid: %s, task not found on the orchestrator service, starting to delete it.", job.TaskUuid)
-					deleteJob(namespace, job.SpaceUuid)
+					deleteJob(job.NameSpace, job.SpaceUuid)
 					deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
 					continue
 				}
 				if strings.Contains(taskStatus, "Terminated") || strings.Contains(taskStatus, "Terminated") ||
 					strings.Contains(taskStatus, "Cancelled") || strings.Contains(taskStatus, "Failed") {
 					logs.GetLogger().Infof("task_uuid: %s, current status is %s, starting to delete it.", job.TaskUuid, taskStatus)
-					if err = deleteJob(namespace, job.SpaceUuid); err == nil {
+					if err = deleteJob(job.NameSpace, job.SpaceUuid); err == nil {
 						deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
 						continue
 					}
@@ -196,7 +193,7 @@ func (task *CronTask) watchExpiredTask() {
 
 			if time.Now().Unix() > job.ExpireTime {
 				logs.GetLogger().Infof("<timer-task> space_uuid: %s has expired, the job starting terminated", job.SpaceUuid)
-				if err = deleteJob(namespace, job.SpaceUuid); err == nil {
+				if err = deleteJob(job.NameSpace, job.SpaceUuid); err == nil {
 					deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
 					continue
 				}
