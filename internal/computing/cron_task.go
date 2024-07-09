@@ -146,6 +146,17 @@ func (task *CronTask) watchExpiredTask() {
 			return
 		}
 
+		deployments, err := NewK8sService().k8sClient.AppsV1().Deployments(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			fmt.Println("Error listing deployments:", err)
+			return
+		}
+
+		var deployOnK8s = make(map[string]string)
+		for _, deploy := range deployments.Items {
+			deployOnK8s[deploy.Name] = deploy.Namespace
+		}
+
 		if len(jobList) == 0 {
 			service := NewK8sService()
 			namespaces, err := service.ListNamespace(context.TODO())
@@ -164,6 +175,10 @@ func (task *CronTask) watchExpiredTask() {
 
 		var deleteSpaceIds []string
 		for _, job := range jobList {
+			if _, ok := deployOnK8s[job.K8sDeployName]; ok {
+				delete(deployOnK8s, job.K8sDeployName)
+			}
+
 			if _, err = NewK8sService().k8sClient.AppsV1().Deployments(job.NameSpace).Get(context.TODO(), job.K8sDeployName, metav1.GetOptions{}); err != nil && errors.IsNotFound(err) {
 				deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
 				continue
@@ -200,6 +215,9 @@ func (task *CronTask) watchExpiredTask() {
 			}
 		}
 
+		for deploymentName, nameSpace := range deployOnK8s {
+			NewK8sService().DeleteDeployment(context.TODO(), nameSpace, deploymentName)
+		}
 		for _, spaceUuid := range deleteSpaceIds {
 			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid)
 		}
