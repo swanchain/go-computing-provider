@@ -23,7 +23,7 @@ type ComputeNode struct {
 	MCS      MCS
 	Registry Registry
 	RPC      RPC
-	CONTRACT CONTRACT
+	CONTRACT CONTRACT `toml:"CONTRACT,omitempty"`
 }
 
 type API struct {
