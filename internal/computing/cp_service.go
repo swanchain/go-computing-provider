@@ -428,7 +428,7 @@ func CancelJob(c *gin.Context) {
 			}
 		}()
 		k8sNameSpace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(jobEntity.WalletAddress)
-		deleteJob(k8sNameSpace, jobEntity.SpaceUuid)
+		deleteJob(k8sNameSpace, jobEntity.SpaceUuid, "")
 		NewJobService().DeleteJobEntityBySpaceUuId(jobEntity.SpaceUuid)
 	}()
 
@@ -794,8 +794,7 @@ func DeploySpaceTask(jobSourceURI, hostName string, duration int, jobUuid string
 	defer func() {
 		if !success {
 			k8sNameSpace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(walletAddress)
-			logs.GetLogger().Warnf("deploy space failed, deleting space_uuid: %s", spaceUuid)
-			deleteJob(k8sNameSpace, spaceUuid)
+			deleteJob(k8sNameSpace, spaceUuid, "deploy space failed")
 			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid)
 		}
 
@@ -847,10 +846,6 @@ func DeploySpaceTask(jobSourceURI, hostName string, duration int, jobUuid string
 		return ""
 	}
 	spacePath = imagePath
-
-	logs.GetLogger().Warnf("Start deploying new space service and delete previous service, space_uuid: %s", spaceUuid)
-	deleteJob(constants.K8S_NAMESPACE_NAME_PREFIX+strings.ToLower(walletAddress), spaceUuid)
-
 	deploy.WithSpacePath(imagePath)
 	if len(modelsSettingFile) > 0 {
 		err := deploy.WithModelSettingFile(modelsSettingFile).ModelInferenceToK8s()
@@ -873,7 +868,7 @@ func DeploySpaceTask(jobSourceURI, hostName string, duration int, jobUuid string
 	return hostName
 }
 
-func deleteJob(namespace, spaceUuid string) error {
+func deleteJob(namespace, spaceUuid string, msg string) error {
 	deployName := constants.K8S_DEPLOY_NAME_PREFIX + spaceUuid
 	serviceName := constants.K8S_SERVICE_NAME_PREFIX + spaceUuid
 	ingressName := constants.K8S_INGRESS_NAME_PREFIX + spaceUuid
@@ -934,7 +929,12 @@ func deleteJob(namespace, spaceUuid string) error {
 		}
 	}
 
-	logs.GetLogger().Infof("delete space service finished, space_uuid: %s", spaceUuid)
+	if msg != "" {
+		logs.GetLogger().Infof("%s, space_uuid: %s", msg, spaceUuid)
+	} else {
+		logs.GetLogger().Infof("delete space service finished, space_uuid: %s", spaceUuid)
+	}
+
 	return nil
 }
 

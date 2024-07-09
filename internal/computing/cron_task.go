@@ -192,14 +192,14 @@ func (task *CronTask) watchExpiredTask() {
 				}
 				if strings.Contains(taskStatus, "no task found") {
 					logs.GetLogger().Infof("task_uuid: %s, task not found on the orchestrator service, starting to delete it.", job.TaskUuid)
-					deleteJob(job.NameSpace, job.SpaceUuid)
+					deleteJob(job.NameSpace, job.SpaceUuid, "cron task time")
 					deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
 					continue
 				}
 				if strings.Contains(taskStatus, "Terminated") || strings.Contains(taskStatus, "Terminated") ||
 					strings.Contains(taskStatus, "Cancelled") || strings.Contains(taskStatus, "Failed") {
 					logs.GetLogger().Infof("task_uuid: %s, current status is %s, starting to delete it.", job.TaskUuid, taskStatus)
-					if err = deleteJob(job.NameSpace, job.SpaceUuid); err == nil {
+					if err = deleteJob(job.NameSpace, job.SpaceUuid, "cron task time"); err == nil {
 						deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
 						continue
 					}
@@ -208,7 +208,7 @@ func (task *CronTask) watchExpiredTask() {
 
 			if time.Now().Unix() > job.ExpireTime {
 				logs.GetLogger().Infof("<timer-task> space_uuid: %s has expired, the job starting terminated", job.SpaceUuid)
-				if err = deleteJob(job.NameSpace, job.SpaceUuid); err == nil {
+				if err = deleteJob(job.NameSpace, job.SpaceUuid, "cron task time"); err == nil {
 					deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
 					continue
 				}
