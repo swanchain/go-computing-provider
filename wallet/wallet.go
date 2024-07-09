@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/swanchain/go-computing-provider/conf"
-	account2 "github.com/swanchain/go-computing-provider/internal/contract/account"
+	"github.com/swanchain/go-computing-provider/internal/contract/account"
 	"github.com/swanchain/go-computing-provider/internal/contract/ecp"
 	"github.com/swanchain/go-computing-provider/internal/contract/fcp"
 	"github.com/swanchain/go-computing-provider/internal/contract/token"
@@ -350,33 +350,49 @@ func (w *LocalWallet) WalletCollateral(ctx context.Context, from string, amount 
 		}
 	}
 
-	if collateralType == "fcp" {
-		tokenStub, err := token.NewTokenStub(client, token.WithPrivateKey(ki.PrivateKey))
+	if collateralType == "sequencer" {
+		sequencerStub, err := ecp.NewSequencerStub(client, ecp.WithSequencerPrivateKey(ki.PrivateKey))
 		if err != nil {
 			return "", err
 		}
+		return sequencerStub.Deposit(cpAccountAddress, sendAmount)
+	}
 
-		swanTokenTxHash, err := tokenStub.Approve(sendAmount)
-		if err != nil {
-			return "", err
-		}
+	tokenStub, err := token.NewTokenStub(client, token.WithPrivateKey(ki.PrivateKey))
+	if err != nil {
+		return "", err
+	}
 
-		timeout := time.After(3 * time.Minute)
-		ticker := time.Tick(3 * time.Second)
-		for {
-			select {
-			case <-timeout:
-				return "", fmt.Errorf("timeout waiting for transaction confirmation, tx: %s", swanTokenTxHash)
-			case <-ticker:
-				receipt, err := client.TransactionReceipt(context.Background(), common.HexToHash(swanTokenTxHash))
+	swanTokenTxHash, err := tokenStub.Approve(sendAmount)
+	if err != nil {
+		return "", err
+	}
+
+	timeout := time.After(3 * time.Minute)
+	ticker := time.Tick(3 * time.Second)
+	for {
+		select {
+		case <-timeout:
+			return "", fmt.Errorf("timeout waiting for transaction confirmation, tx: %s", swanTokenTxHash)
+		case <-ticker:
+			receipt, err := client.TransactionReceipt(context.Background(), common.HexToHash(swanTokenTxHash))
+			if err != nil {
+				if errors.Is(err, ethereum.NotFound) {
+					continue
+				}
+				return "", fmt.Errorf("mintor swan token Approve tx, error: %+v", err)
+			}
+
+			if receipt != nil && receipt.Status == types.ReceiptStatusSuccessful {
+				cpStub, err := account.NewAccountStub(client, account.WithContractAddress(cpAccountAddress))
 				if err != nil {
-					if errors.Is(err, ethereum.NotFound) {
-						continue
-					}
-					return "", fmt.Errorf("mintor swan token Approve tx, error: %+v", err)
+					return "", err
+				}
+				if _, err = cpStub.GetCpAccountInfo(); err != nil {
+					return "", fmt.Errorf("cp account: %s does not exist on the chain", cpAccountAddress)
 				}
 
-				if receipt != nil && receipt.Status == types.ReceiptStatusSuccessful {
+				if collateralType == "fcp" {
 					collateralStub, err := fcp.NewCollateralStub(client, fcp.WithPrivateKey(ki.PrivateKey), fcp.WithCpAccountAddress(cpAccountAddress))
 					if err != nil {
 						return "", err
@@ -386,36 +402,23 @@ func (w *LocalWallet) WalletCollateral(ctx context.Context, from string, amount 
 						return "", err
 					}
 					return collateralTxHash, nil
-				} else if receipt != nil && receipt.Status == 0 {
-					return "", fmt.Errorf("swan token approve transaction execution failed, tx: %s", swanTokenTxHash)
+				} else if collateralType == "ecp" {
+					zkCollateral, err := ecp.NewCollateralStub(client, ecp.WithPrivateKey(ki.PrivateKey))
+					if err != nil {
+						return "", err
+					}
+
+					collateralTxHash, err := zkCollateral.Deposit(cpAccountAddress, sendAmount)
+					if err != nil {
+						return "", err
+					}
+					return collateralTxHash, nil
 				}
+
+			} else if receipt != nil && receipt.Status == 0 {
+				return "", fmt.Errorf("swan token approve transaction execution failed, tx: %s", swanTokenTxHash)
 			}
 		}
-	} else if collateralType == "ecp" {
-		cpStub, err := account2.NewAccountStub(client, account2.WithContractAddress(cpAccountAddress))
-		if err != nil {
-			return "", err
-		}
-		if _, err = cpStub.GetCpAccountInfo(); err != nil {
-			return "", fmt.Errorf("cp account: %s does not exist on the chain", cpAccountAddress)
-		}
-
-		zkCollateral, err := ecp.NewCollateralStub(client, ecp.WithPrivateKey(ki.PrivateKey))
-		if err != nil {
-			return "", err
-		}
-
-		collateralTxHash, err := zkCollateral.Deposit(cpAccountAddress, sendAmount)
-		if err != nil {
-			return "", err
-		}
-		return collateralTxHash, nil
-	} else {
-		sequencerStub, err := ecp.NewSequencerStub(client, ecp.WithSequencerPrivateKey(ki.PrivateKey))
-		if err != nil {
-			return "", err
-		}
-		return sequencerStub.Deposit(cpAccountAddress, sendAmount)
 	}
 }
 

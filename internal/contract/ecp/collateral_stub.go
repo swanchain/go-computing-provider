@@ -3,21 +3,16 @@ package ecp
 import (
 	"context"
 	"crypto/ecdsa"
-	"errors"
 	"fmt"
-	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/contract"
-	"github.com/swanchain/go-computing-provider/internal/contract/token"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"math/big"
 	"strings"
-	"time"
 )
 
 type CollateralStub struct {
@@ -83,48 +78,11 @@ func (s *CollateralStub) Deposit(cpAccountAddress string, amount *big.Int) (stri
 		return "", fmt.Errorf("address: %s, ECP collateral client create transaction, error: %+v", publicAddress, err)
 	}
 
-	tokenClient, err := token.NewToken(common.HexToAddress(conf.GetConfig().CONTRACT.SwanToken), s.client)
+	transaction, err := s.collateral.Deposit(txOptions, common.HexToAddress(cpAccountAddress), amount)
 	if err != nil {
-		return "", fmt.Errorf("create token client failed, error: %v", err)
+		return "", fmt.Errorf("address: %s, ECP collateral client create deposit tx error: %+v", publicAddress, err)
 	}
-
-	approveTx, err := tokenClient.Approve(txOptions, common.HexToAddress(conf.GetConfig().CONTRACT.Collateral), amount)
-	if err != nil {
-		return "", fmt.Errorf("token approve failed, error: %v", err)
-	}
-
-	timeout := time.After(3 * time.Minute)
-	ticker := time.Tick(3 * time.Second)
-	for {
-		select {
-		case <-timeout:
-			return "", fmt.Errorf("timeout waiting for token approve transaction confirmation, tx: %s", approveTx.Hash().String())
-		case <-ticker:
-			receipt, err := s.client.TransactionReceipt(context.Background(), approveTx.Hash())
-			if err != nil {
-				if errors.Is(err, ethereum.NotFound) {
-					continue
-				}
-			}
-
-			if receipt != nil && receipt.Status == types.ReceiptStatusSuccessful {
-				fmt.Printf("token approve transaction hash: %s \n", approveTx.Hash().String())
-				depositTxOptions, err := s.createTransactOpts()
-				if err != nil {
-					return "", fmt.Errorf("address: %s, ECP collateral client create transaction, error: %+v", publicAddress, err)
-				}
-
-				transaction, err := s.collateral.Deposit(depositTxOptions, common.HexToAddress(cpAccountAddress), amount)
-				if err != nil {
-					return "", fmt.Errorf("address: %s, ECP collateral client create deposit tx error: %+v", publicAddress, err)
-				}
-				return transaction.Hash().String(), nil
-
-			} else if receipt != nil && receipt.Status == 0 {
-				return "", fmt.Errorf("swan token approve transaction execution failed, tx: %s", approveTx.Hash().String())
-			}
-		}
-	}
+	return transaction.Hash().String(), nil
 }
 
 func (s *CollateralStub) Withdraw(cpAccountAddress string, amount *big.Int) (string, error) {
