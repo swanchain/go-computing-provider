@@ -154,7 +154,9 @@ func (task *CronTask) watchExpiredTask() {
 
 		var deployOnK8s = make(map[string]string)
 		for _, deploy := range deployments.Items {
-			deployOnK8s[deploy.Name] = deploy.Namespace
+			if strings.HasPrefix(deploy.Namespace, constants.K8S_NAMESPACE_NAME_PREFIX) {
+				deployOnK8s[deploy.Name] = deploy.Namespace
+			}
 		}
 
 		if len(jobList) == 0 {
