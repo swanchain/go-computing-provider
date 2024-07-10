@@ -872,40 +872,43 @@ func deleteJob(namespace, spaceUuid string, msg string) error {
 	ingressName := constants.K8S_INGRESS_NAME_PREFIX + spaceUuid
 
 	k8sService := NewK8sService()
-	if err := k8sService.DeleteIngress(context.TODO(), namespace, ingressName); err != nil && !errors.IsNotFound(err) {
-		logs.GetLogger().Errorf("Failed delete ingress, ingressName: %s, error: %+v", ingressName, err)
-		return err
-	}
 
-	if err := k8sService.DeleteService(context.TODO(), namespace, serviceName); err != nil && !errors.IsNotFound(err) {
-		logs.GetLogger().Errorf("Failed delete service, serviceName: %s, error: %+v", serviceName, err)
-		return err
-	}
+	if namespace != "" {
+		if err := k8sService.DeleteIngress(context.TODO(), namespace, ingressName); err != nil && !errors.IsNotFound(err) {
+			logs.GetLogger().Errorf("Failed delete ingress, ingressName: %s, error: %+v", ingressName, err)
+			return err
+		}
 
-	dockerService := NewDockerService()
-	deployImageIds, err := k8sService.GetDeploymentImages(context.TODO(), namespace, deployName)
-	if err != nil && !errors.IsNotFound(err) {
-		logs.GetLogger().Errorf("Failed get deploy imageIds, deployName: %s, error: %+v", deployName, err)
-		return err
-	}
-	for _, imageId := range deployImageIds {
-		dockerService.RemoveImage(imageId)
-	}
+		if err := k8sService.DeleteService(context.TODO(), namespace, serviceName); err != nil && !errors.IsNotFound(err) {
+			logs.GetLogger().Errorf("Failed delete service, serviceName: %s, error: %+v", serviceName, err)
+			return err
+		}
 
-	if err := k8sService.DeleteDeployment(context.TODO(), namespace, deployName); err != nil && !errors.IsNotFound(err) {
-		logs.GetLogger().Errorf("Failed delete deployment, deployName: %s, error: %+v", deployName, err)
-		return err
-	}
-	time.Sleep(6 * time.Second)
+		dockerService := NewDockerService()
+		deployImageIds, err := k8sService.GetDeploymentImages(context.TODO(), namespace, deployName)
+		if err != nil && !errors.IsNotFound(err) {
+			logs.GetLogger().Errorf("Failed get deploy imageIds, deployName: %s, error: %+v", deployName, err)
+			return err
+		}
+		for _, imageId := range deployImageIds {
+			dockerService.RemoveImage(imageId)
+		}
 
-	if err := k8sService.DeleteDeployRs(context.TODO(), namespace, spaceUuid); err != nil && !errors.IsNotFound(err) {
-		logs.GetLogger().Errorf("Failed delete ReplicaSetsController, spaceUuid: %s, error: %+v", spaceUuid, err)
-		return err
-	}
+		if err := k8sService.DeleteDeployment(context.TODO(), namespace, deployName); err != nil && !errors.IsNotFound(err) {
+			logs.GetLogger().Errorf("Failed delete deployment, deployName: %s, error: %+v", deployName, err)
+			return err
+		}
+		time.Sleep(6 * time.Second)
 
-	if err := k8sService.DeletePod(context.TODO(), namespace, spaceUuid); err != nil && !errors.IsNotFound(err) {
-		logs.GetLogger().Errorf("Failed delete pods, spaceUuid: %s, error: %+v", spaceUuid, err)
-		return err
+		if err := k8sService.DeleteDeployRs(context.TODO(), namespace, spaceUuid); err != nil && !errors.IsNotFound(err) {
+			logs.GetLogger().Errorf("Failed delete ReplicaSetsController, spaceUuid: %s, error: %+v", spaceUuid, err)
+			return err
+		}
+
+		if err := k8sService.DeletePod(context.TODO(), namespace, spaceUuid); err != nil && !errors.IsNotFound(err) {
+			logs.GetLogger().Errorf("Failed delete pods, spaceUuid: %s, error: %+v", spaceUuid, err)
+			return err
+		}
 	}
 
 	ticker := time.NewTicker(3 * time.Second)
