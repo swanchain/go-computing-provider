@@ -791,17 +791,12 @@ func DeploySpaceTask(jobSourceURI, hostName string, duration int, jobUuid string
 	var success bool
 	var spaceUuid string
 	var walletAddress string
-	var spacePath string
 	defer func() {
 		if !success {
 			k8sNameSpace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(walletAddress)
 			deleteJob(k8sNameSpace, spaceUuid, "deploy space failed")
 			fmt.Printf("debug:: DeploySpaceTask failed: %s", spaceUuid)
 			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid)
-		}
-
-		if spacePath != "" {
-			os.RemoveAll(spacePath)
 		}
 
 		if err := recover(); err != nil {
@@ -847,7 +842,7 @@ func DeploySpaceTask(jobSourceURI, hostName string, duration int, jobUuid string
 		logs.GetLogger().Error(err)
 		return ""
 	}
-	spacePath = imagePath
+
 	deploy.WithSpacePath(imagePath)
 	if len(modelsSettingFile) > 0 {
 		err := deploy.WithModelSettingFile(modelsSettingFile).ModelInferenceToK8s()
