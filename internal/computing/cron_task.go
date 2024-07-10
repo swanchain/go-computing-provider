@@ -131,7 +131,7 @@ func (task *CronTask) watchNameSpaceForDeleted() {
 
 func (task *CronTask) watchExpiredTask() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("0 0/5 * * * ?", func() {
+	c.AddFunc("0 0/10 * * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("watchExpiredTask catch panic error: %+v", err)
@@ -173,18 +173,17 @@ func (task *CronTask) watchExpiredTask() {
 			return
 		}
 
-		fmt.Printf("deployOnK8s: %v", deployOnK8s)
-
 		var deleteSpaceIds []string
 		for _, job := range jobList {
 			if _, ok := deployOnK8s[job.K8sDeployName]; ok {
-				fmt.Printf("delete map data, K8sDeployName: %s, all data: %v", job.K8sDeployName, job)
 				delete(deployOnK8s, job.K8sDeployName)
 			}
 
 			if _, err = NewK8sService().k8sClient.AppsV1().Deployments(job.NameSpace).Get(context.TODO(), job.K8sDeployName, metav1.GetOptions{}); err != nil && errors.IsNotFound(err) {
-				deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
-				continue
+				if time.Now().Sub(time.Unix(job.CreateTime, 0)).Hours() > 2 {
+					deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
+					continue
+				}
 			}
 
 			if len(strings.TrimSpace(job.TaskUuid)) != 0 {
