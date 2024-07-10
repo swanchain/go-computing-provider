@@ -131,7 +131,7 @@ func (task *CronTask) watchNameSpaceForDeleted() {
 
 func (task *CronTask) watchExpiredTask() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("0 0/10 * * * ?", func() {
+	c.AddFunc("0 0/5 * * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("watchExpiredTask catch panic error: %+v", err)
