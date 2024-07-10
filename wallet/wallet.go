@@ -438,12 +438,24 @@ func (w *LocalWallet) CollateralWithdraw(ctx context.Context, address string, am
 	}
 	defer client.Close()
 
+	if len(cpAccountAddress) > 0 {
+		cpAccount := common.HexToAddress(cpAccountAddress)
+		bytecode, err := client.CodeAt(context.Background(), cpAccount, nil)
+		if err != nil {
+			return "", fmt.Errorf("check cp account contract address failed, error: %v", err)
+		}
+
+		if len(bytecode) <= 0 {
+			return "", fmt.Errorf("the account parameter must be a CpAccount contract address")
+		}
+	}
+
 	if collateralType == "fcp" {
 		collateralStub, err := fcp.NewCollateralStub(client, fcp.WithPrivateKey(ki.PrivateKey))
 		if err != nil {
 			return "", err
 		}
-		return collateralStub.Withdraw(withDrawAmount)
+		return collateralStub.Withdraw(cpAccountAddress, withDrawAmount)
 	} else {
 		zkCollateral, err := ecp.NewCollateralStub(client, ecp.WithPrivateKey(ki.PrivateKey))
 		if err != nil {

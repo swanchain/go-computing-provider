@@ -102,7 +102,7 @@ func (s *Stub) CollateralInfo() (models.FcpCollateralInfo, error) {
 	return cpInfo, nil
 }
 
-func (s *Stub) Withdraw(amount *big.Int) (string, error) {
+func (s *Stub) Withdraw(cpAccountAddress string, amount *big.Int) (string, error) {
 	publicAddress, err := s.privateKeyToPublicKey()
 	if err != nil {
 		return "", err
@@ -113,11 +113,12 @@ func (s *Stub) Withdraw(amount *big.Int) (string, error) {
 		return "", fmt.Errorf("address: %s, FCP collateral client create transaction, error: %+v", publicAddress, err)
 	}
 
-	cpAccountAddress, err := contract.GetCpAccountAddress()
-	if err != nil {
-		return "", fmt.Errorf("get cp account contract address failed, error: %v", err)
+	if cpAccountAddress == "" || len(strings.TrimSpace(cpAccountAddress)) == 0 {
+		cpAccountAddress, err = contract.GetCpAccountAddress()
+		if err != nil {
+			return "", fmt.Errorf("get cp account contract address failed, error: %v", err)
+		}
 	}
-
 	transaction, err := s.collateral.Withdraw(txOptions, common.HexToAddress(cpAccountAddress), amount)
 	if err != nil {
 		return "", fmt.Errorf("address: %s, FCP collateral withdraw tx error: %+v", publicAddress, err)
