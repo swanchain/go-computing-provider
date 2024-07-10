@@ -225,6 +225,7 @@ func (task *CronTask) watchExpiredTask() {
 			}
 		}
 		for _, spaceUuid := range deleteSpaceIds {
+			fmt.Printf("debug:: watchExpiredTask : %s", spaceUuid)
 			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid)
 		}
 

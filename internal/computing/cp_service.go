@@ -137,6 +137,7 @@ func ReceiveJob(c *gin.Context) {
 			return
 		}
 		if job.SpaceUuid != "" {
+			fmt.Printf("debug:: ReceiveJob : %s", spaceUuid)
 			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid)
 		}
 
@@ -294,6 +295,7 @@ func RedeployJob(c *gin.Context) {
 			return
 		}
 		if job.SpaceUuid != "" {
+			fmt.Printf("debug:: RedeployJob : %s", spaceUuid)
 			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid)
 		}
 
@@ -429,6 +431,7 @@ func CancelJob(c *gin.Context) {
 		}()
 		k8sNameSpace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(jobEntity.WalletAddress)
 		deleteJob(k8sNameSpace, jobEntity.SpaceUuid, "")
+		fmt.Printf("debug:: CancelJob: %s", jobEntity.SpaceUuid)
 		NewJobService().DeleteJobEntityBySpaceUuId(jobEntity.SpaceUuid)
 	}()
 
@@ -793,6 +796,7 @@ func DeploySpaceTask(jobSourceURI, hostName string, duration int, jobUuid string
 		if !success {
 			k8sNameSpace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(walletAddress)
 			deleteJob(k8sNameSpace, spaceUuid, "deploy space failed")
+			fmt.Printf("debug:: DeploySpaceTask failed: %s", spaceUuid)
 			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid)
 		}
 
