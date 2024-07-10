@@ -343,7 +343,7 @@ func (w *LocalWallet) WalletCollateral(ctx context.Context, from string, amount 
 		}
 
 		if len(bytecode) <= 0 {
-			return "", fmt.Errorf("the account parameter must be a CpAccount contract address")
+			return "", fmt.Errorf("the account parameter must be a cpAccount contract address")
 		}
 	}
 
@@ -446,7 +446,7 @@ func (w *LocalWallet) CollateralWithdraw(ctx context.Context, address string, am
 		}
 
 		if len(bytecode) <= 0 {
-			return "", fmt.Errorf("the account parameter must be a CpAccount contract address")
+			return "", fmt.Errorf("the account parameter must be a cpAccount contract address")
 		}
 	}
 
