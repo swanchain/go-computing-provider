@@ -470,8 +470,6 @@ func GetJobStatus(c *gin.Context) {
 		return
 	}
 
-	logs.GetLogger().Infof("job_uuid: %s, signatureMsg: %s", jobUuId, signatureMsg)
-
 	cpAccountAddress, err := contract.GetCpAccountAddress()
 	if err != nil {
 		logs.GetLogger().Errorf("get cp account contract address failed, error: %v", err)
