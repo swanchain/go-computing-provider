@@ -204,6 +204,7 @@ var taskDelete = &cli.Command{
 		}
 		fmt.Printf("debug:: taskDelete: %s", job.SpaceUuid)
 		computing.NewJobService().DeleteJobEntityBySpaceUuId(job.SpaceUuid)
+		fmt.Printf("%s, space serivce successfully deleted \n", job.SpaceUuid)
 		return nil
 	},
 }
