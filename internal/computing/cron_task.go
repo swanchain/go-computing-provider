@@ -173,9 +173,12 @@ func (task *CronTask) watchExpiredTask() {
 			return
 		}
 
+		fmt.Printf("deployOnK8s: %v", deployOnK8s)
+
 		var deleteSpaceIds []string
 		for _, job := range jobList {
 			if _, ok := deployOnK8s[job.K8sDeployName]; ok {
+				fmt.Printf("delete map data, K8sDeployName: %s, all data: %v", job.K8sDeployName, job)
 				delete(deployOnK8s, job.K8sDeployName)
 			}
 
