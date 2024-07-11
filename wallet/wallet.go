@@ -345,6 +345,14 @@ func (w *LocalWallet) WalletCollateral(ctx context.Context, from string, amount 
 		if len(bytecode) <= 0 {
 			return "", fmt.Errorf("the account parameter must be a cpAccount contract address")
 		}
+
+		cpStub, err := account.NewAccountStub(client, account.WithContractAddress(cpAccountAddress))
+		if err != nil {
+			return "", err
+		}
+		if _, err = cpStub.GetCpAccountInfo(); err != nil {
+			return "", fmt.Errorf("cp account: %s does not exist on the chain", cpAccountAddress)
+		}
 	}
 
 	if collateralType == "fcp" {
