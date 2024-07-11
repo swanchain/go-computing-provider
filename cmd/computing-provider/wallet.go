@@ -357,7 +357,7 @@ var collateralAddCmd = &cli.Command{
 
 		fromAddress := cctx.String("from")
 		if strings.TrimSpace(fromAddress) == "" {
-			return fmt.Errorf("the wallet address is required")
+			return fmt.Errorf("the from wallet address is required")
 		}
 
 		cpAccountAddress := cctx.String("account")
