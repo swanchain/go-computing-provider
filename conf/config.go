@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/BurntSushi/toml"
 	"github.com/swanchain/go-computing-provider/build"
-	"golang.org/x/xerrors"
 	"log"
 	"os"
 	"path"
@@ -191,7 +190,7 @@ func GenerateAndUpdateConfigFile(cpRepoPath string, multiAddress, nodeName strin
 		return err
 	}
 	if ok {
-		return xerrors.Errorf("repo at '%s' is already initialized", cpRepoPath)
+		return fmt.Errorf("repo at '%s' is already initialized", cpRepoPath)
 	}
 
 	var configTmpl ComputeNode
