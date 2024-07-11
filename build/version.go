@@ -37,6 +37,7 @@ func LoadParam() []NetworkConfig {
 type NetworkConfig struct {
 	Network string `json:"network"`
 	Config  struct {
+		SequencerUrl                   string `json:"sequencer_url"`
 		ZkEnginePk                     string `json:"zk_engine_pk"`
 		OrchestratorUrl                string `json:"orchestrator_url"`
 		OrchestratorPk                 string `json:"orchestrator_pk"`
@@ -45,5 +46,7 @@ type NetworkConfig struct {
 		OrchestratorCollateralContract string `json:"orchestrator_collateral_contract"`
 		RegisterCpContract             string `json:"register_cp_contract"`
 		ZkCollateralContract           string `json:"zk_collateral_contract"`
+		RegisterTaskContract           string `json:"register_task_contract"`
+		SequencerContract              string `json:"sequencer_contract"`
 	} `json:"config"`
 }

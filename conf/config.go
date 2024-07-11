@@ -114,7 +114,7 @@ func InitConfig(cpRepoPath string, standalone bool) error {
 		if ncCopy.Network == build.NetWorkTag {
 			config.CONTRACT.SwanToken = ncCopy.Config.SwanTokenContract
 			config.CONTRACT.Collateral = ncCopy.Config.OrchestratorCollateralContract
-			config.CONTRACT.Register = ncCopy.Config.RegisterCpContract
+			config.CONTRACT.CpAccountRegister = ncCopy.Config.RegisterCpContract
 			config.CONTRACT.ZkCollateral = ncCopy.Config.ZkCollateralContract
 		}
 	}
@@ -299,10 +299,12 @@ func generateDefaultConfig() ComputeNode {
 			SwanChainRpc: "",
 		},
 		CONTRACT: CONTRACT{
-			SwanToken:    "",
-			Collateral:   "",
-			Register:     "",
-			ZkCollateral: "",
+			SwanToken:         "",
+			Collateral:        "",
+			CpAccountRegister: "",
+			TaskRegister:      "",
+			ZkCollateral:      "",
+			Sequencer:         "",
 		},
 	}
 }
