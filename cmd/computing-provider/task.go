@@ -202,8 +202,8 @@ var taskDelete = &cli.Command{
 		if err := k8sService.DeleteDeployRs(context.TODO(), namespace, job.SpaceUuid); err != nil && !errors.IsNotFound(err) {
 			return err
 		}
-
 		computing.NewJobService().DeleteJobEntityBySpaceUuId(job.SpaceUuid)
+		fmt.Printf("space_uuid: %s space serivce successfully deleted \n", job.SpaceUuid)
 		return nil
 	},
 }

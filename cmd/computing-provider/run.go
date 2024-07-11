@@ -145,10 +145,10 @@ var infoCmd = &cli.Command{
 			}
 
 			for _, taskType := range cpAccount.TaskTypes {
-				taskTypes += models.TaskTypeStr(int(taskType)) + ","
+				taskTypes += models.TaskTypeStr(int(taskType)) + ", "
 			}
 			if taskTypes != "" {
-				taskTypes = taskTypes[:len(taskTypes)-1]
+				taskTypes = taskTypes[:len(taskTypes)-2]
 			}
 
 			contractAddress = cpStub.ContractAddress
@@ -202,10 +202,10 @@ var infoCmd = &cli.Command{
 		taskData = append(taskData, []string{"Owner Balance(sETH):", ownerBalance})
 		taskData = append(taskData, []string{"Worker Balance(sETH):", workerBalance})
 		taskData = append(taskData, []string{""})
-		taskData = append(taskData, []string{"ECP Balance(sETH):"})
+		taskData = append(taskData, []string{"ECP Balance(SWANC):"})
 		taskData = append(taskData, []string{"   Collateral:", ecpCollateralBalance})
 		taskData = append(taskData, []string{"   Escrow:", ecpEscrowBalance})
-		taskData = append(taskData, []string{"FCP Balance(sETH):"})
+		taskData = append(taskData, []string{"FCP Balance(SWANC):"})
 		taskData = append(taskData, []string{"   Collateral:", fcpCollateralBalance})
 		taskData = append(taskData, []string{"   Escrow:", fcpEscrowBalance})
 
@@ -333,10 +333,10 @@ var stateInfoCmd = &cli.Command{
 		taskData = append(taskData, []string{"Owner Balance(sETH):", ownerBalance})
 		taskData = append(taskData, []string{"Worker Balance(sETH):", workerBalance})
 		taskData = append(taskData, []string{""})
-		taskData = append(taskData, []string{"ECP Balance(sETH):"})
+		taskData = append(taskData, []string{"ECP Balance(SWANC):"})
 		taskData = append(taskData, []string{"   Collateral:", ecpCollateralBalance})
 		taskData = append(taskData, []string{"   Escrow:", ecpEscrowBalance})
-		taskData = append(taskData, []string{"FCP Balance(sETH):"})
+		taskData = append(taskData, []string{"FCP Balance(SWANC):"})
 		taskData = append(taskData, []string{"   Collateral:", fcpCollateralBalance})
 		taskData = append(taskData, []string{"   Escrow:", fcpEscrowBalance})
 
@@ -558,12 +558,24 @@ var createAccountCmd = &cli.Command{
 			return fmt.Errorf("the ownerAddress is invalid wallet address")
 		}
 
+		if err := checkWalletAddress(ownerAddress, "owner"); err != nil {
+			return err
+		}
+
 		if !isValidWalletAddress(workerAddress) {
 			return fmt.Errorf("the workerAddress is invalid wallet address")
 		}
 
+		if err := checkWalletAddress(ownerAddress, "worker"); err != nil {
+			return err
+		}
+
 		if !isValidWalletAddress(beneficiaryAddress) {
 			return fmt.Errorf("the beneficiaryAddress is invalid wallet address")
+		}
+
+		if err := checkWalletAddress(ownerAddress, "beneficiary"); err != nil {
+			return err
 		}
 
 		taskTypes := strings.TrimSpace(cctx.String("task-types"))
@@ -572,16 +584,24 @@ var createAccountCmd = &cli.Command{
 		}
 
 		var taskTypesUint []uint8
+
+		taskTypes = handleStr(taskTypes)
 		if strings.Index(taskTypes, ",") > 0 {
 			for _, taskT := range strings.Split(taskTypes, ",") {
-				tt, _ := strconv.ParseUint(taskT, 10, 64)
+				tt, err := strconv.ParseUint(taskT, 10, 64)
+				if err != nil {
+					return err
+				}
 				if tt < 0 {
 					return fmt.Errorf("task-types must be int")
 				}
 				taskTypesUint = append(taskTypesUint, uint8(tt))
 			}
 		} else {
-			tt, _ := strconv.ParseUint(taskTypes, 10, 64)
+			tt, err := strconv.ParseUint(taskTypes, 10, 64)
+			if err != nil {
+				return err
+			}
 			if tt < 0 {
 				return fmt.Errorf("task-types must be int")
 			}
@@ -623,7 +643,7 @@ var changeMultiAddressCmd = &cli.Command{
 
 		client, cpStub, err := getVerifyAccountClient(ownerAddress)
 		if err != nil {
-			return fmt.Errorf("create cp account client failed, error: %v", err)
+			return fmt.Errorf("get cp account client failed, error: %v", err)
 		}
 		defer client.Close()
 
@@ -674,11 +694,15 @@ var changeOwnerAddressCmd = &cli.Command{
 			return fmt.Errorf("the target newOwnerAddress is invalid wallet address")
 		}
 
+		if err := checkWalletAddress(newOwnerAddr, "owner"); err != nil {
+			return err
+		}
+
 		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 
 		client, cpStub, err := getVerifyAccountClient(ownerAddress)
 		if err != nil {
-			return fmt.Errorf("create cp account client failed, error: %v", err)
+			return fmt.Errorf("get cp account client failed, error: %v", err)
 		}
 		defer client.Close()
 
@@ -729,11 +753,15 @@ var changeBeneficiaryAddressCmd = &cli.Command{
 			return fmt.Errorf("the target beneficiary address is invalid wallet address")
 		}
 
+		if err := checkWalletAddress(beneficiaryAddress, "beneficiary"); err != nil {
+			return err
+		}
+
 		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 
 		client, cpStub, err := getVerifyAccountClient(ownerAddress)
 		if err != nil {
-			return fmt.Errorf("create cp account client failed, error: %v", err)
+			return fmt.Errorf("get cp account client failed, error: %v", err)
 		}
 		defer client.Close()
 
@@ -784,11 +812,15 @@ var changeWorkerAddressCmd = &cli.Command{
 			return fmt.Errorf("the target worker address is invalid wallet address")
 		}
 
+		if err := checkWalletAddress(workerAddress, "worker"); err != nil {
+			return err
+		}
+
 		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 
 		client, cpStub, err := getVerifyAccountClient(ownerAddress)
 		if err != nil {
-			return fmt.Errorf("create cp account client failed, error: %v", err)
+			return fmt.Errorf("get cp account client failed, error: %v", err)
 		}
 		defer client.Close()
 
@@ -836,16 +868,23 @@ var changeTaskTypesCmd = &cli.Command{
 		}
 
 		var taskTypesUint []uint8
+		taskTypes = handleStr(taskTypes)
 		if strings.Index(taskTypes, ",") > 0 {
 			for _, taskT := range strings.Split(taskTypes, ",") {
-				tt, _ := strconv.ParseUint(taskT, 10, 64)
+				tt, err := strconv.ParseUint(taskT, 10, 64)
+				if err != nil {
+					return err
+				}
 				if tt < 0 {
 					return fmt.Errorf("task-types must be int")
 				}
 				taskTypesUint = append(taskTypesUint, uint8(tt))
 			}
 		} else {
-			tt, _ := strconv.ParseUint(taskTypes, 10, 64)
+			tt, err := strconv.ParseUint(taskTypes, 10, 64)
+			if err != nil {
+				return err
+			}
 			if tt < 0 {
 				return fmt.Errorf("task-types must be int")
 			}
@@ -862,7 +901,7 @@ var changeTaskTypesCmd = &cli.Command{
 
 		client, cpStub, err := getVerifyAccountClient(ownerAddress)
 		if err != nil {
-			return fmt.Errorf("create cp account client failed, error: %v", err)
+			return fmt.Errorf("get cp account client failed, error: %v", err)
 		}
 		defer client.Close()
 
@@ -887,7 +926,7 @@ var contractCmd = &cli.Command{
 	Usage: "Manage contract info of CP",
 	Subcommands: []*cli.Command{
 		{
-			Name:  "info",
+			Name:  "default",
 			Usage: "Print the contract info that the current network CP is using",
 			Action: func(c *cli.Context) error {
 				cpRepoPath, _ := os.LookupEnv("CP_PATH")
@@ -922,7 +961,7 @@ var contractCmd = &cli.Command{
 				taskData = append(taskData, []string{"Network:", netWork})
 				taskData = append(taskData, []string{"Swan Token:", contract.SwanToken})
 				taskData = append(taskData, []string{"Orchestrator Collateral:", contract.Collateral})
-				taskData = append(taskData, []string{"Register Cp:", contract.Register})
+				taskData = append(taskData, []string{"Register CP:", contract.Register})
 				taskData = append(taskData, []string{"ZK Collateral:", contract.ZkCollateral})
 
 				var rowColorList []RowColor
@@ -945,4 +984,36 @@ var contractCmd = &cli.Command{
 func isValidWalletAddress(address string) bool {
 	re := regexp.MustCompile(`^0x[0-9a-fA-F]{40}$`)
 	return re.MatchString(address)
+}
+
+func checkWalletAddress(walletAddress string, msg string) error {
+	chainUrl, err := conf.GetRpcByNetWorkName()
+	if err != nil {
+		return err
+	}
+
+	client, err := ethclient.Dial(chainUrl)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	checkOwnerAddress := common.HexToAddress(walletAddress)
+	bytecode, err := client.CodeAt(context.Background(), checkOwnerAddress, nil)
+	if err != nil {
+		return fmt.Errorf("check owner address failed, error: %v", err)
+	}
+
+	if len(bytecode) > 0 {
+		return fmt.Errorf("the %s must be a wallet address", msg)
+	}
+	return nil
+}
+
+func handleStr(str string) string {
+	if strings.HasSuffix(str, ",") {
+		return strings.TrimSuffix(str, ",")
+	} else {
+		return str
+	}
 }

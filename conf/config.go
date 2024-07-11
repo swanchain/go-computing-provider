@@ -23,7 +23,7 @@ type ComputeNode struct {
 	MCS      MCS
 	Registry Registry
 	RPC      RPC
-	CONTRACT CONTRACT
+	CONTRACT CONTRACT `toml:"CONTRACT,omitempty"`
 }
 
 type API struct {
@@ -90,6 +90,7 @@ func InitConfig(cpRepoPath string, standalone bool) error {
 	if err != nil {
 		return fmt.Errorf("failed load config file, path: %s, error: %w", configFile, err)
 	}
+
 	if standalone {
 		if !requiredFieldsAreGivenForSeparate(metaData) {
 			log.Fatal("Required fields not given")
@@ -159,7 +160,7 @@ func requiredFieldsAreGivenForSeparate(metaData toml.MetaData) bool {
 	requiredFields := [][]string{
 		{"API"},
 		{"UBI"},
-		{"HUB"},
+		{"RPC"},
 
 		{"API", "MultiAddress"},
 		{"API", "NodeName"},

@@ -12,7 +12,6 @@ import (
 	"github.com/swanchain/go-computing-provider/internal/contract/fcp"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"io"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net/http"
@@ -56,7 +55,6 @@ func (task *CronTask) RunTask() {
 	task.updateUbiTaskReward()
 	task.reportClusterResourceToHub()
 	task.watchExpiredTask()
-	task.checkResourceExporter()
 }
 
 func checkJobStatus() {
@@ -146,6 +144,19 @@ func (task *CronTask) watchExpiredTask() {
 			return
 		}
 
+		deployments, err := NewK8sService().k8sClient.AppsV1().Deployments(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			fmt.Println("Error listing deployments:", err)
+			return
+		}
+
+		var deployOnK8s = make(map[string]string)
+		for _, deploy := range deployments.Items {
+			if strings.HasPrefix(deploy.Namespace, constants.K8S_NAMESPACE_NAME_PREFIX) {
+				deployOnK8s[deploy.Name] = deploy.Namespace
+			}
+		}
+
 		if len(jobList) == 0 {
 			service := NewK8sService()
 			namespaces, err := service.ListNamespace(context.TODO())
@@ -164,12 +175,15 @@ func (task *CronTask) watchExpiredTask() {
 
 		var deleteSpaceIds []string
 		for _, job := range jobList {
-			namespace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(job.WalletAddress)
-			deployName := constants.K8S_DEPLOY_NAME_PREFIX + job.SpaceUuid
+			if _, ok := deployOnK8s[job.K8sDeployName]; ok {
+				delete(deployOnK8s, job.K8sDeployName)
+			}
 
-			if _, err = NewK8sService().k8sClient.AppsV1().Deployments(namespace).Get(context.TODO(), deployName, metav1.GetOptions{}); err != nil && errors.IsNotFound(err) {
-				deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
-				continue
+			if _, err = NewK8sService().k8sClient.AppsV1().Deployments(job.NameSpace).Get(context.TODO(), job.K8sDeployName, metav1.GetOptions{}); err != nil && errors.IsNotFound(err) {
+				if time.Now().Sub(time.Unix(job.CreateTime, 0)).Hours() > 2 {
+					deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
+					continue
+				}
 			}
 
 			if len(strings.TrimSpace(job.TaskUuid)) != 0 {
@@ -180,14 +194,14 @@ func (task *CronTask) watchExpiredTask() {
 				}
 				if strings.Contains(taskStatus, "no task found") {
 					logs.GetLogger().Infof("task_uuid: %s, task not found on the orchestrator service, starting to delete it.", job.TaskUuid)
-					deleteJob(namespace, job.SpaceUuid)
+					deleteJob(job.NameSpace, job.SpaceUuid, "cron task, no task found")
 					deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
 					continue
 				}
 				if strings.Contains(taskStatus, "Terminated") || strings.Contains(taskStatus, "Terminated") ||
 					strings.Contains(taskStatus, "Cancelled") || strings.Contains(taskStatus, "Failed") {
 					logs.GetLogger().Infof("task_uuid: %s, current status is %s, starting to delete it.", job.TaskUuid, taskStatus)
-					if err = deleteJob(namespace, job.SpaceUuid); err == nil {
+					if err = deleteJob(job.NameSpace, job.SpaceUuid, "cron task, abnormal state"); err == nil {
 						deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
 						continue
 					}
@@ -196,13 +210,19 @@ func (task *CronTask) watchExpiredTask() {
 
 			if time.Now().Unix() > job.ExpireTime {
 				logs.GetLogger().Infof("<timer-task> space_uuid: %s has expired, the job starting terminated", job.SpaceUuid)
-				if err = deleteJob(namespace, job.SpaceUuid); err == nil {
+				if err = deleteJob(job.NameSpace, job.SpaceUuid, "cron task, run time expired"); err == nil {
 					deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
 					continue
 				}
 			}
 		}
 
+		for deploymentName, nameSpace := range deployOnK8s {
+			if nameSpace != "" && deploymentName != "" {
+				spaceUuid := strings.TrimPrefix(deploymentName, constants.K8S_DEPLOY_NAME_PREFIX)
+				deleteJob(nameSpace, spaceUuid, "cron task, task left on k8s")
+			}
+		}
 		for _, spaceUuid := range deleteSpaceIds {
 			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid)
 		}
@@ -461,46 +481,4 @@ func checkFcpCollateralBalance() (string, error) {
 		return "", err
 	}
 	return fcpCollateralInfo.AvailableBalance, nil
-}
-
-func (task *CronTask) checkResourceExporter() {
-	c := cron.New(cron.WithSeconds())
-	c.AddFunc("0 0/3 * * * ?", func() {
-		defer func() {
-			if err := recover(); err != nil {
-				logs.GetLogger().Errorf("task job: [checkResourceExporter], error: %+v", err)
-			}
-		}()
-
-		namespace := "kube-system"
-		service := NewK8sService()
-		var num int64 = 1
-		podLogOptions := corev1.PodLogOptions{
-			Container:  "",
-			TailLines:  &num,
-			Timestamps: false,
-		}
-		pods, err := service.k8sClient.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: "app=resource-exporter",
-		})
-		if err != nil {
-			logs.GetLogger().Errorf("get resource-exporter pods failed, error: %+v", err)
-			return
-		}
-
-		for _, pod := range pods.Items {
-			if pod.Status.Phase != corev1.PodRunning {
-				service.k8sClient.CoreV1().Pods(namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
-				continue
-			}
-			podLog, err := service.GetPodLogByPodName(namespace, pod.Name, &podLogOptions)
-			if err != nil {
-				continue
-			}
-			if strings.Contains(podLog, "ERROR::") {
-				service.k8sClient.CoreV1().Pods(namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
-			}
-		}
-	})
-	c.Start()
 }
