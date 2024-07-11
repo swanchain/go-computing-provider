@@ -228,6 +228,12 @@ var infoCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
+
+		if contractAddress == "" {
+			fmt.Printf("Error: CP Account does not exist, please run 'computing-provider account create'.\n")
+			return nil
+		}
+
 		if localNodeId != chainNodeId {
 			fmt.Printf("NodeId mismatch, local node id: %s, chain node id: %s.\n", localNodeId, chainNodeId)
 		}

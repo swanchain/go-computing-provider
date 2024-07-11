@@ -76,6 +76,9 @@ type CONTRACT struct {
 }
 
 func GetRpcByNetWorkName() (string, error) {
+	if len(strings.TrimSpace(GetConfig().RPC.SwanChainRpc)) == 0 {
+		return "", fmt.Errorf("You need to set SWAN_CHAIN_RPC in the configuration file")
+	}
 	return GetConfig().RPC.SwanChainRpc, nil
 }
 
@@ -181,6 +184,8 @@ func requiredFieldsAreGivenForSeparate(metaData toml.MetaData) bool {
 }
 
 func GenerateAndUpdateConfigFile(cpRepoPath string, multiAddress, nodeName string, port int) error {
+	fmt.Println("Checking if repo exists")
+
 	ok, err := Exists(cpRepoPath)
 	if err != nil {
 		return err
