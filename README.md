@@ -326,47 +326,49 @@ make install
 	```
 	**Note:** By default, the CP's repo is `~/.swan/computing`, you can configure it by `export CP_PATH="<YOUR_CP_PATH>"`
 
-2. Update Configuration
+   2. Update Configuration
 
-   Edit the necessary configuration files according to your deployment requirements. These files may include settings for the computing-provider components, container runtime, Kubernetes, and other services.
+      Edit the necessary configuration files according to your deployment requirements. These files may include settings for the computing-provider components, container runtime, Kubernetes, and other services.
 
-	```toml
-	[API]
-	Port = 8085                                    # The port number that the web server listens on
-	MultiAddress = "/ip4/<public_ip>/tcp/<port>"   # The multiAddress for libp2p
-	Domain = ""                                    # The domain name
-	NodeName = ""                                  # The computing-provider node name
-	WalletWhiteList = ""                           # CP only accepts user addresses from this whitelist for space deployment
-	WalletBlackList = ""                           # CP reject user addresses from this blacklist for space deployment
+       ```toml
+       [API]
+       Port = 8085                                    # The port number that the web server listens on
+       MultiAddress = "/ip4/<public_ip>/tcp/<port>"   # The multiAddress for libp2p
+       Domain = ""                                    # The domain name
+       NodeName = ""                                  # The computing-provider node name
+       WalletWhiteList = ""                           # CP only accepts user addresses from this whitelist for space deployment
+       WalletBlackList = ""                           # CP reject user addresses from this blacklist for space deployment
  
-	[UBI]
-	UbiEnginePk = "0xB5aeb540B4895cd024c1625E146684940A849ED9"              # UBI Engine's public key, CP only accept the task from this UBI engine
+       [UBI]
+       UbiEnginePk = "0xB5aeb540B4895cd024c1625E146684940A849ED9"              # UBI Engine's public key, CP only accept the task from this UBI engine
 	
-	[LOG]
-	CrtFile = "/YOUR_DOMAIN_NAME_CRT_PATH/server.crt"                       # Your domain name SSL .crt file path
-	KeyFile = "/YOUR_DOMAIN_NAME_KEY_PATH/server.key"                       # Your domain name SSL .key file path
+       [LOG]
+       CrtFile = "/YOUR_DOMAIN_NAME_CRT_PATH/server.crt"                       # Your domain name SSL .crt file path
+       KeyFile = "/YOUR_DOMAIN_NAME_KEY_PATH/server.key"                       # Your domain name SSL .key file path
 	
-	[HUB]
-	ServerUrl = "https://orchestrator-mainnet-api.swanchain.io"             # The Orchestrator's API address
-	AccessToken = ""                                               	        # The Orchestrator's access token, switch to the mainnet network and use the owner address Acquired from "https://orchestrator.swanchain.io"
-	BalanceThreshold= 10                                                    # The cp’s collateral balance threshold
-	OrchestratorPk = "0x4B98086A20f3C19530AF32D21F85Bc6399358e20"           # Orchestrator's public key, CP only accept the task from this Orchestrator
-	VerifySign = true                                                       # Verify that the task signature is from Orchestrator
+       [HUB]
+       ServerUrl = "https://orchestrator-mainnet-api.swanchain.io"             # The Orchestrator's API address
+       AccessToken = ""                                               	        # The Orchestrator's access token, switch to the mainnet network and use the owner address Acquired from "https://orchestrator.swanchain.io"
+       BalanceThreshold= 10                                                    # The cp’s collateral balance threshold
+       OrchestratorPk = "0x4B98086A20f3C19530AF32D21F85Bc6399358e20"           # Orchestrator's public key, CP only accept the task from this Orchestrator
+       VerifySign = true                                                       # Verify that the task signature is from Orchestrator
 	
-	[MCS]
-	ApiKey = ""                                   # Acquired from "https://www.multichain.storage" -> setting -> Create API Key
-	BucketName = ""                               # Acquired from "https://www.multichain.storage" -> bucket -> Add Bucket
-	Network = "polygon.mainnet"                   # polygon.mainnet for mainnet, polygon.mumbai for testnet
+       [MCS]
+       ApiKey = ""                                   # Acquired from "https://www.multichain.storage" -> setting -> Create API Key
+       BucketName = ""                               # Acquired from "https://www.multichain.storage" -> bucket -> Add Bucket
+       Network = "polygon.mainnet"                   # polygon.mainnet for mainnet, polygon.mumbai for testnet
 	
-	[Registry]
-	ServerAddress = ""                            # The docker container image registry address, if only a single node, you can ignore
-	UserName = ""                                 # The login username, if only a single node, you can ignore
-	Password = ""                                 # The login password, if only a single node, you can ignore
+       [Registry]
+       ServerAddress = ""                            # The docker container image registry address, if only a single node, you can ignore
+       UserName = ""                                 # The login username, if only a single node, you can ignore
+       Password = ""                                 # The login password, if only a single node, you can ignore
 	
-	[RPC]
-	SWAN_CHAIN_RPC = "https://mainnet-rpc01.swanchain.io"                     # Swan chain RPC
-	```
-	*Note:*  Example WalletWhiteList hosted on GitHub can be found [here](https://raw.githubusercontent.com/swanchain/market-providers/main/clients/whitelist.txt).
+       [RPC]
+       SWAN_CHAIN_RPC = "https://mainnet-rpc01.swanchain.io"                     # Swan chain RPC
+       ```
+       *Note:*  
+    	* Example WalletWhiteList hosted on GitHub can be found [here](https://raw.githubusercontent.com/swanchain/market-providers/main/clients/whitelist.txt).
+		* Example WalletBlackList hosted on GitHub can be found [here](https://raw.githubusercontent.com/swanchain/market-providers/main/clients/blacklist.txt).
 
 ## Initialize a Wallet and Deposit Swan-ETH
 1.  Generate a new wallet address or import the previous wallet:
