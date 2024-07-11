@@ -330,7 +330,7 @@ make install
 
 	Edit the necessary configuration files according to your deployment requirements. 
 
-       ```toml
+		```
        [API]
        Port = 8085                                    # The port number that the web server listens on
        MultiAddress = "/ip4/<public_ip>/tcp/<port>"   # The multiAddress for libp2p
@@ -364,11 +364,12 @@ make install
        Password = ""                                 # The login password, if only a single node, you can ignore
 	
        [RPC]
-       SWAN_CHAIN_RPC = "https://mainnet-rpc01.swanchain.io"                     # Swan chain RPC
-       ```
-       **Note:**  
-    	* Example WalletWhiteList hosted on GitHub can be found [here](https://raw.githubusercontent.com/swanchain/market-providers/main/clients/whitelist.txt).
-		* Example WalletBlackList hosted on GitHub can be found [here](https://raw.githubusercontent.com/swanchain/market-providers/main/clients/blacklist.txt).
+       SWAN_CHAIN_RPC = "https://mainnet-rpc01.swanchain.io"     # Swan chain RPC
+
+
+**Note:**  
+* Example WalletWhiteList hosted on GitHub can be found [here](https://raw.githubusercontent.com/swanchain/market-providers/main/clients/whitelist.txt).
+* Example WalletBlackList hosted on GitHub can be found [here](https://raw.githubusercontent.com/swanchain/market-providers/main/clients/blacklist.txt).
 
 ## Initialize a Wallet and Deposit Swan-ETH
 1.  Generate a new wallet address or import the previous wallet:
