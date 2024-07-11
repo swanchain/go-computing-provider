@@ -415,7 +415,15 @@ Transaction hash: 0xb8fd9cc9bfac2b2890230b4f14999b9d449e050339b252273379ab11fac1
 ```bash
  computing-provider collateral add --fcp --from <YOUR_WALLET_ADDRESS>  <amount>
 ```
-**Note:** Currently one AI task requires 5 SWANC.
+**Note:** Currently one AI task requires 5 SWANC. Please deposit enough collaterals for the tasks
+
+
+## Collateral SWANC from FCP
+```bash
+ computing-provider collateral withdraw --fcp --owner <YOUR_WALLET_ADDRESS> --account <YOUR_CP_ACCOUNT> <amount>
+```
+**Note:** if want to withdraw the funds from FCP, you can run the above command
+
 
 ## Start the Computing Provider
 You can run `computing-provider` using the following command
