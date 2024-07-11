@@ -319,17 +319,6 @@ make clean && make testnet
 make install
 ```
 
- - Update Configuration
-
-The computing provider's `mainnet` configuration sample locate in `./go-computing-provider/conf/config.toml.sample`
-
-```
-cp config.toml.sample config.toml
-```
-
-Edit the necessary configuration files according to your deployment requirements. These files may include settings for the computing-provider components, container runtime, Kubernetes, and other services.
-
-
 ## Initialize a CP repo and Update Configuration 
 1. Initialize repo
 	```
@@ -376,12 +365,6 @@ Edit the necessary configuration files according to your deployment requirements
 	
 	[RPC]
 	SWAN_CHAIN_RPC = "https://mainnet-rpc01.swanchain.io"                     # Swan chain RPC
-	
-	[CONTRACT]
-	SWAN_CONTRACT = "0xAF90ac6428775E1Be06BAFA932c2d80119a7bd02"              # Swan token's contract address
-	SWAN_COLLATERAL_CONTRACT = "0x48966A3eb8C1b584Ac9E7767bC9607e235245C81"   # Swan's collateral address
-	REGISTER_CP_CONTRACT = "0xbef1ec33e5Ac3a491fFeE1600e0b00eac97cb138"       # The CP registration contract address
-	ZK_COLLATERAL_CONTRACT = "0x1d2557C9d14882D9eE291BB66eaC6c1C4a587054"     # The ZK task's collateral contract address
 	```
 	*Note:*  Example WalletWhiteList hosted on GitHub can be found [here](https://raw.githubusercontent.com/swanchain/market-providers/main/clients/whitelist.txt).
 
@@ -419,18 +402,18 @@ computing-provider account create --ownerAddress <YOUR_OWNER_WALLET_ADDRESS> \
 	--task-types 3
 ```
 **Note:** `--task-types`: Supports 4 task types (1: Fil-C2-512M, 2: Aleo, 3: AI, 4: Fil-C2-32G), separated by commas. For FCP, it needs to be set to 3.
-_Output:_
 
+_Output:_
 ```
 Contract deployed! Address: 0x3091c9647Ea5248079273B52C3707c958a3f2658
 Transaction hash: 0xb8fd9cc9bfac2b2890230b4f14999b9d449e050339b252273379ab11fac15926
 ```
 
-## Collateral Swan-ETH for FCP
+## Collateral SWANC for FCP
 ```bash
  computing-provider collateral add --fcp --from <YOUR_WALLET_ADDRESS>  <amount>
 ```
-**Note:** Currently one AI task requires 0.01 Swan-ETH.
+**Note:** Currently one AI task requires 5 SWANC.
 
 ## Start the Computing Provider
 You can run `computing-provider` using the following command
@@ -469,12 +452,12 @@ export CP_PATH=<YOUR_CP_PATH>
 * Adjust the value of `RUST_GPU_TOOLS_CUSTOM_GPU` based on the GPU used by the CP's Kubernetes cluster for fil-c2 tasks.
 * For more device choices, please refer to this page:[https://github.com/filecoin-project/bellperson](https://github.com/filecoin-project/bellperson)
 
-### Step 2: Collateral Swan-ETH for receive ZK Task
+### Step 2: Collateral SWANC for receive ZK Task
 
 ```bash
 computing-provider collateral add --ecp --from <YOUR_WALLET_ADDRESS>  <amount>
 ```
-**Note:** Currently one zk-task requires 0.0005 Swan-ETH.
+**Note:** Currently one zk-task requires 0.0005 SWANC.
 
 Example output:
 
