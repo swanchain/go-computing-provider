@@ -319,17 +319,6 @@ make clean && make testnet
 make install
 ```
 
- - Update Configuration
-
-The computing provider's `mainnet` configuration sample locate in `./go-computing-provider/conf/config.toml.sample`
-
-```
-cp config.toml.sample config.toml
-```
-
-Edit the necessary configuration files according to your deployment requirements. These files may include settings for the computing-provider components, container runtime, Kubernetes, and other services.
-
-
 ## Initialize a CP repo and Update Configuration 
 1. Initialize repo
 	```
@@ -337,53 +326,49 @@ Edit the necessary configuration files according to your deployment requirements
 	```
 	**Note:** By default, the CP's repo is `~/.swan/computing`, you can configure it by `export CP_PATH="<YOUR_CP_PATH>"`
 
-2. Update Configuration
+   2. Update Configuration
 
-   Edit the necessary configuration files according to your deployment requirements. These files may include settings for the computing-provider components, container runtime, Kubernetes, and other services.
+      Edit the necessary configuration files according to your deployment requirements. These files may include settings for the computing-provider components, container runtime, Kubernetes, and other services.
 
-	```toml
-	[API]
-	Port = 8085                                    # The port number that the web server listens on
-	MultiAddress = "/ip4/<public_ip>/tcp/<port>"   # The multiAddress for libp2p
-	Domain = ""                                    # The domain name
-	NodeName = ""                                  # The computing-provider node name
-	WalletWhiteList = ""                           # CP only accepts user addresses from this whitelist for space deployment
-	WalletBlackList = ""                           # CP reject user addresses from this blacklist for space deployment
+       ```toml
+       [API]
+       Port = 8085                                    # The port number that the web server listens on
+       MultiAddress = "/ip4/<public_ip>/tcp/<port>"   # The multiAddress for libp2p
+       Domain = ""                                    # The domain name
+       NodeName = ""                                  # The computing-provider node name
+       WalletWhiteList = ""                           # CP only accepts user addresses from this whitelist for space deployment
+       WalletBlackList = ""                           # CP reject user addresses from this blacklist for space deployment
  
-	[UBI]
-	UbiEnginePk = "0xB5aeb540B4895cd024c1625E146684940A849ED9"              # UBI Engine's public key, CP only accept the task from this UBI engine
+       [UBI]
+       UbiEnginePk = "0xB5aeb540B4895cd024c1625E146684940A849ED9"              # UBI Engine's public key, CP only accept the task from this UBI engine
 	
-	[LOG]
-	CrtFile = "/YOUR_DOMAIN_NAME_CRT_PATH/server.crt"                       # Your domain name SSL .crt file path
-	KeyFile = "/YOUR_DOMAIN_NAME_KEY_PATH/server.key"                       # Your domain name SSL .key file path
+       [LOG]
+       CrtFile = "/YOUR_DOMAIN_NAME_CRT_PATH/server.crt"                       # Your domain name SSL .crt file path
+       KeyFile = "/YOUR_DOMAIN_NAME_KEY_PATH/server.key"                       # Your domain name SSL .key file path
 	
-	[HUB]
-	ServerUrl = "https://orchestrator-mainnet-api.swanchain.io"             # The Orchestrator's API address
-	AccessToken = ""                                               	        # The Orchestrator's access token, switch to the mainnet network and use the owner address Acquired from "https://orchestrator.swanchain.io"
-	BalanceThreshold= 10                                                    # The cp’s collateral balance threshold
-	OrchestratorPk = "0x4B98086A20f3C19530AF32D21F85Bc6399358e20"           # Orchestrator's public key, CP only accept the task from this Orchestrator
-	VerifySign = true                                                       # Verify that the task signature is from Orchestrator
+       [HUB]
+       ServerUrl = "https://orchestrator-mainnet-api.swanchain.io"             # The Orchestrator's API address
+       AccessToken = ""                                               	        # The Orchestrator's access token, switch to the mainnet network and use the owner address Acquired from "https://orchestrator.swanchain.io"
+       BalanceThreshold= 10                                                    # The cp’s collateral balance threshold
+       OrchestratorPk = "0x4B98086A20f3C19530AF32D21F85Bc6399358e20"           # Orchestrator's public key, CP only accept the task from this Orchestrator
+       VerifySign = true                                                       # Verify that the task signature is from Orchestrator
 	
-	[MCS]
-	ApiKey = ""                                   # Acquired from "https://www.multichain.storage" -> setting -> Create API Key
-	BucketName = ""                               # Acquired from "https://www.multichain.storage" -> bucket -> Add Bucket
-	Network = "polygon.mainnet"                   # polygon.mainnet for mainnet, polygon.mumbai for testnet
+       [MCS]
+       ApiKey = ""                                   # Acquired from "https://www.multichain.storage" -> setting -> Create API Key
+       BucketName = ""                               # Acquired from "https://www.multichain.storage" -> bucket -> Add Bucket
+       Network = "polygon.mainnet"                   # polygon.mainnet for mainnet, polygon.mumbai for testnet
 	
-	[Registry]
-	ServerAddress = ""                            # The docker container image registry address, if only a single node, you can ignore
-	UserName = ""                                 # The login username, if only a single node, you can ignore
-	Password = ""                                 # The login password, if only a single node, you can ignore
+       [Registry]
+       ServerAddress = ""                            # The docker container image registry address, if only a single node, you can ignore
+       UserName = ""                                 # The login username, if only a single node, you can ignore
+       Password = ""                                 # The login password, if only a single node, you can ignore
 	
-	[RPC]
-	SWAN_CHAIN_RPC = "https://mainnet-rpc01.swanchain.io"                     # Swan chain RPC
-	
-	[CONTRACT]
-	SWAN_CONTRACT = "0xAF90ac6428775E1Be06BAFA932c2d80119a7bd02"              # Swan token's contract address
-	SWAN_COLLATERAL_CONTRACT = "0x48966A3eb8C1b584Ac9E7767bC9607e235245C81"   # Swan's collateral address
-	REGISTER_CP_CONTRACT = "0xbef1ec33e5Ac3a491fFeE1600e0b00eac97cb138"       # The CP registration contract address
-	ZK_COLLATERAL_CONTRACT = "0x1d2557C9d14882D9eE291BB66eaC6c1C4a587054"     # The ZK task's collateral contract address
-	```
-	*Note:*  Example WalletWhiteList hosted on GitHub can be found [here](https://raw.githubusercontent.com/swanchain/market-providers/main/clients/whitelist.txt).
+       [RPC]
+       SWAN_CHAIN_RPC = "https://mainnet-rpc01.swanchain.io"                     # Swan chain RPC
+       ```
+       *Note:*  
+    	* Example WalletWhiteList hosted on GitHub can be found [here](https://raw.githubusercontent.com/swanchain/market-providers/main/clients/whitelist.txt).
+		* Example WalletBlackList hosted on GitHub can be found [here](https://raw.githubusercontent.com/swanchain/market-providers/main/clients/blacklist.txt).
 
 ## Initialize a Wallet and Deposit Swan-ETH
 1.  Generate a new wallet address or import the previous wallet:
@@ -419,18 +404,18 @@ computing-provider account create --ownerAddress <YOUR_OWNER_WALLET_ADDRESS> \
 	--task-types 3
 ```
 **Note:** `--task-types`: Supports 4 task types (1: Fil-C2-512M, 2: Aleo, 3: AI, 4: Fil-C2-32G), separated by commas. For FCP, it needs to be set to 3.
-_Output:_
 
+_Output:_
 ```
 Contract deployed! Address: 0x3091c9647Ea5248079273B52C3707c958a3f2658
 Transaction hash: 0xb8fd9cc9bfac2b2890230b4f14999b9d449e050339b252273379ab11fac15926
 ```
 
-## Collateral Swan-ETH for FCP
+## Collateral SWANC for FCP
 ```bash
  computing-provider collateral add --fcp --from <YOUR_WALLET_ADDRESS>  <amount>
 ```
-**Note:** Currently one AI task requires 0.01 Swan-ETH.
+**Note:** Currently one AI task requires 5 SWANC.
 
 ## Start the Computing Provider
 You can run `computing-provider` using the following command
@@ -469,12 +454,12 @@ export CP_PATH=<YOUR_CP_PATH>
 * Adjust the value of `RUST_GPU_TOOLS_CUSTOM_GPU` based on the GPU used by the CP's Kubernetes cluster for fil-c2 tasks.
 * For more device choices, please refer to this page:[https://github.com/filecoin-project/bellperson](https://github.com/filecoin-project/bellperson)
 
-### Step 2: Collateral Swan-ETH for receive ZK Task
+### Step 2: Collateral SWANC for receive ZK Task
 
 ```bash
 computing-provider collateral add --ecp --from <YOUR_WALLET_ADDRESS>  <amount>
 ```
-**Note:** Currently one zk-task requires 0.0005 Swan-ETH.
+**Note:** Currently one zk-task requires 0.0005 SWANC.
 
 Example output:
 
