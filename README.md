@@ -303,32 +303,32 @@ If you have installed it correctly, you can see the result shown in the figure b
 ```bash
 git clone https://github.com/swanchain/go-computing-provider.git
 cd go-computing-provider
-git checkout releases
+git checkout mainnet
 ```
 
-Then build the Computing provider follow the below steps:
+Then build the Computing provider on the **Swan Mainnet** by following the below steps:
 
-* Mainnet:
 ```bash
 make clean && make mainnet
 make install
 ```
-* Testnet:
-```bash
-make clean && make testnet
-make install
-```
 
-## Initialize a CP repo and Update Configuration 
+> If you want to test the CP in the **testnet**, please build a testnet version:
+> ```bash
+> make clean && make testnet
+> make install
+> ```
+
+## Initialize CP repo and Update Configuration 
 1. Initialize repo
 	```
 	computing-provider init --multi-address=/ip4/<YOUR_PUBLIC_IP>/tcp/<YOUR_PORT> --node-name=<YOUR_NODE_NAME>
 	```
 	**Note:** By default, the CP's repo is `~/.swan/computing`, you can configure it by `export CP_PATH="<YOUR_CP_PATH>"`
 
-   2. Update Configuration
+   2. Update `config.toml`
 
-      Edit the necessary configuration files according to your deployment requirements. These files may include settings for the computing-provider components, container runtime, Kubernetes, and other services.
+	Edit the necessary configuration files according to your deployment requirements. 
 
        ```toml
        [API]
@@ -366,7 +366,7 @@ make install
        [RPC]
        SWAN_CHAIN_RPC = "https://mainnet-rpc01.swanchain.io"                     # Swan chain RPC
        ```
-       *Note:*  
+       **Note:**  
     	* Example WalletWhiteList hosted on GitHub can be found [here](https://raw.githubusercontent.com/swanchain/market-providers/main/clients/whitelist.txt).
 		* Example WalletBlackList hosted on GitHub can be found [here](https://raw.githubusercontent.com/swanchain/market-providers/main/clients/blacklist.txt).
 
@@ -382,18 +382,18 @@ make install
 	0x7791f48931DB81668854921fA70bFf0eB85B8211
 	```
 	
-	or import your own wallet:
+	**or** import your wallet:
 	```bash
-	# Import wallet using private key
+	# Import wallet using the private key
 	computing-provider wallet import <YOUR_PRIVATE_KEY_FILE>
 	```
 	**Note:** `<YOUR_PRIVATE_KEY_FILE>` is a file that contains the private key
 
 2.  Deposit Swan-ETH to the wallet address:
 	```bash
-	computing-provider wallet send --from 0xFbc1d38a2127D81BFe3EA347bec7310a1cfa2373 0x7791f48931DB81668854921fA70bFf0eB85B8211 0.001
+	computing-provider wallet send --from <YOUR_WALLET_ADDRESS> 0x7791f48931DB81668854921fA70bFf0eB85B8211 0.01
 	```
-	**Note:** Follow [the guideline](https://docs.swanchain.io/swan-mainnet/getting-started-guide) to claim Swan-ETH and bridge it to Swan Proxima Chain.
+	**Note:** If you don't have Swan-ETH and SWANC, please follow [the guideline](https://docs.swanchain.io/swan-mainnet/getting-started-guide) to [bridge ETH to Swan Mainnet](https://bridge.swanchain.io), and [claim the SWANC](https://faucet.swanchain.io) as collaterals.
 
 ## Initialization CP Account
 Deploy a CP account contract:
@@ -425,7 +425,7 @@ nohup computing-provider run >> cp.log 2>&1 &
 ```
 ---
 ## [**OPTIONAL**] Install AI Inference Dependency
-It is necessary for Computing Provider to deploy the  AI inference endpoint. But if you do not want to support the feature, you can skip it.
+It is necessary for the Computing Provider to deploy the AI inference endpoint. But if you do not want to support the feature, you can skip it.
 ```bash
 export CP_PATH=<YOUR_CP_PATH>
 ./install.sh
@@ -433,7 +433,7 @@ export CP_PATH=<YOUR_CP_PATH>
 
 ## [**OPTIONAL**] Config and Receive UBI Tasks
 ### **Step 1: Prerequisites:** Perform Filecoin Commit2 (fil-c2) ZK tasks.
-1. Download parameters (specify path with PARENT_PATH variable):
+1. Download parameters (specify the path with PARENT_PATH variable):
 	```bash
 	# At least 200G storage is needed
 	export PARENT_PATH="<V28_PARAMS_PATH>"
@@ -454,7 +454,7 @@ export CP_PATH=<YOUR_CP_PATH>
 * Adjust the value of `RUST_GPU_TOOLS_CUSTOM_GPU` based on the GPU used by the CP's Kubernetes cluster for fil-c2 tasks.
 * For more device choices, please refer to this page:[https://github.com/filecoin-project/bellperson](https://github.com/filecoin-project/bellperson)
 
-### Step 2: Collateral SWANC for receive ZK Task
+### Step 2: Collateral SWANC for receiving ZK Task
 
 ```bash
 computing-provider collateral add --ecp --from <YOUR_WALLET_ADDRESS>  <amount>
@@ -471,7 +471,14 @@ Example output:
 ```bash
 computing-provider account changeTaskTypes --ownerAddress <YOUR_OWNER_WALLET_ADDRESS> 1,2,3,4
 ```
-**Note:** `--task-types`: Supports 4 task types (1: Fil-C2-512M, 2: Aleo, 3: AI, 4: Fil-C2-32G), separated by commas. If you need to run FCP and ECP at the same time, you need to set it to 1,2,3,4 
+**Note:** `--task-types` Supports 4 task types:
+ - `1`: FIL-C2-512M
+ - `2`: Aleo
+ - `3`: AI
+ - `4`: FIL-C2-32G)
+
+If you need to run FCP and ECP at the same time, you need to set it to `1,2,3,4`
+
 
 ### **Step 4: Account Management**
 
