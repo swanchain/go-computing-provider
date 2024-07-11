@@ -79,6 +79,9 @@ func (s *CollateralStub) Deposit(amount *big.Int) (string, error) {
 		return "", fmt.Errorf("address: %s, ECP collateral client create tx opts, error: %+v", publicAddress, err)
 	}
 
+	fmt.Printf("publicAddress: %s", publicAddress)
+	fmt.Printf("sendAmount: %s", amount.String())
+	fmt.Printf("cpAccountAddress: %s", s.cpAccountAddress)
 	transaction, err := s.collateral.Deposit(txOptions, common.HexToAddress(s.cpAccountAddress), amount)
 	if err != nil {
 		return "", fmt.Errorf("address: %s, ECP collateral client create deposit tx error: %+v", publicAddress, err)
