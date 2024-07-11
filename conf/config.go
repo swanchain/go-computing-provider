@@ -240,7 +240,7 @@ func GenerateAndUpdateConfigFile(cpRepoPath string, multiAddress, nodeName strin
 	if err = toml.NewEncoder(configFile).Encode(configTmpl); err != nil {
 		return err
 	}
-	fmt.Printf("CP repo successfully created, the cp repo is: %s, you can now update it. \n", cpRepoPath)
+	fmt.Printf("Initialized CP repo at '%s'. \n", cpRepoPath)
 	return nil
 }
 
