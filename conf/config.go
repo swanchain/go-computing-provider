@@ -75,6 +75,9 @@ type CONTRACT struct {
 }
 
 func GetRpcByNetWorkName() (string, error) {
+	if len(strings.TrimSpace(GetConfig().RPC.SwanChainRpc)) == 0 {
+		return "", fmt.Errorf("You need to set SWAN_CHAIN_RPC in the configuration file")
+	}
 	return GetConfig().RPC.SwanChainRpc, nil
 }
 
@@ -180,6 +183,16 @@ func requiredFieldsAreGivenForSeparate(metaData toml.MetaData) bool {
 }
 
 func GenerateAndUpdateConfigFile(cpRepoPath string, multiAddress, nodeName string, port int) error {
+	fmt.Println("Checking if repo exists")
+
+	ok, err := Exists(cpRepoPath)
+	if err != nil {
+		return err
+	}
+	if ok {
+		return fmt.Errorf("repo at '%s' is already initialized", cpRepoPath)
+	}
+
 	var configTmpl ComputeNode
 
 	configFilePath := path.Join(cpRepoPath, "config.toml")
@@ -288,4 +301,19 @@ func generateDefaultConfig() ComputeNode {
 			ZkCollateral: "",
 		},
 	}
+}
+
+func Exists(cpPath string) (bool, error) {
+	_, err := os.Stat(filepath.Join(cpPath, "keystore"))
+	notexist := os.IsNotExist(err)
+	if notexist {
+		err = nil
+
+		_, err = os.Stat(filepath.Join(cpPath, "provider.db"))
+		notexist = os.IsNotExist(err)
+		if notexist {
+			err = nil
+		}
+	}
+	return !notexist, err
 }
