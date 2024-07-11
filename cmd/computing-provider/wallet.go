@@ -327,7 +327,7 @@ var collateralAddCmd = &cli.Command{
 		},
 		&cli.StringFlag{
 			Name:  "from",
-			Usage: "Specify the wallet address, if the fcp is true, --form must specify the owner wallet address",
+			Usage: "Specify the wallet address, --form must specify the owner wallet address",
 		},
 		&cli.StringFlag{
 			Name:  "account",
@@ -337,6 +337,10 @@ var collateralAddCmd = &cli.Command{
 	ArgsUsage: "[amount]",
 	Action: func(cctx *cli.Context) error {
 		ctx := reqContext(cctx)
+
+		if cctx.NArg() > 1 {
+			return fmt.Errorf("invalid command format")
+		}
 
 		fcpCollateral := cctx.Bool("fcp")
 		ecpCollateral := cctx.Bool("ecp")
@@ -400,6 +404,10 @@ var collateralWithdrawCmd = &cli.Command{
 	ArgsUsage: "[amount]",
 	Action: func(cctx *cli.Context) error {
 		ctx := reqContext(cctx)
+
+		if cctx.NArg() > 1 {
+			return fmt.Errorf("invalid command format")
+		}
 
 		fcpCollateral := cctx.Bool("fcp")
 		ecpCollateral := cctx.Bool("ecp")
