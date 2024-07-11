@@ -122,7 +122,7 @@ func (d *Deploy) DockerfileToK8s() {
 		return
 	}
 
-	deleteJob(d.k8sNameSpace, d.spaceUuid)
+	deleteJob(d.k8sNameSpace, d.spaceUuid, "start deploying new space service and delete previous service")
 
 	if err := d.deployNamespace(); err != nil {
 		logs.GetLogger().Error(err)
@@ -191,7 +191,7 @@ func (d *Deploy) YamlToK8s() {
 		return
 	}
 
-	deleteJob(d.k8sNameSpace, d.spaceUuid)
+	deleteJob(d.k8sNameSpace, d.spaceUuid, "start deploying new space service and delete previous service")
 
 	if err := d.deployNamespace(); err != nil {
 		logs.GetLogger().Error(err)
@@ -376,7 +376,7 @@ func (d *Deploy) ModelInferenceToK8s() error {
 		return err
 	}
 
-	deleteJob(d.k8sNameSpace, d.spaceUuid)
+	deleteJob(d.k8sNameSpace, d.spaceUuid, "start deploying new space service and delete previous service")
 	imageName := "lagrange/" + modelInfo.Framework + ":v1.0"
 
 	logFile := filepath.Join(d.SpacePath, BuildFileName)
@@ -574,7 +574,7 @@ func (d *Deploy) watchContainerRunningTime() {
 		logs.GetLogger().Errorf("update job info failed, error: %v", err)
 		return
 	}
-	logs.GetLogger().Infof("space service deployed, spaceUuid: %s, spaceName: %s", d.spaceUuid, d.spaceName)
+	logs.GetLogger().Infof("space service deployed, jobuuid: %s, spaceUuid: %s, spaceName: %s", d.jobUuid, d.spaceUuid, d.spaceName)
 }
 
 func getHardwareDetail(description string) (string, models.Resource) {

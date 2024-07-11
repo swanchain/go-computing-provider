@@ -43,9 +43,6 @@ func SetupWallet(dir string) (*LocalWallet, error) {
 	if !exit {
 		return nil, fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
 	}
-	if err := conf.InitConfig(cpPath, true); err != nil {
-		return nil, fmt.Errorf("load config file failed, error: %+v", err)
-	}
 
 	var resultErr error
 	timeOutCh := time.After(10 * time.Second)
@@ -346,7 +343,15 @@ func (w *LocalWallet) WalletCollateral(ctx context.Context, from string, amount 
 		}
 
 		if len(bytecode) <= 0 {
-			return "", fmt.Errorf("the account parameter must be a CpAccount contract address")
+			return "", fmt.Errorf("the account parameter must be a cpAccount contract address")
+		}
+
+		cpStub, err := account.NewAccountStub(client, account.WithContractAddress(cpAccountAddress))
+		if err != nil {
+			return "", err
+		}
+		if _, err = cpStub.GetCpAccountInfo(); err != nil {
+			return "", fmt.Errorf("cp account: %s does not exist on the chain", cpAccountAddress)
 		}
 
 		cpStub, err := account.NewAccountStub(client, account.WithContractAddress(cpAccountAddress))
@@ -388,7 +393,7 @@ func (w *LocalWallet) WalletCollateral(ctx context.Context, from string, amount 
 					if errors.Is(err, ethereum.NotFound) {
 						continue
 					}
-					return "", fmt.Errorf("mintor swan token Approve tx, error: %+v", err)
+					return "", fmt.Errorf("check swan token Approve tx, error: %+v", err)
 				}
 				if receipt != nil && receipt.Status == types.ReceiptStatusSuccessful {
 					fmt.Printf("swan token approve TX: %s \n", swanTokenTxHash)
@@ -486,6 +491,18 @@ func (w *LocalWallet) CollateralWithdraw(ctx context.Context, address string, am
 		return "", err
 	}
 	defer client.Close()
+
+	if len(cpAccountAddress) > 0 {
+		cpAccount := common.HexToAddress(cpAccountAddress)
+		bytecode, err := client.CodeAt(context.Background(), cpAccount, nil)
+		if err != nil {
+			return "", fmt.Errorf("check cp account contract address failed, error: %v", err)
+		}
+
+		if len(bytecode) <= 0 {
+			return "", fmt.Errorf("the account parameter must be a cpAccount contract address")
+		}
+	}
 
 	if len(cpAccountAddress) > 0 {
 		cpAccount := common.HexToAddress(cpAccountAddress)

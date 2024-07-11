@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/wallet"
 	"github.com/urfave/cli/v2"
 	"os"
@@ -25,6 +26,17 @@ var walletCmd = &cli.Command{
 		walletSign,
 		walletVerify,
 		walletSend,
+	},
+	Before: func(c *cli.Context) error {
+		if c.Args().Present() {
+			if strings.EqualFold(c.Args().First(), walletList.Name) || strings.EqualFold(c.Args().First(), walletSend.Name) {
+				cpRepoPath, _ := os.LookupEnv("CP_PATH")
+				if err := conf.InitConfig(cpRepoPath, true); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
 	},
 }
 
@@ -52,21 +64,21 @@ var walletList = &cli.Command{
 	Usage: "List wallet address",
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
-			Name:  "contract",
-			Usage: "Specify the token contract",
+			Name:  "swan",
+			Usage: "Specify the swan token contract",
 			Value: false,
 		},
 	},
 	Action: func(cctx *cli.Context) error {
 		ctx := reqContext(cctx)
-		contractFlag := cctx.Bool("contract")
+		swanContractFlag := cctx.Bool("swan")
 
 		localWallet, err := wallet.SetupWallet(wallet.WalletRepo)
 		if err != nil {
 			return err
 		}
 
-		return localWallet.WalletList(ctx, contractFlag)
+		return localWallet.WalletList(ctx, swanContractFlag)
 	},
 }
 
@@ -292,6 +304,13 @@ var collateralCmd = &cli.Command{
 		collateralSendCmd,
 		collateralWithdrawCmd,
 	},
+	Before: func(c *cli.Context) error {
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
+		if err := conf.InitConfig(cpRepoPath, true); err != nil {
+			return err
+		}
+		return nil
+	},
 }
 
 var collateralAddCmd = &cli.Command{
@@ -361,7 +380,7 @@ var collateralAddCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		fmt.Printf("collateral transaction hash: %s \n", txHash)
+		fmt.Printf("collateral TX: %s \n", txHash)
 		return nil
 	},
 }

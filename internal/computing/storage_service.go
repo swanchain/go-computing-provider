@@ -24,10 +24,9 @@ type StorageService struct {
 func NewStorageService() *StorageService {
 	storageOnce.Do(func() {
 		storage = &StorageService{
-			McsApiKey:      conf.GetConfig().MCS.ApiKey,
-			McsAccessToken: conf.GetConfig().MCS.AccessToken,
-			NetWork:        conf.GetConfig().MCS.Network,
-			BucketName:     conf.GetConfig().MCS.BucketName,
+			McsApiKey:  conf.GetConfig().MCS.ApiKey,
+			NetWork:    conf.GetConfig().MCS.Network,
+			BucketName: conf.GetConfig().MCS.BucketName,
 		}
 		var err error
 		var mcsClient *user.McsClient

@@ -74,7 +74,7 @@ func (s *CpStub) ChangeMultiAddress(newMultiAddress []string) (string, error) {
 
 	transaction, err := s.account.ChangeMultiaddrs(txOptions, newMultiAddress)
 	if err != nil {
-		return "", fmt.Errorf("address: %s, cpAccount client create ChangeMultiaddrs tx error: %+v", publicAddress, err)
+		return "", fmt.Errorf("address: %s, cpAccount client ChangeMultiaddrs tx error: %+v", publicAddress, err)
 	}
 	return transaction.Hash().String(), nil
 }

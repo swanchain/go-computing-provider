@@ -40,12 +40,14 @@ func main() {
 			walletCmd,
 			collateralCmd,
 			ubiTaskCmd,
+			contractCmd,
 		},
 		Before: func(c *cli.Context) error {
 			cpRepoPath, err := homedir.Expand(c.String(FlagRepo.Name))
 			if err != nil {
 				return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
 			}
+
 			if c.Args().Present() {
 				if strings.EqualFold(c.Args().First(), initCmd.Name) || strings.EqualFold(c.Args().First(), walletCmd.Name) {
 					if _, err := os.Stat(cpRepoPath); os.IsNotExist(err) {
