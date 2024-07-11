@@ -14,10 +14,11 @@ import (
 )
 
 type Stub struct {
-	client   *ethclient.Client
-	token    *Token
-	privateK string
-	publicK  string
+	client             *ethclient.Client
+	token              *Token
+	privateK           string
+	publicK            string
+	collateralContract string
 }
 
 type Option func(*Stub)
@@ -31,6 +32,12 @@ func WithPrivateKey(pk string) Option {
 func WithPublicKey(pk string) Option {
 	return func(obj *Stub) {
 		obj.publicK = pk
+	}
+}
+
+func WithCollateralContract(collateralContract string) Option {
+	return func(obj *Stub) {
+		obj.collateralContract = collateralContract
 	}
 }
 
@@ -85,9 +92,11 @@ func (s *Stub) Approve(amount *big.Int) (string, error) {
 		return "", fmt.Errorf("address: %s, collateral client create transaction, error: %+v", publicAddress, err)
 	}
 
-	collateralAddress := common.HexToAddress(conf.GetConfig().CONTRACT.Collateral)
+	if s.collateralContract == "" {
+		return "", fmt.Errorf("must be set a collateral contract address")
+	}
 
-	transaction, err := s.token.Approve(txOptions, collateralAddress, amount)
+	transaction, err := s.token.Approve(txOptions, common.HexToAddress(s.collateralContract), amount)
 	if err != nil {
 		return "", fmt.Errorf("address: %s, token contract approve, error: %+v", publicAddress, err)
 	}
