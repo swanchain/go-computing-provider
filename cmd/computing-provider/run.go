@@ -148,7 +148,7 @@ var infoCmd = &cli.Command{
 				taskTypes += models.TaskTypeStr(int(taskType)) + ", "
 			}
 			if taskTypes != "" {
-				taskTypes = taskTypes[:len(taskTypes)-1]
+				taskTypes = taskTypes[:len(taskTypes)-2]
 			}
 
 			contractAddress = cpStub.ContractAddress
@@ -584,16 +584,24 @@ var createAccountCmd = &cli.Command{
 		}
 
 		var taskTypesUint []uint8
+
+		taskTypes = handleStr(taskTypes)
 		if strings.Index(taskTypes, ",") > 0 {
 			for _, taskT := range strings.Split(taskTypes, ",") {
-				tt, _ := strconv.ParseUint(taskT, 10, 64)
+				tt, err := strconv.ParseUint(taskT, 10, 64)
+				if err != nil {
+					return err
+				}
 				if tt < 0 {
 					return fmt.Errorf("task-types must be int")
 				}
 				taskTypesUint = append(taskTypesUint, uint8(tt))
 			}
 		} else {
-			tt, _ := strconv.ParseUint(taskTypes, 10, 64)
+			tt, err := strconv.ParseUint(taskTypes, 10, 64)
+			if err != nil {
+				return err
+			}
 			if tt < 0 {
 				return fmt.Errorf("task-types must be int")
 			}
@@ -860,16 +868,23 @@ var changeTaskTypesCmd = &cli.Command{
 		}
 
 		var taskTypesUint []uint8
+		taskTypes = handleStr(taskTypes)
 		if strings.Index(taskTypes, ",") > 0 {
 			for _, taskT := range strings.Split(taskTypes, ",") {
-				tt, _ := strconv.ParseUint(taskT, 10, 64)
+				tt, err := strconv.ParseUint(taskT, 10, 64)
+				if err != nil {
+					return err
+				}
 				if tt < 0 {
 					return fmt.Errorf("task-types must be int")
 				}
 				taskTypesUint = append(taskTypesUint, uint8(tt))
 			}
 		} else {
-			tt, _ := strconv.ParseUint(taskTypes, 10, 64)
+			tt, err := strconv.ParseUint(taskTypes, 10, 64)
+			if err != nil {
+				return err
+			}
 			if tt < 0 {
 				return fmt.Errorf("task-types must be int")
 			}
@@ -993,4 +1008,12 @@ func checkWalletAddress(walletAddress string, msg string) error {
 		return fmt.Errorf("the %s must be a wallet address", msg)
 	}
 	return nil
+}
+
+func handleStr(str string) string {
+	if strings.HasSuffix(str, ",") {
+		return strings.TrimSuffix(str, ",")
+	} else {
+		return str
+	}
 }
