@@ -60,32 +60,33 @@ func NewCollateralStub(client *ethclient.Client, options ...CollateralOption) (*
 	return stub, nil
 }
 
-func (s *CollateralStub) Deposit(cpAccountAddress string, amount *big.Int) (string, error) {
+func (s *CollateralStub) Deposit(amount *big.Int) (string, error) {
 	publicAddress, err := s.privateKeyToPublicKey()
 	if err != nil {
 		return "", err
 	}
 
-	if cpAccountAddress == "" || len(strings.TrimSpace(cpAccountAddress)) == 0 {
-		cpAccountAddress, err = contract.GetCpAccountAddress()
+	if s.cpAccountAddress == "" || len(strings.TrimSpace(s.cpAccountAddress)) == 0 {
+		cpAccountAddress, err := contract.GetCpAccountAddress()
 		if err != nil {
 			return "", fmt.Errorf("get cp account contract address failed, error: %v", err)
 		}
+		s.cpAccountAddress = cpAccountAddress
 	}
 
 	txOptions, err := s.createTransactOpts()
 	if err != nil {
-		return "", fmt.Errorf("address: %s, ECP collateral client create transaction, error: %+v", publicAddress, err)
+		return "", fmt.Errorf("address: %s, ECP collateral client create tx opts, error: %+v", publicAddress, err)
 	}
 
-	transaction, err := s.collateral.Deposit(txOptions, common.HexToAddress(cpAccountAddress), amount)
+	transaction, err := s.collateral.Deposit(txOptions, common.HexToAddress(s.cpAccountAddress), amount)
 	if err != nil {
 		return "", fmt.Errorf("address: %s, ECP collateral client create deposit tx error: %+v", publicAddress, err)
 	}
 	return transaction.Hash().String(), nil
 }
 
-func (s *CollateralStub) Withdraw(cpAccountAddress string, amount *big.Int) (string, error) {
+func (s *CollateralStub) Withdraw(amount *big.Int) (string, error) {
 	publicAddress, err := s.privateKeyToPublicKey()
 	if err != nil {
 		return "", err
@@ -96,14 +97,15 @@ func (s *CollateralStub) Withdraw(cpAccountAddress string, amount *big.Int) (str
 		return "", fmt.Errorf("address: %s, ECP collateral client create transaction, error: %+v", publicAddress, err)
 	}
 
-	if cpAccountAddress == "" || len(strings.TrimSpace(cpAccountAddress)) == 0 {
-		cpAccountAddress, err = contract.GetCpAccountAddress()
+	if s.cpAccountAddress == "" || len(strings.TrimSpace(s.cpAccountAddress)) == 0 {
+		cpAccountAddress, err := contract.GetCpAccountAddress()
 		if err != nil {
 			return "", fmt.Errorf("get cp account contract address failed, error: %v", err)
 		}
+		s.cpAccountAddress = cpAccountAddress
 	}
 
-	transaction, err := s.collateral.Withdraw(txOptions, common.HexToAddress(cpAccountAddress), amount)
+	transaction, err := s.collateral.Withdraw(txOptions, common.HexToAddress(s.cpAccountAddress), amount)
 	if err != nil {
 		return "", fmt.Errorf("address: %s, ECP collateral client create withdraw tx error: %+v", publicAddress, err)
 	}

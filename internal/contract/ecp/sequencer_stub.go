@@ -53,31 +53,32 @@ func NewSequencerStub(client *ethclient.Client, options ...SequencerOption) (*Se
 	return stub, nil
 }
 
-func (s *SequencerStub) Deposit(cpAccountAddress string, amount *big.Int) (string, error) {
+func (s *SequencerStub) Deposit(amount *big.Int) (string, error) {
 	publicAddress, err := s.privateKeyToPublicKey()
 	if err != nil {
 		return "", err
 	}
 
-	if cpAccountAddress == "" || len(strings.TrimSpace(cpAccountAddress)) == 0 {
-		cpAccountAddress, err = contract.GetCpAccountAddress()
+	if s.cpAccountAddress == "" || len(strings.TrimSpace(s.cpAccountAddress)) == 0 {
+		cpAccountAddress, err := contract.GetCpAccountAddress()
 		if err != nil {
 			return "", fmt.Errorf("get cp account contract address failed, error: %v", err)
 		}
+		s.cpAccountAddress = cpAccountAddress
 	}
 
 	txOptions, err := s.createTransactOpts(amount, true)
 	if err != nil {
 		return "", fmt.Errorf("address: %s, ECP sequencer client create transaction, error: %+v", publicAddress, err)
 	}
-	transaction, err := s.sequencer.Deposit(txOptions, common.HexToAddress(cpAccountAddress))
+	transaction, err := s.sequencer.Deposit(txOptions, common.HexToAddress(s.cpAccountAddress))
 	if err != nil {
 		return "", fmt.Errorf("address: %s, ECP sequencer client create deposit tx error: %+v", publicAddress, err)
 	}
 	return transaction.Hash().String(), nil
 }
 
-func (s *SequencerStub) Withdraw(cpAccountAddress string, amount *big.Int) (string, error) {
+func (s *SequencerStub) Withdraw(amount *big.Int) (string, error) {
 	publicAddress, err := s.privateKeyToPublicKey()
 	if err != nil {
 		return "", err
@@ -88,16 +89,17 @@ func (s *SequencerStub) Withdraw(cpAccountAddress string, amount *big.Int) (stri
 		return "", fmt.Errorf("address: %s, ECP collateral client create transaction, error: %+v", publicAddress, err)
 	}
 
-	if cpAccountAddress == "" || len(strings.TrimSpace(cpAccountAddress)) == 0 {
-		cpAccountAddress, err = contract.GetCpAccountAddress()
+	if s.cpAccountAddress == "" || len(strings.TrimSpace(s.cpAccountAddress)) == 0 {
+		cpAccountAddress, err := contract.GetCpAccountAddress()
 		if err != nil {
 			return "", fmt.Errorf("get cp account contract address failed, error: %v", err)
 		}
+		s.cpAccountAddress = cpAccountAddress
 	}
 
-	transaction, err := s.sequencer.Withdraw(txOptions, common.HexToAddress(cpAccountAddress), amount)
+	transaction, err := s.sequencer.Withdraw(txOptions, common.HexToAddress(s.cpAccountAddress), amount)
 	if err != nil {
-		return "", fmt.Errorf("address: %s, ECP collateral client create withdraw tx error: %+v", publicAddress, err)
+		return "", fmt.Errorf("address: %s, ECP sequencer client withdraw tx error: %+v", publicAddress, err)
 	}
 	return transaction.Hash().String(), nil
 }

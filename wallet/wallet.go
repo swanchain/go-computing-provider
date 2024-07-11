@@ -351,11 +351,11 @@ func (w *LocalWallet) WalletCollateral(ctx context.Context, from string, amount 
 	}
 
 	if collateralType == "sequencer" {
-		sequencerStub, err := ecp.NewSequencerStub(client, ecp.WithSequencerPrivateKey(ki.PrivateKey))
+		sequencerStub, err := ecp.NewSequencerStub(client, ecp.WithSequencerPrivateKey(ki.PrivateKey), ecp.WithSequencerCpAccountAddress(cpAccountAddress))
 		if err != nil {
 			return "", err
 		}
-		return sequencerStub.Deposit(cpAccountAddress, sendAmount)
+		return sequencerStub.Deposit(sendAmount)
 	}
 
 	tokenStub, err := token.NewTokenStub(client, token.WithPrivateKey(ki.PrivateKey))
@@ -404,12 +404,12 @@ func (w *LocalWallet) WalletCollateral(ctx context.Context, from string, amount 
 					}
 					return collateralTxHash, nil
 				} else if collateralType == "ecp" {
-					zkCollateral, err := ecp.NewCollateralStub(client, ecp.WithPrivateKey(ki.PrivateKey))
+					zkCollateral, err := ecp.NewCollateralStub(client, ecp.WithPrivateKey(ki.PrivateKey), ecp.WithCpAccountAddress(cpAccountAddress))
 					if err != nil {
 						return "", err
 					}
 
-					collateralTxHash, err := zkCollateral.Deposit(cpAccountAddress, sendAmount)
+					collateralTxHash, err := zkCollateral.Deposit(sendAmount)
 					if err != nil {
 						return "", err
 					}
@@ -462,23 +462,23 @@ func (w *LocalWallet) CollateralWithdraw(ctx context.Context, address string, am
 	}
 
 	if collateralType == "fcp" {
-		collateralStub, err := fcp.NewCollateralStub(client, fcp.WithPrivateKey(ki.PrivateKey))
+		collateralStub, err := fcp.NewCollateralStub(client, fcp.WithPrivateKey(ki.PrivateKey), fcp.WithCpAccountAddress(cpAccountAddress))
 		if err != nil {
 			return "", err
 		}
 		return collateralStub.Withdraw(withDrawAmount)
 	} else if collateralType == "ecp" {
-		zkCollateral, err := ecp.NewCollateralStub(client, ecp.WithPrivateKey(ki.PrivateKey))
+		zkCollateral, err := ecp.NewCollateralStub(client, ecp.WithPrivateKey(ki.PrivateKey), ecp.WithCpAccountAddress(cpAccountAddress))
 		if err != nil {
 			return "", err
 		}
-		return zkCollateral.Withdraw(cpAccountAddress, withDrawAmount)
+		return zkCollateral.Withdraw(withDrawAmount)
 	} else {
-		sequencerStub, err := ecp.NewSequencerStub(client, ecp.WithSequencerPrivateKey(ki.PrivateKey))
+		sequencerStub, err := ecp.NewSequencerStub(client, ecp.WithSequencerPrivateKey(ki.PrivateKey), ecp.WithSequencerCpAccountAddress(cpAccountAddress))
 		if err != nil {
 			return "", err
 		}
-		return sequencerStub.Withdraw(cpAccountAddress, withDrawAmount)
+		return sequencerStub.Withdraw(withDrawAmount)
 	}
 }
 
