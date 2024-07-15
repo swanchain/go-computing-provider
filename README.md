@@ -420,7 +420,7 @@ Transaction hash: 0xb8fd9cc9bfac2b2890230b4f14999b9d449e050339b252273379ab11fac1
 **Note:** Currently one AI task requires 5 `SWANC`. Please deposit enough collaterals for the tasks
 
 
-## Collateral `SWANC` from FCP
+## Withdraw `SWANC` from FCP
 ```bash
  computing-provider collateral withdraw --fcp --owner <YOUR_WALLET_ADDRESS> --account <YOUR_CP_ACCOUNT> <amount>
 ```
