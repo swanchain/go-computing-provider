@@ -485,7 +485,7 @@ computing-provider account changeTaskTypes --ownerAddress <YOUR_OWNER_WALLET_ADD
  - `1`: FIL-C2-512M
  - `2`: Aleo
  - `3`: AI
- - `4`: FIL-C2-32G)
+ - `4`: FIL-C2-32G
 
 If you need to run FCP and ECP at the same time, you need to set it to `1,2,3,4`
 
