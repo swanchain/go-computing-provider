@@ -212,7 +212,7 @@ func (s *TaskStub) GetReward() (status int, rewardTx string, challengeTx string,
 		if err != nil {
 			return 0, taskInfo.RewardTx, "", "", reward, err
 		}
-		contractAbi, err := abi.JSON(strings.NewReader(token.MainMetaData.ABI))
+		contractAbi, err := abi.JSON(strings.NewReader(token.TokenMetaData.ABI))
 		if err != nil {
 			return 0, taskInfo.RewardTx, "", "", reward, err
 		}

@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"github.com/mitchellh/go-homedir"
 	"github.com/swanchain/go-computing-provider/build"
-	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/db"
 	"github.com/urfave/cli/v2"
 	"os"
+	"strings"
 )
 
 const (
@@ -40,20 +40,27 @@ func main() {
 			walletCmd,
 			collateralCmd,
 			ubiTaskCmd,
+			contractCmd,
 		},
 		Before: func(c *cli.Context) error {
 			cpRepoPath, err := homedir.Expand(c.String(FlagRepo.Name))
 			if err != nil {
 				return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
 			}
-			if _, err = os.Stat(cpRepoPath); os.IsNotExist(err) {
-				err := os.MkdirAll(cpRepoPath, 0755)
-				if err != nil {
-					return fmt.Errorf("create cp repo failed, error: %v", cpRepoPath)
+
+			if c.Args().Present() {
+				if strings.EqualFold(c.Args().First(), initCmd.Name) || strings.EqualFold(c.Args().First(), walletCmd.Name) {
+					if _, err := os.Stat(cpRepoPath); os.IsNotExist(err) {
+						err := os.MkdirAll(cpRepoPath, 0755)
+						if err != nil {
+							return fmt.Errorf("create cp repo failed, error: %v", cpRepoPath)
+						}
+					}
 				}
 			}
-			if err = conf.GenerateRepo(cpRepoPath); err != nil {
-				return fmt.Errorf("init repo failed, error: %v", err)
+
+			if _, err = os.Stat(cpRepoPath); os.IsNotExist(err) {
+				return fmt.Errorf("CP_PATH: %s, no such directory", cpRepoPath)
 			}
 			os.Setenv("CP_PATH", cpRepoPath)
 			db.InitDb(cpRepoPath)

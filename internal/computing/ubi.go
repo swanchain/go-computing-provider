@@ -477,7 +477,7 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		return
 	}
 
-	if _, err := GetTaskInfoOnChain(conf.DefaultRpc, ubiTask.ContractAddr); err != nil {
+	if _, err := GetTaskInfoOnChain(ubiTask.ContractAddr); err != nil {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskContractError))
 		return
 	}
@@ -807,7 +807,7 @@ func GetCpResource(c *gin.Context) {
 }
 
 func submitUBIProof(c2Proof models.UbiC2Proof, task *models.TaskEntity) error {
-	chainUrl, err := conf.GetRpcByName(conf.DefaultRpc)
+	chainUrl, err := conf.GetRpcByNetWorkName()
 	if err != nil {
 		logs.GetLogger().Errorf("get rpc url failed, taskId: %s, error: %v", c2Proof.TaskId, err)
 		return err
@@ -889,10 +889,10 @@ loopTask:
 	return NewTaskService().SaveTaskEntity(task)
 }
 
-func GetTaskInfoOnChain(rpcName string, taskContract string) (ecp.ECPTaskTaskInfo, error) {
+func GetTaskInfoOnChain(taskContract string) (ecp.ECPTaskTaskInfo, error) {
 	var taskInfo ecp.ECPTaskTaskInfo
 
-	chainRpc, err := conf.GetRpcByName(rpcName)
+	chainRpc, err := conf.GetRpcByNetWorkName()
 	if err != nil {
 		return taskInfo, err
 	}
@@ -1030,7 +1030,7 @@ func SyncCpAccountInfo() {
 		return
 	}
 
-	chainUrl, err := conf.GetRpcByName(conf.DefaultRpc)
+	chainUrl, err := conf.GetRpcByNetWorkName()
 	if err != nil {
 		logs.GetLogger().Errorf("get rpc url failed, error: %v", err)
 		return
@@ -1094,7 +1094,7 @@ func RestartResourceExporter() error {
 }
 
 func getReward(task *models.TaskEntity) error {
-	chainUrl, err := conf.GetRpcByName(conf.DefaultRpc)
+	chainUrl, err := conf.GetRpcByNetWorkName()
 	if err != nil {
 		return fmt.Errorf("get rpc url failed, error: %s", err.Error())
 	}
