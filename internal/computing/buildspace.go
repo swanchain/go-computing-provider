@@ -7,7 +7,6 @@ import (
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"io"
-	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -18,12 +17,24 @@ import (
 
 var NotFoundError = errors.New("not found resource")
 
+const (
+	yamlDeployName = "deploy.yaml"
+	ymlDeployName  = "deploy.yml"
+	modelSetName   = "model-setting.json"
+)
+
 func BuildSpaceTaskImage(spaceUuid string, files []models.SpaceFile) (bool, string, string, string, string, error) {
 	var err error
 	cpRepoPath, _ := os.LookupEnv("CP_PATH")
 	buildFolder := filepath.Join(cpRepoPath, "build")
 	if len(files) > 0 {
+		var containsYaml bool
+		var yamlName string
+		var modelsSettingFileName string
+
+		var fileNames []string
 		for _, file := range files {
+			fileNames = append(fileNames, file.Name)
 			dirPath := filepath.Dir(file.Name)
 			if err = os.MkdirAll(filepath.Join(buildFolder, dirPath), os.ModePerm); err != nil {
 				return false, "", "", "", "", err
@@ -31,36 +42,52 @@ func BuildSpaceTaskImage(spaceUuid string, files []models.SpaceFile) (bool, stri
 			if err = downloadFile(filepath.Join(buildFolder, file.Name), file.URL); err != nil {
 				return false, "", "", "", "", fmt.Errorf("error downloading file: %w", err)
 			}
-		}
 
-		imagePath := filepath.Join(buildFolder, getDownloadPath(files[0].Name))
-		var containsYaml bool
-		var yamlPath string
-		var modelsSetting string
-
-		err = filepath.WalkDir(imagePath, func(path string, d fs.DirEntry, err error) error {
-			if strings.HasSuffix(strings.ToLower(d.Name()), "deploy.yaml") || strings.HasSuffix(strings.ToLower(d.Name()), "deploy.yml") {
+			if strings.HasSuffix(strings.ToLower(file.Name), yamlDeployName) ||
+				strings.HasSuffix(strings.ToLower(file.Name), ymlDeployName) {
 				containsYaml = true
-				yamlPath = path
+				yamlName = file.Name
 			}
-			if strings.EqualFold(d.Name(), "model-setting.json") {
-				modelsSetting = path
+			if strings.EqualFold(file.Name, modelSetName) {
+				modelsSettingFileName = file.Name
 			}
-			return nil
-		})
-		if err != nil {
-			return containsYaml, yamlPath, imagePath, modelsSetting, "", err
 		}
-		return containsYaml, yamlPath, imagePath, modelsSetting, "", nil
+		prefix := commonPrefix(fileNames)
+		imagePath := filepath.Join(buildFolder, prefix)
+
+		var modelsSettingFilePath string
+		var yamlPath string
+		if modelsSettingFileName != "" {
+			modelsSettingFilePath = filepath.Join(buildFolder, modelsSettingFileName)
+		}
+		if yamlName != "" {
+			yamlPath = filepath.Join(buildFolder, yamlName)
+		}
+
+		return containsYaml, yamlPath, imagePath, modelsSettingFilePath, "", nil
 	} else {
 		logs.GetLogger().Warnf("Space %s is not found.", spaceUuid)
 	}
 	return false, "", "", "", "", NotFoundError
 }
 
-func getDownloadPath(fileName string) string {
-	splits := strings.Split(fileName, "/")
-	return filepath.Join(splits[0], splits[1], splits[2])
+func commonPrefix(strs []string) string {
+	if len(strs) == 0 {
+		return ""
+	}
+
+	prefix := strs[0]
+
+	for _, str := range strs {
+		for !strings.HasPrefix(str, prefix) {
+			if len(prefix) == 0 {
+				return ""
+			}
+			prefix = prefix[:len(prefix)-1]
+		}
+	}
+
+	return prefix
 }
 
 func BuildImagesByDockerfile(jobUuid, spaceUuid, spaceName, imagePath string) (string, string) {

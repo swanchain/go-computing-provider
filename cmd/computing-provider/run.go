@@ -81,6 +81,7 @@ func cpManager(router *gin.RouterGroup) {
 	router.GET("/lagrange/spaces/log", computing.GetSpaceLog)
 	router.POST("/lagrange/cp/proof", computing.DoProof)
 	router.GET("/lagrange/cp/whitelist", computing.WhiteList)
+	router.GET("/lagrange/cp/blacklist", computing.BlackList)
 	router.GET("/lagrange/job/:job_uuid", computing.GetJobStatus)
 
 	router.POST("/cp/ubi", computing.DoUbiTaskForK8s)
@@ -92,16 +93,12 @@ var infoCmd = &cli.Command{
 	Name:  "info",
 	Usage: "Print computing-provider info",
 	Action: func(cctx *cli.Context) error {
-		cpRepoPath, ok := os.LookupEnv("CP_PATH")
-		if !ok {
-			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
-		}
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 		if err := conf.InitConfig(cpRepoPath, true); err != nil {
 			return fmt.Errorf("load config file failed, error: %+v", err)
 		}
 
 		localNodeId := computing.GetNodeId(cpRepoPath)
-
 		k8sService := computing.NewK8sService()
 		var count int
 		if k8sService.Version == "" {
@@ -110,7 +107,7 @@ var infoCmd = &cli.Command{
 			count, _ = k8sService.GetDeploymentActiveCount()
 		}
 
-		chainRpc, err := conf.GetRpcByName(conf.DefaultRpc)
+		chainRpc, err := conf.GetRpcByNetWorkName()
 		if err != nil {
 			return err
 		}
@@ -120,12 +117,23 @@ var infoCmd = &cli.Command{
 		}
 		defer client.Close()
 
-		var fcpCollateralBalance = "0.000"
-		var fcpEscrowBalance = "0.000"
-		var ecpCollateralBalance = "0.000"
-		var ecpEscrowBalance = "0.000"
-		var ownerBalance = "0.000"
-		var workerBalance = "0.000"
+		var netWork = ""
+		chainId, err := client.ChainID(context.Background())
+		if err != nil {
+			return err
+		}
+		if chainId.Int64() == 254 {
+			netWork = fmt.Sprintf("Mainnet(%d)", chainId.Int64())
+		} else {
+			netWork = fmt.Sprintf("Testnet(%d)", chainId.Int64())
+		}
+
+		var fcpCollateralBalance = "0.0000"
+		var fcpEscrowBalance = "0.0000"
+		var ecpCollateralBalance = "0.0000"
+		var ecpEscrowBalance = "0.0000"
+		var ownerBalance = "0.0000"
+		var workerBalance = "0.0000"
 		var contractAddress, ownerAddress, workerAddress, beneficiaryAddress, taskTypes, chainNodeId, version string
 		var cpAccount models.Account
 
@@ -137,10 +145,10 @@ var infoCmd = &cli.Command{
 			}
 
 			for _, taskType := range cpAccount.TaskTypes {
-				taskTypes += models.TaskTypeStr(int(taskType)) + ","
+				taskTypes += models.TaskTypeStr(int(taskType)) + ", "
 			}
 			if taskTypes != "" {
-				taskTypes = taskTypes[:len(taskTypes)-1]
+				taskTypes = taskTypes[:len(taskTypes)-2]
 			}
 
 			contractAddress = cpStub.ContractAddress
@@ -177,6 +185,7 @@ var infoCmd = &cli.Command{
 		}
 		var taskData [][]string
 
+		taskData = append(taskData, []string{"   Network:", netWork})
 		taskData = append(taskData, []string{fmt.Sprintf("   CP Account Address(%s):", version), contractAddress})
 		taskData = append(taskData, []string{"   Name:", conf.GetConfig().API.NodeName})
 		taskData = append(taskData, []string{"   Owner:", ownerAddress})
@@ -193,28 +202,38 @@ var infoCmd = &cli.Command{
 		taskData = append(taskData, []string{"Owner Balance(sETH):", ownerBalance})
 		taskData = append(taskData, []string{"Worker Balance(sETH):", workerBalance})
 		taskData = append(taskData, []string{""})
-		taskData = append(taskData, []string{"ECP Balance(sETH):"})
+		taskData = append(taskData, []string{"ECP Balance(SWANC):"})
 		taskData = append(taskData, []string{"   Collateral:", ecpCollateralBalance})
 		taskData = append(taskData, []string{"   Escrow:", ecpEscrowBalance})
-		taskData = append(taskData, []string{"FCP Balance(sETH):"})
+		taskData = append(taskData, []string{"FCP Balance(SWANC):"})
 		taskData = append(taskData, []string{"   Collateral:", fcpCollateralBalance})
 		taskData = append(taskData, []string{"   Escrow:", fcpEscrowBalance})
 
 		var rowColorList []RowColor
 		if taskTypes != "" {
-			var rowColor []tablewriter.Colors
-			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
-			rowColorList = append(rowColorList, RowColor{
-				row:    10,
-				column: []int{1},
-				color:  rowColor,
-			})
+			rowColorList = append(rowColorList,
+				RowColor{
+					row:    0,
+					column: []int{1},
+					color:  []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgBlueColor}},
+				},
+				RowColor{
+					row:    11,
+					column: []int{1},
+					color:  []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}},
+				})
 		}
 		header := []string{"CP Account Info:"}
 		NewVisualTable(header, taskData, rowColorList).Generate(false)
 		if err != nil {
 			return err
 		}
+
+		if contractAddress == "" {
+			fmt.Printf("Error: CP Account does not exist, please run 'computing-provider account create'.\n")
+			return nil
+		}
+
 		if localNodeId != chainNodeId {
 			fmt.Printf("NodeId mismatch, local node id: %s, chain node id: %s.\n", localNodeId, chainNodeId)
 		}
@@ -229,34 +248,21 @@ var stateCmd = &cli.Command{
 		stateInfoCmd,
 		taskInfoCmd,
 	},
+	Before: func(c *cli.Context) error {
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
+		if err := conf.InitConfig(cpRepoPath, true); err != nil {
+			return fmt.Errorf("load config file failed, error: %+v", err)
+		}
+		return nil
+	},
 }
 
 var stateInfoCmd = &cli.Command{
 	Name:      "cp-info",
 	Usage:     "Print computing-provider chain info",
 	ArgsUsage: "[cp_account_contract_address]",
-	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:  "chain",
-			Usage: "Specify which rpc connection chain to use",
-			Value: conf.DefaultRpc,
-		},
-	},
 	Action: func(cctx *cli.Context) error {
-		cpRepoPath, ok := os.LookupEnv("CP_PATH")
-		if !ok {
-			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
-		}
-		if err := conf.InitConfig(cpRepoPath, true); err != nil {
-			return fmt.Errorf("load config file failed, error: %+v", err)
-		}
-
-		chain := cctx.String("chain")
-		if strings.TrimSpace(chain) == "" {
-			return fmt.Errorf("the chain is required")
-		}
-
-		chainRpc, err := conf.GetRpcByName(conf.DefaultRpc)
+		chainRpc, err := conf.GetRpcByNetWorkName()
 		if err != nil {
 			return err
 		}
@@ -266,12 +272,12 @@ var stateInfoCmd = &cli.Command{
 		}
 		defer client.Close()
 
-		var fcpCollateralBalance = "0.000"
-		var fcpEscrowBalance = "0.000"
-		var ecpCollateralBalance = "0.000"
-		var ecpEscrowBalance = "0.000"
-		var ownerBalance = "0.000"
-		var workerBalance = "0.000"
+		var fcpCollateralBalance = "0.0000"
+		var fcpEscrowBalance = "0.0000"
+		var ecpCollateralBalance = "0.0000"
+		var ecpEscrowBalance = "0.0000"
+		var ownerBalance = "0.0000"
+		var workerBalance = "0.0000"
 		var chainMultiAddress string
 		var contractAddress, ownerAddress, workerAddress, beneficiaryAddress, taskTypes, chainNodeId, version string
 
@@ -304,7 +310,7 @@ var stateInfoCmd = &cli.Command{
 
 		ownerBalance, err = wallet.Balance(context.TODO(), client, ownerAddress)
 		workerBalance, err = wallet.Balance(context.TODO(), client, workerAddress)
-		fcpCollateralStub, err := fcp.NewCollateralStub(client, fcp.WithPublicKey(ownerAddress))
+		fcpCollateralStub, err := fcp.NewCollateralStub(client, fcp.WithCpAccountAddress(contractAddress))
 		if err == nil {
 			fcpCollateralInfo, err := fcpCollateralStub.CollateralInfo()
 			if err == nil {
@@ -313,7 +319,7 @@ var stateInfoCmd = &cli.Command{
 			}
 		}
 
-		ecpCollateral, err := ecp.NewCollateralStub(client, ecp.WithPublicKey(ownerAddress))
+		ecpCollateral, err := ecp.NewCollateralStub(client, ecp.WithCpAccountAddress(contractAddress))
 		if err == nil {
 			cpCollateralInfo, err := ecpCollateral.CpInfo()
 			if err == nil {
@@ -333,10 +339,10 @@ var stateInfoCmd = &cli.Command{
 		taskData = append(taskData, []string{"Owner Balance(sETH):", ownerBalance})
 		taskData = append(taskData, []string{"Worker Balance(sETH):", workerBalance})
 		taskData = append(taskData, []string{""})
-		taskData = append(taskData, []string{"ECP Balance(sETH):"})
+		taskData = append(taskData, []string{"ECP Balance(SWANC):"})
 		taskData = append(taskData, []string{"   Collateral:", ecpCollateralBalance})
 		taskData = append(taskData, []string{"   Escrow:", ecpEscrowBalance})
-		taskData = append(taskData, []string{"FCP Balance(sETH):"})
+		taskData = append(taskData, []string{"FCP Balance(SWANC):"})
 		taskData = append(taskData, []string{"   Collateral:", fcpCollateralBalance})
 		taskData = append(taskData, []string{"   Escrow:", fcpEscrowBalance})
 
@@ -361,11 +367,6 @@ var taskInfoCmd = &cli.Command{
 	Usage:     "Print task info on the chain",
 	ArgsUsage: "[task_contract_address]",
 	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:  "chain",
-			Usage: "Specify which rpc connection chain to use",
-			Value: conf.DefaultRpc,
-		},
 		&cli.BoolFlag{
 			Name:     "ecp",
 			Usage:    "Check ECP task on the chain",
@@ -379,25 +380,12 @@ var taskInfoCmd = &cli.Command{
 			return fmt.Errorf("the task contract address is required")
 		}
 
-		cpRepoPath, ok := os.LookupEnv("CP_PATH")
-		if !ok {
-			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
-		}
-		if err := conf.InitConfig(cpRepoPath, true); err != nil {
-			return fmt.Errorf("load config file failed, error: %+v", err)
-		}
-
-		chain := cctx.String("chain")
-		if strings.TrimSpace(chain) == "" {
-			return fmt.Errorf("the chain is required")
-		}
-
-		chainRpc, err := conf.GetRpcByName(chain)
+		chainRpc, err := conf.GetRpcByNetWorkName()
 		if err != nil {
 			return err
 		}
 
-		taskInfo, err := computing.GetTaskInfoOnChain(chain, taskContract)
+		taskInfo, err := computing.GetTaskInfoOnChain(taskContract)
 		if err != nil {
 			return fmt.Errorf("get task info on the chain failed, error: %v", err)
 		}
@@ -435,7 +423,7 @@ var taskInfoCmd = &cli.Command{
 				defer client.Close()
 				receipt, err := client.TransactionReceipt(context.Background(), common.HexToHash(taskInfo.RewardTx))
 				if err == nil {
-					contractAbi, err := abi.JSON(strings.NewReader(token.MainMetaData.ABI))
+					contractAbi, err := abi.JSON(strings.NewReader(token.TokenMetaData.ABI))
 					if err == nil {
 						for _, l := range receipt.Logs {
 							event := struct {
@@ -450,12 +438,12 @@ var taskInfoCmd = &cli.Command{
 							if len(l.Topics) == 3 && l.Topics[0] == contractAbi.Events["Transfer"].ID {
 								balance := event.Value
 								if balance.String() == "0" {
-									reward = "0.000"
+									reward = "0.0000"
 								} else {
 									fbalance := new(big.Float)
 									fbalance.SetString(balance.String())
 									etherQuotient := new(big.Float).Quo(fbalance, new(big.Float).SetInt(big.NewInt(1e18)))
-									reward = etherQuotient.Text('f', 3)
+									reward = etherQuotient.Text('f', 4)
 								}
 							}
 						}
@@ -510,14 +498,8 @@ var initCmd = &cli.Command{
 		}
 		nodeName := cctx.String("node-name")
 
-		cpRepoPath, ok := os.LookupEnv("CP_PATH")
-		if !ok {
-			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
-		}
-		if err := conf.InitConfig(cpRepoPath, true); err != nil {
-			logs.GetLogger().Fatal(err)
-		}
-		return conf.UpdateConfigFile(cpRepoPath, strings.TrimSpace(multiAddr), nodeName, port)
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
+		return conf.GenerateAndUpdateConfigFile(cpRepoPath, strings.TrimSpace(multiAddr), nodeName, port)
 	},
 }
 
@@ -531,6 +513,13 @@ var accountCmd = &cli.Command{
 		changeWorkerAddressCmd,
 		changeBeneficiaryAddressCmd,
 		changeTaskTypesCmd,
+	},
+	Before: func(c *cli.Context) error {
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
+		if err := conf.InitConfig(cpRepoPath, true); err != nil {
+			return fmt.Errorf("load config file failed, error: %+v", err)
+		}
+		return nil
 	},
 }
 
@@ -575,12 +564,24 @@ var createAccountCmd = &cli.Command{
 			return fmt.Errorf("the ownerAddress is invalid wallet address")
 		}
 
+		if err := checkWalletAddress(ownerAddress, "owner"); err != nil {
+			return err
+		}
+
 		if !isValidWalletAddress(workerAddress) {
 			return fmt.Errorf("the workerAddress is invalid wallet address")
 		}
 
+		if err := checkWalletAddress(ownerAddress, "worker"); err != nil {
+			return err
+		}
+
 		if !isValidWalletAddress(beneficiaryAddress) {
 			return fmt.Errorf("the beneficiaryAddress is invalid wallet address")
+		}
+
+		if err := checkWalletAddress(ownerAddress, "beneficiary"); err != nil {
+			return err
 		}
 
 		taskTypes := strings.TrimSpace(cctx.String("task-types"))
@@ -589,29 +590,31 @@ var createAccountCmd = &cli.Command{
 		}
 
 		var taskTypesUint []uint8
+
+		taskTypes = handleStr(taskTypes)
 		if strings.Index(taskTypes, ",") > 0 {
 			for _, taskT := range strings.Split(taskTypes, ",") {
-				tt, _ := strconv.ParseUint(taskT, 10, 64)
+				tt, err := strconv.ParseUint(taskT, 10, 64)
+				if err != nil {
+					return err
+				}
 				if tt < 0 {
 					return fmt.Errorf("task-types must be int")
 				}
 				taskTypesUint = append(taskTypesUint, uint8(tt))
 			}
 		} else {
-			tt, _ := strconv.ParseUint(taskTypes, 10, 64)
+			tt, err := strconv.ParseUint(taskTypes, 10, 64)
+			if err != nil {
+				return err
+			}
 			if tt < 0 {
 				return fmt.Errorf("task-types must be int")
 			}
 			taskTypesUint = append(taskTypesUint, uint8(tt))
 		}
 
-		cpRepoPath, ok := os.LookupEnv("CP_PATH")
-		if !ok {
-			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
-		}
-		if err := conf.InitConfig(cpRepoPath, true); err != nil {
-			logs.GetLogger().Fatal(err)
-		}
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 		return createAccount(cpRepoPath, ownerAddress, beneficiaryAddress, workerAddress, taskTypesUint)
 	},
 }
@@ -642,17 +645,11 @@ var changeMultiAddressCmd = &cli.Command{
 			return fmt.Errorf("multiAddress is required")
 		}
 
-		cpRepoPath, ok := os.LookupEnv("CP_PATH")
-		if !ok {
-			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
-		}
-		if err := conf.InitConfig(cpRepoPath, false); err != nil {
-			logs.GetLogger().Fatal(err)
-		}
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 
 		client, cpStub, err := getVerifyAccountClient(ownerAddress)
 		if err != nil {
-			return fmt.Errorf("create cp account client failed, error: %v", err)
+			return fmt.Errorf("get cp account client failed, error: %v", err)
 		}
 		defer client.Close()
 
@@ -667,7 +664,7 @@ var changeMultiAddressCmd = &cli.Command{
 			return fmt.Errorf("update multi_addresses of cp to db failed, error: %v", err)
 		}
 		fmt.Printf("changeMultiAddress Transaction hash: %s\n", changeMultiAddressTx)
-		fmt.Printf("Multi-Address is changed successfully! please manually update the `MultiAddress` in the config.toml file \n")
+		fmt.Printf("Multi-Address is changed successfully! please manually update the `MultiAddress` in the config file \n")
 
 		return nil
 	},
@@ -703,17 +700,15 @@ var changeOwnerAddressCmd = &cli.Command{
 			return fmt.Errorf("the target newOwnerAddress is invalid wallet address")
 		}
 
-		cpRepoPath, ok := os.LookupEnv("CP_PATH")
-		if !ok {
-			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
+		if err := checkWalletAddress(newOwnerAddr, "owner"); err != nil {
+			return err
 		}
-		if err := conf.InitConfig(cpRepoPath, false); err != nil {
-			logs.GetLogger().Fatal(err)
-		}
+
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 
 		client, cpStub, err := getVerifyAccountClient(ownerAddress)
 		if err != nil {
-			return fmt.Errorf("create cp account client failed, error: %v", err)
+			return fmt.Errorf("get cp account client failed, error: %v", err)
 		}
 		defer client.Close()
 
@@ -764,17 +759,15 @@ var changeBeneficiaryAddressCmd = &cli.Command{
 			return fmt.Errorf("the target beneficiary address is invalid wallet address")
 		}
 
-		cpRepoPath, ok := os.LookupEnv("CP_PATH")
-		if !ok {
-			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
+		if err := checkWalletAddress(beneficiaryAddress, "beneficiary"); err != nil {
+			return err
 		}
-		if err := conf.InitConfig(cpRepoPath, false); err != nil {
-			logs.GetLogger().Fatal(err)
-		}
+
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 
 		client, cpStub, err := getVerifyAccountClient(ownerAddress)
 		if err != nil {
-			return fmt.Errorf("create cp account client failed, error: %v", err)
+			return fmt.Errorf("get cp account client failed, error: %v", err)
 		}
 		defer client.Close()
 
@@ -825,17 +818,15 @@ var changeWorkerAddressCmd = &cli.Command{
 			return fmt.Errorf("the target worker address is invalid wallet address")
 		}
 
-		cpRepoPath, ok := os.LookupEnv("CP_PATH")
-		if !ok {
-			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
+		if err := checkWalletAddress(workerAddress, "worker"); err != nil {
+			return err
 		}
-		if err := conf.InitConfig(cpRepoPath, false); err != nil {
-			logs.GetLogger().Fatal(err)
-		}
+
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 
 		client, cpStub, err := getVerifyAccountClient(ownerAddress)
 		if err != nil {
-			return fmt.Errorf("create cp account client failed, error: %v", err)
+			return fmt.Errorf("get cp account client failed, error: %v", err)
 		}
 		defer client.Close()
 
@@ -883,16 +874,23 @@ var changeTaskTypesCmd = &cli.Command{
 		}
 
 		var taskTypesUint []uint8
+		taskTypes = handleStr(taskTypes)
 		if strings.Index(taskTypes, ",") > 0 {
 			for _, taskT := range strings.Split(taskTypes, ",") {
-				tt, _ := strconv.ParseUint(taskT, 10, 64)
+				tt, err := strconv.ParseUint(taskT, 10, 64)
+				if err != nil {
+					return err
+				}
 				if tt < 0 {
 					return fmt.Errorf("task-types must be int")
 				}
 				taskTypesUint = append(taskTypesUint, uint8(tt))
 			}
 		} else {
-			tt, _ := strconv.ParseUint(taskTypes, 10, 64)
+			tt, err := strconv.ParseUint(taskTypes, 10, 64)
+			if err != nil {
+				return err
+			}
 			if tt < 0 {
 				return fmt.Errorf("task-types must be int")
 			}
@@ -909,7 +907,7 @@ var changeTaskTypesCmd = &cli.Command{
 
 		client, cpStub, err := getVerifyAccountClient(ownerAddress)
 		if err != nil {
-			return fmt.Errorf("create cp account client failed, error: %v", err)
+			return fmt.Errorf("get cp account client failed, error: %v", err)
 		}
 		defer client.Close()
 
@@ -929,7 +927,99 @@ var changeTaskTypesCmd = &cli.Command{
 	},
 }
 
+var contractCmd = &cli.Command{
+	Name:  "contract",
+	Usage: "Manage contract info of CP",
+	Subcommands: []*cli.Command{
+		{
+			Name:  "default",
+			Usage: "Print the contract info that the current network CP is using",
+			Action: func(c *cli.Context) error {
+				cpRepoPath, _ := os.LookupEnv("CP_PATH")
+				if err := conf.InitConfig(cpRepoPath, true); err != nil {
+					return fmt.Errorf("load config file failed, error: %+v", err)
+				}
+
+				chainRpc, err := conf.GetRpcByNetWorkName()
+				if err != nil {
+					return err
+				}
+				client, err := ethclient.Dial(chainRpc)
+				if err != nil {
+					return err
+				}
+				defer client.Close()
+
+				var netWork = ""
+				chainId, err := client.ChainID(context.Background())
+				if err != nil {
+					return err
+				}
+				if chainId.Int64() == 254 {
+					netWork = fmt.Sprintf("Mainnet(%d)", chainId.Int64())
+				} else {
+					netWork = fmt.Sprintf("Testnet(%d)", chainId.Int64())
+				}
+
+				contract := conf.GetConfig().CONTRACT
+				var taskData [][]string
+
+				taskData = append(taskData, []string{"Network:", netWork})
+				taskData = append(taskData, []string{"Swan Token:", contract.SwanToken})
+				taskData = append(taskData, []string{"Orchestrator Collateral:", contract.Collateral})
+				taskData = append(taskData, []string{"Register CP:", contract.Register})
+				taskData = append(taskData, []string{"ZK Collateral:", contract.ZkCollateral})
+
+				var rowColorList []RowColor
+				rowColorList = append(rowColorList,
+					RowColor{
+						row:    0,
+						column: []int{1},
+						color:  []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgBlueColor}},
+					})
+
+				header := []string{"CP Contract Info:"}
+				NewVisualTable(header, taskData, rowColorList).Generate(false)
+				return nil
+
+			},
+		},
+	},
+}
+
 func isValidWalletAddress(address string) bool {
 	re := regexp.MustCompile(`^0x[0-9a-fA-F]{40}$`)
 	return re.MatchString(address)
+}
+
+func checkWalletAddress(walletAddress string, msg string) error {
+	chainUrl, err := conf.GetRpcByNetWorkName()
+	if err != nil {
+		return err
+	}
+
+	client, err := ethclient.Dial(chainUrl)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	checkOwnerAddress := common.HexToAddress(walletAddress)
+	bytecode, err := client.CodeAt(context.Background(), checkOwnerAddress, nil)
+	if err != nil {
+		return fmt.Errorf("check owner address failed, error: %v", err)
+	}
+
+	if len(bytecode) > 0 {
+		return fmt.Errorf("the %s must be a wallet address", msg)
+	}
+	return nil
+}
+
+func handleStr(str string) string {
+	if strings.HasSuffix(str, ",") {
+		return strings.TrimSuffix(str, ",")
+	} else {
+		return str
+	}
 }

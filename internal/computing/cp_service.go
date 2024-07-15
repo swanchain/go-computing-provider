@@ -56,6 +56,12 @@ func ReceiveJob(c *gin.Context) {
 		return
 	}
 
+	if CheckWalletBlackList(jobData.JobSourceURI) {
+		logs.GetLogger().Errorf("This cp does not accept tasks from wallet addresses inside the blacklist")
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SpaceCheckBlackListError))
+		return
+	}
+
 	if conf.GetConfig().HUB.VerifySign {
 		if len(jobData.NodeIdJobSourceUriSignature) == 0 {
 			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BadParamError, "missing node_id_job_source_uri_signature field"))
@@ -64,7 +70,14 @@ func ReceiveJob(c *gin.Context) {
 		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 		nodeID := GetNodeId(cpRepoPath)
 
-		signature, err := verifySignatureForHub(conf.GetConfig().HUB.OrchestratorPk, fmt.Sprintf("%s%s", nodeID, jobData.JobSourceURI), jobData.NodeIdJobSourceUriSignature)
+		cpAccountAddress, err := contract.GetCpAccountAddress()
+		if err != nil {
+			logs.GetLogger().Errorf("get cp account contract address failed, error: %v", err)
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.GetCpAccountError))
+			return
+		}
+
+		signature, err := verifySignatureForHub(conf.GetConfig().HUB.OrchestratorPk, fmt.Sprintf("%s%s%s", cpAccountAddress, nodeID, jobData.JobSourceURI), jobData.NodeIdJobSourceUriSignature)
 		if err != nil {
 			logs.GetLogger().Errorf("verifySignature for space job failed, error: %+v", err)
 			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
@@ -139,7 +152,11 @@ func ReceiveJob(c *gin.Context) {
 		jobEntity.JobUuid = jobData.UUID
 		jobEntity.DeployStatus = models.DEPLOY_RECEIVE_JOB
 		jobEntity.CreateTime = time.Now().Unix()
-		NewJobService().SaveJobEntity(jobEntity)
+		jobEntity.ExpireTime = time.Now().Unix() + int64(jobData.Duration)
+		err = NewJobService().SaveJobEntity(jobEntity)
+		if err != nil {
+			logs.GetLogger().Errorf("spaceUuid: %s, save job to db failed, error: %+v", spaceUuid, err)
+		}
 
 		go func() {
 			if err = submitJob(&jobData); err != nil {
@@ -292,6 +309,7 @@ func RedeployJob(c *gin.Context) {
 		jobEntity.Duration = jobData.Duration
 		jobEntity.DeployStatus = models.DEPLOY_RECEIVE_JOB
 		jobEntity.CreateTime = time.Now().Unix()
+		jobEntity.ExpireTime = time.Now().Unix() + int64(jobData.Duration)
 		NewJobService().SaveJobEntity(jobEntity)
 
 		go func() {
@@ -306,7 +324,7 @@ func RedeployJob(c *gin.Context) {
 		DeploySpaceTask(jobData.JobSourceURI, hostName, jobData.Duration, jobData.UUID, jobData.TaskUUID, gpuProductName)
 	}()
 
-	c.JSON(http.StatusOK, jobData)
+	c.JSON(http.StatusOK, util.CreateSuccessResponse(jobData))
 }
 
 func ReNewJob(c *gin.Context) {
@@ -372,7 +390,14 @@ func CancelJob(c *gin.Context) {
 		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 		nodeID := GetNodeId(cpRepoPath)
 
-		signature, err := verifySignatureForHub(conf.GetConfig().HUB.OrchestratorPk, fmt.Sprintf("%s%s", nodeID, taskUuid), nodeIdAndTaskUuidSignature)
+		cpAccountAddress, err := contract.GetCpAccountAddress()
+		if err != nil {
+			logs.GetLogger().Errorf("get cp account contract address failed, error: %v", err)
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.GetCpAccountError))
+			return
+		}
+
+		signature, err := verifySignatureForHub(conf.GetConfig().HUB.OrchestratorPk, fmt.Sprintf("%s%s%s", cpAccountAddress, nodeID, taskUuid), nodeIdAndTaskUuidSignature)
 		if err != nil {
 			logs.GetLogger().Errorf("verifySignature for space job failed, error: %+v", err)
 			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ServerError, "verify sign data failed"))
@@ -405,7 +430,7 @@ func CancelJob(c *gin.Context) {
 			}
 		}()
 		k8sNameSpace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(jobEntity.WalletAddress)
-		deleteJob(k8sNameSpace, jobEntity.SpaceUuid)
+		deleteJob(k8sNameSpace, jobEntity.SpaceUuid, "")
 		NewJobService().DeleteJobEntityBySpaceUuId(jobEntity.SpaceUuid)
 	}()
 
@@ -414,10 +439,21 @@ func CancelJob(c *gin.Context) {
 
 func WhiteList(c *gin.Context) {
 	walletWhiteListUrl := conf.GetConfig().API.WalletWhiteList
-	list, err := getWhiteList(walletWhiteListUrl)
+	list, err := getWalletList(walletWhiteListUrl)
 	if err != nil {
 		logs.GetLogger().Errorf("Failed get whiteList, error: %+v", err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.FoundWhiteListError))
+		return
+	}
+	c.JSON(http.StatusOK, util.CreateSuccessResponse(list))
+}
+
+func BlackList(c *gin.Context) {
+	walletBlackListUrl := conf.GetConfig().API.WalletBlackList
+	list, err := getWalletList(walletBlackListUrl)
+	if err != nil {
+		logs.GetLogger().Errorf("Failed get blackList, error: %+v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.FoundBlackListError))
 		return
 	}
 	c.JSON(http.StatusOK, util.CreateSuccessResponse(list))
@@ -436,21 +472,27 @@ func GetJobStatus(c *gin.Context) {
 		return
 	}
 
-	logs.GetLogger().Infof("job_uuid: %s, signatureMsg: %s", jobUuId, signatureMsg)
-	//cpRepoPath, _ := os.LookupEnv("CP_PATH")
-	//nodeID := GetNodeId(cpRepoPath)
-	//signature, err := verifySignatureForHub(conf.GetConfig().HUB.OrchestratorPk, fmt.Sprintf("%s%s", nodeID, jobUuId), signatureMsg)
-	//if err != nil {
-	//	logs.GetLogger().Errorf("verifySignature for space job failed, error: %+v", err)
-	//	c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
-	//	return
-	//}
-	//
-	//if !signature {
-	//	logs.GetLogger().Errorf("get job status sign verifing, jobUuid: %s, verify: %t", jobUuId, signature)
-	//	c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError))
-	//	return
-	//}
+	cpAccountAddress, err := contract.GetCpAccountAddress()
+	if err != nil {
+		logs.GetLogger().Errorf("get cp account contract address failed, error: %v", err)
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.GetCpAccountError))
+		return
+	}
+
+	cpRepoPath, _ := os.LookupEnv("CP_PATH")
+	nodeID := GetNodeId(cpRepoPath)
+	signature, err := verifySignatureForHub(conf.GetConfig().HUB.OrchestratorPk, fmt.Sprintf("%s%s%s", cpAccountAddress, nodeID, jobUuId), signatureMsg)
+	if err != nil {
+		logs.GetLogger().Errorf("verifySignature for space job failed, error: %+v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
+		return
+	}
+
+	if !signature {
+		logs.GetLogger().Errorf("get job status sign verifing, jobUuid: %s, verify: %t", jobUuId, signature)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError))
+		return
+	}
 
 	jobEntity, err := NewJobService().GetJobEntityByJobUuid(jobUuId)
 	if err != nil {
@@ -698,7 +740,8 @@ func handleConnection(conn *websocket.Conn, jobDetail models.JobEntity, logType 
 	client := NewWsClient(conn)
 
 	if logType == "build" {
-		buildLogPath := filepath.Join("build", jobDetail.WalletAddress, "spaces", jobDetail.Name, BuildFileName)
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
+		buildLogPath := filepath.Join(cpRepoPath, "build", jobDetail.WalletAddress, "spaces", jobDetail.Name, BuildFileName)
 		if _, err := os.Stat(buildLogPath); err != nil {
 			client.HandleLogs(strings.NewReader("This space is deployed starting from a image."))
 		} else {
@@ -750,7 +793,7 @@ func DeploySpaceTask(jobSourceURI, hostName string, duration int, jobUuid string
 	defer func() {
 		if !success {
 			k8sNameSpace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(walletAddress)
-			deleteJob(k8sNameSpace, spaceUuid)
+			deleteJob(k8sNameSpace, spaceUuid, "deploy space failed")
 			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid)
 		}
 
@@ -791,9 +834,6 @@ func DeploySpaceTask(jobSourceURI, hostName string, duration int, jobUuid string
 	deploy.WithSpaceInfo(spaceUuid, spaceName)
 	deploy.WithGpuProductName(gpuProductName)
 
-	cpRepoPath, _ := os.LookupEnv("CP_PATH")
-	spacePath := filepath.Join(cpRepoPath, "build", walletAddress, "spaces", spaceName)
-	os.RemoveAll(spacePath)
 	updateJobStatus(jobUuid, models.DEPLOY_DOWNLOAD_SOURCE)
 	containsYaml, yamlPath, imagePath, modelsSettingFile, _, err := BuildSpaceTaskImage(spaceUuid, spaceDetail.Data.Files)
 	if err != nil {
@@ -808,6 +848,7 @@ func DeploySpaceTask(jobSourceURI, hostName string, duration int, jobUuid string
 			logs.GetLogger().Error(err)
 			return ""
 		}
+		success = true
 		return hostName
 	}
 
@@ -822,47 +863,49 @@ func DeploySpaceTask(jobSourceURI, hostName string, duration int, jobUuid string
 	return hostName
 }
 
-func deleteJob(namespace, spaceUuid string) error {
+func deleteJob(namespace, spaceUuid string, msg string) error {
 	deployName := constants.K8S_DEPLOY_NAME_PREFIX + spaceUuid
 	serviceName := constants.K8S_SERVICE_NAME_PREFIX + spaceUuid
 	ingressName := constants.K8S_INGRESS_NAME_PREFIX + spaceUuid
 
-	logs.GetLogger().Infof("deleting space service, space_uuid: %s", spaceUuid)
 	k8sService := NewK8sService()
-	if err := k8sService.DeleteIngress(context.TODO(), namespace, ingressName); err != nil && !errors.IsNotFound(err) {
-		logs.GetLogger().Errorf("Failed delete ingress, ingressName: %s, error: %+v", ingressName, err)
-		return err
-	}
 
-	if err := k8sService.DeleteService(context.TODO(), namespace, serviceName); err != nil && !errors.IsNotFound(err) {
-		logs.GetLogger().Errorf("Failed delete service, serviceName: %s, error: %+v", serviceName, err)
-		return err
-	}
+	if namespace != "" {
+		if err := k8sService.DeleteIngress(context.TODO(), namespace, ingressName); err != nil && !errors.IsNotFound(err) {
+			logs.GetLogger().Errorf("Failed delete ingress, ingressName: %s, error: %+v", ingressName, err)
+			return err
+		}
 
-	dockerService := NewDockerService()
-	deployImageIds, err := k8sService.GetDeploymentImages(context.TODO(), namespace, deployName)
-	if err != nil && !errors.IsNotFound(err) {
-		logs.GetLogger().Errorf("Failed get deploy imageIds, deployName: %s, error: %+v", deployName, err)
-		return err
-	}
-	for _, imageId := range deployImageIds {
-		dockerService.RemoveImage(imageId)
-	}
+		if err := k8sService.DeleteService(context.TODO(), namespace, serviceName); err != nil && !errors.IsNotFound(err) {
+			logs.GetLogger().Errorf("Failed delete service, serviceName: %s, error: %+v", serviceName, err)
+			return err
+		}
 
-	if err := k8sService.DeleteDeployment(context.TODO(), namespace, deployName); err != nil && !errors.IsNotFound(err) {
-		logs.GetLogger().Errorf("Failed delete deployment, deployName: %s, error: %+v", deployName, err)
-		return err
-	}
-	time.Sleep(6 * time.Second)
+		dockerService := NewDockerService()
+		deployImageIds, err := k8sService.GetDeploymentImages(context.TODO(), namespace, deployName)
+		if err != nil && !errors.IsNotFound(err) {
+			logs.GetLogger().Errorf("Failed get deploy imageIds, deployName: %s, error: %+v", deployName, err)
+			return err
+		}
+		for _, imageId := range deployImageIds {
+			dockerService.RemoveImage(imageId)
+		}
 
-	if err := k8sService.DeleteDeployRs(context.TODO(), namespace, spaceUuid); err != nil && !errors.IsNotFound(err) {
-		logs.GetLogger().Errorf("Failed delete ReplicaSetsController, spaceUuid: %s, error: %+v", spaceUuid, err)
-		return err
-	}
+		if err := k8sService.DeleteDeployment(context.TODO(), namespace, deployName); err != nil && !errors.IsNotFound(err) {
+			logs.GetLogger().Errorf("Failed delete deployment, deployName: %s, error: %+v", deployName, err)
+			return err
+		}
+		time.Sleep(6 * time.Second)
 
-	if err := k8sService.DeletePod(context.TODO(), namespace, spaceUuid); err != nil && !errors.IsNotFound(err) {
-		logs.GetLogger().Errorf("Failed delete pods, spaceUuid: %s, error: %+v", spaceUuid, err)
-		return err
+		if err := k8sService.DeleteDeployRs(context.TODO(), namespace, spaceUuid); err != nil && !errors.IsNotFound(err) {
+			logs.GetLogger().Errorf("Failed delete ReplicaSetsController, spaceUuid: %s, error: %+v", spaceUuid, err)
+			return err
+		}
+
+		if err := k8sService.DeletePod(context.TODO(), namespace, spaceUuid); err != nil && !errors.IsNotFound(err) {
+			logs.GetLogger().Errorf("Failed delete pods, spaceUuid: %s, error: %+v", spaceUuid, err)
+			return err
+		}
 	}
 
 	ticker := time.NewTicker(3 * time.Second)
@@ -883,6 +926,13 @@ func deleteJob(namespace, spaceUuid string) error {
 			break
 		}
 	}
+
+	if msg != "" {
+		logs.GetLogger().Infof("%s, space_uuid: %s", msg, spaceUuid)
+	} else {
+		logs.GetLogger().Infof("delete space service finished, space_uuid: %s", spaceUuid)
+	}
+
 	return nil
 }
 
@@ -1239,15 +1289,15 @@ func convertGpuName(name string) string {
 	return strings.ToUpper(name)
 }
 
-func getWhiteList(whiteListUrl string) ([]string, error) {
-	if whiteListUrl == "" {
+func getWalletList(walletUrl string) ([]string, error) {
+	if walletUrl == "" {
 		return nil, nil
 	}
 
 	var walletMap = make(map[string]struct{})
-	resp, err := http.Get(whiteListUrl)
+	resp, err := http.Get(walletUrl)
 	if err != nil {
-		logs.GetLogger().Errorf("send wallet whitelist failed, error: %v", err)
+		logs.GetLogger().Errorf("send wallet url: %s, failed, error: %v", walletUrl, err)
 		return nil, err
 	}
 	defer resp.Body.Close()
@@ -1283,7 +1333,7 @@ func CheckWalletWhiteList(jobSourceURI string) bool {
 	if walletWhiteListUrl == "" {
 		return true
 	}
-	whiteList, err := getWhiteList(walletWhiteListUrl)
+	whiteList, err := getWalletList(walletWhiteListUrl)
 	if err != nil {
 		logs.GetLogger().Errorf("get whiteList By url failed, url: %s, error: %v", err)
 		return false
@@ -1297,6 +1347,32 @@ func CheckWalletWhiteList(jobSourceURI string) bool {
 	userWalletAddress := spaceDetail.Data.Owner.PublicAddress
 
 	for _, address := range whiteList {
+		if userWalletAddress == address {
+			return true
+		}
+	}
+	return false
+}
+
+func CheckWalletBlackList(jobSourceURI string) bool {
+	walletBlackListUrl := conf.GetConfig().API.WalletBlackList
+	if walletBlackListUrl == "" {
+		return false
+	}
+	blackList, err := getWalletList(walletBlackListUrl)
+	if err != nil {
+		logs.GetLogger().Errorf("get blacklist By url failed, url: %s, error: %v", err)
+		return false
+	}
+
+	spaceDetail, err := getSpaceDetail(jobSourceURI)
+	if err != nil {
+		logs.GetLogger().Errorln(err)
+		return false
+	}
+	userWalletAddress := spaceDetail.Data.Owner.PublicAddress
+
+	for _, address := range blackList {
 		if userWalletAddress == address {
 			return true
 		}

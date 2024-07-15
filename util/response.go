@@ -51,6 +51,8 @@ const (
 	NotFoundJobEntityError     = 4008
 	SaveJobEntityError         = 4009
 	FoundWhiteListError        = 4010
+	FoundBlackListError        = 4011
+	SpaceCheckBlackListError   = 4012
 
 	ProofParamError   = 7001
 	ProofReadLogError = 7002
@@ -74,11 +76,13 @@ var codeMsg = map[int]string{
 	SpaceParseResourceUriError: "An error occurred while parsing sourceUri",
 	CheckResourcesError:        "An error occurred while check resources available",
 	SpaceCheckWhiteListError:   "This cp does not accept tasks from wallet addresses outside the whitelist",
+	SpaceCheckBlackListError:   "This cp does not accept tasks from wallet addresses inside the blacklist",
 	NoAvailableResourcesError:  "No resources available",
 	FoundJobEntityError:        "An error occurred while get job info",
 	NotFoundJobEntityError:     "No found this Job",
 	SaveJobEntityError:         "An error occurred while save job info",
 	FoundWhiteListError:        "An error occurred while get whitelist",
+	FoundBlackListError:        "An error occurred while get blacklist",
 
 	ProofReadLogError: "An error occurred while read the log of proof",
 	ProofError:        "An error occurred while executing the calculation task",

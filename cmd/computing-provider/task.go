@@ -112,10 +112,10 @@ var taskList = &cli.Command{
 var taskDetail = &cli.Command{
 	Name:      "get",
 	Usage:     "Get task detail info",
-	ArgsUsage: "[space_uuid]",
+	ArgsUsage: "[task_uuid]",
 	Action: func(cctx *cli.Context) error {
 		if cctx.NArg() != 1 {
-			return fmt.Errorf("incorrect number of arguments, got %d, missing args: space_uuid", cctx.NArg())
+			return fmt.Errorf("incorrect number of arguments, got %d, missing args: task_uuid", cctx.NArg())
 		}
 
 		cpRepoPath, ok := os.LookupEnv("CP_PATH")
@@ -126,10 +126,10 @@ var taskDetail = &cli.Command{
 			return fmt.Errorf("load config file failed, error: %+v", err)
 		}
 
-		spaceUuid := cctx.Args().First()
-		job, err := computing.NewJobService().GetJobEntityBySpaceUuid(spaceUuid)
+		taskUuid := cctx.Args().First()
+		job, err := computing.NewJobService().GetJobEntityByTaskUuid(taskUuid)
 		if err != nil {
-			return fmt.Errorf("failed get job detail: %s, error: %+v", spaceUuid, err)
+			return fmt.Errorf("task_uuid: %s, get job detail failed, error: %+v", taskUuid, err)
 		}
 
 		k8sService := computing.NewK8sService()
@@ -171,10 +171,10 @@ var taskDetail = &cli.Command{
 var taskDelete = &cli.Command{
 	Name:      "delete",
 	Usage:     "Delete an task from the k8s",
-	ArgsUsage: "[space_uuid]",
+	ArgsUsage: "[task_uuid]",
 	Action: func(cctx *cli.Context) error {
 		if cctx.NArg() != 1 {
-			return fmt.Errorf("incorrect number of arguments, got %d, missing args: space_uuid", cctx.NArg())
+			return fmt.Errorf("incorrect number of arguments, got %d, missing args: task_uuid", cctx.NArg())
 		}
 
 		cpRepoPath, ok := os.LookupEnv("CP_PATH")
@@ -185,25 +185,25 @@ var taskDelete = &cli.Command{
 			return fmt.Errorf("load config file failed, error: %+v", err)
 		}
 
-		spaceUuid := strings.ToLower(cctx.Args().First())
-		job, err := computing.NewJobService().GetJobEntityBySpaceUuid(spaceUuid)
+		taskUuid := strings.ToLower(cctx.Args().First())
+		job, err := computing.NewJobService().GetJobEntityByTaskUuid(taskUuid)
 		if err != nil {
-			return fmt.Errorf("failed get job detail: %s, error: %+v", spaceUuid, err)
+			return fmt.Errorf("failed get job detail: %s, error: %+v", taskUuid, err)
 		}
 
-		deployName := constants.K8S_DEPLOY_NAME_PREFIX + spaceUuid
+		deployName := constants.K8S_DEPLOY_NAME_PREFIX + job.SpaceUuid
 		namespace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(job.WalletAddress)
 		k8sService := computing.NewK8sService()
 		if err := k8sService.DeleteDeployment(context.TODO(), namespace, deployName); err != nil && !errors.IsNotFound(err) {
 			return err
 		}
-		time.Sleep(6 * time.Second)
+		time.Sleep(3 * time.Second)
 
-		if err := k8sService.DeleteDeployRs(context.TODO(), namespace, spaceUuid); err != nil && !errors.IsNotFound(err) {
+		if err := k8sService.DeleteDeployRs(context.TODO(), namespace, job.SpaceUuid); err != nil && !errors.IsNotFound(err) {
 			return err
 		}
-
-		computing.NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid)
+		computing.NewJobService().DeleteJobEntityBySpaceUuId(job.SpaceUuid)
+		fmt.Printf("space_uuid: %s space serivce successfully deleted \n", job.SpaceUuid)
 		return nil
 	},
 }
