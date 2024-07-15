@@ -23,7 +23,7 @@ As a resource provider, you can run a **ECP**(Edge Computing Provider) and **FCP
  	- [Prerequisites](#Prerequisites)
  	- [Install the Kubernetes](#Install-the-Kubernetes)
  		- [Install Container Runtime Environment](#install-Container-Runtime-Environment)
- 		- [Optional-Setup a docker registry server](#Optional-setup-a-Docker-Registry-Server)
+ 		- [Optional - Setup a docker registry server](#Optional-setup-a-Docker-Registry-Server)
 		- [Create a Kubernetes Cluster](#Create-a-Kubernetes-Cluster)
  		- [Install the Network Plugin](#Install-the-Network-Plugin)
 		- [Install the NVIDIA Plugin](#Install-the-NVIDIA-Plugin)
@@ -321,16 +321,17 @@ make install
 
 ## Initialize CP repo and Update Configuration 
 1. Initialize repo
-	```
-	computing-provider init --multi-address=/ip4/<YOUR_PUBLIC_IP>/tcp/<YOUR_PORT> --node-name=<YOUR_NODE_NAME>
-	```
-	**Note:** By default, the CP's repo is `~/.swan/computing`, you can configure it by `export CP_PATH="<YOUR_CP_PATH>"`
+    ```
+    computing-provider init --multi-address=/ip4/<YOUR_PUBLIC_IP>/tcp/<YOUR_PORT> --node-name=<YOUR_NODE_NAME>
+    ```
+    **Note:**
+    - By default, the CP's repo is `~/.swan/computing`, you can configure it by `export CP_PATH="<YOUR_CP_PATH>"`
+    - The CP service port (`8085` by default) must be mapped to the public IP address and port
+2. Update `config.toml`
 
-   2. Update `config.toml`
+    Edit the necessary configuration files according to your deployment requirements. 
 
-	Edit the necessary configuration files according to your deployment requirements. 
-
-		```
+        ```
        [API]
        Port = 8085                                    # The port number that the web server listens on
        MultiAddress = "/ip4/<public_ip>/tcp/<port>"   # The multiAddress for libp2p
@@ -348,7 +349,7 @@ make install
 	
        [HUB]
        ServerUrl = "https://orchestrator-mainnet-api.swanchain.io"             # The Orchestrator's API address
-       AccessToken = ""                                               	        # The Orchestrator's access token, switch to the mainnet network and use the owner address Acquired from "https://orchestrator.swanchain.io"
+       AccessToken = ""                                               	       # The Orchestrator's access token, Acquired from "https://orchestrator.swanchain.io", and switch to the `mainnet network` and use the owner address
        BalanceThreshold= 10                                                    # The cp’s collateral balance threshold
        OrchestratorPk = "0x4B98086A20f3C19530AF32D21F85Bc6399358e20"           # Orchestrator's public key, CP only accept the task from this Orchestrator
        VerifySign = true                                                       # Verify that the task signature is from Orchestrator
@@ -368,10 +369,10 @@ make install
 
 
 **Note:**  
-* Example WalletWhiteList hosted on GitHub can be found [here](https://raw.githubusercontent.com/swanchain/market-providers/main/clients/whitelist.txt).
-* Example WalletBlackList hosted on GitHub can be found [here](https://raw.githubusercontent.com/swanchain/market-providers/main/clients/blacklist.txt).
+* Example `[api].WalletWhiteList` hosted on GitHub can be found [here](https://raw.githubusercontent.com/swanchain/market-providers/main/clients/whitelist.txt).
+* Example `[api].WalletBlackList` hosted on GitHub can be found [here](https://raw.githubusercontent.com/swanchain/market-providers/main/clients/blacklist.txt).
 
-## Initialize a Wallet and Deposit Swan-ETH
+## Initialize a Wallet and Deposit `SwanETH`
 1.  Generate a new wallet address or import the previous wallet:
 
 	```bash
@@ -390,11 +391,11 @@ make install
 	```
 	**Note:** `<YOUR_PRIVATE_KEY_FILE>` is a file that contains the private key
 
-2.  Deposit Swan-ETH to the wallet address:
+2.  Deposit `SwanETH` to the wallet address:
 	```bash
 	computing-provider wallet send --from <YOUR_WALLET_ADDRESS> 0x7791f48931DB81668854921fA70bFf0eB85B8211 0.01
 	```
-	**Note:** If you don't have Swan-ETH and SWANC, please follow [the guideline](https://docs.swanchain.io/swan-mainnet/getting-started-guide) to [bridge ETH to Swan Mainnet](https://bridge.swanchain.io), and [claim the SWANC](https://faucet.swanchain.io) as collaterals.
+	**Note:** If you don't have `SwanETH` and `SWANC`, please follow [the guideline](https://docs.swanchain.io/swan-mainnet/getting-started-guide) to [bridge ETH to Swan Mainnet](https://bridge.swanchain.io), and [claim the SWANC](https://faucet.swanchain.io) as collaterals.
 
 ## Initialization CP Account
 Deploy a CP account contract:
@@ -404,26 +405,26 @@ computing-provider account create --ownerAddress <YOUR_OWNER_WALLET_ADDRESS> \
 	--beneficiaryAddress <YOUR_BENEFICIARY_WALLET_ADDRESS>  \
 	--task-types 3
 ```
-**Note:** `--task-types`: Supports 4 task types (1: Fil-C2-512M, 2: Aleo, 3: AI, 4: Fil-C2-32G), separated by commas. For FCP, it needs to be set to 3.
+**Note:** `--task-types`: Supports 4 task types (`1`: Fil-C2-512M, `2`: Aleo, `3`: AI, `4`: Fil-C2-32G), separated by commas. For FCP, it needs to be set to 3.
 
-_Output:_
+**Output:**
 ```
 Contract deployed! Address: 0x3091c9647Ea5248079273B52C3707c958a3f2658
 Transaction hash: 0xb8fd9cc9bfac2b2890230b4f14999b9d449e050339b252273379ab11fac15926
 ```
 
-## Collateral SWANC for FCP
+## Collateral `SWANC` for FCP
 ```bash
  computing-provider collateral add --fcp --from <YOUR_WALLET_ADDRESS>  <amount>
 ```
-**Note:** Currently one AI task requires 5 SWANC. Please deposit enough collaterals for the tasks
+**Note:** Currently one AI task requires 5 `SWANC`. Please deposit enough collaterals for the tasks
 
 
-## Collateral SWANC from FCP
+## Collateral `SWANC` from FCP
 ```bash
  computing-provider collateral withdraw --fcp --owner <YOUR_WALLET_ADDRESS> --account <YOUR_CP_ACCOUNT> <amount>
 ```
-**Note:** if want to withdraw the funds from FCP, you can run the above command
+**Note:** If you want to withdraw the funds from FCP, you can run the above command
 
 
 ## Start the Computing Provider
@@ -463,7 +464,7 @@ export CP_PATH=<YOUR_CP_PATH>
 * Adjust the value of `RUST_GPU_TOOLS_CUSTOM_GPU` based on the GPU used by the CP's Kubernetes cluster for fil-c2 tasks.
 * For more device choices, please refer to this page:[https://github.com/filecoin-project/bellperson](https://github.com/filecoin-project/bellperson)
 
-### Step 2: Collateral SWANC for receiving ZK Task
+### Step 2: Collateral `SWANC` for receiving ZK Task
 
 ```bash
 computing-provider collateral add --ecp --from <YOUR_WALLET_ADDRESS>  <amount>
