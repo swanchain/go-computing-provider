@@ -769,8 +769,7 @@ func GetCpResource(c *gin.Context) {
 	location, err := getLocation()
 	if err != nil {
 		logs.GetLogger().Error(err)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ServerError, err.Error()))
-		return
+		location = "-"
 	}
 
 	dockerService := NewDockerService()

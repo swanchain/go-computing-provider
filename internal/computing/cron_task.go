@@ -27,7 +27,6 @@ var TaskMap sync.Map
 type CronTask struct {
 	nodeId       string
 	ownerAddress string
-	location     string
 }
 
 func NewCronTask(nodeId string) *CronTask {
@@ -37,12 +36,7 @@ func NewCronTask(nodeId string) *CronTask {
 		return nil
 	}
 
-	location, err := getLocation()
-	if err != nil {
-		logs.GetLogger().Error(err)
-	}
-
-	return &CronTask{nodeId: nodeId, ownerAddress: ownerAddress, location: location}
+	return &CronTask{nodeId: nodeId, ownerAddress: ownerAddress}
 }
 
 func (task *CronTask) RunTask() {
