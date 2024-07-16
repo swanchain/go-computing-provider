@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/mitchellh/go-homedir"
 	"github.com/swanchain/go-computing-provider/build"
+	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/db"
 	"github.com/urfave/cli/v2"
 	"os"
@@ -64,6 +65,9 @@ func main() {
 			}
 			os.Setenv("CP_PATH", cpRepoPath)
 			if !strings.EqualFold(c.Args().First(), initCmd.Name) {
+				if !conf.Exists(cpRepoPath) {
+					return fmt.Errorf("repo at '%s' not exist, please initialize it", cpRepoPath)
+				}
 				db.InitDb(cpRepoPath)
 			}
 
