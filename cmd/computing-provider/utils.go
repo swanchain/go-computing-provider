@@ -71,8 +71,6 @@ func createAccount(cpRepoPath, ownerAddress, beneficiaryAddress string, workerAd
 	}
 
 	auth.Nonce = big.NewInt(int64(nonce))
-	suggestGasPrice = suggestGasPrice.Mul(suggestGasPrice, big.NewInt(3))
-	suggestGasPrice = suggestGasPrice.Div(suggestGasPrice, big.NewInt(2))
 	auth.GasFeeCap = suggestGasPrice
 	auth.Context = context.Background()
 

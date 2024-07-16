@@ -521,8 +521,7 @@ func StatisticalSources(c *gin.Context) {
 	location, err := getLocation()
 	if err != nil {
 		logs.GetLogger().Error(err)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.GetLocationError))
-		return
+		location = "-"
 	}
 
 	k8sService := NewK8sService()
