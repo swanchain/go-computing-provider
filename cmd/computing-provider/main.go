@@ -63,7 +63,9 @@ func main() {
 				return fmt.Errorf("CP_PATH: %s, no such directory", cpRepoPath)
 			}
 			os.Setenv("CP_PATH", cpRepoPath)
-			db.InitDb(cpRepoPath)
+			if !strings.EqualFold(c.Args().First(), initCmd.Name) {
+				db.InitDb(cpRepoPath)
+			}
 
 			return nil
 		},

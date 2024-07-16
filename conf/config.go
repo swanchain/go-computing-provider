@@ -185,11 +185,7 @@ func requiredFieldsAreGivenForSeparate(metaData toml.MetaData) bool {
 func GenerateAndUpdateConfigFile(cpRepoPath string, multiAddress, nodeName string, port int) error {
 	fmt.Println("Checking if repo exists")
 
-	ok, err := Exists(cpRepoPath)
-	if err != nil {
-		return err
-	}
-	if ok {
+	if Exists(cpRepoPath) {
 		return fmt.Errorf("repo at '%s' is already initialized", cpRepoPath)
 	}
 
@@ -253,6 +249,13 @@ func GenerateAndUpdateConfigFile(cpRepoPath string, multiAddress, nodeName strin
 	if err = toml.NewEncoder(configFile).Encode(configTmpl); err != nil {
 		return err
 	}
+
+	file, err := os.Create(path.Join(cpRepoPath, "provider.db"))
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
 	fmt.Printf("Initialized CP repo at '%s'. \n", cpRepoPath)
 	return nil
 }
@@ -303,17 +306,15 @@ func generateDefaultConfig() ComputeNode {
 	}
 }
 
-func Exists(cpPath string) (bool, error) {
+func Exists(cpPath string) bool {
 	_, err := os.Stat(filepath.Join(cpPath, "keystore"))
-	notexist := os.IsNotExist(err)
-	if notexist {
-		err = nil
+	KeyStoreNoExist := os.IsNotExist(err)
+	err = nil
+	_, err = os.Stat(filepath.Join(cpPath, "provider.db"))
+	providerNotExist := os.IsNotExist(err)
 
-		_, err = os.Stat(filepath.Join(cpPath, "provider.db"))
-		notexist = os.IsNotExist(err)
-		if notexist {
-			err = nil
-		}
+	if KeyStoreNoExist && providerNotExist {
+		return false
 	}
-	return !notexist, err
+	return true
 }
