@@ -256,6 +256,10 @@ func GenerateAndUpdateConfigFile(cpRepoPath string, multiAddress, nodeName strin
 	}
 	defer file.Close()
 
+	if err = os.MkdirAll(path.Join(cpRepoPath, "keystore"), 0755); err != nil {
+		return fmt.Errorf("failed to create keystore, error: %v", err)
+	}
+
 	fmt.Printf("Initialized CP repo at '%s'. \n", cpRepoPath)
 	return nil
 }
