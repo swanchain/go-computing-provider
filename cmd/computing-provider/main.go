@@ -54,7 +54,7 @@ func main() {
 					if _, err := os.Stat(cpRepoPath); os.IsNotExist(err) {
 						err := os.MkdirAll(cpRepoPath, 0755)
 						if err != nil {
-							return fmt.Errorf("create cp repo failed, error: %v", cpRepoPath)
+							return fmt.Errorf("failed to create cp repo, error: %v", cpRepoPath)
 						}
 					}
 				}
