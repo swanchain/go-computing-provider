@@ -21,6 +21,7 @@ type CollateralStub struct {
 	privateK         string
 	publicK          string
 	cpAccountAddress string
+	contract         string
 }
 
 type CollateralOption func(*CollateralStub)
@@ -49,12 +50,14 @@ func NewCollateralStub(client *ethclient.Client, options ...CollateralOption) (*
 		option(stub)
 	}
 
-	collateralAddress := common.HexToAddress(conf.GetConfig().CONTRACT.ZkCollateral)
+	contractAddr := conf.GetConfig().CONTRACT.ZkCollateral
+	collateralAddress := common.HexToAddress(contractAddr)
 	collateralClient, err := NewEcpCollateral(collateralAddress, client)
 	if err != nil {
 		return nil, fmt.Errorf("ECP create collateral contract client, error: %+v", err)
 	}
 
+	stub.contract = contractAddr
 	stub.collateral = collateralClient
 	stub.client = client
 	return stub, nil
@@ -112,13 +115,99 @@ func (s *CollateralStub) Withdraw(amount *big.Int) (string, error) {
 	return transaction.Hash().String(), nil
 }
 
-func (s *CollateralStub) CpInfo() (models.EcpCollateralInfo, error) {
-	var cpInfo models.EcpCollateralInfo
+func (s *CollateralStub) WithdrawRequest(amount *big.Int) (string, error) {
+	publicAddress, err := s.privateKeyToPublicKey()
+	if err != nil {
+		return "", err
+	}
+
+	txOptions, err := s.createTransactOpts()
+	if err != nil {
+		return "", fmt.Errorf("address: %s, ECP collateral client create transaction, error: %+v", publicAddress, err)
+	}
 
 	if s.cpAccountAddress == "" || len(strings.TrimSpace(s.cpAccountAddress)) == 0 {
 		cpAccountAddress, err := contract.GetCpAccountAddress()
 		if err != nil {
-			return models.EcpCollateralInfo{}, fmt.Errorf("get cp account contract address failed, error: %v", err)
+			return "", fmt.Errorf("failed to get cp account contract address, error: %v", err)
+		}
+		s.cpAccountAddress = cpAccountAddress
+	}
+
+	transaction, err := s.collateral.RequestWithdraw(txOptions, common.HexToAddress(s.cpAccountAddress), amount)
+	if err != nil {
+		return "", fmt.Errorf("failed to request withdraw for ecp, cp account address: %s, error: %+v", s.cpAccountAddress, err)
+	}
+	return transaction.Hash().String(), nil
+}
+
+func (s *CollateralStub) WithdrawView() (models.WithdrawRequest, error) {
+	var request models.WithdrawRequest
+
+	if s.cpAccountAddress == "" || len(strings.TrimSpace(s.cpAccountAddress)) == 0 {
+		cpAccountAddress, err := contract.GetCpAccountAddress()
+		if err != nil {
+			return request, fmt.Errorf("get cp account contract address failed, error: %v", err)
+		}
+		s.cpAccountAddress = cpAccountAddress
+	}
+
+	withdrawRequest, err := s.collateral.ViewWithdrawRequest(&bind.CallOpts{}, common.HexToAddress(s.cpAccountAddress))
+	if err != nil {
+		return request, fmt.Errorf("failed to view withdraw request for ecp, cp account address: %s, error: %+v", s.cpAccountAddress, err)
+	}
+
+	request.RequestBlock = withdrawRequest.RequestBlock.Int64()
+	request.Amount = withdrawRequest.Amount
+	return request, nil
+}
+
+func (s *CollateralStub) WithdrawConfirm() (string, error) {
+	publicAddress, err := s.privateKeyToPublicKey()
+	if err != nil {
+		return "", err
+	}
+
+	txOptions, err := s.createTransactOpts()
+	if err != nil {
+		return "", fmt.Errorf("failed to create transaction opts, address: %s, error: %+v", publicAddress, err)
+	}
+
+	if s.cpAccountAddress == "" || len(strings.TrimSpace(s.cpAccountAddress)) == 0 {
+		cpAccountAddress, err := contract.GetCpAccountAddress()
+		if err != nil {
+			return "", fmt.Errorf("failed to get cp account contract address, error: %v", err)
+		}
+		s.cpAccountAddress = cpAccountAddress
+	}
+
+	transaction, err := s.collateral.ConfirmWithdraw(txOptions, common.HexToAddress(s.cpAccountAddress))
+	if err != nil {
+		return "", fmt.Errorf("failed to confirm withdraw for ecp, cp account address: %s, error: %+v", s.cpAccountAddress, err)
+	}
+	return transaction.Hash().String(), nil
+}
+
+func (s *CollateralStub) ContractInfo() (models.CollateralContractInfoForECP, error) {
+	var contractInfo models.CollateralContractInfoForECP
+
+	collateral, err := s.collateral.GetECPCollateralInfo(&bind.CallOpts{})
+	if err != nil {
+		return contractInfo, fmt.Errorf("failed to get ecp collaternal contract info, contract address: %s, error: %+v", s.contract, err)
+	}
+
+	contractInfo.CollateralToken = collateral.CollateralToken.Hex()
+	contractInfo.WithdrawDelay = collateral.WithdrawDelay.Int64()
+	return contractInfo, nil
+}
+
+func (s *CollateralStub) CpInfo() (models.CpCollateralInfoForECP, error) {
+	var cpInfo models.CpCollateralInfoForECP
+
+	if s.cpAccountAddress == "" || len(strings.TrimSpace(s.cpAccountAddress)) == 0 {
+		cpAccountAddress, err := contract.GetCpAccountAddress()
+		if err != nil {
+			return models.CpCollateralInfoForECP{}, fmt.Errorf("get cp account contract address failed, error: %v", err)
 		}
 		s.cpAccountAddress = cpAccountAddress
 	}

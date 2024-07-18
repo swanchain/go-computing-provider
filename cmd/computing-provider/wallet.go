@@ -10,6 +10,7 @@ import (
 	"github.com/urfave/cli/v2"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 )
@@ -303,6 +304,9 @@ var collateralCmd = &cli.Command{
 		collateralAddCmd,
 		collateralSendCmd,
 		collateralWithdrawCmd,
+		collateralWithDrawRequestCmd,
+		collateralWithDrawConfirmCmd,
+		collateralWithDrawViewCmd,
 	},
 	Before: func(c *cli.Context) error {
 		cpRepoPath, _ := os.LookupEnv("CP_PATH")
@@ -452,6 +456,127 @@ var collateralWithdrawCmd = &cli.Command{
 			return err
 		}
 		fmt.Println(txHash)
+		return nil
+	},
+}
+
+var collateralWithDrawRequestCmd = &cli.Command{
+	Name:  "withdraw-request",
+	Usage: "Send a request to Withdraw frozen token from the collateral contract",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "owner",
+			Usage: "Specify the owner address",
+		},
+		&cli.StringFlag{
+			Name:  "account",
+			Usage: "Specify the cp account address, if not specified, cp account is the content of the account file under the CP_PATH variable",
+		},
+	},
+	ArgsUsage: "[amount]",
+	Action: func(cctx *cli.Context) error {
+		ctx := reqContext(cctx)
+
+		ownerAddress := cctx.String("owner")
+		if strings.TrimSpace(ownerAddress) == "" {
+			return fmt.Errorf("the owner address is required")
+		}
+
+		cpAccountAddress := cctx.String("account")
+		amount := cctx.Args().Get(0)
+		if strings.TrimSpace(amount) == "" {
+			return fmt.Errorf("the amount param is required")
+		}
+
+		localWallet, err := wallet.SetupWallet(wallet.WalletRepo)
+		if err != nil {
+			return err
+		}
+		txHash, err := localWallet.CollateralWithdrawRequest(ctx, ownerAddress, amount, cpAccountAddress)
+		if err != nil {
+			return err
+		}
+		fmt.Println(txHash)
+		return nil
+	},
+}
+
+var collateralWithDrawConfirmCmd = &cli.Command{
+	Name:  "withdraw-confirm",
+	Usage: "Confirm a request to Withdraw frozen token from the collateral contract",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "owner",
+			Usage: "Specify the owner address",
+		},
+		&cli.StringFlag{
+			Name:  "account",
+			Usage: "Specify the cp account address, if not specified, cp account is the content of the account file under the CP_PATH variable",
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+		ctx := reqContext(cctx)
+
+		ownerAddress := cctx.String("owner")
+		if strings.TrimSpace(ownerAddress) == "" {
+			return fmt.Errorf("the owner address is required")
+		}
+
+		cpAccountAddress := cctx.String("account")
+
+		localWallet, err := wallet.SetupWallet(wallet.WalletRepo)
+		if err != nil {
+			return err
+		}
+		txHash, err := localWallet.CollateralWithdrawConfirm(ctx, ownerAddress, cpAccountAddress)
+		if err != nil {
+			return err
+		}
+		fmt.Println(txHash)
+		return nil
+	},
+}
+
+var collateralWithDrawViewCmd = &cli.Command{
+	Name:  "withdraw-view",
+	Usage: "View a request to Withdraw frozen token from the collateral contract",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "owner",
+			Usage: "Specify the owner address",
+		},
+		&cli.StringFlag{
+			Name:  "account",
+			Usage: "Specify the cp account address, if not specified, cp account is the content of the account file under the CP_PATH variable",
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+		ctx := reqContext(cctx)
+
+		ownerAddress := cctx.String("owner")
+		if strings.TrimSpace(ownerAddress) == "" {
+			return fmt.Errorf("the owner address is required")
+		}
+
+		cpAccountAddress := cctx.String("account")
+
+		localWallet, err := wallet.SetupWallet(wallet.WalletRepo)
+		if err != nil {
+			return err
+		}
+		withdrawView, err := localWallet.CollateralWithdrawView(ctx, ownerAddress, cpAccountAddress)
+		if err != nil {
+			return err
+		}
+
+		var taskData [][]string
+		taskData = append(taskData, []string{"Amount:", withdrawView.Amount.String()})
+		taskData = append(taskData, []string{"Request Block:", strconv.Itoa(int(withdrawView.RequestBlock))})
+		taskData = append(taskData, []string{"Confirmable Block:", strconv.Itoa(int(withdrawView.RequestBlock + withdrawView.WithdrawDelay))})
+
+		header := []string{"Withdraw View:"}
+		NewVisualTable(header, taskData, []RowColor{}).Generate(false)
+
 		return nil
 	},
 }

@@ -71,11 +71,14 @@ type RPC struct {
 
 type CONTRACT struct {
 	SwanToken         string `toml:"SWAN_CONTRACT"`
-	Collateral        string `toml:"SWAN_COLLATERAL_CONTRACT"`
 	CpAccountRegister string `toml:"REGISTER_CP_CONTRACT"`
-	TaskRegister      string `toml:"REGISTER_TASK_CONTRACT"`
-	ZkCollateral      string `toml:"ZK_COLLATERAL_CONTRACT"`
-	Sequencer         string `toml:"SEQUENCER_CONTRACT"`
+
+	JobCollateral string `toml:"SWAN_COLLATERAL_CONTRACT"`
+	JobManager    string `toml:"SWAN_JOB_CONTRACT"`
+
+	TaskRegister string `toml:"REGISTER_TASK_CONTRACT"`
+	ZkCollateral string `toml:"ZK_COLLATERAL_CONTRACT"`
+	Sequencer    string `toml:"SEQUENCER_CONTRACT"`
 }
 
 func GetRpcByNetWorkName() (string, error) {
@@ -113,9 +116,12 @@ func InitConfig(cpRepoPath string, standalone bool) error {
 		ncCopy := nc
 		if ncCopy.Network == build.NetWorkTag {
 			config.CONTRACT.SwanToken = ncCopy.Config.SwanTokenContract
-			config.CONTRACT.Collateral = ncCopy.Config.OrchestratorCollateralContract
+			config.CONTRACT.JobCollateral = ncCopy.Config.OrchestratorCollateralContract
+			config.CONTRACT.JobManager = ncCopy.Config.OrchestratorCollateralContract
+
 			config.CONTRACT.CpAccountRegister = ncCopy.Config.RegisterCpContract
 			config.CONTRACT.ZkCollateral = ncCopy.Config.ZkCollateralContract
+			config.CONTRACT.Sequencer = ncCopy.Config.SequencerContract
 		}
 	}
 	return nil
@@ -307,7 +313,7 @@ func generateDefaultConfig() ComputeNode {
 		},
 		CONTRACT: CONTRACT{
 			SwanToken:         "",
-			Collateral:        "",
+			JobCollateral:     "",
 			CpAccountRegister: "",
 			TaskRegister:      "",
 			ZkCollateral:      "",

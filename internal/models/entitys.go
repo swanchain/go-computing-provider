@@ -93,6 +93,40 @@ func (task *TaskEntity) TableName() string {
 }
 
 const (
+	All_FLAG         = -1
+	UN_DELETEED_FLAG = 0
+	DELETED_FLAG     = 1
+)
+
+const (
+	POD_UNKNOWN_STATUS = 0
+	POD_RUNNING_STATUS = 1
+	POD_DELETE_STATUS  = 2
+)
+
+const (
+	JOB_DEPLOY_STATUS     = 1
+	JOB_RUNNING_STATUS    = 2
+	JOB_TERMINATED_STATUS = 3
+	JOB_EXPIRED_STATUS    = 4
+)
+
+func GetJobStatus(status int) string {
+	var statusStr string
+	switch status {
+	case JOB_DEPLOY_STATUS:
+		statusStr = "deploying"
+	case JOB_RUNNING_STATUS:
+		statusStr = "running"
+	case JOB_TERMINATED_STATUS:
+		statusStr = "terminated"
+	case JOB_EXPIRED_STATUS:
+		statusStr = "expired"
+	}
+	return statusStr
+}
+
+const (
 	DEPLOY_RECEIVE_JOB = iota + 1
 	DEPLOY_DOWNLOAD_SOURCE
 	DEPLOY_UPLOAD_RESULT
@@ -146,6 +180,9 @@ type JobEntity struct {
 	ExpireTime      int64  `json:"expire_time" gorm:"expire_time"`
 	CreateTime      int64  `json:"create_time" gorm:"create_time"`
 	Error           string `json:"error" gorm:"error"`
+	DeleteAt        int    `json:"delete_at" gorm:"delete_at; default:0"` // 1 deleted
+	PodStatus       int    `json:"pod_status"`
+	Status          int    `json:"status"`
 }
 
 func (*JobEntity) TableName() string {

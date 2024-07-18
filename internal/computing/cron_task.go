@@ -131,7 +131,7 @@ func (task *CronTask) watchExpiredTask() {
 			}
 		}()
 
-		jobList, err := NewJobService().GetJobList()
+		jobList, err := NewJobService().GetJobList(models.UN_DELETEED_FLAG)
 		if err != nil {
 			logs.GetLogger().Errorf("Failed watchExpiredTask get job data, error: %+v", err)
 			return
@@ -203,7 +203,7 @@ func (task *CronTask) watchExpiredTask() {
 
 			if time.Now().Unix() > job.ExpireTime {
 				logs.GetLogger().Infof("<timer-task> space_uuid: %s has expired, the job starting terminated", job.SpaceUuid)
-				if err = deleteJob(job.NameSpace, job.SpaceUuid, "cron task, run time expired"); err == nil {
+				if err = deleteJob(job.NameSpace, job.SpaceUuid, "cron-task the task execution time has expired"); err == nil {
 					deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
 					continue
 				}
@@ -213,11 +213,11 @@ func (task *CronTask) watchExpiredTask() {
 		for deploymentName, nameSpace := range deployOnK8s {
 			if nameSpace != "" && deploymentName != "" {
 				spaceUuid := strings.TrimPrefix(deploymentName, constants.K8S_DEPLOY_NAME_PREFIX)
-				deleteJob(nameSpace, spaceUuid, "cron task, task left on k8s")
+				deleteJob(nameSpace, spaceUuid, "cron-task the obsolete task left in the k8s")
 			}
 		}
 		for _, spaceUuid := range deleteSpaceIds {
-			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid)
+			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid, models.JOB_EXPIRED_STATUS)
 		}
 
 	})
@@ -419,6 +419,14 @@ func reportJobStatus(jobUuid string, deployStatus int) bool {
 	var job = new(models.JobEntity)
 	job.JobUuid = jobUuid
 	job.DeployStatus = deployStatus
+	if deployStatus < models.DEPLOY_TO_K8S {
+		job.PodStatus = models.POD_UNKNOWN_STATUS
+		job.Status = models.JOB_DEPLOY_STATUS
+	} else {
+		job.PodStatus = models.POD_RUNNING_STATUS
+		job.Status = models.JOB_RUNNING_STATUS
+	}
+
 	if err := NewJobService().UpdateJobEntityByJobUuid(job); err != nil {
 		logs.GetLogger().Errorf("update job info by jobUuid failed, error: %v", err)
 	}

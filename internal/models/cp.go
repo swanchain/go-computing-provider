@@ -5,15 +5,6 @@ import (
 	"math/big"
 )
 
-type ComputingProvider struct {
-	Name          string `json:"name"`
-	NodeId        string `json:"node_id"`
-	MultiAddress  string `json:"multi_address"`
-	Autobid       int    `json:"autobid"`
-	Status        string `json:"status"`
-	PublicAddress string `json:"public_address"`
-}
-
 type JobData struct {
 	UUID                        string `json:"uuid"`
 	Name                        string `json:"name"`
@@ -32,13 +23,6 @@ type Job struct {
 	Uuid   string
 	Status int
 	Url    string
-}
-
-type JobStatus string
-
-type DeleteJobReq struct {
-	CreatorWallet string `json:"creator_wallet"`
-	SpaceName     string `json:"space_name"`
 }
 
 type SpaceJSON struct {
@@ -123,14 +107,19 @@ type Account struct {
 	Contract       string
 }
 
-type EcpCollateralInfo struct {
+type CollateralContractInfoForECP struct {
+	CollateralToken string
+	WithdrawDelay   int64
+}
+
+type CpCollateralInfoForECP struct {
 	CpAddress         string
 	CollateralBalance string
 	FrozenBalance     string
 	Status            string
 }
 
-type FcpCollateralInfo struct {
+type CpCollateralInfoForFCP struct {
 	CpAddress        string
 	AvailableBalance string
 	LockedCollateral string
@@ -150,4 +139,23 @@ type EcpTaskInfo struct {
 	CheckCode            string
 	Owner                common.Address
 	Version              string
+}
+
+type WithdrawRequest struct {
+	Amount        *big.Int
+	RequestBlock  int64
+	WithdrawDelay int64
+}
+
+type TaskInfoOnChain struct {
+	TaskUuid           string
+	CpList             []string
+	OwnerAddress       string
+	Reward             *big.Int
+	Collateral         *big.Int
+	StartTimestamp     int64
+	TerminateTimestamp int64
+	Duration           int64
+	TaskStatus         uint8
+	CollateralStatus   uint8
 }

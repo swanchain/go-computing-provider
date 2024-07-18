@@ -43,7 +43,7 @@ func NewCollateralStub(client *ethclient.Client, options ...Option) (*Stub, erro
 		option(stub)
 	}
 
-	collateralAddress := common.HexToAddress(conf.GetConfig().CONTRACT.Collateral)
+	collateralAddress := common.HexToAddress(conf.GetConfig().CONTRACT.JobCollateral)
 	collateralClient, err := NewFcpCollateral(collateralAddress, client)
 	if err != nil {
 		return nil, fmt.Errorf("create fcp collateral contract client, error: %+v", err)
@@ -79,8 +79,8 @@ func (s *Stub) Deposit(amount *big.Int) (string, error) {
 	return transaction.Hash().String(), nil
 }
 
-func (s *Stub) CollateralInfo() (models.FcpCollateralInfo, error) {
-	var cpInfo models.FcpCollateralInfo
+func (s *Stub) CollateralInfo() (models.CpCollateralInfoForFCP, error) {
+	var cpInfo models.CpCollateralInfoForFCP
 
 	if s.cpAccountAddress == "" || len(strings.TrimSpace(s.cpAccountAddress)) == 0 {
 		cpAccountAddress, err := contract.GetCpAccountAddress()

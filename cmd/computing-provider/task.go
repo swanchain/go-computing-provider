@@ -7,6 +7,7 @@ import (
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/constants"
 	"github.com/swanchain/go-computing-provider/internal/computing"
+	"github.com/swanchain/go-computing-provider/internal/models"
 	"github.com/urfave/cli/v2"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"os"
@@ -29,12 +30,17 @@ var taskList = &cli.Command{
 	Usage: "List task",
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
+			Name:  "show-completed",
+			Usage: "Display completed jobs",
+		},
+		&cli.BoolFlag{
 			Name:    "verbose",
 			Usage:   "--verbose",
 			Aliases: []string{"v"},
 		},
 	},
 	Action: func(cctx *cli.Context) error {
+		showCompleted := cctx.Bool("show-completed")
 		fullFlag := cctx.Bool("verbose")
 		cpRepoPath, ok := os.LookupEnv("CP_PATH")
 		if !ok {
@@ -47,7 +53,14 @@ var taskList = &cli.Command{
 		var taskData [][]string
 		var rowColorList []RowColor
 
-		list, err := computing.NewJobService().GetJobList()
+		var jobStatus int
+		if showCompleted {
+			jobStatus = models.All_FLAG
+		} else {
+			jobStatus = models.UN_DELETEED_FLAG
+		}
+
+		list, err := computing.NewJobService().GetJobList(jobStatus)
 		if err != nil {
 			return fmt.Errorf("get jobs failed, error: %+v", err)
 		}
@@ -202,7 +215,7 @@ var taskDelete = &cli.Command{
 		if err := k8sService.DeleteDeployRs(context.TODO(), namespace, job.SpaceUuid); err != nil && !errors.IsNotFound(err) {
 			return err
 		}
-		computing.NewJobService().DeleteJobEntityBySpaceUuId(job.SpaceUuid)
+		computing.NewJobService().DeleteJobEntityBySpaceUuId(job.SpaceUuid, models.JOB_TERMINATED_STATUS)
 		fmt.Printf("space_uuid: %s space serivce successfully deleted \n", job.SpaceUuid)
 		return nil
 	},
