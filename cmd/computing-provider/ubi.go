@@ -132,7 +132,7 @@ var listCmd = &cli.Command{
 
 		}
 
-		header := []string{"TASK ID", "Task Contract", "TASK TYPE", "ZK TYPE", "STATUS", "CREATE TIME", "ERROR"}
+		header := []string{"TASK ID", "TASK CONTRACT", "TASK TYPE", "ZK TYPE", "STATUS", "CREATE TIME", "ERROR"}
 		NewVisualTable(header, taskData, rowColorList).Generate(false)
 
 		return nil
