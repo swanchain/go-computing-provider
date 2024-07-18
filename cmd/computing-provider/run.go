@@ -386,11 +386,6 @@ var taskInfoCmd = &cli.Command{
 			return fmt.Errorf("the task contract address is required")
 		}
 
-		chainRpc, err := conf.GetRpcByNetWorkName()
-		if err != nil {
-			return err
-		}
-
 		taskInfo, err := computing.GetTaskInfoOnChain(taskContract)
 		if err != nil {
 			return fmt.Errorf("get task info on the chain failed, error: %v", err)
@@ -913,7 +908,7 @@ var contractCmd = &cli.Command{
 				taskData = append(taskData, []string{"Network:", netWork})
 				taskData = append(taskData, []string{"Swan Token:", contract.SwanToken})
 				taskData = append(taskData, []string{"Orchestrator Collateral:", contract.Collateral})
-				taskData = append(taskData, []string{"Register CP:", contract.Register})
+				taskData = append(taskData, []string{"Register CP:", contract.CpAccountRegister})
 				taskData = append(taskData, []string{"ZK Collateral:", contract.ZkCollateral})
 
 				var rowColorList []RowColor
