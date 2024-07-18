@@ -68,10 +68,11 @@ type RPC struct {
 }
 
 type CONTRACT struct {
-	SwanToken    string `toml:"SWAN_CONTRACT"`
-	Collateral   string `toml:"SWAN_COLLATERAL_CONTRACT"`
-	Register     string `toml:"REGISTER_CP_CONTRACT"`
-	ZkCollateral string `toml:"ZK_COLLATERAL_CONTRACT"`
+	SwanToken         string `toml:"SWAN_CONTRACT"`
+	Collateral        string `toml:"SWAN_COLLATERAL_CONTRACT"`
+	CpAccountRegister string `toml:"REGISTER_CP_CONTRACT"`
+	TaskRegister      string `toml:"REGISTER_TASK_CONTRACT"`
+	ZkCollateral      string `toml:"ZK_COLLATERAL_CONTRACT"`
 }
 
 func GetRpcByNetWorkName() (string, error) {

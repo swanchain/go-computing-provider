@@ -5,14 +5,16 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
-	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/filswan/go-swan-lib/logs"
+	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/contract"
-	"github.com/swanchain/go-computing-provider/internal/contract/token"
+	"github.com/swanchain/go-computing-provider/internal/models"
 	"math/big"
 	"strings"
 	"sync"
@@ -48,50 +50,46 @@ func NewTaskStub(client *ethclient.Client, options ...TaskOption) (*TaskStub, er
 	for _, option := range options {
 		option(stub)
 	}
-
-	if stub.ContractAddress == "" {
-		return nil, errors.New("missing task contract address")
-	}
-
-	cpAccountAddress := common.HexToAddress(stub.ContractAddress)
-	taskClient, err := NewTask(cpAccountAddress, client)
-	if err != nil {
-		return nil, fmt.Errorf("create task contract client, error: %+v", err)
-	}
-
-	stub.task = taskClient
 	stub.client = client
 	return stub, nil
 }
 
-func (s *TaskStub) SubmitUBIProof(taskId, proof string, timeOut int64) (string, error) {
+func (s *TaskStub) CreateTaskContract(proof string, task *models.TaskEntity, timeOut int64) (string, error) {
 	var err error
-	var submitProofTxHash string
+	var taskContractAddress string
 	var flag bool
+
+	cpAccountAddress, err := contract.GetCpAccountAddress()
+	if err != nil {
+		return "", fmt.Errorf("get cp account contract address failed, error: %v", err)
+	}
 
 	timeOutCh := time.After(time.Second * time.Duration(timeOut))
 outerLoop:
 	for {
 		select {
 		case <-timeOutCh:
-			err = fmt.Errorf("Proof submission timed out")
+			err = fmt.Errorf("create contract timed out")
 			break outerLoop
 		default:
 			time.Sleep(3 * time.Second)
 			if !flag {
 				err = s.getNonce()
 				if err != nil {
-					logs.GetLogger().Warnf("taskId: %s, get nonce: %s, retrying", taskId, ParseError(err))
+					logs.GetLogger().Warnf("taskId: %s, get nonce: %s, retrying", task.Id, ParseError(err))
 					continue
 				}
 			}
 
 			txOptions, err := s.createTransactOpts(int64(s.nonceX))
 			if err != nil {
-				logs.GetLogger().Warnf("taskId: %s, create transaction opts failed, error: %s", taskId, ParseError(err))
+				logs.GetLogger().Warnf("taskId: %d, create transaction opts failed, error: %s", task.Id, ParseError(err))
 				continue
 			}
-			transaction, err := s.task.SubmitProof(txOptions, proof)
+
+			contractAddress, transaction, _, err := DeployTask(txOptions, s.client, new(big.Int).SetInt64(task.Id), new(big.Int).SetInt64(int64(task.Type)),
+				new(big.Int).SetInt64(int64(task.ResourceType)), task.InputParam, task.VerifyParam, common.HexToAddress(cpAccountAddress),
+				proof, new(big.Int).SetInt64(task.Deadline), common.HexToAddress(conf.GetConfig().CONTRACT.TaskRegister), task.CheckCode)
 			if err != nil {
 				if err.Error() == "replacement transaction underpriced" {
 					s.IncrementNonce()
@@ -99,28 +97,41 @@ outerLoop:
 				} else if strings.Contains(err.Error(), "next nonce") {
 					err = s.getNonce()
 					if err != nil {
-						logs.GetLogger().Warnf("taskId: %s, get nonce: %s, retrying", taskId, ParseError(err))
+						logs.GetLogger().Warnf("taskId: %d, get nonce: %s, retrying", task.Id, ParseError(err))
 						flag = false
 						continue
 					}
 				} else {
-					logs.GetLogger().Warnf("taskId: %s SubmitUBIProof failed, error: %s", taskId, ParseError(err))
+					logs.GetLogger().Warnf("taskId: %d create task contract failed, error: %s", task.Id, ParseError(err))
 					continue
 				}
 			}
 			if transaction != nil {
-				submitProofTxHash = transaction.Hash().String()
+				if err = checkTransaction(s.client, transaction); err != nil {
+					logs.GetLogger().Warnf("taskId: %d checked create task contract failed, error: %s", task.Id, ParseError(err))
+					continue
+				}
+				taskContractAddress = contractAddress.Hex()
 				break outerLoop
 			} else {
-				logs.GetLogger().Warnf("taskId: %s submitProofTxHash is nil, retrying", taskId)
+				logs.GetLogger().Warnf("taskId: %d create task contract is nil, retrying", task.Id)
 			}
 		}
 	}
-	return submitProofTxHash, err
+	return taskContractAddress, err
 }
 
-func (s *TaskStub) GetTaskInfo() (ECPTaskTaskInfo, error) {
-	return s.task.GetTaskInfo(&bind.CallOpts{})
+func (s *TaskStub) GetTaskInfo() (models.EcpTaskInfo, error) {
+	if s.ContractAddress == "" {
+		return models.EcpTaskInfo{}, errors.New("missing task contract address")
+	}
+
+	taskClient, err := NewTask(common.HexToAddress(s.ContractAddress), s.client)
+	if err != nil {
+		return models.EcpTaskInfo{}, fmt.Errorf("create task contract client, error: %+v", err)
+	}
+
+	return taskClient.TaskInfo(&bind.CallOpts{})
 }
 
 func (s *TaskStub) privateKeyToPublicKey() (common.Address, error) {
@@ -191,49 +202,27 @@ func (s *TaskStub) IncrementNonce() {
 	s.nonceX++
 }
 
-// GetReward  status: 1: Challenged  2: Slashed  3: rewarded
-func (s *TaskStub) GetReward() (status int, rewardTx string, challengeTx string, slashTx string, reward string, err error) {
-	reward = "0.0"
-	taskInfo, err := s.GetTaskInfo()
-	if err != nil {
-		return 0, "", "", "", reward, err
-	}
-
-	if taskInfo.ChallengeTx != "" {
-		return 1, "", taskInfo.ChallengeTx, "", reward, nil
-	}
-
-	if taskInfo.SlashTx != "" {
-		return 2, "", "", taskInfo.SlashTx, reward, nil
-	}
-
-	if taskInfo.RewardTx != "" {
-		receipt, err := s.client.TransactionReceipt(context.Background(), common.HexToHash(taskInfo.RewardTx))
-		if err != nil {
-			return 0, taskInfo.RewardTx, "", "", reward, err
-		}
-		contractAbi, err := abi.JSON(strings.NewReader(token.TokenMetaData.ABI))
-		if err != nil {
-			return 0, taskInfo.RewardTx, "", "", reward, err
-		}
-
-		for _, l := range receipt.Logs {
-			event := struct {
-				From  common.Address
-				To    common.Address
-				Value *big.Int
-			}{}
-			if err := contractAbi.UnpackIntoInterface(&event, "Transfer", l.Data); err != nil {
-				continue
+func checkTransaction(client *ethclient.Client, tx *types.Transaction) error {
+	timeout := time.After(10 * time.Second)
+	ticker := time.Tick(2 * time.Second)
+	for {
+		select {
+		case <-timeout:
+			return fmt.Errorf("timeout waiting for transaction confirmation, tx: %s", tx.Hash().Hex())
+		case <-ticker:
+			receipt, err := client.TransactionReceipt(context.Background(), tx.Hash())
+			if err != nil {
+				if errors.Is(err, ethereum.NotFound) {
+					continue
+				}
+				return err
 			}
 
-			if len(l.Topics) == 3 && l.Topics[0] == contractAbi.Events["Transfer"].ID {
-				reward = contract.BalanceToStr(event.Value)
+			if receipt != nil && receipt.Status == types.ReceiptStatusSuccessful {
+				return nil
 			}
 		}
-		return 3, taskInfo.RewardTx, "", "", reward, nil
 	}
-	return 0, "", "", "", reward, nil
 }
 
 func ParseError(err error) string {

@@ -50,15 +50,15 @@ func TaskStatusStr(status int) string {
 }
 
 const (
-	SOURCE_TYPE_CPU = 0
-	SOURCE_TYPE_GPU = 1
+	RESOURCE_TYPE_CPU = 0
+	RESOURCE_TYPE_GPU = 1
 )
 
-func GetSourceTypeStr(resourceType int) string {
+func GetResourceTypeStr(resourceType int) string {
 	switch resourceType {
-	case SOURCE_TYPE_CPU:
+	case RESOURCE_TYPE_CPU:
 		return "CPU"
-	case SOURCE_TYPE_GPU:
+	case RESOURCE_TYPE_GPU:
 		return "GPU"
 	}
 	return ""
@@ -75,19 +75,17 @@ type TaskEntity struct {
 	Id           int64  `json:"id" gorm:"primaryKey;id"`
 	Type         int    `json:"type" gorm:"type"`
 	Name         string `json:"name" gorm:"name"`
-	Contract     string `json:"contract" gorm:"name"`
+	Contract     string `json:"contract" gorm:"contract"`
 	ResourceType int    `json:"resource_type" gorm:"resource_type"` // 1
 	InputParam   string `json:"input_param" gorm:"input_param"`
+	VerifyParam  string `json:"verify_param" gorm:"verify_param"`
 	TxHash       string `json:"tx_hash" gorm:"tx_hash"`
-	RewardTx     string `json:"reward_tx"`
-	ChallengeTx  string `json:"challenge_tx"`
-	SlashTx      string `json:"slash_tx"`
 	Status       int    `json:"status" gorm:"status"`
-	RewardStatus int    `json:"reward_status" gorm:"status"` // 0: unclaimed; 1: challenged; 2: slashed; 3: claimed
-	Reward       string `json:"reward" gorm:"column:reward; default:0.0000"`
 	CreateTime   int64  `json:"create_time" gorm:"create_time"`
 	EndTime      int64  `json:"end_time" gorm:"end_time"`
 	Error        string `json:"error" gorm:"error"`
+	Deadline     int64  `json:"deadline"`
+	CheckCode    string `json:"check_code"`
 }
 
 func (task *TaskEntity) TableName() string {

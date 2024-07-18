@@ -10,7 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/computing"
-	account2 "github.com/swanchain/go-computing-provider/internal/contract/account"
+	"github.com/swanchain/go-computing-provider/internal/contract/account"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"github.com/swanchain/go-computing-provider/wallet"
 	"math/big"
@@ -81,8 +81,8 @@ func createAccount(cpRepoPath, ownerAddress, beneficiaryAddress string, workerAd
 		return fmt.Errorf("the multi-address field needs to be configured, by modify config file or computing-provider init")
 	}
 
-	contractAddress, tx, _, err := account2.DeployAccount(auth, client, nodeID, []string{multiAddresses}, common.HexToAddress(beneficiaryAddress),
-		common.HexToAddress(workerAddress), common.HexToAddress(conf.GetConfig().CONTRACT.Register), taskTypes)
+	contractAddress, tx, _, err := account.DeployAccount(auth, client, nodeID, []string{multiAddresses}, common.HexToAddress(beneficiaryAddress),
+		common.HexToAddress(workerAddress), common.HexToAddress(conf.GetConfig().CONTRACT.CpAccountRegister), taskTypes)
 	if err != nil {
 		return fmt.Errorf("deploy cp account contract failed, error: %v", err)
 	}
@@ -113,7 +113,7 @@ func createAccount(cpRepoPath, ownerAddress, beneficiaryAddress string, workerAd
 	return nil
 }
 
-func getVerifyAccountClient(ownerAddress string) (*ethclient.Client, *account2.CpStub, error) {
+func getVerifyAccountClient(ownerAddress string) (*ethclient.Client, *account.CpStub, error) {
 	chainUrl, err := conf.GetRpcByNetWorkName()
 	if err != nil {
 		return nil, nil, fmt.Errorf("get rpc url failed, error: %v", err)
@@ -135,7 +135,7 @@ func getVerifyAccountClient(ownerAddress string) (*ethclient.Client, *account2.C
 		return nil, nil, fmt.Errorf("dial rpc connect failed, error: %v", err)
 	}
 
-	cpStub, err := account2.NewAccountStub(client, account2.WithCpPrivateKey(ki.PrivateKey))
+	cpStub, err := account.NewAccountStub(client, account.WithCpPrivateKey(ki.PrivateKey))
 	if err != nil {
 		client.Close()
 		return nil, nil, err

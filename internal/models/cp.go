@@ -1,11 +1,8 @@
 package models
 
 import (
-	"time"
-)
-
-const (
-	ActiveStatus string = "Active"
+	"github.com/ethereum/go-ethereum/common"
+	"math/big"
 )
 
 type ComputingProvider struct {
@@ -87,29 +84,17 @@ type Specification struct {
 	Unit     string
 }
 
-type CacheSpaceDetail struct {
-	WalletAddress string
-	SpaceName     string
-	SpaceUuid     string
-	ExpireTime    int64
-	JobUuid       string
-	TaskType      string
-	DeployName    string
-	Hardware      string
-	Url           string
-	TaskUuid      string
-	SpaceType     string
-}
-
 type UBITaskReq struct {
 	ID           int           `json:"id"`
 	Name         string        `json:"name,omitempty"`
 	Type         int           `json:"type"`
 	InputParam   string        `json:"input_param"`
+	VerifyParam  string        `json:"verify_param"`
 	Signature    string        `json:"signature"`
 	Resource     *TaskResource `json:"resource"`
 	ResourceType int           `json:"resource_type"`
-	ContractAddr string        `json:"contract_addr"`
+	DeadLine     int64         `json:"deadline"`
+	CheckCode    string        `json:"check_code"`
 }
 
 type UbiC2Proof struct {
@@ -125,17 +110,6 @@ type TaskResource struct {
 	GPU     string `json:"gpu"`
 	Memory  string `json:"memory"`
 	Storage string `json:"storage"`
-}
-
-type CacheUbiTaskDetail struct {
-	TaskId     string `json:"task_id"`
-	TaskType   string `json:"task_type"`
-	ZkType     string `json:"zk_type"`
-	Tx         string `json:"tx"`
-	Status     string `json:"status"`
-	Reward     string `json:"reward"`
-	CreateTime string `json:"create_time"`
-	Contract   string `json:"contract"`
 }
 
 type Account struct {
@@ -163,18 +137,17 @@ type FcpCollateralInfo struct {
 	Status           string
 }
 
-type TaskList []CacheUbiTaskDetail
-
-func (t TaskList) Len() int {
-	return len(t)
-}
-
-func (t TaskList) Less(i, j int) bool {
-	timeI, _ := time.Parse("2006-01-02 15:04:05", t[i].CreateTime)
-	timeJ, _ := time.Parse("2006-01-02 15:04:05", t[j].CreateTime)
-	return timeI.Before(timeJ)
-}
-
-func (t TaskList) Swap(i, j int) {
-	t[i], t[j] = t[j], t[i]
+type EcpTaskInfo struct {
+	TaskID               *big.Int
+	TaskType             *big.Int
+	ResourceType         *big.Int
+	InputParam           string
+	VerifyParam          string
+	CpAccount            common.Address
+	Proof                string
+	Deadline             *big.Int
+	TaskRegistryContract common.Address
+	CheckCode            string
+	Owner                common.Address
+	Version              string
 }
