@@ -339,7 +339,7 @@ func (w *LocalWallet) WalletCollateral(ctx context.Context, from string, amount 
 		cpAccount := common.HexToAddress(cpAccountAddress)
 		bytecode, err := client.CodeAt(context.Background(), cpAccount, nil)
 		if err != nil {
-			return "", fmt.Errorf("check cp account contract address failed, error: %v", err)
+			return "", fmt.Errorf("failed to check cp account contract address, error: %v", err)
 		}
 
 		if len(bytecode) <= 0 {
@@ -400,7 +400,7 @@ func (w *LocalWallet) WalletCollateral(ctx context.Context, from string, amount 
 					return collateralTxHash, nil
 
 				} else if receipt != nil && receipt.Status == 0 {
-					return "", fmt.Errorf("swan token approve transaction execution failed, tx: %s", swanTokenTxHash)
+					return "", fmt.Errorf("failed to check swan token approve transaction, tx: %s", swanTokenTxHash)
 				}
 			}
 		}
@@ -427,7 +427,7 @@ func (w *LocalWallet) WalletCollateral(ctx context.Context, from string, amount 
 					if errors.Is(err, ethereum.NotFound) {
 						continue
 					}
-					return "", fmt.Errorf("mintor swan token Approve tx, error: %+v", err)
+					return "", fmt.Errorf("check swan token Approve tx, error: %+v", err)
 				}
 
 				if receipt != nil && receipt.Status == types.ReceiptStatusSuccessful {
@@ -450,7 +450,7 @@ func (w *LocalWallet) WalletCollateral(ctx context.Context, from string, amount 
 					}
 					return collateralTxHash, nil
 				} else if receipt != nil && receipt.Status == 0 {
-					return "", fmt.Errorf("swan token approve transaction execution failed, tx: %s", swanTokenTxHash)
+					return "", fmt.Errorf("failed to check swan token approve transaction, tx: %s", swanTokenTxHash)
 				}
 			}
 		}
@@ -493,19 +493,6 @@ func (w *LocalWallet) CollateralWithdraw(ctx context.Context, address string, am
 
 		if len(bytecode) <= 0 {
 			return "", fmt.Errorf("the account parameter must be a cpAccount contract address")
-			return "", fmt.Errorf("the account parameter must be a cpAccount contract address")
-		}
-	}
-
-	if len(cpAccountAddress) > 0 {
-		cpAccount := common.HexToAddress(cpAccountAddress)
-		bytecode, err := client.CodeAt(context.Background(), cpAccount, nil)
-		if err != nil {
-			return "", fmt.Errorf("check cp account contract address failed, error: %v", err)
-		}
-
-		if len(bytecode) <= 0 {
-			return "", fmt.Errorf("the account parameter must be a CpAccount contract address")
 		}
 	}
 
