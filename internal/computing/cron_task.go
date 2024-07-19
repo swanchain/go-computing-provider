@@ -25,18 +25,11 @@ var deployingChan = make(chan models.Job)
 var TaskMap sync.Map
 
 type CronTask struct {
-	nodeId       string
-	ownerAddress string
+	nodeId string
 }
 
 func NewCronTask(nodeId string) *CronTask {
-	ownerAddress, _, err := GetOwnerAddressAndWorkerAddress()
-	if err != nil {
-		logs.GetLogger().Errorf("get owner address failed, error: %v", err)
-		return nil
-	}
-
-	return &CronTask{nodeId: nodeId, ownerAddress: ownerAddress}
+	return &CronTask{nodeId: nodeId}
 }
 
 func (task *CronTask) RunTask() {
@@ -46,7 +39,7 @@ func (task *CronTask) RunTask() {
 	task.cleanAbnormalDeployment()
 	task.setFailedUbiTaskStatus()
 	task.watchNameSpaceForDeleted()
-	task.reportClusterResourceToHub()
+	task.reportClusterResource()
 	task.watchExpiredTask()
 }
 
@@ -70,7 +63,7 @@ func checkJobStatus() {
 	}()
 }
 
-func (task *CronTask) reportClusterResourceToHub() {
+func (task *CronTask) reportClusterResource() {
 	c := cron.New(cron.WithSeconds())
 	c.AddFunc("0/10 * * * * ?", func() {
 		defer func() {
@@ -82,7 +75,7 @@ func (task *CronTask) reportClusterResourceToHub() {
 		k8sService := NewK8sService()
 		statisticalSources, err := k8sService.StatisticalSources(context.TODO())
 		if err != nil {
-			logs.GetLogger().Errorf("Failed k8s statistical sources, error: %+v", err)
+			logs.GetLogger().Errorf("failed to collect k8s statistical sources, error: %+v", err)
 			return
 		}
 		checkClusterProviderStatus(statisticalSources)
@@ -217,7 +210,7 @@ func (task *CronTask) watchExpiredTask() {
 			}
 		}
 		for _, spaceUuid := range deleteSpaceIds {
-			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid, models.JOB_EXPIRED_STATUS)
+			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid, models.JOB_COMPLETED_STATUS)
 		}
 
 	})
@@ -455,4 +448,41 @@ func checkFcpCollateralBalance() (string, error) {
 		return "", err
 	}
 	return fcpCollateralInfo.AvailableBalance, nil
+}
+
+func checkFcpJobInfoInChain(job *models.JobEntity) {
+	var taskInfo models.TaskInfoOnChain
+	var err error
+	chainRpc, err := conf.GetRpcByNetWorkName()
+	if err != nil {
+		return
+	}
+	client, err := ethclient.Dial(chainRpc)
+	if err != nil {
+		return
+	}
+	defer client.Close()
+	taskManagerStub, err := fcp.NewTaskManagerStub(client)
+	if err != nil {
+		return
+	}
+	taskInfo, err = taskManagerStub.GetTaskInfo(job.TaskUuid)
+	if err != nil {
+		return
+	}
+
+	if taskInfo.TaskStatus == models.COMPLETED {
+		job.Status = models.JOB_COMPLETED_STATUS
+	} else if taskInfo.TaskStatus == models.TERMINATED {
+		job.Status = models.JOB_TERMINATED_STATUS
+	}
+}
+
+func checkHealth(url string) bool {
+	response, err := http.Get(url)
+	if err != nil {
+		return false
+	}
+	defer response.Body.Close()
+	return response.StatusCode == 200
 }

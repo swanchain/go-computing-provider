@@ -142,26 +142,6 @@ func ReceiveJob(c *gin.Context) {
 			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid, models.JOB_TERMINATED_STATUS)
 		}
 
-		chainRpc, err := conf.GetRpcByNetWorkName()
-		if err != nil {
-			return
-		}
-		client, err := ethclient.Dial(chainRpc)
-		if err != nil {
-			return
-		}
-		defer client.Close()
-		taskManagerStub, err := fcp.NewTaskManagerStub(client)
-		if err != nil {
-			return
-		}
-
-		taskInfoOnChain, err := taskManagerStub.GetTaskInfo(jobData.TaskUUID)
-		if err != nil {
-			return
-		}
-		expireTime := taskInfoOnChain.StartTimestamp + taskInfoOnChain.Duration
-
 		var jobEntity = new(models.JobEntity)
 		jobEntity.Source = jobData.StorageSource
 		jobEntity.SpaceUuid = spaceUuid
@@ -174,18 +154,18 @@ func ReceiveJob(c *gin.Context) {
 		jobEntity.JobUuid = jobData.UUID
 		jobEntity.DeployStatus = models.DEPLOY_RECEIVE_JOB
 		jobEntity.CreateTime = time.Now().Unix()
-		jobEntity.ExpireTime = expireTime
+		jobEntity.ExpireTime = getJobExpiredTime(job)
 		err = NewJobService().SaveJobEntity(jobEntity)
 		if err != nil {
-			logs.GetLogger().Errorf("spaceUuid: %s, save job to db failed, error: %+v", spaceUuid, err)
+			logs.GetLogger().Errorf("failed to save job to db, spaceUuid: %s, error: %+v", spaceUuid, err)
 		}
 
 		go func() {
 			if err = submitJob(&jobData); err != nil {
-				logs.GetLogger().Errorf("upload job data to MCS failed, jobUuid: %s, spaceUuid: %s, error: %v", jobData.UUID, spaceUuid, err)
+				logs.GetLogger().Errorf("failed to upload job data to MCS, jobUuid: %s, spaceUuid: %s, error: %v", jobData.UUID, spaceUuid, err)
 				return
 			}
-			logs.GetLogger().Infof("jobuuid: %s successfully uploaded to MCS", jobData.UUID)
+			logs.GetLogger().Infof("successfully uploaded to MCS, jobuuid: %s", jobData.UUID)
 		}()
 
 		DeploySpaceTask(jobData.JobSourceURI, hostName, jobData.Duration, jobData.UUID, jobData.TaskUUID, gpuProductName)
@@ -320,26 +300,6 @@ func RedeployJob(c *gin.Context) {
 			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid, models.JOB_TERMINATED_STATUS)
 		}
 
-		chainRpc, err := conf.GetRpcByNetWorkName()
-		if err != nil {
-			return
-		}
-		client, err := ethclient.Dial(chainRpc)
-		if err != nil {
-			return
-		}
-		defer client.Close()
-		taskManagerStub, err := fcp.NewTaskManagerStub(client)
-		if err != nil {
-			return
-		}
-
-		taskInfoOnChain, err := taskManagerStub.GetTaskInfo(jobData.TaskUUID)
-		if err != nil {
-			return
-		}
-		expireTime := taskInfoOnChain.StartTimestamp + taskInfoOnChain.Duration
-
 		var jobEntity = new(models.JobEntity)
 		jobEntity.Source = jobData.StorageSource
 		jobEntity.SpaceUuid = spaceUuid
@@ -351,16 +311,16 @@ func RedeployJob(c *gin.Context) {
 		jobEntity.Duration = jobData.Duration
 		jobEntity.DeployStatus = models.DEPLOY_RECEIVE_JOB
 		jobEntity.CreateTime = time.Now().Unix()
-		jobEntity.ExpireTime = expireTime
+		jobEntity.ExpireTime = getJobExpiredTime(job)
 		NewJobService().SaveJobEntity(jobEntity)
 
 		go func() {
 			if err = submitJob(&jobData); err != nil {
-				logs.GetLogger().Errorf("upload job data to MCS failed, jobUuid: %s, spaceUuid: %s, error: %v",
+				logs.GetLogger().Errorf("failed to upload job data to MCS, jobUuid: %s, spaceUuid: %s, error: %v",
 					jobData.UUID, spaceUuid, err)
 				return
 			}
-			logs.GetLogger().Infof("jobuuid: %s successfully uploaded to MCS", jobData.UUID)
+			logs.GetLogger().Infof("successfully uploaded to MCS, jobuuid: %s", jobData.UUID)
 		}()
 
 		DeploySpaceTask(jobData.JobSourceURI, hostName, jobData.Duration, jobData.UUID, jobData.TaskUUID, gpuProductName)
@@ -403,26 +363,7 @@ func ReNewJob(c *gin.Context) {
 		c.JSON(http.StatusOK, util.CreateErrorResponse(util.BadParamError, "The job was terminated due to its expiration date"))
 		return
 	} else {
-		chainRpc, err := conf.GetRpcByNetWorkName()
-		if err != nil {
-			return
-		}
-		client, err := ethclient.Dial(chainRpc)
-		if err != nil {
-			return
-		}
-		defer client.Close()
-		taskManagerStub, err := fcp.NewTaskManagerStub(client)
-		if err != nil {
-			return
-		}
-
-		taskInfoOnChain, err := taskManagerStub.GetTaskInfo(jobData.TaskUuid)
-		if err != nil {
-			return
-		}
-		expireTime := taskInfoOnChain.StartTimestamp + taskInfoOnChain.Duration
-		jobEntity.ExpireTime = expireTime
+		jobEntity.ExpireTime = getJobExpiredTime(jobEntity)
 		err = NewJobService().SaveJobEntity(&jobEntity)
 		if err != nil {
 			logs.GetLogger().Errorf("update job expireTime failed, taskUuid: %s, error: %+v", jobData.TaskUuid, err)
@@ -1439,4 +1380,38 @@ func CheckWalletBlackList(jobSourceURI string) bool {
 		}
 	}
 	return false
+}
+
+func getJobExpiredTime(jobEntity models.JobEntity) int64 {
+	var expiredTime = jobEntity.ExpireTime
+	var taskInfoOnChain models.TaskInfoOnChain
+	var err error
+
+	for i := 0; i < 5; i++ {
+		taskInfoOnChain, err = getJobOnChain(jobEntity.TaskUuid)
+		if err != nil {
+			time.Sleep(5 * time.Second)
+			continue
+		}
+		break
+	}
+	expiredTime = taskInfoOnChain.StartTimestamp + taskInfoOnChain.Duration
+	return expiredTime
+}
+
+func getJobOnChain(taskUuid string) (models.TaskInfoOnChain, error) {
+	chainRpc, err := conf.GetRpcByNetWorkName()
+	if err != nil {
+		return models.TaskInfoOnChain{}, err
+	}
+	client, err := ethclient.Dial(chainRpc)
+	if err != nil {
+		return models.TaskInfoOnChain{}, fmt.Errorf("failed to rpc, error: %v", err)
+	}
+	defer client.Close()
+	taskManagerStub, err := fcp.NewTaskManagerStub(client)
+	if err != nil {
+		return models.TaskInfoOnChain{}, err
+	}
+	return taskManagerStub.GetTaskInfo(taskUuid)
 }

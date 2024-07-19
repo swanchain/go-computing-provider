@@ -156,6 +156,19 @@ type TaskInfoOnChain struct {
 	StartTimestamp     int64
 	TerminateTimestamp int64
 	Duration           int64
-	TaskStatus         uint8
-	CollateralStatus   uint8
+	TaskStatus         int
+	CollateralStatus   int
 }
+
+const (
+	NOT_ASSIGNED = iota
+	IN_PROGRESS
+	COMPLETED
+	TERMINATED
+)
+
+const (
+	LOCKED = iota
+	UNLOCKED
+	SLASHED
+)

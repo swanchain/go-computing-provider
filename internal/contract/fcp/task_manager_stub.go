@@ -44,8 +44,8 @@ func (s *TaskManagerStub) GetTaskInfo(taskUuid string) (models.TaskInfoOnChain, 
 	taskInfo.StartTimestamp = fullTaskInfo.StartTimestamp.Int64()
 	taskInfo.TerminateTimestamp = fullTaskInfo.TerminateTimestamp.Int64()
 	taskInfo.Duration = fullTaskInfo.Duration.Int64()
-	taskInfo.TaskStatus = fullTaskInfo.TaskStatus
-	taskInfo.CollateralStatus = fullTaskInfo.CollateralStatus
+	taskInfo.TaskStatus = int(fullTaskInfo.TaskStatus)
+	taskInfo.CollateralStatus = int(fullTaskInfo.CollateralStatus)
 
 	var cpAccount []string
 	for _, address := range fullTaskInfo.CpList {

@@ -108,7 +108,7 @@ const (
 	JOB_DEPLOY_STATUS     = 1
 	JOB_RUNNING_STATUS    = 2
 	JOB_TERMINATED_STATUS = 3
-	JOB_EXPIRED_STATUS    = 4
+	JOB_COMPLETED_STATUS  = 4
 )
 
 func GetJobStatus(status int) string {
@@ -120,8 +120,8 @@ func GetJobStatus(status int) string {
 		statusStr = "running"
 	case JOB_TERMINATED_STATUS:
 		statusStr = "terminated"
-	case JOB_EXPIRED_STATUS:
-		statusStr = "expired"
+	case JOB_COMPLETED_STATUS:
+		statusStr = "completed"
 	}
 	return statusStr
 }
