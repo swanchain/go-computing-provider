@@ -78,7 +78,7 @@ func (jobServ JobService) SaveJobEntity(job *models.JobEntity) (err error) {
 }
 
 func (jobServ JobService) UpdateJobEntityBySpaceUuid(job *models.JobEntity) (err error) {
-	return jobServ.Where("space_uuid=? and delete_at=?", job.SpaceUuid, models.UN_DELETEED_FLAG).Updates(job).Error
+	return jobServ.Model(&models.JobEntity{}).Where("space_uuid=? and delete_at=?", job.SpaceUuid, models.UN_DELETEED_FLAG).Updates(job).Error
 }
 
 func (jobServ JobService) UpdateJobEntityByJobUuid(job *models.JobEntity) (err error) {
@@ -91,24 +91,24 @@ func (jobServ JobService) UpdateJobResultUrlByJobUuid(jobUuid string, resultUrl 
 
 func (jobServ JobService) GetJobEntityByTaskUuid(taskUuid string) (models.JobEntity, error) {
 	var job models.JobEntity
-	err := jobServ.Where("task_uuid=? and delete_at=?", taskUuid, models.UN_DELETEED_FLAG).Find(&job).Error
+	err := jobServ.Model(&models.JobEntity{}).Where("task_uuid=? and delete_at=?", taskUuid, models.UN_DELETEED_FLAG).Find(&job).Error
 	return job, err
 }
 
 func (jobServ JobService) GetJobEntityBySpaceUuid(spaceUuid string) (models.JobEntity, error) {
 	var job models.JobEntity
-	err := jobServ.Where("space_uuid=? and delete_at=?", spaceUuid, models.UN_DELETEED_FLAG).Find(&job).Error
+	err := jobServ.Model(&models.JobEntity{}).Where("space_uuid=? and delete_at=?", spaceUuid, models.UN_DELETEED_FLAG).Find(&job).Error
 	return job, err
 }
 
 func (jobServ JobService) GetJobEntityByJobUuid(jobUuid string) (models.JobEntity, error) {
 	var job models.JobEntity
-	err := jobServ.Where("job_uuid=? and delete_at=?", jobUuid, models.UN_DELETEED_FLAG).Find(&job).Error
+	err := jobServ.Model(&models.JobEntity{}).Where("job_uuid=? and delete_at=?", jobUuid, models.UN_DELETEED_FLAG).Find(&job).Error
 	return job, err
 }
 
 func (jobServ JobService) DeleteJobEntityBySpaceUuId(spaceUuid string, jobStatus int) error {
-	return jobServ.Debug().Where("space_uuid=? and delete_at=?", spaceUuid, models.UN_DELETEED_FLAG).Updates(map[string]interface{}{
+	return jobServ.Debug().Model(&models.JobEntity{}).Where("space_uuid=? and delete_at=?", spaceUuid, models.UN_DELETEED_FLAG).Updates(map[string]interface{}{
 		"delete_at":  models.DELETED_FLAG,
 		"status":     jobStatus,
 		"pod_status": models.POD_DELETE_STATUS,
@@ -125,11 +125,11 @@ func (jobServ JobService) GetJobList(status int) (list []*models.JobEntity, err 
 }
 
 func (jobServ JobService) DeleteJobs(spaceIds []string) (err error) {
-	return jobServ.Where("space_uuid in ? and delete_at=?", spaceIds, models.UN_DELETEED_FLAG).Update("delete_at", models.DELETED_FLAG).Error
+	return jobServ.Model(&models.JobEntity{}).Where("space_uuid in ? and delete_at=?", spaceIds, models.UN_DELETEED_FLAG).Update("delete_at", models.DELETED_FLAG).Error
 }
 
 func (jobServ JobService) UpdateAllJobStatusToDeleted() error {
-	return jobServ.Where("delete_at=?", models.UN_DELETEED_FLAG).Updates(map[string]interface{}{
+	return jobServ.Model(&models.JobEntity{}).Where("delete_at=?", models.UN_DELETEED_FLAG).Updates(map[string]interface{}{
 		"delete_at":  models.DELETED_FLAG,
 		"status":     models.JOB_COMPLETED_STATUS,
 		"pod_status": models.POD_DELETE_STATUS,
@@ -142,17 +142,17 @@ type CpInfoService struct {
 
 func (cpServ CpInfoService) GetCpInfoEntityByAccountAddress(accountAddress string) (*models.CpInfoEntity, error) {
 	var cp models.CpInfoEntity
-	err := cpServ.Where("contract_address=?", accountAddress).Find(&cp).Error
+	err := cpServ.Model(&models.JobEntity{}).Where("contract_address=?", accountAddress).Find(&cp).Error
 	return &cp, err
 }
 
 func (cpServ CpInfoService) SaveCpInfoEntity(cp *models.CpInfoEntity) (err error) {
-	cpServ.Where("contract_address =?", cp.ContractAddress).Delete(&models.CpInfoEntity{})
+	cpServ.Model(&models.JobEntity{}).Where("contract_address =?", cp.ContractAddress).Delete(&models.CpInfoEntity{})
 	return cpServ.Save(cp).Error
 }
 
 func (cpServ CpInfoService) UpdateCpInfoByNodeId(cp *models.CpInfoEntity) (err error) {
-	return cpServ.Where("node_id =?", cp.NodeId).Updates(cp).Error
+	return cpServ.Model(&models.JobEntity{}).Where("node_id =?", cp.NodeId).Updates(cp).Error
 }
 
 var taskSet = wire.NewSet(db.NewDbService, wire.Struct(new(TaskService), "*"))
