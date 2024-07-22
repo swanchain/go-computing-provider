@@ -117,7 +117,7 @@ func (jobServ JobService) DeleteJobEntityBySpaceUuId(spaceUuid string, jobStatus
 
 func (jobServ JobService) GetJobList(status int) (list []*models.JobEntity, err error) {
 	if status >= 0 {
-		err = jobServ.Model(&models.JobEntity{}).Where("delete_at=？", status).Find(&list).Error
+		err = jobServ.Model(&models.JobEntity{}).Where("delete_at=?", status).Find(&list).Error
 	} else {
 		err = jobServ.Model(&models.JobEntity{}).Find(&list).Error
 	}
