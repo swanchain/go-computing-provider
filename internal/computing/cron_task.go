@@ -2,7 +2,6 @@ package computing
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
@@ -11,7 +10,6 @@ import (
 	"github.com/swanchain/go-computing-provider/constants"
 	"github.com/swanchain/go-computing-provider/internal/contract/fcp"
 	"github.com/swanchain/go-computing-provider/internal/models"
-	"io"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net/http"
@@ -117,7 +115,7 @@ func (task *CronTask) watchNameSpaceForDeleted() {
 
 func (task *CronTask) watchExpiredTask() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("0 0/5 * * * ?", func() {
+	c.AddFunc("0 0/10 * * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("watchExpiredTask catch panic error: %+v", err)
@@ -126,7 +124,7 @@ func (task *CronTask) watchExpiredTask() {
 
 		jobList, err := NewJobService().GetJobList(models.UN_DELETEED_FLAG)
 		if err != nil {
-			logs.GetLogger().Errorf("Failed watchExpiredTask get job data, error: %+v", err)
+			logs.GetLogger().Errorf("failed to get job data, error: %+v", err)
 			return
 		}
 
@@ -167,22 +165,17 @@ func (task *CronTask) watchExpiredTask() {
 					continue
 				}
 
-				if len(strings.TrimSpace(job.TaskUuid)) != 0 {
-					taskStatus, err := checkTaskStatusByHub(job.TaskUuid, task.nodeId)
-					if err != nil {
-						logs.GetLogger().Errorf("Failed check task status by Orchestrator service, error: %+v", err)
-						return
-					}
-					if strings.Contains(taskStatus, "no task found") {
-						logs.GetLogger().Infof("task_uuid: %s, task not found on the orchestrator service, starting to delete it.", job.TaskUuid)
-						deleteJob(job.NameSpace, job.SpaceUuid, "cron task, no task found")
+				checkFcpJobInfoInChain(job)
+
+				if job.Status == models.JOB_TERMINATED_STATUS || job.Status == models.JOB_COMPLETED_STATUS {
+					logs.GetLogger().Infof("task_uuid: %s, current status is %s, starting to delete it.", job.TaskUuid, models.GetJobStatus(job.Status))
+					if err = deleteJob(job.NameSpace, job.SpaceUuid, "cron task, abnormal state"); err == nil {
 						deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
 						continue
 					}
-					if strings.Contains(taskStatus, "Terminated") || strings.Contains(taskStatus, "Terminated") ||
-						strings.Contains(taskStatus, "Cancelled") || strings.Contains(taskStatus, "Failed") {
-						logs.GetLogger().Infof("task_uuid: %s, current status is %s, starting to delete it.", job.TaskUuid, taskStatus)
-						if err = deleteJob(job.NameSpace, job.SpaceUuid, "cron task, abnormal state"); err == nil {
+				} else if job.Status == models.JOB_RUNNING_STATUS {
+					if !checkHealth(job.RealUrl) {
+						if err = deleteJob(job.NameSpace, job.SpaceUuid, "cron task, job service is not available"); err == nil {
 							deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
 							continue
 						}
@@ -358,48 +351,6 @@ func addNodeLabel() {
 			}
 		}
 	}
-}
-
-func checkTaskStatusByHub(taskUuid, nodeId string) (string, error) {
-	url := fmt.Sprintf("%s/check_task_status_with_node_id/%s/%s", conf.GetConfig().HUB.ServerUrl, taskUuid, nodeId)
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return "", err
-	}
-
-	req.Header.Add("offset", "0")
-	req.Header.Add("limit", "10")
-	req.Header.Add("Authorization", "Bearer "+conf.GetConfig().HUB.AccessToken)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Println("Error making HTTP request:", err)
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-	var taskStatus struct {
-		Data struct {
-			JobStatus  string `json:"job_status"`
-			TaskStatus string `json:"task_status"`
-		} `json:"data"`
-		Message string `json:"message"`
-		Status  string `json:"status"`
-	}
-	err = json.Unmarshal(respBody, &taskStatus)
-	if err != nil {
-		logs.GetLogger().Errorf("check_task_status_with_node_id resp: %s", string(respBody))
-		return "", err
-	}
-	if taskStatus.Status == "failed" {
-		return taskStatus.Message, nil
-	}
-	return taskStatus.Status, nil
 }
 
 func reportJobStatus(jobUuid string, deployStatus int) bool {
