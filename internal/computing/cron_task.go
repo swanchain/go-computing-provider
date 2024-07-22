@@ -146,7 +146,9 @@ func (task *CronTask) watchExpiredTask() {
 		if len(deployOnK8s) == 0 && len(jobList) > 0 {
 			logs.GetLogger().Infof("start delete job from db")
 			for _, job := range jobList {
-				NewJobService().DeleteJobEntityBySpaceUuId(job.SpaceUuid, models.JOB_COMPLETED_STATUS)
+				if err = NewJobService().DeleteJobEntityBySpaceUuId(job.SpaceUuid, models.JOB_COMPLETED_STATUS); err != nil {
+					logs.GetLogger().Infof("failed to delete job from db, space_uuid: %s, error: %v", job.SpaceUuid, err)
+				}
 			}
 		} else if len(deployOnK8s) > 0 && len(jobList) == 0 {
 			for _, namespace := range deployOnK8s {
