@@ -117,7 +117,7 @@ func (task *CronTask) watchNameSpaceForDeleted() {
 
 func (task *CronTask) watchExpiredTask() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("0 0/3 * * * ?", func() {
+	c.AddFunc("0 0/5 * * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("watchExpiredTask catch panic error: %+v", err)
@@ -144,7 +144,6 @@ func (task *CronTask) watchExpiredTask() {
 		}
 
 		if len(deployOnK8s) == 0 && len(jobList) > 0 {
-			logs.GetLogger().Infof("start delete job from db")
 			for _, job := range jobList {
 				if err = NewJobService().DeleteJobEntityBySpaceUuId(job.SpaceUuid, models.JOB_COMPLETED_STATUS); err != nil {
 					logs.GetLogger().Infof("failed to delete job from db, space_uuid: %s, error: %v", job.SpaceUuid, err)
@@ -152,7 +151,9 @@ func (task *CronTask) watchExpiredTask() {
 			}
 		} else if len(deployOnK8s) > 0 && len(jobList) == 0 {
 			for _, namespace := range deployOnK8s {
-				NewK8sService().DeleteNameSpace(context.TODO(), namespace)
+				if err = NewK8sService().DeleteNameSpace(context.TODO(), namespace); err != nil {
+					logs.GetLogger().Errorf("failed to delete job from k8s, namespace: %s, error: %v", namespace, err)
+				}
 			}
 		} else if len(deployOnK8s) > 0 && len(jobList) > 0 {
 			var deleteSpaceIds []string
