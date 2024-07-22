@@ -128,6 +128,14 @@ func (jobServ JobService) DeleteJobs(spaceIds []string) (err error) {
 	return jobServ.Where("space_uuid in ? and delete_at=?", spaceIds, models.UN_DELETEED_FLAG).Update("delete_at", models.DELETED_FLAG).Error
 }
 
+func (jobServ JobService) UpdateAllJobStatusToDeleted() error {
+	return jobServ.Where("delete_at=?", models.UN_DELETEED_FLAG).Updates(map[string]interface{}{
+		"delete_at":  models.DELETED_FLAG,
+		"status":     models.JOB_COMPLETED_STATUS,
+		"pod_status": models.POD_DELETE_STATUS,
+	}).Error
+}
+
 type CpInfoService struct {
 	*gorm.DB
 }

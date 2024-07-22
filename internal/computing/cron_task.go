@@ -143,76 +143,66 @@ func (task *CronTask) watchExpiredTask() {
 			}
 		}
 
-		if len(jobList) == 0 {
-			service := NewK8sService()
-			namespaces, err := service.ListNamespace(context.TODO())
-			if err != nil {
-				logs.GetLogger().Errorf("Failed get all namespace, error: %+v", err)
-				return
+		if len(deployOnK8s) == 0 && len(jobList) > 0 {
+			for _, job := range jobList {
+				NewJobService().DeleteJobEntityBySpaceUuId(job.SpaceUuid, models.JOB_COMPLETED_STATUS)
 			}
-
-			for _, namespace := range namespaces {
-				if strings.HasPrefix(namespace, constants.K8S_NAMESPACE_NAME_PREFIX) {
-					service.DeleteNameSpace(context.TODO(), namespace)
+		} else if len(deployOnK8s) > 0 && len(jobList) == 0 {
+			for _, namespace := range deployOnK8s {
+				NewK8sService().DeleteNameSpace(context.TODO(), namespace)
+			}
+		} else if len(deployOnK8s) > 0 && len(jobList) > 0 {
+			var deleteSpaceIds []string
+			for _, job := range jobList {
+				if _, ok := deployOnK8s[job.K8sDeployName]; ok {
+					delete(deployOnK8s, job.K8sDeployName)
 				}
-			}
-			return
-		}
 
-		var deleteSpaceIds []string
-		for _, job := range jobList {
-			if _, ok := deployOnK8s[job.K8sDeployName]; ok {
-				delete(deployOnK8s, job.K8sDeployName)
-			}
-
-			if _, err = NewK8sService().k8sClient.AppsV1().Deployments(job.NameSpace).Get(context.TODO(), job.K8sDeployName, metav1.GetOptions{}); err != nil && errors.IsNotFound(err) {
 				if time.Now().Sub(time.Unix(job.CreateTime, 0)).Hours() > 2 {
 					deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
 					continue
 				}
-			}
 
-			if len(strings.TrimSpace(job.TaskUuid)) != 0 {
-				taskStatus, err := checkTaskStatusByHub(job.TaskUuid, task.nodeId)
-				if err != nil {
-					logs.GetLogger().Errorf("Failed check task status by Orchestrator service, error: %+v", err)
-					return
+				if len(strings.TrimSpace(job.TaskUuid)) != 0 {
+					taskStatus, err := checkTaskStatusByHub(job.TaskUuid, task.nodeId)
+					if err != nil {
+						logs.GetLogger().Errorf("Failed check task status by Orchestrator service, error: %+v", err)
+						return
+					}
+					if strings.Contains(taskStatus, "no task found") {
+						logs.GetLogger().Infof("task_uuid: %s, task not found on the orchestrator service, starting to delete it.", job.TaskUuid)
+						deleteJob(job.NameSpace, job.SpaceUuid, "cron task, no task found")
+						deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
+						continue
+					}
+					if strings.Contains(taskStatus, "Terminated") || strings.Contains(taskStatus, "Terminated") ||
+						strings.Contains(taskStatus, "Cancelled") || strings.Contains(taskStatus, "Failed") {
+						logs.GetLogger().Infof("task_uuid: %s, current status is %s, starting to delete it.", job.TaskUuid, taskStatus)
+						if err = deleteJob(job.NameSpace, job.SpaceUuid, "cron task, abnormal state"); err == nil {
+							deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
+							continue
+						}
+					}
 				}
-				if strings.Contains(taskStatus, "no task found") {
-					logs.GetLogger().Infof("task_uuid: %s, task not found on the orchestrator service, starting to delete it.", job.TaskUuid)
-					deleteJob(job.NameSpace, job.SpaceUuid, "cron task, no task found")
-					deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
-					continue
-				}
-				if strings.Contains(taskStatus, "Terminated") || strings.Contains(taskStatus, "Terminated") ||
-					strings.Contains(taskStatus, "Cancelled") || strings.Contains(taskStatus, "Failed") {
-					logs.GetLogger().Infof("task_uuid: %s, current status is %s, starting to delete it.", job.TaskUuid, taskStatus)
-					if err = deleteJob(job.NameSpace, job.SpaceUuid, "cron task, abnormal state"); err == nil {
+
+				if time.Now().Unix() > job.ExpireTime {
+					if err = deleteJob(job.NameSpace, job.SpaceUuid, "cron-task the task execution time has expired"); err == nil {
 						deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
 						continue
 					}
 				}
 			}
 
-			if time.Now().Unix() > job.ExpireTime {
-				logs.GetLogger().Infof("<timer-task> space_uuid: %s has expired, the job starting terminated", job.SpaceUuid)
-				if err = deleteJob(job.NameSpace, job.SpaceUuid, "cron-task the task execution time has expired"); err == nil {
-					deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
-					continue
+			for deploymentName, nameSpace := range deployOnK8s {
+				if nameSpace != "" && deploymentName != "" {
+					spaceUuid := strings.TrimPrefix(deploymentName, constants.K8S_DEPLOY_NAME_PREFIX)
+					deleteJob(nameSpace, spaceUuid, "cron-task the obsolete task left in the k8s")
 				}
 			}
-		}
-
-		for deploymentName, nameSpace := range deployOnK8s {
-			if nameSpace != "" && deploymentName != "" {
-				spaceUuid := strings.TrimPrefix(deploymentName, constants.K8S_DEPLOY_NAME_PREFIX)
-				deleteJob(nameSpace, spaceUuid, "cron-task the obsolete task left in the k8s")
+			for _, spaceUuid := range deleteSpaceIds {
+				NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid, models.JOB_COMPLETED_STATUS)
 			}
 		}
-		for _, spaceUuid := range deleteSpaceIds {
-			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid, models.JOB_COMPLETED_STATUS)
-		}
-
 	})
 	c.Start()
 }
