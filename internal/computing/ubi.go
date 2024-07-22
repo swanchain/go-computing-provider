@@ -1,7 +1,6 @@
 package computing
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -15,7 +14,6 @@ import (
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/constants"
 	"github.com/swanchain/go-computing-provider/internal/contract"
-	account2 "github.com/swanchain/go-computing-provider/internal/contract/account"
 	"github.com/swanchain/go-computing-provider/internal/contract/ecp"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"github.com/swanchain/go-computing-provider/util"
@@ -998,26 +996,7 @@ func SyncCpAccountInfo() {
 		return
 	}
 
-	chainUrl, err := conf.GetRpcByNetWorkName()
-	if err != nil {
-		logs.GetLogger().Errorf("get rpc url failed, error: %v", err)
-		return
-	}
-
-	client, err := ethclient.Dial(chainUrl)
-	if err != nil {
-		logs.GetLogger().Errorf("dial rpc connect failed, error: %v", err)
-		return
-	}
-	defer client.Close()
-
-	cpStub, err := account2.NewAccountStub(client)
-	if err != nil {
-		logs.GetLogger().Errorf("create account client failed, error: %v", err)
-		return
-	}
-
-	cpAccount, err := cpStub.GetCpAccountInfo()
+	cpAccount, err := contract.GetAccountInfo()
 	if err != nil {
 		logs.GetLogger().Errorf("get cpAccount failed, error: %v", err)
 		return
@@ -1064,7 +1043,6 @@ func RestartResourceExporter() error {
 func submitTaskToSequencer(proof string, task *models.TaskEntity, timeOut int64) error {
 	var err error
 	var taskReq struct {
-		Contract     string `json:"contract"`
 		Id           int64  `json:"id"`
 		Type         int    `json:"type"`
 		ResourceType int    `json:"resource_type"`
@@ -1073,25 +1051,16 @@ func submitTaskToSequencer(proof string, task *models.TaskEntity, timeOut int64)
 		Deadline     int64  `json:"deadline"`
 		CheckCode    string `json:"check_code"`
 		Proof        string `json:"proof"`
-		Version      string `json:"version"`
-		Status       int    `json:"status"`
-		StartAt      int64  `json:"start_at"`
-		EndedAt      int64  `json:"ended_at"`
-		Lock         string `json:"lock"`
-		Reward       string `json:"reward"`
 	}
 
 	taskReq.Id = task.Id
 	taskReq.Type = task.Type
 	taskReq.ResourceType = task.ResourceType
-
 	taskReq.InputParam = task.InputParam
 	taskReq.VerifyParam = task.VerifyParam
 	taskReq.Deadline = task.Deadline
 	taskReq.CheckCode = task.CheckCode
 	taskReq.Proof = proof
-	taskReq.StartAt = task.CreateTime
-	taskReq.EndedAt = time.Now().Unix()
 
 	data, err := json.Marshal(&taskReq)
 	if err != nil {
@@ -1106,7 +1075,7 @@ outerLoop:
 			err = fmt.Errorf("submit task to sequencer timed out")
 			break outerLoop
 		default:
-			if err = doSend(data); err != nil {
+			if err = NewSequencer().SendTaskProof(data); err != nil {
 				logs.GetLogger().Warnf("taskId: %d submit task to sequencer failed, error: %v, retrying", task.Id, err)
 				time.Sleep(2 * time.Second)
 				continue
@@ -1116,39 +1085,4 @@ outerLoop:
 	}
 
 	return err
-}
-
-func doSend(data []byte) error {
-	req, err := http.NewRequest("POST", conf.GetConfig().UBI.SequencerUrl, bytes.NewBuffer(data))
-	if err != nil {
-		return fmt.Errorf("error creating request: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("error sending request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	var resultResp struct {
-		Code int    `json:"code"`
-		Msg  string `json:"msg"`
-		Data any    `json:"data,omitempty"`
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("error reading response: %v", err)
-	}
-	err = json.Unmarshal(body, &resultResp)
-	if err != nil {
-		return fmt.Errorf("response convert to json failed: %v", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf(resultResp.Msg)
-	}
-	return nil
 }

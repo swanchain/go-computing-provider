@@ -321,6 +321,28 @@ func (task *CronTask) setFailedUbiTaskStatus() {
 	c.Start()
 }
 
+func (task *CronTask) CheckJobReward() {
+	c := cron.New(cron.WithSeconds())
+	c.AddFunc("* 0/30 * * * ?", func() {
+		defer func() {
+			if err := recover(); err != nil {
+				logs.GetLogger().Errorf("task job: [cleanAbnormalDeployment], error: %+v", err)
+			}
+		}()
+
+		//jobList, err := NewJobService().GetJobListByNoReward()
+		//if err != nil {
+		//	logs.GetLogger().Errorf("failed to get job data, error: %+v", err)
+		//	return
+		//}
+		//for _, job := range jobList {
+		//
+		//}
+
+	})
+	c.Start()
+}
+
 func addNodeLabel() {
 	k8sService := NewK8sService()
 	nodes, err := k8sService.k8sClient.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})

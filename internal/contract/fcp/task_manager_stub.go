@@ -12,7 +12,7 @@ import (
 
 type TaskManagerStub struct {
 	client      *ethclient.Client
-	taskManager *EcpTaskManager
+	taskManager *FcpTaskManager
 	privateK    string
 	publicK     string
 }
@@ -21,7 +21,7 @@ func NewTaskManagerStub(client *ethclient.Client) (*TaskManagerStub, error) {
 	stub := &TaskManagerStub{}
 
 	jobManagerAddress := common.HexToAddress(conf.GetConfig().CONTRACT.JobManager)
-	taskManagerClient, err := NewEcpTaskManager(jobManagerAddress, client)
+	taskManagerClient, err := NewFcpTaskManager(jobManagerAddress, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create job manager contract client, error: %+v", err)
 	}

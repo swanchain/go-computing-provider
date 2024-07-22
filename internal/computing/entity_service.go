@@ -124,6 +124,11 @@ func (jobServ JobService) GetJobList(status int) (list []*models.JobEntity, err 
 	return
 }
 
+func (jobServ JobService) GetJobListByNoReward() (list []*models.JobEntity, err error) {
+	err = jobServ.Model(&models.JobEntity{}).Where("reward is not null").Find(&list).Error
+	return
+}
+
 func (jobServ JobService) DeleteJobs(spaceIds []string) (err error) {
 	return jobServ.Model(&models.JobEntity{}).Where("space_uuid in ? and delete_at=?", spaceIds, models.UN_DELETEED_FLAG).Update("delete_at", models.DELETED_FLAG).Error
 }

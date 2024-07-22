@@ -119,23 +119,13 @@ func getVerifyAccountClient(ownerAddress string) (*ethclient.Client, *account.Cp
 		return nil, nil, fmt.Errorf("get rpc url failed, error: %v", err)
 	}
 
-	localWallet, err := wallet.SetupWallet(wallet.WalletRepo)
-	if err != nil {
-		return nil, nil, fmt.Errorf("setup wallet failed, error: %v", err)
-	}
-
-	ki, err := localWallet.FindKey(ownerAddress)
-	if err != nil || ki == nil {
-		return nil, nil, fmt.Errorf("the address: %s, private key %v", ownerAddress, wallet.ErrKeyInfoNotFound)
-	}
-
 	client, err := ethclient.Dial(chainUrl)
 	if err != nil {
 		client.Close()
 		return nil, nil, fmt.Errorf("dial rpc connect failed, error: %v", err)
 	}
 
-	cpStub, err := account.NewAccountStub(client, account.WithCpPrivateKey(ki.PrivateKey))
+	cpStub, err := account.NewAccountStub(client)
 	if err != nil {
 		client.Close()
 		return nil, nil, err
