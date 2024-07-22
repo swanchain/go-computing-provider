@@ -117,7 +117,7 @@ func (task *CronTask) watchNameSpaceForDeleted() {
 
 func (task *CronTask) watchExpiredTask() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("0 0/5 * * * ?", func() {
+	c.AddFunc("0 0/3 * * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("watchExpiredTask catch panic error: %+v", err)
@@ -144,6 +144,7 @@ func (task *CronTask) watchExpiredTask() {
 		}
 
 		if len(deployOnK8s) == 0 && len(jobList) > 0 {
+			logs.GetLogger().Infof("start delete job from db")
 			for _, job := range jobList {
 				NewJobService().DeleteJobEntityBySpaceUuId(job.SpaceUuid, models.JOB_COMPLETED_STATUS)
 			}
