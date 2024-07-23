@@ -136,7 +136,7 @@ func InitConfig(cpRepoPath string, standalone bool) error {
 		}
 
 		if !checkDomain(domain, multiAddressSplit[2]) {
-			log.Fatalf("domain %s does not match IP address %s\n", domain, multiAddressSplit[4])
+			log.Fatalf("domain %s does not match IP address %s\n", domain, multiAddressSplit[2])
 		}
 	}
 

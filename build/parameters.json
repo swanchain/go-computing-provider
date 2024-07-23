@@ -36,7 +36,7 @@
   {
     "network": "dev-proxima",
     "config": {
-      "sequencer_url": "http://127.0.0.1:8005/task",
+      "sequencer_url": "http://sequencer.storefrontiers.cn/v1",
       "zk_engine_pk": "0xB5aeb540B4895cd024c1625E146684940A849ED9",
       "orchestrator_url": "https://swanhub-cali.swanchain.io",
       "orchestrator_pk": "0x29eD49c8E973696D07E7927f748F6E5Eacd5516D",
