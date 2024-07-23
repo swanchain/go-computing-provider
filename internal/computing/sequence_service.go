@@ -25,7 +25,7 @@ const (
 	task  = "/task"
 )
 
-var tokenCahe string
+var tokenCache string
 
 func NewSequencer() *Sequencer {
 	return &Sequencer{
@@ -78,14 +78,14 @@ func (s *Sequencer) getToken() error {
 		return err
 	}
 	if returnResult.Code == 0 {
-		tokenCahe = returnResult.Data.(Token).Token
+		tokenCache = returnResult.Data.(Token).Token
 		return nil
 	}
 	return fmt.Errorf(returnResult.Msg)
 }
 
 func (s *Sequencer) SendTaskProof(data []byte) error {
-	if tokenCahe == "" {
+	if tokenCache == "" {
 		if err := s.getToken(); err != nil {
 			return fmt.Errorf("failed to get token, error: %v", err)
 		}
@@ -97,7 +97,7 @@ func (s *Sequencer) SendTaskProof(data []byte) error {
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", tokenCahe)
+	req.Header.Set("Authorization", tokenCache)
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -107,7 +107,7 @@ func (s *Sequencer) SendTaskProof(data []byte) error {
 
 	newToken := resp.Header.Get("new-token")
 	if newToken != "" {
-		tokenCahe = newToken
+		tokenCache = newToken
 	}
 
 	body, err := io.ReadAll(resp.Body)
@@ -128,7 +128,7 @@ func (s *Sequencer) SendTaskProof(data []byte) error {
 }
 
 func (s *Sequencer) QueryTask(pageNo, pageSize int, taskId ...int) (TaskResp, error) {
-	if tokenCahe == "" {
+	if tokenCache == "" {
 		if err := s.getToken(); err != nil {
 			return TaskResp{}, fmt.Errorf("failed to get token, error: %v", err)
 		}
@@ -146,7 +146,7 @@ func (s *Sequencer) QueryTask(pageNo, pageSize int, taskId ...int) (TaskResp, er
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", tokenCahe)
+	req.Header.Set("Authorization", tokenCache)
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -156,7 +156,7 @@ func (s *Sequencer) QueryTask(pageNo, pageSize int, taskId ...int) (TaskResp, er
 
 	newToken := resp.Header.Get("new-token")
 	if newToken != "" {
-		tokenCahe = newToken
+		tokenCache = newToken
 	}
 
 	body, err := io.ReadAll(resp.Body)

@@ -128,6 +128,8 @@ var infoCmd = &cli.Command{
 			netWork = fmt.Sprintf("Testnet(%d)", chainId.Int64())
 		}
 
+		var sequencerCollateralBalance = "0.0000"
+		var sequencerEscrowBalance = "0.0000"
 		var fcpCollateralBalance = "0.0000"
 		var fcpEscrowBalance = "0.0000"
 		var ecpCollateralBalance = "0.0000"
@@ -208,6 +210,9 @@ var infoCmd = &cli.Command{
 		taskData = append(taskData, []string{"FCP Balance(SWANC):"})
 		taskData = append(taskData, []string{"   Collateral:", fcpCollateralBalance})
 		taskData = append(taskData, []string{"   Escrow:", fcpEscrowBalance})
+		taskData = append(taskData, []string{"Sequencer Balance(sETH):"})
+		taskData = append(taskData, []string{"   Collateral:", sequencerCollateralBalance})
+		taskData = append(taskData, []string{"   Escrow:", sequencerEscrowBalance})
 
 		var rowColorList []RowColor
 		if taskTypes != "" {
