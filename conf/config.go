@@ -6,6 +6,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/swanchain/go-computing-provider/build"
 	"log"
+	"net"
 	"os"
 	"path"
 	"path/filepath"
@@ -124,6 +125,14 @@ func InitConfig(cpRepoPath string, standalone bool) error {
 			config.CONTRACT.Sequencer = ncCopy.Config.SequencerContract
 		}
 	}
+
+	multiAddressSplit := strings.Split(config.API.MultiAddress, "/")
+	if len(multiAddressSplit) >= 4 {
+		if !checkDomain(config.API.Domain, multiAddressSplit[4]) {
+			log.Fatalf("domain %s does not match IP address %s\n", config.API.Domain, multiAddressSplit[4])
+		}
+	}
+
 	return nil
 }
 
@@ -149,6 +158,7 @@ func requiredFieldsAreGiven(metaData toml.MetaData) bool {
 		{"LOG", "KeyFile"},
 
 		{"UBI", "UbiEnginePk"},
+		{"UBI", "SequencerUrl"},
 
 		{"HUB", "ServerUrl"},
 		{"HUB", "AccessToken"},
@@ -179,6 +189,7 @@ func requiredFieldsAreGivenForSeparate(metaData toml.MetaData) bool {
 		{"API", "NodeName"},
 
 		{"UBI", "UbiEnginePk"},
+		{"UBI", "SequencerUrl"},
 
 		{"RPC", "SWAN_CHAIN_RPC"},
 	}
@@ -333,4 +344,20 @@ func Exists(cpPath string) bool {
 		return false
 	}
 	return true
+}
+
+func checkDomain(domain string, expectedIP string) bool {
+	ips, err := net.LookupIP(domain)
+	if err != nil {
+		return false
+	}
+
+	matched := false
+	for _, ip := range ips {
+		if ip.String() == expectedIP {
+			matched = true
+			break
+		}
+	}
+	return matched
 }

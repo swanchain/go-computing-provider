@@ -29,23 +29,23 @@ var tokenCahe string
 
 func NewSequencer() *Sequencer {
 	return &Sequencer{
-		url: "",
+		url: conf.GetConfig().UBI.SequencerUrl,
 	}
 }
 
-func (s *Sequencer) getToken() (string, error) {
+func (s *Sequencer) getToken() error {
 	var client = http.Client{
 		Timeout: 30,
 	}
 
 	accountInfo, err := contract.GetAccountInfo()
 	if err != nil {
-		return "", err
+		return err
 	}
 	var timestamp = time.Now().Unix()
 	signMsg, err := signMessage(fmt.Sprintf("%s%d", accountInfo.Contract, timestamp), accountInfo.OwnerAddress)
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	var data struct {
@@ -60,52 +60,65 @@ func (s *Sequencer) getToken() (string, error) {
 
 	reqBody, err := json.Marshal(&data)
 	if err != nil {
-		return "", fmt.Errorf("failed to convet json, error: %v", err)
+		return fmt.Errorf("failed to convet json, error: %v", err)
 	}
 
-	req, err := http.NewRequest("POST", s.url+token, strings.NewReader(string((reqBody))))
+	req, err := http.NewRequest("POST", s.url+token, strings.NewReader(string(reqBody)))
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	var returnResult ReturnResult
 	if err = json.NewDecoder(resp.Body).Decode(&returnResult); err != nil {
-		return "", err
+		return err
 	}
 	if returnResult.Code == 0 {
-		return returnResult.Data.(Token).Token, nil
+		tokenCahe = returnResult.Data.(Token).Token
+		return nil
 	}
-	return "", fmt.Errorf(returnResult.Msg)
+	return fmt.Errorf(returnResult.Msg)
 }
 
 func (s *Sequencer) SendTaskProof(data []byte) error {
-	req, err := http.NewRequest("POST", conf.GetConfig().UBI.SequencerUrl, bytes.NewBuffer(data))
+	if tokenCahe == "" {
+		if err := s.getToken(); err != nil {
+			return fmt.Errorf("failed to get token, error: %v", err)
+		}
+	}
+
+	req, err := http.NewRequest("POST", conf.GetConfig().UBI.SequencerUrl+task, bytes.NewBuffer(data))
 	if err != nil {
 		return fmt.Errorf("error creating request: %v", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", tokenCahe)
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to sending request: %v", err)
+		return fmt.Errorf("failed to send request: %v", err)
 	}
 	defer resp.Body.Close()
 
+	newToken := resp.Header.Get("new-token")
+	if newToken != "" {
+		tokenCahe = newToken
+	}
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("error reading response: %v", err)
+		return fmt.Errorf("failed to read response: %v", err)
 	}
 
 	var returnResult ReturnResult
 	err = json.Unmarshal(body, &returnResult)
 	if err != nil {
-		return fmt.Errorf("response convert to json failed: %v", err)
+		return fmt.Errorf("failed to convert to json, error: %v", err)
 	}
 
 	if returnResult.Code != 0 {
@@ -114,8 +127,53 @@ func (s *Sequencer) SendTaskProof(data []byte) error {
 	return nil
 }
 
-func (s *Sequencer) QueryTask() {
+func (s *Sequencer) QueryTask(pageNo, pageSize int, taskId ...int) (TaskResp, error) {
+	if tokenCahe == "" {
+		if err := s.getToken(); err != nil {
+			return TaskResp{}, fmt.Errorf("failed to get token, error: %v", err)
+		}
+	}
+	var url string
+	if len(taskId) > 0 && taskId[0] != 0 {
+		url = conf.GetConfig().UBI.SequencerUrl + task + fmt.Sprintf("?id=%d&page_no=%d&page_size=%d", taskId[0], pageNo, pageSize)
+	} else {
+		url = conf.GetConfig().UBI.SequencerUrl + task + fmt.Sprintf("?page_no=%d&page_size=%d", pageNo, pageSize)
+	}
 
+	req, err := http.NewRequest("POST", url, nil)
+	if err != nil {
+		return TaskResp{}, fmt.Errorf("error creating request: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", tokenCahe)
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return TaskResp{}, fmt.Errorf("failed to sending request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	newToken := resp.Header.Get("new-token")
+	if newToken != "" {
+		tokenCahe = newToken
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return TaskResp{}, fmt.Errorf("error reading response: %v", err)
+	}
+
+	var returnResult ReturnResult
+	err = json.Unmarshal(body, &returnResult)
+	if err != nil {
+		return TaskResp{}, fmt.Errorf("response convert to json failed: %v", err)
+	}
+
+	if returnResult.Code != 0 {
+		return TaskResp{}, fmt.Errorf(returnResult.Msg)
+	}
+	return returnResult.Data.(TaskResp), nil
 }
 
 func signMessage(msg string, ownerAddress string) (string, error) {

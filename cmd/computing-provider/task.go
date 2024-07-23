@@ -65,11 +65,6 @@ var taskList = &cli.Command{
 			return fmt.Errorf("get jobs failed, error: %+v", err)
 		}
 		for i, job := range list {
-			k8sService := computing.NewK8sService()
-			status, err := k8sService.GetDeploymentStatus(job.WalletAddress, job.SpaceUuid)
-			if err != nil {
-				return fmt.Errorf("failed get job status: %s, error: %+v", job.JobUuid, err)
-			}
 			var fullSpaceUuid string
 			if len(job.K8sDeployName) > 0 {
 				fullSpaceUuid = job.K8sDeployName[7:]
@@ -97,16 +92,19 @@ var taskList = &cli.Command{
 				}
 
 				taskData = append(taskData,
-					[]string{taskUuid, job.ResourceType, walletAddress, spaceUuid, job.Name, status, expireTime})
+					[]string{taskUuid, job.ResourceType, walletAddress, spaceUuid, job.Name, models.GetJobStatus(job.Status), expireTime})
 			}
 
 			var rowColor []tablewriter.Colors
-			if status == "Pending" {
+			switch job.Status {
+			case models.JOB_DEPLOY_STATUS:
 				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgYellowColor}}
-			} else if status == "Running" {
+			case models.JOB_RUNNING_STATUS:
 				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
-			} else {
+			case models.JOB_TERMINATED_STATUS:
 				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
+			case models.JOB_COMPLETED_STATUS:
+				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiMagentaColor}}
 			}
 
 			rowColorList = append(rowColorList, RowColor{
@@ -145,27 +143,24 @@ var taskDetail = &cli.Command{
 			return fmt.Errorf("task_uuid: %s, get job detail failed, error: %+v", taskUuid, err)
 		}
 
-		k8sService := computing.NewK8sService()
-		status, err := k8sService.GetDeploymentStatus(job.WalletAddress, job.SpaceUuid)
-		if err != nil {
-			return fmt.Errorf("failed get job status: %s, error: %+v", job.JobUuid, err)
-		}
-
 		var taskData [][]string
 		taskData = append(taskData, []string{"TASK TYPE:", job.ResourceType})
 		taskData = append(taskData, []string{"WALLET ADDRESS:", job.WalletAddress})
 		taskData = append(taskData, []string{"SPACE NAME:", job.Name})
 		taskData = append(taskData, []string{"SPACE URL:", job.RealUrl})
 		taskData = append(taskData, []string{"HARDWARE:", job.Hardware})
-		taskData = append(taskData, []string{"STATUS:", status})
+		taskData = append(taskData, []string{"STATUS:", models.GetJobStatus(job.Status)})
 
 		var rowColor []tablewriter.Colors
-		if status == "Pending" {
-			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgYellowColor}, {tablewriter.Bold, tablewriter.FgYellowColor}}
-		} else if status == "Running" {
-			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}, {tablewriter.Bold, tablewriter.FgGreenColor}}
-		} else {
-			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}, {tablewriter.Bold, tablewriter.FgCyanColor}}
+		switch job.Status {
+		case models.JOB_DEPLOY_STATUS:
+			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgYellowColor}}
+		case models.JOB_RUNNING_STATUS:
+			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
+		case models.JOB_TERMINATED_STATUS:
+			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
+		case models.JOB_COMPLETED_STATUS:
+			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiMagentaColor}}
 		}
 
 		header := []string{"TASK UUID:", job.TaskUuid}
