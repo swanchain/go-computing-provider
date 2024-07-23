@@ -1076,7 +1076,7 @@ outerLoop:
 			err = fmt.Errorf("submit task to sequencer timed out")
 			break outerLoop
 		default:
-			if err = NewSequencer("").SendTaskProof(data); err != nil {
+			if err = NewSequencer().SendTaskProof(data); err != nil {
 				logs.GetLogger().Warnf("taskId: %d submit task to sequencer failed, error: %v, retrying", task.Id, err)
 				time.Sleep(2 * time.Second)
 				continue
