@@ -128,8 +128,15 @@ func InitConfig(cpRepoPath string, standalone bool) error {
 
 	multiAddressSplit := strings.Split(config.API.MultiAddress, "/")
 	if len(multiAddressSplit) >= 4 {
-		if !checkDomain(config.API.Domain, multiAddressSplit[4]) {
-			log.Fatalf("domain %s does not match IP address %s\n", config.API.Domain, multiAddressSplit[4])
+		var domain string
+		if strings.HasPrefix(config.API.Domain, ".") {
+			domain = config.API.Domain[1:]
+		} else {
+			domain = config.API.Domain
+		}
+
+		if !checkDomain(domain, multiAddressSplit[2]) {
+			log.Fatalf("domain %s does not match IP address %s\n", domain, multiAddressSplit[4])
 		}
 	}
 
