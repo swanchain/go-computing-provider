@@ -142,7 +142,7 @@ type EcpTaskInfo struct {
 }
 
 type WithdrawRequest struct {
-	Amount        *big.Int
+	Amount        string
 	RequestBlock  int64
 	WithdrawDelay int64
 }

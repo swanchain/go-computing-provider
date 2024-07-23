@@ -110,7 +110,7 @@ func (s *Sequencer) SendTaskProof(data []byte) error {
 		}
 	}
 
-	req, err := http.NewRequest("POST", conf.GetConfig().UBI.SequencerUrl+task, bytes.NewBuffer(data))
+	req, err := http.NewRequest("POST", s.url+task, bytes.NewBuffer(data))
 	if err != nil {
 		return fmt.Errorf("error creating request: %v", err)
 	}
@@ -134,7 +134,7 @@ func (s *Sequencer) SendTaskProof(data []byte) error {
 		return fmt.Errorf("failed to read response: %v", err)
 	}
 
-	logs.GetLogger().Infof("SendTaskProof: %s", string(body))
+	logs.GetLogger().Infof("SendTaskProof: code: %d, result: %s", resp.StatusCode, string(body))
 
 	var returnResult ReturnResult
 	err = json.Unmarshal(body, &returnResult)
@@ -156,9 +156,9 @@ func (s *Sequencer) QueryTask(pageNo, pageSize int, taskId ...int) (TaskResp, er
 	}
 	var url string
 	if len(taskId) > 0 && taskId[0] != 0 {
-		url = conf.GetConfig().UBI.SequencerUrl + task + fmt.Sprintf("?id=%d&page_no=%d&page_size=%d", taskId[0], pageNo, pageSize)
+		url = s.url + task + fmt.Sprintf("?id=%d&page_no=%d&page_size=%d", taskId[0], pageNo, pageSize)
 	} else {
-		url = conf.GetConfig().UBI.SequencerUrl + task + fmt.Sprintf("?page_no=%d&page_size=%d", pageNo, pageSize)
+		url = s.url + task + fmt.Sprintf("?page_no=%d&page_size=%d", pageNo, pageSize)
 	}
 
 	req, err := http.NewRequest("POST", url, nil)
@@ -185,7 +185,7 @@ func (s *Sequencer) QueryTask(pageNo, pageSize int, taskId ...int) (TaskResp, er
 		return TaskResp{}, fmt.Errorf("error reading response: %v", err)
 	}
 
-	logs.GetLogger().Infof("QueryTask: %s", string(body))
+	logs.GetLogger().Infof("QueryTask: code: %d, result: %s", resp.StatusCode, string(body))
 
 	var returnResult ReturnResult
 	err = json.Unmarshal(body, &returnResult)
