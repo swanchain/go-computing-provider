@@ -2,10 +2,6 @@ package contract
 
 import (
 	"fmt"
-	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/swanchain/go-computing-provider/conf"
-	"github.com/swanchain/go-computing-provider/internal/contract/account"
-	"github.com/swanchain/go-computing-provider/internal/models"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -41,24 +37,4 @@ func GetCpAccountAddress() (string, error) {
 	}
 
 	return string(accountAddress), err
-}
-
-func GetAccountInfo() (models.Account, error) {
-	chainUrl, err := conf.GetRpcByNetWorkName()
-	if err != nil {
-		return models.Account{}, fmt.Errorf("failed to get rpc url, error: %v", err)
-	}
-
-	client, err := ethclient.Dial(chainUrl)
-	if err != nil {
-		return models.Account{}, fmt.Errorf("failed to dial rpc connect, error: %v", err)
-	}
-	defer client.Close()
-
-	cpStub, err := account.NewAccountStub(client)
-	if err != nil {
-		return models.Account{}, err
-	}
-
-	return cpStub.GetCpAccountInfo()
 }

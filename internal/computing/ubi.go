@@ -14,6 +14,7 @@ import (
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/constants"
 	"github.com/swanchain/go-computing-provider/internal/contract"
+	"github.com/swanchain/go-computing-provider/internal/contract/account"
 	"github.com/swanchain/go-computing-provider/internal/contract/ecp"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"github.com/swanchain/go-computing-provider/util"
@@ -996,7 +997,7 @@ func SyncCpAccountInfo() {
 		return
 	}
 
-	cpAccount, err := contract.GetAccountInfo()
+	cpAccount, err := account.GetAccountInfo()
 	if err != nil {
 		logs.GetLogger().Errorf("get cpAccount failed, error: %v", err)
 		return

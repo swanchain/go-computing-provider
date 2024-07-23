@@ -43,7 +43,7 @@
       "chain_rpc": "https://rpc-proxima.swanchain.io",
       "swan_token_contract": "0x91B25A65b295F0405552A4bbB77879ab5e38166c",
       "orchestrator_collateral_contract": "0x4fd3809F3f69bC05b1339031744A1A4101eC0E75",
-      "job_manager_contract": "",
+      "job_manager_contract": "0x1b213Ab4132d629d909aAc9c40848d553E2b4e29",
       "register_cp_contract": "0x0c5ff16ecac04d89413aaa3ebf904ac0ea440675",
       "zk_collateral_contract": "0x0eb78230dc037388938019d45db0a4c992c130ab",
       "register_task_contract": "0xE8b7f7A65C945F39514c535A35Fcb55Ff77DabeE",

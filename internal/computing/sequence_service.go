@@ -7,7 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/swanchain/go-computing-provider/conf"
-	"github.com/swanchain/go-computing-provider/internal/contract"
+	"github.com/swanchain/go-computing-provider/internal/contract/account"
 	"github.com/swanchain/go-computing-provider/wallet"
 	"golang.org/x/xerrors"
 	"io"
@@ -38,7 +38,7 @@ func (s *Sequencer) getToken() error {
 		Timeout: 30,
 	}
 
-	accountInfo, err := contract.GetAccountInfo()
+	accountInfo, err := account.GetAccountInfo()
 	if err != nil {
 		return err
 	}
