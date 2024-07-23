@@ -110,6 +110,21 @@ func InitConfig(cpRepoPath string, standalone bool) error {
 		if !requiredFieldsAreGiven(metaData) {
 			log.Fatal("Required fields not given")
 		}
+
+		multiAddressSplit := strings.Split(config.API.MultiAddress, "/")
+		if len(multiAddressSplit) >= 4 {
+			var domain string
+			if strings.HasPrefix(config.API.Domain, ".") {
+				domain = config.API.Domain[1:]
+			} else {
+				domain = config.API.Domain
+			}
+
+			if !checkDomain(domain, multiAddressSplit[2]) {
+				log.Fatalf("domain %s does not match IP address %s\n", domain, multiAddressSplit[2])
+			}
+		}
+
 	}
 
 	networkConfig := build.LoadParam()
@@ -125,21 +140,6 @@ func InitConfig(cpRepoPath string, standalone bool) error {
 			config.CONTRACT.Sequencer = ncCopy.Config.SequencerContract
 		}
 	}
-
-	multiAddressSplit := strings.Split(config.API.MultiAddress, "/")
-	if len(multiAddressSplit) >= 4 {
-		var domain string
-		if strings.HasPrefix(config.API.Domain, ".") {
-			domain = config.API.Domain[1:]
-		} else {
-			domain = config.API.Domain
-		}
-
-		if !checkDomain(domain, multiAddressSplit[2]) {
-			log.Fatalf("domain %s does not match IP address %s\n", domain, multiAddressSplit[2])
-		}
-	}
-
 	return nil
 }
 
