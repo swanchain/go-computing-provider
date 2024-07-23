@@ -67,6 +67,7 @@ func (s *Sequencer) getToken() error {
 	if err != nil {
 		return err
 	}
+	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := client.Do(req)
 	if err != nil {
