@@ -12,7 +12,7 @@ import (
 	"github.com/olekukonko/tablewriter"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/computing"
-	account2 "github.com/swanchain/go-computing-provider/internal/contract/account"
+	"github.com/swanchain/go-computing-provider/internal/contract/account"
 	"github.com/swanchain/go-computing-provider/internal/contract/ecp"
 	"github.com/swanchain/go-computing-provider/internal/contract/fcp"
 	"github.com/swanchain/go-computing-provider/internal/initializer"
@@ -128,8 +128,7 @@ var infoCmd = &cli.Command{
 			netWork = fmt.Sprintf("Testnet(%d)", chainId.Int64())
 		}
 
-		var sequencerCollateralBalance = "0.0000"
-		var sequencerEscrowBalance = "0.0000"
+		var sequencerBalance = "0.0000"
 		var fcpCollateralBalance = "0.0000"
 		var fcpEscrowBalance = "0.0000"
 		var ecpCollateralBalance = "0.0000"
@@ -139,7 +138,7 @@ var infoCmd = &cli.Command{
 		var contractAddress, ownerAddress, workerAddress, beneficiaryAddress, taskTypes, chainNodeId, version string
 		var cpAccount models.Account
 
-		cpStub, err := account2.NewAccountStub(client)
+		cpStub, err := account.NewAccountStub(client)
 		if err == nil {
 			cpAccount, err = cpStub.GetCpAccountInfo()
 			if err != nil {
@@ -181,6 +180,11 @@ var infoCmd = &cli.Command{
 			}
 		}
 
+		sequencerStub, err := ecp.NewSequencerStub(client, ecp.WithSequencerCpAccountAddress(contractAddress))
+		if err == nil {
+			sequencerBalance, err = sequencerStub.GetCPBalance()
+		}
+
 		var domain = conf.GetConfig().API.Domain
 		if strings.HasPrefix(domain, ".") {
 			domain = domain[1:]
@@ -203,6 +207,7 @@ var infoCmd = &cli.Command{
 		taskData = append(taskData, []string{""})
 		taskData = append(taskData, []string{"Owner Balance(sETH):", ownerBalance})
 		taskData = append(taskData, []string{"Worker Balance(sETH):", workerBalance})
+		taskData = append(taskData, []string{"Sequencer Balance(sETH):", sequencerBalance})
 		taskData = append(taskData, []string{""})
 		taskData = append(taskData, []string{"ECP Balance(SWANC):"})
 		taskData = append(taskData, []string{"   Collateral:", ecpCollateralBalance})
@@ -210,9 +215,6 @@ var infoCmd = &cli.Command{
 		taskData = append(taskData, []string{"FCP Balance(SWANC):"})
 		taskData = append(taskData, []string{"   Collateral:", fcpCollateralBalance})
 		taskData = append(taskData, []string{"   Escrow:", fcpEscrowBalance})
-		taskData = append(taskData, []string{"Sequencer Balance(sETH):"})
-		taskData = append(taskData, []string{"   Collateral:", sequencerCollateralBalance})
-		taskData = append(taskData, []string{"   Escrow:", sequencerEscrowBalance})
 
 		var rowColorList []RowColor
 		if taskTypes != "" {
@@ -277,6 +279,7 @@ var stateInfoCmd = &cli.Command{
 		}
 		defer client.Close()
 
+		var sequencerBalance = "0.0000"
 		var fcpCollateralBalance = "0.0000"
 		var fcpEscrowBalance = "0.0000"
 		var ecpCollateralBalance = "0.0000"
@@ -286,7 +289,7 @@ var stateInfoCmd = &cli.Command{
 		var chainMultiAddress string
 		var contractAddress, ownerAddress, workerAddress, beneficiaryAddress, taskTypes, chainNodeId, version string
 
-		cpStub, err := account2.NewAccountStub(client, account2.WithContractAddress(cctx.Args().Get(0)))
+		cpStub, err := account.NewAccountStub(client, account.WithContractAddress(cctx.Args().Get(0)))
 		if err == nil {
 			cpAccount, err := cpStub.GetCpAccountInfo()
 			if err != nil {
@@ -333,6 +336,11 @@ var stateInfoCmd = &cli.Command{
 			}
 		}
 
+		sequencerStub, err := ecp.NewSequencerStub(client, ecp.WithSequencerCpAccountAddress(contractAddress))
+		if err == nil {
+			sequencerBalance, err = sequencerStub.GetCPBalance()
+		}
+
 		var taskData [][]string
 		taskData = append(taskData, []string{"Node ID:", chainNodeId})
 		taskData = append(taskData, []string{"Multi-Address:", chainMultiAddress})
@@ -343,6 +351,7 @@ var stateInfoCmd = &cli.Command{
 		taskData = append(taskData, []string{""})
 		taskData = append(taskData, []string{"Owner Balance(sETH):", ownerBalance})
 		taskData = append(taskData, []string{"Worker Balance(sETH):", workerBalance})
+		taskData = append(taskData, []string{"Sequencer Balance(sETH):", sequencerBalance})
 		taskData = append(taskData, []string{""})
 		taskData = append(taskData, []string{"ECP Balance(SWANC):"})
 		taskData = append(taskData, []string{"   Collateral:", ecpCollateralBalance})

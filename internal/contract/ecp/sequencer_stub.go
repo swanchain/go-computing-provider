@@ -104,6 +104,22 @@ func (s *SequencerStub) Withdraw(amount *big.Int) (string, error) {
 	return transaction.Hash().String(), nil
 }
 
+func (s *SequencerStub) GetCPBalance() (string, error) {
+	if s.cpAccountAddress == "" || len(strings.TrimSpace(s.cpAccountAddress)) == 0 {
+		cpAccountAddress, err := contract.GetCpAccountAddress()
+		if err != nil {
+			return "", fmt.Errorf("get cp account contract address failed, error: %v", err)
+		}
+		s.cpAccountAddress = cpAccountAddress
+	}
+
+	balance, err := s.sequencer.GetCPBalance(&bind.CallOpts{}, common.HexToAddress(s.cpAccountAddress))
+	if err != nil {
+		return "", fmt.Errorf("address: %s, ECP sequencer client withdraw tx error: %+v", s.cpAccountAddress, err)
+	}
+	return contract.BalanceToStr(balance), nil
+}
+
 func (s *SequencerStub) privateKeyToPublicKey() (common.Address, error) {
 	if len(strings.TrimSpace(s.privateK)) == 0 {
 		return common.Address{}, fmt.Errorf("wallet address private key must be not empty")
