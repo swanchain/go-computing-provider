@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/contract/account"
 	"github.com/swanchain/go-computing-provider/wallet"
@@ -73,9 +74,16 @@ func (s *Sequencer) getToken() error {
 	if err != nil {
 		return err
 	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response: %v", err)
+	}
+	logs.GetLogger().Infof("getToken: %s", string(body))
 
 	var returnResult ReturnResult
-	if err = json.NewDecoder(resp.Body).Decode(&returnResult); err != nil {
+	if err = json.Unmarshal(body, &returnResult); err != nil {
 		return err
 	}
 	if returnResult.Code == 0 {
@@ -115,6 +123,8 @@ func (s *Sequencer) SendTaskProof(data []byte) error {
 	if err != nil {
 		return fmt.Errorf("failed to read response: %v", err)
 	}
+
+	logs.GetLogger().Infof("SendTaskProof: %s", string(body))
 
 	var returnResult ReturnResult
 	err = json.Unmarshal(body, &returnResult)
@@ -164,6 +174,8 @@ func (s *Sequencer) QueryTask(pageNo, pageSize int, taskId ...int) (TaskResp, er
 	if err != nil {
 		return TaskResp{}, fmt.Errorf("error reading response: %v", err)
 	}
+
+	logs.GetLogger().Infof("QueryTask: %s", string(body))
 
 	var returnResult ReturnResult
 	err = json.Unmarshal(body, &returnResult)
