@@ -35,7 +35,7 @@ func NewSequencer() *Sequencer {
 
 func (s *Sequencer) getToken() error {
 	var client = http.Client{
-		Timeout: 30,
+		Timeout: 30 * time.Second,
 	}
 
 	accountInfo, err := account.GetAccountInfo()
