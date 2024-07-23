@@ -542,29 +542,19 @@ var collateralWithDrawViewCmd = &cli.Command{
 	Usage: "View a request to Withdraw frozen token from the collateral contract",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
-			Name:  "owner",
-			Usage: "Specify the owner address",
-		},
-		&cli.StringFlag{
 			Name:  "account",
 			Usage: "Specify the cp account address, if not specified, cp account is the content of the account file under the CP_PATH variable",
 		},
 	},
 	Action: func(cctx *cli.Context) error {
 		ctx := reqContext(cctx)
-
-		ownerAddress := cctx.String("owner")
-		if strings.TrimSpace(ownerAddress) == "" {
-			return fmt.Errorf("the owner address is required")
-		}
-
 		cpAccountAddress := cctx.String("account")
 
 		localWallet, err := wallet.SetupWallet(wallet.WalletRepo)
 		if err != nil {
 			return err
 		}
-		withdrawView, err := localWallet.CollateralWithdrawView(ctx, ownerAddress, cpAccountAddress)
+		withdrawView, err := localWallet.CollateralWithdrawView(ctx, cpAccountAddress)
 		if err != nil {
 			return err
 		}

@@ -604,21 +604,13 @@ func (w *LocalWallet) CollateralWithdrawConfirm(ctx context.Context, address str
 	return zkCollateral.WithdrawConfirm()
 }
 
-func (w *LocalWallet) CollateralWithdrawView(ctx context.Context, address string, cpAccountAddress string) (models.WithdrawRequest, error) {
+func (w *LocalWallet) CollateralWithdrawView(ctx context.Context, cpAccountAddress string) (models.WithdrawRequest, error) {
 	defer w.keystore.Close()
 
 	var withdrawRequest models.WithdrawRequest
 	chainUrl, err := conf.GetRpcByNetWorkName()
 	if err != nil {
 		return withdrawRequest, err
-	}
-
-	ki, err := w.FindKey(address)
-	if err != nil {
-		return withdrawRequest, err
-	}
-	if ki == nil {
-		return withdrawRequest, xerrors.Errorf("the address: %s, private key %w,", address, ErrKeyInfoNotFound)
 	}
 
 	client, err := ethclient.Dial(chainUrl)
@@ -639,7 +631,7 @@ func (w *LocalWallet) CollateralWithdrawView(ctx context.Context, address string
 		}
 	}
 
-	zkCollateral, err := ecp.NewCollateralStub(client, ecp.WithPrivateKey(ki.PrivateKey), ecp.WithCpAccountAddress(cpAccountAddress))
+	zkCollateral, err := ecp.NewCollateralStub(client, ecp.WithCpAccountAddress(cpAccountAddress))
 	if err != nil {
 		return withdrawRequest, err
 	}
