@@ -157,6 +157,7 @@ func (s *CollateralStub) WithdrawView() (models.WithdrawRequest, error) {
 		return request, fmt.Errorf("failed to view withdraw request for ecp, cp account address: %s, error: %+v", s.cpAccountAddress, err)
 	}
 
+	fmt.Printf("withdrawRequest: %s, %d", withdrawRequest.Amount.String(), withdrawRequest.RequestBlock.Int64())
 	request.RequestBlock = withdrawRequest.RequestBlock.Int64()
 	request.Amount = withdrawRequest.Amount
 	return request, nil
