@@ -147,17 +147,17 @@ type CpInfoService struct {
 
 func (cpServ CpInfoService) GetCpInfoEntityByAccountAddress(accountAddress string) (*models.CpInfoEntity, error) {
 	var cp models.CpInfoEntity
-	err := cpServ.Model(&models.JobEntity{}).Where("contract_address=?", accountAddress).Find(&cp).Error
+	err := cpServ.Model(&models.CpInfoEntity{}).Where("contract_address=?", accountAddress).Find(&cp).Error
 	return &cp, err
 }
 
 func (cpServ CpInfoService) SaveCpInfoEntity(cp *models.CpInfoEntity) (err error) {
-	cpServ.Model(&models.JobEntity{}).Where("contract_address =?", cp.ContractAddress).Delete(&models.CpInfoEntity{})
+	cpServ.Model(&models.CpInfoEntity{}).Where("contract_address =?", cp.ContractAddress).Delete(&models.CpInfoEntity{})
 	return cpServ.Save(cp).Error
 }
 
 func (cpServ CpInfoService) UpdateCpInfoByNodeId(cp *models.CpInfoEntity) (err error) {
-	return cpServ.Model(&models.JobEntity{}).Where("node_id =?", cp.NodeId).Updates(cp).Error
+	return cpServ.Model(&models.CpInfoEntity{}).Where("node_id =?", cp.NodeId).Updates(cp).Error
 }
 
 var taskSet = wire.NewSet(db.NewDbService, wire.Struct(new(TaskService), "*"))

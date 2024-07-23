@@ -74,7 +74,7 @@ var taskList = &cli.Command{
 
 			if fullFlag {
 				taskData = append(taskData,
-					[]string{job.TaskUuid, job.ResourceType, job.WalletAddress, fullSpaceUuid, job.Name, status, expireTime})
+					[]string{job.TaskUuid, job.ResourceType, job.WalletAddress, fullSpaceUuid, job.Name, models.GetJobStatus(job.Status), expireTime})
 			} else {
 				var walletAddress string
 				if len(job.WalletAddress) > 0 {
