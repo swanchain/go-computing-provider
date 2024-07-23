@@ -560,7 +560,7 @@ var collateralWithDrawViewCmd = &cli.Command{
 		}
 
 		var taskData [][]string
-		taskData = append(taskData, []string{"Amount:", withdrawView.Amount.String()})
+		taskData = append(taskData, []string{"Amount:", withdrawView.Amount})
 		taskData = append(taskData, []string{"Request Block:", strconv.Itoa(int(withdrawView.RequestBlock))})
 		taskData = append(taskData, []string{"Confirmable Block:", strconv.Itoa(int(withdrawView.RequestBlock + withdrawView.WithdrawDelay))})
 
