@@ -80,14 +80,24 @@ func (s *Sequencer) getToken() error {
 	if err != nil {
 		return fmt.Errorf("failed to read response: %v", err)
 	}
-	logs.GetLogger().Infof("getToken: %s", string(body))
 
 	var returnResult ReturnResult
 	if err = json.Unmarshal(body, &returnResult); err != nil {
 		return err
 	}
 	if returnResult.Code == 0 {
-		tokenCache = returnResult.Data.(Token).Token
+		if dataMap, ok := returnResult.Data.(map[string]interface{}); ok {
+			dataJSON, err := json.Marshal(dataMap)
+			if err != nil {
+				return err
+			}
+			var t Token
+			err = json.Unmarshal(dataJSON, &t)
+			if err != nil {
+				return err
+			}
+			tokenCache = t.Token
+		}
 		return nil
 	}
 	return fmt.Errorf(returnResult.Msg)

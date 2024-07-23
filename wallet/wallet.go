@@ -560,7 +560,7 @@ func (w *LocalWallet) CollateralWithdrawRequest(ctx context.Context, address str
 	if err != nil {
 		return "", err
 	}
-	return zkCollateral.Withdraw(withDrawAmount)
+	return zkCollateral.WithdrawRequest(withDrawAmount)
 }
 
 func (w *LocalWallet) CollateralWithdrawConfirm(ctx context.Context, address string, cpAccountAddress string) (string, error) {
