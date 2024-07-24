@@ -9,6 +9,7 @@ import (
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/wallet"
 	"github.com/urfave/cli/v2"
+	"math/big"
 	"os"
 	"os/signal"
 	"strconv"
@@ -581,7 +582,7 @@ var collateralWithDrawViewCmd = &cli.Command{
 			requestBlock = withdrawView.RequestBlock
 			confirmableBlock = withdrawView.RequestBlock + withdrawView.WithdrawDelay
 
-			var secondFlag = 2
+			var secondFlag int64 = 2
 			chainId, err := client.ChainID(context.Background())
 			if err != nil {
 				return err
@@ -590,7 +591,12 @@ var collateralWithDrawViewCmd = &cli.Command{
 				secondFlag = 5
 			}
 
-			currentTime := time.Unix(confirmableBlock*int64(secondFlag), 0)
+			block, err := client.BlockByNumber(context.Background(), big.NewInt(withdrawView.RequestBlock))
+			if err != nil {
+				return err
+			}
+
+			currentTime := time.Unix((int64(block.Time())+withdrawView.WithdrawDelay)*secondFlag, 0)
 			timeStr := currentTime.Format("2006-01-02 15:04:05")
 			timeZone, _ := currentTime.Zone()
 			confirmableBlockStr = fmt.Sprintf("%d(%s %s)", confirmableBlock, timeStr, timeZone)
