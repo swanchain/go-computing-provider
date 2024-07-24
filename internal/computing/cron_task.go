@@ -345,35 +345,52 @@ func (task *CronTask) CheckJobReward() {
 
 func (task *CronTask) GetUbiTaskReward() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("0 0 1 * * ?", func() {
+	c.AddFunc("* 0/10 * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("task job: [cleanAbnormalDeployment], error: %+v", err)
 			}
 		}()
 
-		//taskList, err := NewTaskService().GetTaskListNoReward()
-		//if err != nil {
-		//	logs.GetLogger().Errorf("failed to get task list, error: %+v", err)
-		//	return
-		//}
-		//
-		//taskGroups := handleTasksToGroup(taskList)
-		//for _, group := range taskGroups {
-		//	taskList, err := NewSequencer().QueryTask(group.Ids...)
-		//	if err != nil {
-		//		logs.GetLogger().Warnf("taskId: %d submit task to sequencer failed, error: %v, retrying", task.Id, err)
-		//		continue
-		//	}
-		//
-		//	for _, item := range group.Items {
-		//		for _, t := range taskList.List {
-		//
-		//		}
-		//	}
-		//
-		//}
+		taskList, err := NewTaskService().GetTaskListNoReward()
+		if err != nil {
+			logs.GetLogger().Errorf("failed to get task list, error: %+v", err)
+			return
+		}
 
+		taskGroups := handleTasksToGroup(taskList)
+		for _, group := range taskGroups {
+			taskList, err := NewSequencer().QueryTask(group.Ids...)
+			if err != nil {
+				logs.GetLogger().Errorf("failed to query task, task ids: %v, error: %v", group.Ids, err)
+				continue
+			}
+
+			var taskMap = make(map[int64]SequenceTask)
+			for _, t := range taskList.List {
+				taskMap[int64(t.Id)] = t
+			}
+
+			for _, item := range group.Items {
+				if t, ok := taskMap[item.Id]; ok {
+					item.Reward = t.Reward
+					item.SettlementCid = t.SettlementCid
+					item.SequenceCid = t.SequenceCid
+
+					var status int
+					switch t.Status {
+					case "Verified":
+						status = models.TASK_VERIFIED_STATUS
+					case "rewarded":
+						status = models.TASK_REWARDED_STATUS
+					case "NSC":
+						status = models.TASK_NSC_STATUS
+					}
+					item.Status = status
+					NewTaskService().UpdateTaskEntityByTaskId(item)
+				}
+			}
+		}
 	})
 	c.Start()
 }

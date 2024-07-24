@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/wallet"
 	"github.com/urfave/cli/v2"
@@ -13,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 )
 
 var walletCmd = &cli.Command{
@@ -559,10 +561,35 @@ var collateralWithDrawViewCmd = &cli.Command{
 			return err
 		}
 
+		chainRpc, err := conf.GetRpcByNetWorkName()
+		if err != nil {
+			return err
+		}
+		client, err := ethclient.Dial(chainRpc)
+		if err != nil {
+			return err
+		}
+		defer client.Close()
+
+		var secondFlag = 2
+		chainId, err := client.ChainID(context.Background())
+		if err != nil {
+			return err
+		}
+		if chainId.Int64() == 254 {
+			secondFlag = 5
+		}
+		confirmableBlock := withdrawView.RequestBlock + withdrawView.WithdrawDelay
+		currentTime := time.Unix(confirmableBlock*int64(secondFlag), 0)
+		timeStr := currentTime.Format("2006-01-02 15:04:05")
+		timeZone, _ := currentTime.Zone()
+		latestBlockNumber, _ := client.BlockNumber(ctx)
+
 		var taskData [][]string
-		taskData = append(taskData, []string{"Amount:", withdrawView.Amount})
+		taskData = append(taskData, []string{"Amount(SWANC):", withdrawView.Amount})
+		taskData = append(taskData, []string{"Latest Block:", strconv.FormatUint(latestBlockNumber, 10)})
 		taskData = append(taskData, []string{"Request Block:", strconv.Itoa(int(withdrawView.RequestBlock))})
-		taskData = append(taskData, []string{"Confirmable Block:", strconv.Itoa(int(withdrawView.RequestBlock + withdrawView.WithdrawDelay))})
+		taskData = append(taskData, []string{"Confirmable Block:", fmt.Sprintf("%d ( %s %s )", confirmableBlock, timeStr, timeZone)})
 
 		header := []string{"Withdraw View:"}
 		NewVisualTable(header, taskData, []RowColor{}).Generate(false)
