@@ -585,7 +585,7 @@ var collateralWithDrawViewCmd = &cli.Command{
 			var secondFlag int64 = 2
 			chainId, err := client.ChainID(context.Background())
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to get chain id, error: %v", err)
 			}
 			if chainId.Int64() == 254 {
 				secondFlag = 5
@@ -593,7 +593,7 @@ var collateralWithDrawViewCmd = &cli.Command{
 
 			block, err := client.BlockByNumber(context.Background(), big.NewInt(withdrawView.RequestBlock))
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to get block time, block: %d, error: %v", withdrawView.RequestBlock, err)
 			}
 
 			currentTime := time.Unix((int64(block.Time())+withdrawView.WithdrawDelay)*secondFlag, 0)
