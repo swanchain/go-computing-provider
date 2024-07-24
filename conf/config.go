@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -102,6 +103,11 @@ func InitConfig(cpRepoPath string, standalone bool) error {
 		return fmt.Errorf("failed load config file, path: %s, error: %w", configFile, err)
 	}
 
+	multiAddressSplit := strings.Split(config.API.MultiAddress, "/")
+	if len(multiAddressSplit) < 4 {
+		log.Fatalf("MultiAddress %s is invalid\n", multiAddressSplit[2])
+	}
+
 	if standalone {
 		if !requiredFieldsAreGivenForSeparate(metaData) {
 			log.Fatal("Required fields not given")
@@ -110,21 +116,16 @@ func InitConfig(cpRepoPath string, standalone bool) error {
 		if !requiredFieldsAreGiven(metaData) {
 			log.Fatal("Required fields not given")
 		}
-
-		multiAddressSplit := strings.Split(config.API.MultiAddress, "/")
-		if len(multiAddressSplit) >= 4 {
-			var domain string
-			if strings.HasPrefix(config.API.Domain, ".") {
-				domain = config.API.Domain[1:]
-			} else {
-				domain = config.API.Domain
-			}
-
-			if !checkDomain(domain, multiAddressSplit[2]) {
-				log.Fatalf("domain %s does not match IP address %s\n", domain, multiAddressSplit[2])
-			}
+		var domain string
+		if strings.HasPrefix(config.API.Domain, ".") {
+			domain = config.API.Domain[1:]
+		} else {
+			domain = config.API.Domain
 		}
 
+		if !isValidDomain(domain) {
+			log.Fatalf("domain %s is invalid\n", domain)
+		}
 	}
 
 	networkConfig := build.LoadParam()
@@ -142,6 +143,12 @@ func InitConfig(cpRepoPath string, standalone bool) error {
 		}
 	}
 	return nil
+}
+
+func isValidDomain(domain string) bool {
+	domainRegex := `^(?i:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$`
+	re := regexp.MustCompile(domainRegex)
+	return re.MatchString(domain)
 }
 
 func GetConfig() *ComputeNode {
