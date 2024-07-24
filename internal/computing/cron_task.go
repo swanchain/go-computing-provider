@@ -293,7 +293,7 @@ func (task *CronTask) setFailedUbiTaskStatus() {
 		oneHourAgo := time.Now().Add(-1 * time.Hour).Unix()
 		err := NewTaskService().Model(&models.TaskEntity{}).Where("status in (?,?)", models.TASK_RECEIVED_STATUS, models.TASK_RUNNING_STATUS).
 			Or("status ==? and tx_hash !=''", models.TASK_FAILED_STATUS).
-			Or("status=? and tx_hash==''", models.TASK_SUCCESS_STATUS).Find(&taskList).Error
+			Or("status=? and tx_hash==''", models.TASK_SUBMITTED_STATUS).Find(&taskList).Error
 		if err != nil {
 			logs.GetLogger().Errorf("Failed get task list, error: %+v", err)
 			return
@@ -310,7 +310,7 @@ func (task *CronTask) setFailedUbiTaskStatus() {
 			}
 
 			if ubiTask.TxHash != "" {
-				ubiTask.Status = models.TASK_SUCCESS_STATUS
+				ubiTask.Status = models.TASK_SUBMITTED_STATUS
 			} else {
 				ubiTask.Status = models.TASK_FAILED_STATUS
 			}
@@ -336,6 +336,41 @@ func (task *CronTask) CheckJobReward() {
 		//	return
 		//}
 		//for _, job := range jobList {
+		//
+		//}
+
+	})
+	c.Start()
+}
+
+func (task *CronTask) GetUbiTaskReward() {
+	c := cron.New(cron.WithSeconds())
+	c.AddFunc("0 0 1 * * ?", func() {
+		defer func() {
+			if err := recover(); err != nil {
+				logs.GetLogger().Errorf("task job: [cleanAbnormalDeployment], error: %+v", err)
+			}
+		}()
+
+		//taskList, err := NewTaskService().GetTaskListNoReward()
+		//if err != nil {
+		//	logs.GetLogger().Errorf("failed to get task list, error: %+v", err)
+		//	return
+		//}
+		//
+		//taskGroups := handleTasksToGroup(taskList)
+		//for _, group := range taskGroups {
+		//	taskList, err := NewSequencer().QueryTask(group.Ids...)
+		//	if err != nil {
+		//		logs.GetLogger().Warnf("taskId: %d submit task to sequencer failed, error: %v, retrying", task.Id, err)
+		//		continue
+		//	}
+		//
+		//	for _, item := range group.Items {
+		//		for _, t := range taskList.List {
+		//
+		//		}
+		//	}
 		//
 		//}
 
@@ -452,4 +487,33 @@ func checkHealth(url string) bool {
 	}
 	defer response.Body.Close()
 	return response.StatusCode == 200
+}
+
+type TaskGroup struct {
+	Items []*models.TaskEntity
+	Ids   []int64
+}
+
+func handleTasksToGroup(list []*models.TaskEntity) []TaskGroup {
+	var groups []TaskGroup
+	const batchSize = 20
+	for i := 0; i < len(list); i += batchSize {
+		end := i + batchSize
+		if end > len(list) {
+			end = len(list)
+		}
+		batch := list[i:end]
+
+		var ids []int64
+		for _, item := range batch {
+			ids = append(ids, item.Id)
+		}
+
+		group := TaskGroup{
+			Items: batch,
+			Ids:   ids,
+		}
+		groups = append(groups, group)
+	}
+	return groups
 }

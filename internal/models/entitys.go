@@ -30,8 +30,11 @@ func UbiTaskTypeStr(typeInt int) string {
 const (
 	TASK_RECEIVED_STATUS = iota + 1
 	TASK_RUNNING_STATUS
-	TASK_SUCCESS_STATUS
+	TASK_SUBMITTED_STATUS
 	TASK_FAILED_STATUS
+	TASK_VERIFIED_STATUS
+	TASK_REWARDED_STATUS
+	TASK_NSC_STATUS
 )
 
 func TaskStatusStr(status int) string {
@@ -41,10 +44,16 @@ func TaskStatusStr(status int) string {
 		statusStr = "received"
 	case TASK_RUNNING_STATUS:
 		statusStr = "running"
-	case TASK_SUCCESS_STATUS:
-		statusStr = "success"
+	case TASK_SUBMITTED_STATUS:
+		statusStr = "submitted"
 	case TASK_FAILED_STATUS:
 		statusStr = "failed"
+	case TASK_VERIFIED_STATUS:
+		statusStr = "verified"
+	case TASK_REWARDED_STATUS:
+		statusStr = "rewarded"
+	case TASK_NSC_STATUS:
+		statusStr = "NSC"
 	}
 	return statusStr
 }
@@ -86,6 +95,9 @@ type TaskEntity struct {
 	Error        string `json:"error" gorm:"error"`
 	Deadline     int64  `json:"deadline"`
 	CheckCode    string `json:"check_code"`
+	BlockHash    string `json:"block_hash"`
+	Sign         string `json:"sign"`
+	Reward       string `json:"reward"`
 }
 
 func (task *TaskEntity) TableName() string {

@@ -64,7 +64,7 @@ var listCmd = &cli.Command{
 				return fmt.Errorf("failed get ubi task, error: %+v", err)
 			}
 		} else {
-			taskList, err = computing.NewTaskService().GetTaskList(models.TASK_SUCCESS_STATUS, tailNum)
+			taskList, err = computing.NewTaskService().GetTaskList(models.TASK_SUBMITTED_STATUS, tailNum)
 			if err != nil {
 				return fmt.Errorf("failed get ubi task, error: %+v", err)
 			}
@@ -86,7 +86,7 @@ var listCmd = &cli.Command{
 					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgYellowColor}}
 				} else if task.Status == models.TASK_RUNNING_STATUS {
 					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgCyanColor}}
-				} else if task.Status == models.TASK_SUCCESS_STATUS {
+				} else if task.Status == models.TASK_SUBMITTED_STATUS {
 					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
 				} else if task.Status == models.TASK_FAILED_STATUS {
 					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
@@ -117,7 +117,7 @@ var listCmd = &cli.Command{
 					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgYellowColor}}
 				} else if task.Status == models.TASK_RUNNING_STATUS {
 					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgCyanColor}}
-				} else if task.Status == models.TASK_SUCCESS_STATUS {
+				} else if task.Status == models.TASK_SUBMITTED_STATUS {
 					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
 				} else if task.Status == models.TASK_FAILED_STATUS {
 					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}

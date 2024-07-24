@@ -237,7 +237,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 			}
 
 			if ubiTaskRun.TxHash != "" {
-				ubiTaskRun.Status = models.TASK_SUCCESS_STATUS
+				ubiTaskRun.Status = models.TASK_SUBMITTED_STATUS
 			} else {
 				ubiTaskRun.Status = models.TASK_FAILED_STATUS
 				k8sService := NewK8sService()
@@ -864,7 +864,7 @@ loopTask:
 	} else {
 		taskContractAddress, err := taskStub.CreateTaskContract(c2Proof.Proof, task, remainingTime)
 		if taskContractAddress != "" {
-			task.Status = models.TASK_SUCCESS_STATUS
+			task.Status = models.TASK_SUBMITTED_STATUS
 			task.Contract = taskContractAddress
 			logs.GetLogger().Infof("taskId: %s, taskContractAddress: %s", c2Proof.TaskId, taskContractAddress)
 		} else if err != nil {
@@ -970,7 +970,7 @@ func CronTaskForEcp() {
 		for range ticker.C {
 			var taskList []models.TaskEntity
 			oneHourAgo := time.Now().Add(-1 * time.Hour).Unix()
-			err := NewTaskService().Model(&models.TaskEntity{}).Where("status !=? and status !=? and create_time <?", models.TASK_SUCCESS_STATUS, models.TASK_FAILED_STATUS, oneHourAgo).
+			err := NewTaskService().Model(&models.TaskEntity{}).Where("status !=? and status !=? and create_time <?", models.TASK_SUBMITTED_STATUS, models.TASK_FAILED_STATUS, oneHourAgo).
 				Or("tx_hash !='' and status =?", models.TASK_FAILED_STATUS).Find(&taskList).Error
 			if err != nil {
 				logs.GetLogger().Errorf("Failed get task list, error: %+v", err)
@@ -980,7 +980,7 @@ func CronTaskForEcp() {
 			for _, entity := range taskList {
 				ubiTask := entity
 				if ubiTask.TxHash != "" {
-					ubiTask.Status = models.TASK_SUCCESS_STATUS
+					ubiTask.Status = models.TASK_SUBMITTED_STATUS
 				} else {
 					ubiTask.Status = models.TASK_FAILED_STATUS
 				}
@@ -1076,11 +1076,14 @@ outerLoop:
 			err = fmt.Errorf("submit task to sequencer timed out")
 			break outerLoop
 		default:
-			if err = NewSequencer().SendTaskProof(data); err != nil {
+			sendTaskProof, err := NewSequencer().SendTaskProof(data)
+			if err != nil {
 				logs.GetLogger().Warnf("taskId: %d submit task to sequencer failed, error: %v, retrying", task.Id, err)
 				time.Sleep(2 * time.Second)
 				continue
 			}
+			task.BlockHash = sendTaskProof.BlockHash
+			task.Sign = sendTaskProof.Sign
 			break outerLoop
 		}
 	}

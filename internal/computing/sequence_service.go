@@ -103,16 +103,16 @@ func (s *Sequencer) getToken() error {
 	return fmt.Errorf(returnResult.Msg)
 }
 
-func (s *Sequencer) SendTaskProof(data []byte) error {
+func (s *Sequencer) SendTaskProof(data []byte) (SendProofResp, error) {
 	if tokenCache == "" {
 		if err := s.getToken(); err != nil {
-			return fmt.Errorf("failed to get token, error: %v", err)
+			return SendProofResp{}, fmt.Errorf("failed to get token, error: %v", err)
 		}
 	}
 
 	req, err := http.NewRequest("POST", s.url+task, bytes.NewBuffer(data))
 	if err != nil {
-		return fmt.Errorf("error creating request: %v", err)
+		return SendProofResp{}, fmt.Errorf("error creating request: %v", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -120,7 +120,7 @@ func (s *Sequencer) SendTaskProof(data []byte) error {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to send request: %v", err)
+		return SendProofResp{}, fmt.Errorf("failed to send request: %v", err)
 	}
 	defer resp.Body.Close()
 
@@ -131,7 +131,7 @@ func (s *Sequencer) SendTaskProof(data []byte) error {
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("failed to read response: %v", err)
+		return SendProofResp{}, fmt.Errorf("failed to read response: %v", err)
 	}
 
 	logs.GetLogger().Infof("SendTaskProof: code: %d, result: %s", resp.StatusCode, string(body))
@@ -139,31 +139,37 @@ func (s *Sequencer) SendTaskProof(data []byte) error {
 	var returnResult ReturnResult
 	err = json.Unmarshal(body, &returnResult)
 	if err != nil {
-		return fmt.Errorf("failed to convert to json, error: %v", err)
+		return SendProofResp{}, fmt.Errorf("failed to convert to json, error: %v", err)
 	}
 
+	var spr SendProofResp
 	if returnResult.Code != 0 {
-		return fmt.Errorf(returnResult.Msg)
+		if dataMap, ok := returnResult.Data.(map[string]interface{}); ok {
+			dataJSON, err := json.Marshal(dataMap)
+			if err != nil {
+				return spr, err
+			}
+			err = json.Unmarshal(dataJSON, &spr)
+			if err != nil {
+				return spr, err
+			}
+		}
+		return spr, fmt.Errorf(returnResult.Msg)
 	}
-	return nil
+	return spr, nil
 }
 
-func (s *Sequencer) QueryTask(pageNo, pageSize int, taskId ...int) (TaskResp, error) {
+func (s *Sequencer) QueryTask(taskIds ...int64) (TaskListResp, error) {
 	if tokenCache == "" {
 		if err := s.getToken(); err != nil {
-			return TaskResp{}, fmt.Errorf("failed to get token, error: %v", err)
+			return TaskListResp{}, fmt.Errorf("failed to get token, error: %v", err)
 		}
 	}
-	var url string
-	if len(taskId) > 0 && taskId[0] != 0 {
-		url = s.url + task + fmt.Sprintf("?id=%d&page_no=%d&page_size=%d", taskId[0], pageNo, pageSize)
-	} else {
-		url = s.url + task + fmt.Sprintf("?page_no=%d&page_size=%d", pageNo, pageSize)
-	}
 
+	var url = s.url + task + fmt.Sprintf("?ids=%d", taskIds)
 	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
-		return TaskResp{}, fmt.Errorf("error creating request: %v", err)
+		return TaskListResp{}, fmt.Errorf("error creating request: %v", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -171,7 +177,7 @@ func (s *Sequencer) QueryTask(pageNo, pageSize int, taskId ...int) (TaskResp, er
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return TaskResp{}, fmt.Errorf("failed to sending request: %v", err)
+		return TaskListResp{}, fmt.Errorf("failed to sending request: %v", err)
 	}
 	defer resp.Body.Close()
 
@@ -182,7 +188,7 @@ func (s *Sequencer) QueryTask(pageNo, pageSize int, taskId ...int) (TaskResp, er
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return TaskResp{}, fmt.Errorf("error reading response: %v", err)
+		return TaskListResp{}, fmt.Errorf("error reading response: %v", err)
 	}
 
 	logs.GetLogger().Infof("QueryTask: code: %d, result: %s", resp.StatusCode, string(body))
@@ -190,13 +196,24 @@ func (s *Sequencer) QueryTask(pageNo, pageSize int, taskId ...int) (TaskResp, er
 	var returnResult ReturnResult
 	err = json.Unmarshal(body, &returnResult)
 	if err != nil {
-		return TaskResp{}, fmt.Errorf("response convert to json failed: %v", err)
+		return TaskListResp{}, fmt.Errorf("response convert to json failed: %v", err)
 	}
 
+	var list TaskListResp
 	if returnResult.Code != 0 {
-		return TaskResp{}, fmt.Errorf(returnResult.Msg)
+		if dataMap, ok := returnResult.Data.(map[string]interface{}); ok {
+			dataJSON, err := json.Marshal(dataMap)
+			if err != nil {
+				return list, err
+			}
+			err = json.Unmarshal(dataJSON, &list)
+			if err != nil {
+				return list, err
+			}
+		}
+		return list, fmt.Errorf(returnResult.Msg)
 	}
-	return returnResult.Data.(TaskResp), nil
+	return list, nil
 }
 
 func signMessage(msg string, ownerAddress string) (string, error) {
@@ -235,7 +252,12 @@ type Token struct {
 	Token string `json:"token"`
 }
 
-type TaskResp struct {
+type SendProofResp struct {
+	BlockHash string `json:"block_hash"`
+	Sign      string `json:"sign"`
+}
+
+type TaskListResp struct {
 	Total int `json:"total"`
 	List  []struct {
 		Id            int    `json:"id"`

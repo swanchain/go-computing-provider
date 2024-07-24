@@ -138,6 +138,7 @@ func InitConfig(cpRepoPath string, standalone bool) error {
 			config.CONTRACT.CpAccountRegister = ncCopy.Config.RegisterCpContract
 			config.CONTRACT.ZkCollateral = ncCopy.Config.ZkCollateralContract
 			config.CONTRACT.Sequencer = ncCopy.Config.SequencerContract
+			config.CONTRACT.TaskRegister = ncCopy.Config.RegisterTaskContract
 		}
 	}
 	return nil

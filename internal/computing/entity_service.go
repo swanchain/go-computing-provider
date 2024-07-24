@@ -49,10 +49,14 @@ func (taskServ TaskService) GetTaskList(taskStatus, tailNum int) (list []*models
 }
 
 func (taskServ TaskService) SaveTaskEntity(task *models.TaskEntity) (err error) {
-	if task.Status == models.TASK_FAILED_STATUS || task.Status == models.TASK_SUCCESS_STATUS {
+	if task.Status == models.TASK_FAILED_STATUS || task.Status == models.TASK_SUBMITTED_STATUS {
 		task.EndTime = time.Now().Unix()
 	}
 	return taskServ.Save(task).Error
+}
+
+func (taskServ TaskService) UpdateTaskEntityBySpaceUuid(task *models.TaskEntity) (err error) {
+	return taskServ.Model(&models.TaskEntity{}).Where("id=? and delete_at=?", task.Id).Updates(task).Error
 }
 
 func (taskServ TaskService) GetTaskEntity(taskId int64) (*models.TaskEntity, error) {
@@ -62,7 +66,7 @@ func (taskServ TaskService) GetTaskEntity(taskId int64) (*models.TaskEntity, err
 }
 
 func (taskServ TaskService) GetTaskListNoReward() (list []*models.TaskEntity, err error) {
-	err = taskServ.Where("status=? and reward_status=?", models.TASK_SUCCESS_STATUS, models.REWARD_UNCLAIMED).Find(&list).Error
+	err = taskServ.Where("status=? and reward_status=?", models.TASK_SUBMITTED_STATUS, models.REWARD_UNCLAIMED).Find(&list).Error
 	if err != nil {
 		return nil, err
 	}
