@@ -596,7 +596,7 @@ var collateralWithDrawViewCmd = &cli.Command{
 				return fmt.Errorf("failed to get block time, block: %d, error: %v", withdrawView.RequestBlock, err)
 			}
 
-			currentTime := time.Unix((int64(block.Time)+withdrawView.WithdrawDelay)*secondFlag, 0)
+			currentTime := time.Unix(int64(block.Time)+withdrawView.WithdrawDelay*secondFlag, 0)
 			timeStr := currentTime.Format("2006-01-02 15:04:05")
 			timeZone, _ := currentTime.Zone()
 			confirmableBlockStr = fmt.Sprintf("%d(%s %s)", confirmableBlock, timeStr, timeZone)
