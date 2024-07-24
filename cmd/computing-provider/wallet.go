@@ -592,7 +592,7 @@ var collateralWithDrawViewCmd = &cli.Command{
 		taskData = append(taskData, []string{"Confirmable Block:", fmt.Sprintf("%d(%s %s)", confirmableBlock, timeStr, timeZone)})
 
 		header := []string{"Withdraw View:"}
-		NewVisualTable(header, taskData, []RowColor{}).Generate(false)
+		NewVisualTable(header, taskData, []RowColor{}).SetAutoWrapText(false).Generate(false)
 
 		return nil
 	},
