@@ -376,6 +376,7 @@ func (task *CronTask) GetUbiTaskReward() {
 					item.Reward = t.Reward
 					item.SettlementCid = t.SettlementCid
 					item.SequenceCid = t.SequenceCid
+					item.Sequencer = 1
 
 					var status int
 					switch t.Status {

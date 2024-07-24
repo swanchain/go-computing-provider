@@ -72,14 +72,18 @@ var listCmd = &cli.Command{
 
 		if fullFlag {
 			for i, task := range taskList {
-				var errorMsg string
-				if showFailed {
-					errorMsg = task.Error
+
+				var sequencerStr string
+				if task.Sequencer == 1 {
+					sequencerStr = "YES"
+				} else {
+					sequencerStr = "NO"
 				}
+
 				createTime := time.Unix(task.CreateTime, 0).Format("2006-01-02 15:04:05")
 				taskData = append(taskData,
 					[]string{strconv.Itoa(int(task.Id)), task.Contract, models.GetResourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type),
-						models.TaskStatusStr(task.Status), createTime, errorMsg})
+						models.TaskStatusStr(task.Status), sequencerStr, createTime})
 
 				var rowColor []tablewriter.Colors
 				if task.Status == models.TASK_RECEIVED_STATUS {
@@ -104,13 +108,16 @@ var listCmd = &cli.Command{
 				createTime := time.Unix(task.CreateTime, 0).Format("2006-01-02 15:04:05")
 				contract := shortenAddress(task.Contract)
 
-				var errorMsg string
-				if showFailed {
-					errorMsg = task.Error
+				var sequencerStr string
+				if task.Sequencer == 1 {
+					sequencerStr = "YES"
+				} else {
+					sequencerStr = "NO"
 				}
+
 				taskData = append(taskData,
 					[]string{strconv.Itoa(int(task.Id)), contract, models.GetResourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type),
-						models.TaskStatusStr(task.Status), createTime, errorMsg})
+						models.TaskStatusStr(task.Status), task.Reward, sequencerStr, createTime})
 
 				var rowColor []tablewriter.Colors
 				if task.Status == models.TASK_RECEIVED_STATUS {
@@ -132,7 +139,7 @@ var listCmd = &cli.Command{
 
 		}
 
-		header := []string{"TASK ID", "TASK CONTRACT", "TASK TYPE", "ZK TYPE", "STATUS", "CREATE TIME", "ERROR"}
+		header := []string{"TASK ID", "TASK CONTRACT", "TASK TYPE", "ZK TYPE", "STATUS", "REWARD", "SEQUENCER", "CREATE TIME"}
 		NewVisualTable(header, taskData, rowColorList).Generate(false)
 
 		return nil

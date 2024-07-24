@@ -100,6 +100,7 @@ type TaskEntity struct {
 	Reward        string `json:"reward"`
 	SequenceCid   string `json:"sequence_cid"`
 	SettlementCid string `json:"settlement_cid"`
+	Sequencer     int    `json:"sequencer"`
 }
 
 func (task *TaskEntity) TableName() string {
