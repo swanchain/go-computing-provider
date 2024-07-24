@@ -570,26 +570,36 @@ var collateralWithDrawViewCmd = &cli.Command{
 			return err
 		}
 		defer client.Close()
-
-		var secondFlag = 2
-		chainId, err := client.ChainID(context.Background())
-		if err != nil {
-			return err
-		}
-		if chainId.Int64() == 254 {
-			secondFlag = 5
-		}
-		confirmableBlock := withdrawView.RequestBlock + withdrawView.WithdrawDelay
-		currentTime := time.Unix(confirmableBlock*int64(secondFlag), 0)
-		timeStr := currentTime.Format("2006-01-02 15:04:05")
-		timeZone, _ := currentTime.Zone()
 		latestBlockNumber, _ := client.BlockNumber(ctx)
 
+		var amount = "0.0000"
+		var requestBlock int64
+		var confirmableBlock int64
+		var confirmableBlockStr string
+		if withdrawView.RequestBlock != 0 {
+			amount = withdrawView.Amount
+			requestBlock = withdrawView.RequestBlock
+			confirmableBlock = withdrawView.RequestBlock + withdrawView.WithdrawDelay
+
+			var secondFlag = 2
+			chainId, err := client.ChainID(context.Background())
+			if err != nil {
+				return err
+			}
+			if chainId.Int64() == 254 {
+				secondFlag = 5
+			}
+
+			currentTime := time.Unix(confirmableBlock*int64(secondFlag), 0)
+			timeStr := currentTime.Format("2006-01-02 15:04:05")
+			timeZone, _ := currentTime.Zone()
+			confirmableBlockStr = fmt.Sprintf("%d(%s %s)", confirmableBlock, timeStr, timeZone)
+		}
 		var taskData [][]string
-		taskData = append(taskData, []string{"Amount(SWANC):", withdrawView.Amount})
+		taskData = append(taskData, []string{"Amount(SWANC):", amount})
 		taskData = append(taskData, []string{"Latest Block:", strconv.FormatUint(latestBlockNumber, 10)})
-		taskData = append(taskData, []string{"Request Block:", strconv.Itoa(int(withdrawView.RequestBlock))})
-		taskData = append(taskData, []string{"Confirmable Block:", fmt.Sprintf("%d(%s %s)", confirmableBlock, timeStr, timeZone)})
+		taskData = append(taskData, []string{"Request Block:", strconv.Itoa(int(requestBlock))})
+		taskData = append(taskData, []string{"Confirmable Block:", confirmableBlockStr})
 
 		header := []string{"Withdraw View:"}
 		NewVisualTable(header, taskData, []RowColor{}).SetAutoWrapText(false).Generate(false)
