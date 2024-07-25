@@ -1034,7 +1034,7 @@ func CronTaskForEcp() {
 				logs.GetLogger().Errorf("GetUbiTaskReward, error: %+v", err)
 			}
 		}()
-		ticker := time.NewTicker(3 * time.Minute)
+		ticker := time.NewTicker(1 * time.Minute)
 		for range ticker.C {
 
 			taskList, err := NewTaskService().GetTaskListNoReward()

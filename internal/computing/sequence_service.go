@@ -137,6 +137,7 @@ func (s *Sequencer) QueryTask(taskIds ...int64) (TaskListResp, error) {
 		return TaskListResp{}, fmt.Errorf("error creating request: %v", err)
 	}
 
+	println("token: %s", tokenCache)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Authorization", tokenCache)
 	client := &http.Client{}
