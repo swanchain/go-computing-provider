@@ -373,13 +373,18 @@ func (task *CronTask) GetUbiTaskReward() {
 
 			for _, item := range group.Items {
 				if t, ok := taskMap[item.Id]; ok {
-					item.Reward = t.Reward
-					item.SequenceCid = t.SequenceCid
-
 					var status int
 					if t.SequenceCid == "-1" {
 						status = models.TASK_NSC_STATUS
 					} else {
+						if len(t.SequenceCid) > 0 {
+							item.SequenceCid = t.SequenceCid
+							if len(t.Reward) >= 6 {
+								item.Reward = t.Reward[:6]
+							} else {
+								item.Reward = t.Reward
+							}
+						}
 						switch t.Status {
 						case "Verified":
 							status = models.TASK_VERIFIED_STATUS
