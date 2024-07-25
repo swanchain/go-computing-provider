@@ -48,7 +48,6 @@ type LOG struct {
 }
 
 type HUB struct {
-	ServerUrl        string
 	AccessToken      string
 	BalanceThreshold float64
 	OrchestratorPk   string
@@ -175,7 +174,6 @@ func requiredFieldsAreGiven(metaData toml.MetaData) bool {
 		{"UBI", "UbiEnginePk"},
 		{"UBI", "SequencerUrl"},
 
-		{"HUB", "ServerUrl"},
 		{"HUB", "AccessToken"},
 
 		{"MCS", "ApiKey"},
@@ -235,10 +233,7 @@ func GenerateAndUpdateConfigFile(cpRepoPath string, multiAddress, nodeName strin
 			ncCopy := nc
 			if ncCopy.Network == build.NetWorkTag {
 				defaultComputeNode.UBI.UbiEnginePk = ncCopy.Config.ZkEnginePk
-
-				defaultComputeNode.HUB.ServerUrl = ncCopy.Config.OrchestratorUrl
 				defaultComputeNode.HUB.OrchestratorPk = ncCopy.Config.OrchestratorPk
-
 				defaultComputeNode.RPC.SwanChainRpc = ncCopy.Config.ChainRpc
 			}
 		}
@@ -318,7 +313,6 @@ func generateDefaultConfig() ComputeNode {
 			KeyFile: "",
 		},
 		HUB: HUB{
-			ServerUrl:        "",
 			AccessToken:      "",
 			BalanceThreshold: 0.1,
 			OrchestratorPk:   "",

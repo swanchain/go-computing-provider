@@ -39,7 +39,6 @@ type NetworkConfig struct {
 	Config  struct {
 		SequencerUrl                   string `json:"sequencer_url"`
 		ZkEnginePk                     string `json:"zk_engine_pk"`
-		OrchestratorUrl                string `json:"orchestrator_url"`
 		OrchestratorPk                 string `json:"orchestrator_pk"`
 		ChainRpc                       string `json:"chain_rpc"`
 		SwanTokenContract              string `json:"swan_token_contract"`
