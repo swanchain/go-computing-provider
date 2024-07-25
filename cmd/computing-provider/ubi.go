@@ -115,6 +115,10 @@ var listCmd = &cli.Command{
 					sequencerStr = "NO"
 				}
 
+				if len(task.Reward) >= 6 {
+					task.Reward = task.Reward[:6]
+				}
+
 				taskData = append(taskData,
 					[]string{strconv.Itoa(int(task.Id)), contract, models.GetResourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type),
 						models.TaskStatusStr(task.Status), task.Reward, sequencerStr, createTime})
