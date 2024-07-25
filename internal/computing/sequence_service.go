@@ -108,6 +108,10 @@ func (s *Sequencer) SendTaskProof(data []byte) (SendProofResp, error) {
 		return spr, fmt.Errorf("response status: %d", resp.StatusCode)
 	}
 
+	err = json.Unmarshal(body, &spr)
+	if err != nil {
+		return spr, fmt.Errorf("failed to response convert to json, error: %v", err)
+	}
 	if spr.Code == 0 {
 		return spr, nil
 	}
