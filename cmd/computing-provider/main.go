@@ -40,6 +40,7 @@ func main() {
 			taskCmd,
 			walletCmd,
 			collateralCmd,
+			sequencerCmd,
 			ubiTaskCmd,
 			contractCmd,
 		},

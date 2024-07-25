@@ -332,10 +332,6 @@ var collateralAddCmd = &cli.Command{
 			Name:  "ecp",
 			Usage: "Specify the ecp collateral",
 		},
-		&cli.BoolFlag{
-			Name:  "sequencer",
-			Usage: "Specify the sequencer collateral",
-		},
 		&cli.StringFlag{
 			Name:  "from",
 			Usage: "Specify the wallet address, if the fcp is true, --form must specify the owner wallet address",
@@ -351,9 +347,8 @@ var collateralAddCmd = &cli.Command{
 
 		fcpCollateral := cctx.Bool("fcp")
 		ecpCollateral := cctx.Bool("ecp")
-		sequencerCollateral := cctx.Bool("sequencer")
 
-		if !fcpCollateral && !ecpCollateral && !sequencerCollateral {
+		if !fcpCollateral && !ecpCollateral {
 			return fmt.Errorf("must specify one of fcp or ecp or sequencer")
 		}
 		var collateralType string
@@ -362,9 +357,6 @@ var collateralAddCmd = &cli.Command{
 		}
 		if ecpCollateral {
 			collateralType = "ecp"
-		}
-		if sequencerCollateral {
-			collateralType = "sequencer"
 		}
 
 		fromAddress := cctx.String("from")
@@ -409,10 +401,6 @@ var collateralWithdrawCmd = &cli.Command{
 			Name:  "ecp",
 			Usage: "Specify the ecp collateral",
 		},
-		&cli.BoolFlag{
-			Name:  "sequencer",
-			Usage: "Specify the sequencer collateral",
-		},
 		&cli.StringFlag{
 			Name:  "owner",
 			Usage: "Specify the owner address",
@@ -428,10 +416,9 @@ var collateralWithdrawCmd = &cli.Command{
 
 		fcpCollateral := cctx.Bool("fcp")
 		ecpCollateral := cctx.Bool("ecp")
-		sequencerCollateral := cctx.Bool("sequencer")
 
-		if !fcpCollateral && !ecpCollateral && !sequencerCollateral {
-			return fmt.Errorf("must specify one of fcp or ecp or sequencer")
+		if !fcpCollateral && !ecpCollateral {
+			return fmt.Errorf("must specify one of fcp or ecp")
 		}
 		var collateralType string
 		if fcpCollateral {
@@ -439,9 +426,6 @@ var collateralWithdrawCmd = &cli.Command{
 		}
 		if ecpCollateral {
 			collateralType = "ecp"
-		}
-		if sequencerCollateral {
-			collateralType = "sequencer"
 		}
 
 		ownerAddress := cctx.String("owner")
@@ -470,7 +454,7 @@ var collateralWithdrawCmd = &cli.Command{
 
 var collateralWithDrawRequestCmd = &cli.Command{
 	Name:  "withdraw-request",
-	Usage: "Send a request to Withdraw frozen token from the collateral contract",
+	Usage: "Send a request to withdraw tokens from the collateral escrow account from the collateral contract",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:  "owner",
@@ -511,7 +495,7 @@ var collateralWithDrawRequestCmd = &cli.Command{
 
 var collateralWithDrawConfirmCmd = &cli.Command{
 	Name:  "withdraw-confirm",
-	Usage: "Confirm a request to Withdraw frozen token from the collateral contract",
+	Usage: "Confirm a request to withdraw tokens from the collateral escrow account from the collateral contract",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:  "owner",
@@ -547,7 +531,7 @@ var collateralWithDrawConfirmCmd = &cli.Command{
 
 var collateralWithDrawViewCmd = &cli.Command{
 	Name:  "withdraw-view",
-	Usage: "View a request to Withdraw frozen token from the collateral contract",
+	Usage: "View a request to withdraw tokens from the collateral escrow account from the collateral contract",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:  "account",
@@ -655,6 +639,106 @@ var collateralSendCmd = &cli.Command{
 			return err
 		}
 		txHash, err := localWallet.CollateralSend(ctx, from, to, amount)
+		if err != nil {
+			return err
+		}
+		fmt.Println(txHash)
+		return nil
+	},
+}
+
+var sequencerCmd = &cli.Command{
+	Name:      "sequencer",
+	Usage:     "Manage the sequencer account",
+	ArgsUsage: "[fromAddress] [amount]",
+	Subcommands: []*cli.Command{
+		sequencerAddCmd,
+		sequencerSendCmd,
+	},
+	Before: func(c *cli.Context) error {
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
+		if err := conf.InitConfig(cpRepoPath, true); err != nil {
+			return err
+		}
+		return nil
+	},
+}
+
+var sequencerAddCmd = &cli.Command{
+	Name:  "add",
+	Usage: "Send the amount to the sequencer contract address",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "from",
+			Usage: "Specify the wallet address, if the fcp is true, --form must specify the owner wallet address",
+		},
+		&cli.StringFlag{
+			Name:  "account",
+			Usage: "Specify the cp account address, if not specified, cp account is the content of the account file under the CP_PATH variable",
+		},
+	},
+	ArgsUsage: "[amount]",
+	Action: func(cctx *cli.Context) error {
+		ctx := reqContext(cctx)
+
+		fromAddress := cctx.String("from")
+		if strings.TrimSpace(fromAddress) == "" {
+			return fmt.Errorf("the wallet address is required")
+		}
+
+		cpAccountAddress := cctx.String("account")
+
+		amount := cctx.Args().Get(0)
+		if strings.TrimSpace(amount) == "" {
+			return fmt.Errorf("failed to get amount: %s", amount)
+		}
+
+		localWallet, err := wallet.SetupWallet(wallet.WalletRepo)
+		if err != nil {
+			return err
+		}
+		txHash, err := localWallet.SequencerDeposit(ctx, fromAddress, amount, cpAccountAddress)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Transfer to Sequencer Account Tx Hash: %s \n", txHash)
+		return nil
+	},
+}
+
+var sequencerSendCmd = &cli.Command{
+	Name:  "withdraw",
+	Usage: "Withdraw funds from the sequencer contract",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "owner",
+			Usage: "Specify the owner address",
+		},
+		&cli.StringFlag{
+			Name:  "account",
+			Usage: "Specify the cp account address, if not specified, cp account is the content of the account file under the CP_PATH variable",
+		},
+	},
+	ArgsUsage: "[amount]",
+	Action: func(cctx *cli.Context) error {
+		ctx := reqContext(cctx)
+
+		ownerAddress := cctx.String("owner")
+		if strings.TrimSpace(ownerAddress) == "" {
+			return fmt.Errorf("the owner address is required")
+		}
+
+		cpAccountAddress := cctx.String("account")
+		amount := cctx.Args().Get(0)
+		if strings.TrimSpace(amount) == "" {
+			return fmt.Errorf("the amount param is required")
+		}
+
+		localWallet, err := wallet.SetupWallet(wallet.WalletRepo)
+		if err != nil {
+			return err
+		}
+		txHash, err := localWallet.SequencerDeposit(ctx, ownerAddress, amount, cpAccountAddress)
 		if err != nil {
 			return err
 		}
