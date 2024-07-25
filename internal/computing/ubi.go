@@ -879,7 +879,7 @@ loopTask:
 			if taskContractAddress != "" {
 				task.Status = models.TASK_SUBMITTED_STATUS
 				task.Contract = taskContractAddress
-				logs.GetLogger().Infof("taskId: %s, taskContractAddress: %s", c2Proof.TaskId, taskContractAddress)
+				logs.GetLogger().Infof("successfully submitted to the chain，taskId: %s task contract address: %s", c2Proof.TaskId, taskContractAddress)
 			} else {
 				task.Status = models.TASK_FAILED_STATUS
 				task.Error = fmt.Sprintf("%s", err.Error())
@@ -1190,7 +1190,7 @@ outerLoop:
 			task.BlockHash = sendTaskProof.Data.BlockHash
 			task.Sign = sendTaskProof.Data.Sign
 			task.Sequencer = 1
-			logs.GetLogger().Infof("taskId: %d submit task to sequencer", task.Id)
+			logs.GetLogger().Infof("successfully submitted to the sequencer，taskId: %d sequencer Receipt is block_hash: %s, sign: %s", task.Id, task.BlockHash, task.Sign)
 			break outerLoop
 		}
 	}

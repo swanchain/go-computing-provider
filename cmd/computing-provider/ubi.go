@@ -82,8 +82,8 @@ var listCmd = &cli.Command{
 					sequencerStr = ""
 				}
 
-				if len(task.Reward) >= 3 {
-					task.Reward = task.Reward[:3]
+				if len(task.Reward) >= 4 {
+					task.Reward = task.Reward[:4]
 				}
 
 				createTime := time.Unix(task.CreateTime, 0).Format("2006-01-02 15:04:05")
@@ -122,8 +122,8 @@ var listCmd = &cli.Command{
 					sequencerStr = "NO"
 				}
 
-				if len(task.Reward) >= 3 {
-					task.Reward = task.Reward[:3]
+				if len(task.Reward) >= 4 {
+					task.Reward = task.Reward[:4]
 				}
 
 				taskData = append(taskData,
