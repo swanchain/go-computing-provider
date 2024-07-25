@@ -208,7 +208,9 @@ func (s *Sequencer) QueryTask(taskIds ...int64) (TaskListResp, error) {
 	}
 
 	var list TaskListResp
-	if returnResult.Code != 0 {
+	if returnResult.Code == 0 {
+		return list, fmt.Errorf(returnResult.Msg)
+	} else {
 		if dataMap, ok := returnResult.Data.(map[string]interface{}); ok {
 			dataJSON, err := json.Marshal(dataMap)
 			if err != nil {
@@ -218,10 +220,11 @@ func (s *Sequencer) QueryTask(taskIds ...int64) (TaskListResp, error) {
 			if err != nil {
 				return list, err
 			}
+			return list, nil
 		}
-		return list, fmt.Errorf(returnResult.Msg)
+		return list, fmt.Errorf("failed to convert result")
 	}
-	return list, nil
+
 }
 
 func signMessage(msg string, ownerAddress string) (string, error) {
