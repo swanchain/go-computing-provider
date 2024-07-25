@@ -860,7 +860,11 @@ loopTask:
 	}
 
 	if conf.GetConfig().UBI.AggregateCommits {
-		err = submitTaskToSequencer(c2Proof.Proof, task, remainingTime)
+		if err = submitTaskToSequencer(c2Proof.Proof, task, remainingTime); err != nil {
+			task.Status = models.TASK_FAILED_STATUS
+		} else {
+			task.Status = models.TASK_SUBMITTED_STATUS
+		}
 	} else {
 		taskContractAddress, err := taskStub.CreateTaskContract(c2Proof.Proof, task, remainingTime)
 		if taskContractAddress != "" {
@@ -1136,6 +1140,7 @@ outerLoop:
 			}
 			task.BlockHash = sendTaskProof.BlockHash
 			task.Sign = sendTaskProof.Sign
+			task.Sequencer = 1
 			break outerLoop
 		}
 	}
