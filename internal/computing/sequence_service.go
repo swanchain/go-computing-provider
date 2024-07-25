@@ -83,7 +83,6 @@ func (s *Sequencer) SendTaskProof(data []byte) (SendProofResp, error) {
 	if err != nil {
 		return SendProofResp{}, fmt.Errorf("error creating request: %v", err)
 	}
-	println("token: %s", tokenCache)
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", tokenCache)
@@ -155,8 +154,6 @@ func (s *Sequencer) QueryTask(taskIds ...int64) (TaskListResp, error) {
 	if err != nil {
 		return TaskListResp{}, fmt.Errorf("error reading response: %v", err)
 	}
-
-	logs.GetLogger().Infof("QueryTask: code: %d, result: %s", resp.StatusCode, string(body))
 
 	var taskListResp TaskListResp
 	if resp.StatusCode != http.StatusOK {
