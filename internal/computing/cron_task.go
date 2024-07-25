@@ -367,7 +367,7 @@ func (task *CronTask) GetUbiTaskReward() {
 			}
 
 			var taskMap = make(map[int64]SequenceTask)
-			for _, t := range taskList.List {
+			for _, t := range taskList.Data.List {
 				taskMap[int64(t.Id)] = t
 			}
 
