@@ -145,6 +145,8 @@ func (s *Sequencer) SendTaskProof(data []byte) (SendProofResp, error) {
 
 	var spr SendProofResp
 	if returnResult.Code != 0 {
+		return spr, fmt.Errorf(returnResult.Msg)
+	} else {
 		if dataMap, ok := returnResult.Data.(map[string]interface{}); ok {
 			dataJSON, err := json.Marshal(dataMap)
 			if err != nil {
@@ -154,10 +156,10 @@ func (s *Sequencer) SendTaskProof(data []byte) (SendProofResp, error) {
 			if err != nil {
 				return spr, err
 			}
+			return spr, nil
 		}
-		return spr, fmt.Errorf(returnResult.Msg)
+		return spr, fmt.Errorf("failed to convert result")
 	}
-	return spr, nil
 }
 
 func (s *Sequencer) QueryTask(taskIds ...int64) (TaskListResp, error) {
