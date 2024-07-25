@@ -852,13 +852,7 @@ var changeTaskTypesCmd = &cli.Command{
 			taskTypesUint = append(taskTypesUint, uint8(tt))
 		}
 
-		cpRepoPath, ok := os.LookupEnv("CP_PATH")
-		if !ok {
-			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
-		}
-		if err := conf.InitConfig(cpRepoPath, false); err != nil {
-			logs.GetLogger().Fatal(err)
-		}
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 
 		client, cpStub, err := getVerifyAccountClient(ownerAddress)
 		if err != nil {
