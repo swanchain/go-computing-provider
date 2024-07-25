@@ -134,7 +134,7 @@ func InitConfig(cpRepoPath string, standalone bool) error {
 		if ncCopy.Network == build.NetWorkTag {
 			config.CONTRACT.SwanToken = ncCopy.Config.SwanTokenContract
 			config.CONTRACT.JobCollateral = ncCopy.Config.OrchestratorCollateralContract
-			config.CONTRACT.JobManager = ncCopy.Config.OrchestratorCollateralContract
+			config.CONTRACT.JobManager = ncCopy.Config.JobManagerContract
 
 			config.CONTRACT.CpAccountRegister = ncCopy.Config.RegisterCpContract
 			config.CONTRACT.ZkCollateral = ncCopy.Config.ZkCollateralContract
