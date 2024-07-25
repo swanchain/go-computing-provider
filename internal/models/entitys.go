@@ -199,6 +199,9 @@ type JobEntity struct {
 	DeleteAt        int    `json:"delete_at" gorm:"delete_at; default:0"` // 1 deleted
 	PodStatus       int    `json:"pod_status"`
 	Status          int    `json:"status"`
+	StartedBlock    uint64 `json:"started_block" gorm:"column:started_block;not null;default:0"`
+	ScannedBlock    uint64 `json:"scanned_block" gorm:"column:scanned_block;not null;default:0"`
+	EndedBlock      uint64 `json:"ended_block" gorm:"column:ended_block;not null;default:0"`
 }
 
 func (*JobEntity) TableName() string {

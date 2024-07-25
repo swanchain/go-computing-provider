@@ -324,22 +324,21 @@ func (task *CronTask) setFailedUbiTaskStatus() {
 
 func (task *CronTask) CheckJobReward() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("* 0/30 * * * ?", func() {
+	c.AddFunc("* 0/5 * * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("task job: [cleanAbnormalDeployment], error: %+v", err)
 			}
 		}()
 
-		//jobList, err := NewJobService().GetJobListByNoReward()
-		//if err != nil {
-		//	logs.GetLogger().Errorf("failed to get job data, error: %+v", err)
-		//	return
-		//}
-		//for _, job := range jobList {
-		//
-		//}
-
+		jobList, err := NewJobService().GetJobListByNoReward()
+		if err != nil {
+			logs.GetLogger().Errorf("failed to get job data, error: %+v", err)
+			return
+		}
+		for _, job := range jobList {
+			NewTaskManagerContract().Scan(job)
+		}
 	})
 	c.Start()
 }

@@ -128,6 +128,14 @@ func (jobServ JobService) GetJobList(status int) (list []*models.JobEntity, err 
 	return
 }
 
+func (jobServ JobService) UpdateJobReward(taskUuid string, amount string) (err error) {
+	return jobServ.Model(&models.JobEntity{}).Where("task_uuid=?", taskUuid).Update("reward", amount).Error
+}
+
+func (jobServ JobService) UpdateJobScannedBlock(taskUuid string, end uint64) (err error) {
+	return jobServ.Model(&models.JobEntity{}).Where("task_uuid=?", taskUuid).Update("scanned_block", end).Error
+}
+
 func (jobServ JobService) GetJobListByNoReward() (list []*models.JobEntity, err error) {
 	err = jobServ.Model(&models.JobEntity{}).Where("reward is not null").Find(&list).Error
 	return
