@@ -14,7 +14,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 )
 
@@ -36,10 +35,6 @@ func NewSequencer() *Sequencer {
 }
 
 func (s *Sequencer) getToken() error {
-	var client = http.Client{
-		Timeout: 30 * time.Second,
-	}
-
 	accountInfo, err := account.GetAccountInfo()
 	if err != nil {
 		return err
@@ -60,48 +55,22 @@ func (s *Sequencer) getToken() error {
 	data.Timestamp = timestamp
 	data.Sign = signMsg
 
-	reqBody, err := json.Marshal(&data)
+	var header http.Header
+	header.Set("Content-Type", "application/json")
+	header.Set("Authorization", tokenCache)
+
+	var tokenResp TokenResp
+	err = NewHttpClient(s.url, header).PostJSON(token, data, &tokenResp)
 	if err != nil {
-		return fmt.Errorf("failed to convet json, error: %v", err)
+		return fmt.Errorf("failed to get token, error: %v", err)
 	}
 
-	req, err := http.NewRequest("POST", s.url+token, strings.NewReader(string(reqBody)))
-	if err != nil {
-		return err
+	if tokenResp.Code == 0 {
+		tokenCache = tokenResp.Data.Token
+	} else {
+		return fmt.Errorf(tokenResp.Msg)
 	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("failed to read response: %v", err)
-	}
-
-	var returnResult ReturnResult
-	if err = json.Unmarshal(body, &returnResult); err != nil {
-		return err
-	}
-	if returnResult.Code == 0 {
-		if dataMap, ok := returnResult.Data.(map[string]interface{}); ok {
-			dataJSON, err := json.Marshal(dataMap)
-			if err != nil {
-				return err
-			}
-			var t Token
-			err = json.Unmarshal(dataJSON, &t)
-			if err != nil {
-				return err
-			}
-			tokenCache = t.Token
-		}
-		return nil
-	}
-	return fmt.Errorf(returnResult.Msg)
+	return nil
 }
 
 func (s *Sequencer) SendTaskProof(data []byte) (SendProofResp, error) {
@@ -124,7 +93,6 @@ func (s *Sequencer) SendTaskProof(data []byte) (SendProofResp, error) {
 		return SendProofResp{}, fmt.Errorf("failed to send request: %v", err)
 	}
 	defer resp.Body.Close()
-
 	newToken := resp.Header.Get("new-token")
 	if newToken != "" {
 		tokenCache = newToken
@@ -135,31 +103,16 @@ func (s *Sequencer) SendTaskProof(data []byte) (SendProofResp, error) {
 		return SendProofResp{}, fmt.Errorf("failed to read response: %v", err)
 	}
 
-	logs.GetLogger().Infof("SendTaskProof: code: %d, result: %s", resp.StatusCode, string(body))
-
-	var returnResult ReturnResult
-	err = json.Unmarshal(body, &returnResult)
-	if err != nil {
-		return SendProofResp{}, fmt.Errorf("failed to convert to json, error: %v", err)
-	}
-
 	var spr SendProofResp
-	if returnResult.Code != 0 {
-		return spr, fmt.Errorf(returnResult.Msg)
-	} else {
-		if dataMap, ok := returnResult.Data.(map[string]interface{}); ok {
-			dataJSON, err := json.Marshal(dataMap)
-			if err != nil {
-				return spr, err
-			}
-			err = json.Unmarshal(dataJSON, &spr)
-			if err != nil {
-				return spr, err
-			}
-			return spr, nil
-		}
-		return spr, fmt.Errorf("failed to convert result")
+	if resp.StatusCode != http.StatusOK {
+		logs.GetLogger().Infof("SendTaskProof: code: %d, result: %s", resp.StatusCode, string(body))
+		return spr, fmt.Errorf("response status: %d", resp.StatusCode)
 	}
+
+	if spr.Code == 0 {
+		return spr, nil
+	}
+	return spr, fmt.Errorf(spr.Msg)
 }
 
 func (s *Sequencer) QueryTask(taskIds ...int64) (TaskListResp, error) {
@@ -201,30 +154,22 @@ func (s *Sequencer) QueryTask(taskIds ...int64) (TaskListResp, error) {
 
 	logs.GetLogger().Infof("QueryTask: code: %d, result: %s", resp.StatusCode, string(body))
 
-	var returnResult ReturnResult
-	err = json.Unmarshal(body, &returnResult)
+	var taskListResp TaskListResp
+	if resp.StatusCode != http.StatusOK {
+		logs.GetLogger().Infof("QueryTask: code: %d, result: %s", resp.StatusCode, string(body))
+		return taskListResp, fmt.Errorf("response status: %d", resp.StatusCode)
+	}
+
+	err = json.Unmarshal(body, &taskListResp)
 	if err != nil {
 		return TaskListResp{}, fmt.Errorf("response convert to json failed: %v", err)
 	}
 
-	var list TaskListResp
-	if returnResult.Code == 0 {
-		return list, fmt.Errorf(returnResult.Msg)
+	if taskListResp.Code != 0 {
+		return taskListResp, fmt.Errorf(taskListResp.Msg)
 	} else {
-		if dataMap, ok := returnResult.Data.(map[string]interface{}); ok {
-			dataJSON, err := json.Marshal(dataMap)
-			if err != nil {
-				return list, err
-			}
-			err = json.Unmarshal(dataJSON, &list)
-			if err != nil {
-				return list, err
-			}
-			return list, nil
-		}
-		return list, fmt.Errorf("failed to convert result")
+		return taskListResp, nil
 	}
-
 }
 
 func signMessage(msg string, ownerAddress string) (string, error) {
@@ -253,24 +198,30 @@ func signMessage(msg string, ownerAddress string) (string, error) {
 	return hexutil.Encode(sig), nil
 }
 
-type ReturnResult struct {
-	Code int         `json:"code"`
-	Msg  string      `json:"msg"`
-	Data interface{} `json:"data"`
-}
-
-type Token struct {
-	Token string `json:"token"`
+type TokenResp struct {
+	Code int    `json:"code"`
+	Msg  string `json:"msg"`
+	Data struct {
+		Token string `json:"token"`
+	} `json:"data"`
 }
 
 type SendProofResp struct {
-	BlockHash string `json:"block_hash"`
-	Sign      string `json:"sign"`
+	Code int    `json:"code"`
+	Msg  string `json:"msg"`
+	Data struct {
+		BlockHash string `json:"block_hash"`
+		Sign      string `json:"sign"`
+	} `json:"data"`
 }
 
 type TaskListResp struct {
-	Total int            `json:"total"`
-	List  []SequenceTask `json:"list"`
+	Code int    `json:"code"`
+	Msg  string `json:"msg"`
+	Data struct {
+		Total int            `json:"total"`
+		List  []SequenceTask `json:"list"`
+	} `json:"data"`
 }
 
 type SequenceTask struct {
