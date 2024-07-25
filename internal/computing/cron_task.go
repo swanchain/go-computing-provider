@@ -39,6 +39,7 @@ func (task *CronTask) RunTask() {
 	task.watchNameSpaceForDeleted()
 	task.reportClusterResource()
 	task.watchExpiredTask()
+	task.GetUbiTaskReward()
 }
 
 func checkJobStatus() {
@@ -348,7 +349,7 @@ func (task *CronTask) GetUbiTaskReward() {
 	c.AddFunc("* 0/10 * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
-				logs.GetLogger().Errorf("task job: [cleanAbnormalDeployment], error: %+v", err)
+				logs.GetLogger().Errorf("task job: [GetUbiTaskReward], error: %+v", err)
 			}
 		}()
 

@@ -988,6 +988,58 @@ func CronTaskForEcp() {
 			}
 		}
 	}()
+
+	go func() {
+		defer func() {
+			if err := recover(); err != nil {
+				logs.GetLogger().Errorf("GetUbiTaskReward, error: %+v", err)
+			}
+		}()
+		ticker := time.NewTicker(3 * time.Minute)
+		for range ticker.C {
+
+			taskList, err := NewTaskService().GetTaskListNoReward()
+			if err != nil {
+				logs.GetLogger().Errorf("failed to get task list, error: %+v", err)
+				return
+			}
+
+			taskGroups := handleTasksToGroup(taskList)
+			for _, group := range taskGroups {
+				taskList, err := NewSequencer().QueryTask(group.Ids...)
+				if err != nil {
+					logs.GetLogger().Errorf("failed to query task, task ids: %v, error: %v", group.Ids, err)
+					continue
+				}
+
+				var taskMap = make(map[int64]SequenceTask)
+				for _, t := range taskList.List {
+					taskMap[int64(t.Id)] = t
+				}
+
+				for _, item := range group.Items {
+					if t, ok := taskMap[item.Id]; ok {
+						item.Reward = t.Reward
+						item.SettlementCid = t.SettlementCid
+						item.SequenceCid = t.SequenceCid
+						item.Sequencer = 1
+
+						var status int
+						switch t.Status {
+						case "Verified":
+							status = models.TASK_VERIFIED_STATUS
+						case "rewarded":
+							status = models.TASK_REWARDED_STATUS
+						case "NSC":
+							status = models.TASK_NSC_STATUS
+						}
+						item.Status = status
+						NewTaskService().UpdateTaskEntityByTaskId(item)
+					}
+				}
+			}
+		}
+	}()
 }
 
 func SyncCpAccountInfo() {
