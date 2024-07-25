@@ -831,6 +831,20 @@ func submitUBIProof(c2Proof models.UbiC2Proof, task *models.TaskEntity) error {
 		return err
 	}
 
+	cpAccountAddress, err := contract.GetCpAccountAddress()
+	if err != nil {
+		return fmt.Errorf("failed to get cp account contract address, error: %v", err)
+	}
+
+	sequencerStub, err := ecp.NewSequencerStub(client, ecp.WithSequencerCpAccountAddress(cpAccountAddress))
+	if err != nil {
+		return fmt.Errorf("failed to get cp sequencer contract, error: %v", err)
+	}
+	sequencerBalance, err := sequencerStub.GetCPBalance()
+	if err != nil {
+		return fmt.Errorf("failed to get cp sequencer contract, error: %v", err)
+	}
+
 	var blockNumber uint64
 
 loopTask:
@@ -859,11 +873,32 @@ loopTask:
 		return NewTaskService().SaveTaskEntity(task)
 	}
 
-	if conf.GetConfig().UBI.AggregateCommits {
-		if err = submitTaskToSequencer(c2Proof.Proof, task, remainingTime); err != nil {
-			task.Status = models.TASK_FAILED_STATUS
+	if conf.GetConfig().UBI.AggregateCommits && conf.GetConfig().UBI.ErrSeqBalanceForSingleSubmit {
+		if strings.HasPrefix(sequencerBalance, "-") {
+			taskContractAddress, err := taskStub.CreateTaskContract(c2Proof.Proof, task, remainingTime)
+			if taskContractAddress != "" {
+				task.Status = models.TASK_SUBMITTED_STATUS
+				task.Contract = taskContractAddress
+				logs.GetLogger().Infof("taskId: %s, taskContractAddress: %s", c2Proof.TaskId, taskContractAddress)
+			} else {
+				task.Status = models.TASK_FAILED_STATUS
+				task.Error = fmt.Sprintf("%s", err.Error())
+				logs.GetLogger().Errorf("taskId: %s, create task contract failed, error: %v", c2Proof.TaskId, err)
+			}
 		} else {
-			task.Status = models.TASK_SUBMITTED_STATUS
+			if err = submitTaskToSequencer(c2Proof.Proof, task, remainingTime); err != nil {
+				task.Status = models.TASK_FAILED_STATUS
+			} else {
+				task.Status = models.TASK_SUBMITTED_STATUS
+			}
+		}
+	} else if conf.GetConfig().UBI.AggregateCommits && !conf.GetConfig().UBI.ErrSeqBalanceForSingleSubmit {
+		if !strings.HasPrefix(sequencerBalance, "-") {
+			if err = submitTaskToSequencer(c2Proof.Proof, task, remainingTime); err != nil {
+				task.Status = models.TASK_FAILED_STATUS
+			} else {
+				task.Status = models.TASK_SUBMITTED_STATUS
+			}
 		}
 	} else {
 		taskContractAddress, err := taskStub.CreateTaskContract(c2Proof.Proof, task, remainingTime)

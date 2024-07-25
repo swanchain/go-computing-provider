@@ -13,7 +13,6 @@ import (
 	"golang.org/x/xerrors"
 	"io"
 	"net/http"
-	"net/url"
 	"time"
 )
 
@@ -122,18 +121,18 @@ func (s *Sequencer) QueryTask(taskIds ...int64) (TaskListResp, error) {
 		}
 	}
 
-	values := url.Values{}
-	for _, id := range taskIds {
-		values.Add("ids", fmt.Sprintf("%d", id))
+	reqData, err := json.Marshal(taskIds)
+	if err != nil {
+		return TaskListResp{}, err
 	}
 
-	var reqUrl = s.url + task + fmt.Sprintf("?%s", values.Encode())
-	req, err := http.NewRequest("POST", reqUrl, nil)
+	var reqUrl = s.url + task + fmt.Sprintf("?ids=%s", string(reqData))
+	req, err := http.NewRequest("GET", reqUrl, nil)
 	if err != nil {
 		return TaskListResp{}, fmt.Errorf("error creating request: %v", err)
 	}
 
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Authorization", tokenCache)
 	client := &http.Client{}
 	resp, err := client.Do(req)

@@ -37,9 +37,10 @@ type API struct {
 	WalletBlackList string
 }
 type UBI struct {
-	UbiEnginePk      string
-	AggregateCommits bool
-	SequencerUrl     string
+	UbiEnginePk                  string
+	AggregateCommits             bool
+	ErrSeqBalanceForSingleSubmit bool
+	SequencerUrl                 string
 }
 
 type LOG struct {
@@ -172,6 +173,8 @@ func requiredFieldsAreGiven(metaData toml.MetaData) bool {
 		{"LOG", "KeyFile"},
 
 		{"UBI", "UbiEnginePk"},
+		{"UBI", "AggregateCommits"},
+		{"UBI", "ErrSeqBalanceForSingleSubmit"},
 		{"UBI", "SequencerUrl"},
 
 		{"MCS", "ApiKey"},
@@ -200,6 +203,8 @@ func requiredFieldsAreGivenForSeparate(metaData toml.MetaData) bool {
 		{"API", "NodeName"},
 
 		{"UBI", "UbiEnginePk"},
+		{"UBI", "AggregateCommits"},
+		{"UBI", "ErrSeqBalanceForSingleSubmit"},
 		{"UBI", "SequencerUrl"},
 
 		{"RPC", "SWAN_CHAIN_RPC"},
@@ -304,7 +309,9 @@ func generateDefaultConfig() ComputeNode {
 			WalletBlackList: "",
 		},
 		UBI: UBI{
-			UbiEnginePk: "",
+			UbiEnginePk:                  "",
+			AggregateCommits:             true,
+			ErrSeqBalanceForSingleSubmit: false,
 		},
 		LOG: LOG{
 			CrtFile: "",
