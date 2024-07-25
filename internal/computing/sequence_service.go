@@ -54,7 +54,7 @@ func (s *Sequencer) getToken() error {
 	data.Timestamp = timestamp
 	data.Sign = signMsg
 
-	var header http.Header
+	var header = make(http.Header)
 	header.Set("Content-Type", "application/json")
 	header.Set("Authorization", tokenCache)
 
@@ -137,7 +137,6 @@ func (s *Sequencer) QueryTask(taskIds ...int64) (TaskListResp, error) {
 		return TaskListResp{}, fmt.Errorf("error creating request: %v", err)
 	}
 
-	println("token: %s", tokenCache)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Authorization", tokenCache)
 	client := &http.Client{}
