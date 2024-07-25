@@ -431,7 +431,7 @@ func ReceiveUbiProof(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
 		return
 	}
-	logs.GetLogger().Infof("task_id: %s, C2 proof out received: %+v", c2Proof.TaskId, c2Proof)
+	logs.GetLogger().Infof("task_id: %s, The ZK proof computation is complete: %+v", c2Proof.TaskId, c2Proof)
 
 	taskId, err := strconv.Atoi(c2Proof.TaskId)
 	if err != nil {
@@ -1058,7 +1058,12 @@ func CronTaskForEcp() {
 
 				for _, item := range group.Items {
 					if t, ok := taskMap[item.Id]; ok {
-						item.Reward = t.Reward
+						if len(t.Reward) >= 3 {
+							item.Reward = t.Reward[:3]
+						} else {
+							item.Reward = t.Reward
+						}
+
 						item.SequenceCid = t.SequenceCid
 
 						var status int
@@ -1066,7 +1071,7 @@ func CronTaskForEcp() {
 							status = models.TASK_NSC_STATUS
 						} else {
 							switch t.Status {
-							case "Verified":
+							case "verified":
 								status = models.TASK_VERIFIED_STATUS
 							case "rewarded":
 								status = models.TASK_REWARDED_STATUS
@@ -1185,6 +1190,7 @@ outerLoop:
 			task.BlockHash = sendTaskProof.Data.BlockHash
 			task.Sign = sendTaskProof.Data.Sign
 			task.Sequencer = 1
+			logs.GetLogger().Infof("taskId: %d submit task to sequencer", task.Id)
 			break outerLoop
 		}
 	}

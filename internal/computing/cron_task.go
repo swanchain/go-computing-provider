@@ -380,8 +380,8 @@ func (task *CronTask) GetUbiTaskReward() {
 					} else {
 						if len(t.SequenceCid) > 0 {
 							item.SequenceCid = t.SequenceCid
-							if len(t.Reward) >= 6 {
-								item.Reward = t.Reward[:6]
+							if len(t.Reward) >= 3 {
+								item.Reward = t.Reward[:3]
 							} else {
 								item.Reward = t.Reward
 							}

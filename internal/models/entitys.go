@@ -104,7 +104,7 @@ type TaskEntity struct {
 	Sign         string `json:"sign"`
 	Reward       string `json:"reward"`
 	SequenceCid  string `json:"sequence_cid"`
-	Sequencer    int    `json:"sequencer"`
+	Sequencer    int    `json:"sequencer" gorm:"default:-1"`
 }
 
 func (task *TaskEntity) TableName() string {

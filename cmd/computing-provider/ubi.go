@@ -76,14 +76,20 @@ var listCmd = &cli.Command{
 				var sequencerStr string
 				if task.Sequencer == 1 {
 					sequencerStr = "YES"
-				} else {
+				} else if task.Sequencer == 0 {
 					sequencerStr = "NO"
+				} else {
+					sequencerStr = ""
+				}
+
+				if len(task.Reward) >= 3 {
+					task.Reward = task.Reward[:3]
 				}
 
 				createTime := time.Unix(task.CreateTime, 0).Format("2006-01-02 15:04:05")
 				taskData = append(taskData,
 					[]string{strconv.Itoa(int(task.Id)), task.Contract, models.GetResourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type),
-						models.TaskStatusStr(task.Status), sequencerStr, createTime})
+						task.CheckCode, task.Sign, models.TaskStatusStr(task.Status), task.Reward, sequencerStr, createTime})
 
 				var rowColor []tablewriter.Colors
 				if task.Status == models.TASK_RECEIVED_STATUS {
@@ -98,15 +104,16 @@ var listCmd = &cli.Command{
 
 				rowColorList = append(rowColorList, RowColor{
 					row:    i,
-					column: []int{4},
+					column: []int{6},
 					color:  rowColor,
 				})
 			}
+			header := []string{"TASK ID", "TASK CONTRACT", "TASK TYPE", "ZK TYPE", "CHECK CODE", "SIGNATURE", "STATUS", "REWARD", "SEQUENCER", "CREATE TIME"}
+			NewVisualTable(header, taskData, rowColorList).Generate(false)
 
 		} else {
 			for i, task := range taskList {
 				createTime := time.Unix(task.CreateTime, 0).Format("2006-01-02 15:04:05")
-				contract := shortenAddress(task.Contract)
 
 				var sequencerStr string
 				if task.Sequencer == 1 {
@@ -115,12 +122,12 @@ var listCmd = &cli.Command{
 					sequencerStr = "NO"
 				}
 
-				if len(task.Reward) >= 6 {
-					task.Reward = task.Reward[:6]
+				if len(task.Reward) >= 3 {
+					task.Reward = task.Reward[:3]
 				}
 
 				taskData = append(taskData,
-					[]string{strconv.Itoa(int(task.Id)), contract, models.GetResourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type),
+					[]string{strconv.Itoa(int(task.Id)), task.Contract, models.GetResourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type),
 						models.TaskStatusStr(task.Status), task.Reward, sequencerStr, createTime})
 
 				var rowColor []tablewriter.Colors
@@ -141,11 +148,9 @@ var listCmd = &cli.Command{
 				})
 			}
 
+			header := []string{"TASK ID", "TASK CONTRACT", "TASK TYPE", "ZK TYPE", "STATUS", "REWARD", "SEQUENCER", "CREATE TIME"}
+			NewVisualTable(header, taskData, rowColorList).Generate(false)
 		}
-
-		header := []string{"TASK ID", "TASK CONTRACT", "TASK TYPE", "ZK TYPE", "STATUS", "REWARD", "SEQUENCER", "CREATE TIME"}
-		NewVisualTable(header, taskData, rowColorList).Generate(false)
-
 		return nil
 
 	},
@@ -208,11 +213,4 @@ var daemonCmd = &cli.Command{
 
 		return nil
 	},
-}
-
-func shortenAddress(address string) string {
-	if len(address) <= 12 {
-		return address
-	}
-	return address[:7] + "...." + address[len(address)-7:]
 }
