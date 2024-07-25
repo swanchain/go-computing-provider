@@ -389,7 +389,7 @@ func (w *LocalWallet) WalletCollateral(ctx context.Context, from string, amount 
 					return "", fmt.Errorf("check swan token Approve tx, error: %+v", err)
 				}
 				if receipt != nil && receipt.Status == types.ReceiptStatusSuccessful {
-					fmt.Printf("swan token approve TX: %s \n", swanTokenTxHash)
+					fmt.Printf("swan token approve TX Hash: %s \n", swanTokenTxHash)
 					collateralStub, err := fcp.NewCollateralStub(client, fcp.WithPrivateKey(ki.PrivateKey), fcp.WithCpAccountAddress(cpAccountAddress))
 					if err != nil {
 						return "", err
@@ -432,7 +432,7 @@ func (w *LocalWallet) WalletCollateral(ctx context.Context, from string, amount 
 				}
 
 				if receipt != nil && receipt.Status == types.ReceiptStatusSuccessful {
-					fmt.Printf("swan token approve TX: %s \n", swanTokenTxHash)
+					fmt.Printf("swan token approve TX Hash: %s \n", swanTokenTxHash)
 					cpStub, err := account.NewAccountStub(client, account.WithContractAddress(cpAccountAddress))
 					if err != nil {
 						return "", err

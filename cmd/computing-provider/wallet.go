@@ -387,7 +387,12 @@ var collateralAddCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		fmt.Printf("collateral TX: %s \n", txHash)
+
+		if collateralType == "sequencer" {
+			fmt.Printf("Transfer to Sequencer Account Tx Hash: %s \n", txHash)
+		} else {
+			fmt.Printf("collateral TX Hash: %s \n", txHash)
+		}
 		return nil
 	},
 }

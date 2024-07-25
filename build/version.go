@@ -44,6 +44,7 @@ type NetworkConfig struct {
 		SwanTokenContract              string `json:"swan_token_contract"`
 		OrchestratorCollateralContract string `json:"orchestrator_collateral_contract"`
 		JobManagerContract             string `json:"job_manager_contract"`
+		JobManagerContractCreated      uint64 `json:"job_manager_contract_created"`
 		RegisterCpContract             string `json:"register_cp_contract"`
 		ZkCollateralContract           string `json:"zk_collateral_contract"`
 		RegisterTaskContract           string `json:"register_task_contract"`

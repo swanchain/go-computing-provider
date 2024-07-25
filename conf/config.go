@@ -75,8 +75,9 @@ type CONTRACT struct {
 	SwanToken         string `toml:"SWAN_CONTRACT"`
 	CpAccountRegister string `toml:"REGISTER_CP_CONTRACT"`
 
-	JobCollateral string `toml:"SWAN_COLLATERAL_CONTRACT"`
-	JobManager    string `toml:"SWAN_JOB_CONTRACT"`
+	JobCollateral     string `toml:"SWAN_COLLATERAL_CONTRACT"`
+	JobManager        string `toml:"SWAN_JOB_CONTRACT"`
+	JobManagerCreated uint64
 
 	TaskRegister string `toml:"REGISTER_TASK_CONTRACT"`
 	ZkCollateral string `toml:"ZK_COLLATERAL_CONTRACT"`
@@ -135,7 +136,7 @@ func InitConfig(cpRepoPath string, standalone bool) error {
 			config.CONTRACT.SwanToken = ncCopy.Config.SwanTokenContract
 			config.CONTRACT.JobCollateral = ncCopy.Config.OrchestratorCollateralContract
 			config.CONTRACT.JobManager = ncCopy.Config.JobManagerContract
-
+			config.CONTRACT.JobManagerCreated = ncCopy.Config.JobManagerContractCreated
 			config.CONTRACT.CpAccountRegister = ncCopy.Config.RegisterCpContract
 			config.CONTRACT.ZkCollateral = ncCopy.Config.ZkCollateralContract
 			config.CONTRACT.Sequencer = ncCopy.Config.SequencerContract

@@ -155,6 +155,7 @@ func ReceiveJob(c *gin.Context) {
 		jobEntity.DeployStatus = models.DEPLOY_RECEIVE_JOB
 		jobEntity.CreateTime = time.Now().Unix()
 		jobEntity.ExpireTime = getJobExpiredTime(job)
+		jobEntity.StartedBlock = conf.GetConfig().CONTRACT.JobManagerCreated
 		err = NewJobService().SaveJobEntity(jobEntity)
 		if err != nil {
 			logs.GetLogger().Errorf("failed to save job to db, spaceUuid: %s, error: %+v", spaceUuid, err)
@@ -312,6 +313,7 @@ func RedeployJob(c *gin.Context) {
 		jobEntity.DeployStatus = models.DEPLOY_RECEIVE_JOB
 		jobEntity.CreateTime = time.Now().Unix()
 		jobEntity.ExpireTime = getJobExpiredTime(job)
+		jobEntity.StartedBlock = conf.GetConfig().CONTRACT.JobManagerCreated
 		NewJobService().SaveJobEntity(jobEntity)
 
 		go func() {
