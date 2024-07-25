@@ -1017,7 +1017,7 @@ func CronTaskForEcp() {
 				}
 
 				var taskMap = make(map[int64]SequenceTask)
-				for _, t := range taskList.List {
+				for _, t := range taskList.Data.List {
 					taskMap[int64(t.Id)] = t
 				}
 
@@ -1138,8 +1138,8 @@ outerLoop:
 				time.Sleep(2 * time.Second)
 				continue
 			}
-			task.BlockHash = sendTaskProof.BlockHash
-			task.Sign = sendTaskProof.Sign
+			task.BlockHash = sendTaskProof.Data.BlockHash
+			task.Sign = sendTaskProof.Data.Sign
 			task.Sequencer = 1
 			break outerLoop
 		}
