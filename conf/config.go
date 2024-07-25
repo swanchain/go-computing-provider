@@ -174,8 +174,6 @@ func requiredFieldsAreGiven(metaData toml.MetaData) bool {
 		{"UBI", "UbiEnginePk"},
 		{"UBI", "SequencerUrl"},
 
-		{"HUB", "AccessToken"},
-
 		{"MCS", "ApiKey"},
 		{"MCS", "BucketName"},
 		{"MCS", "Network"},
