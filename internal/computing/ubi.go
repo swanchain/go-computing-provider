@@ -1059,18 +1059,28 @@ func CronTaskForEcp() {
 				for _, item := range group.Items {
 					if t, ok := taskMap[item.Id]; ok {
 						item.Reward = t.Reward
-						item.SettlementCid = t.SettlementCid
 						item.SequenceCid = t.SequenceCid
 
 						var status int
-						switch t.Status {
-						case "Verified":
-							status = models.TASK_VERIFIED_STATUS
-						case "rewarded":
-							status = models.TASK_REWARDED_STATUS
-						case "NSC":
+						if t.SequenceCid == "-1" {
 							status = models.TASK_NSC_STATUS
+						} else {
+							switch t.Status {
+							case "Verified":
+								status = models.TASK_VERIFIED_STATUS
+							case "rewarded":
+								status = models.TASK_REWARDED_STATUS
+							case "invalid":
+								status = models.TASK_INVALID_STATUS
+							case "repeated":
+								status = models.TASK_REPEATED_STATUS
+							case "timeout":
+								status = models.TASK_TIMEOUT_STATUS
+							case "verifyFailed":
+								status = models.TASK_VERIFYFAILED_STATUS
+							}
 						}
+
 						item.Status = status
 						NewTaskService().UpdateTaskEntityByTaskId(item)
 					}

@@ -66,7 +66,16 @@ func (taskServ TaskService) GetTaskEntity(taskId int64) (*models.TaskEntity, err
 }
 
 func (taskServ TaskService) GetTaskListNoReward() (list []*models.TaskEntity, err error) {
-	err = taskServ.Where("status in ?", []int{models.TASK_SUBMITTED_STATUS, models.TASK_VERIFIED_STATUS}).Find(&list).Error
+	status := []int{
+		models.TASK_SUBMITTED_STATUS,
+		models.TASK_VERIFIED_STATUS,
+		models.TASK_INVALID_STATUS,
+		models.TASK_VERIFYFAILED_STATUS,
+		models.TASK_REWARDED_STATUS,
+		models.TASK_TIMEOUT_STATUS,
+		models.TASK_REPEATED_STATUS,
+	}
+	err = taskServ.Model(&models.TaskEntity{}).Where("status in ? and (sequence_cid is null or sequence_cid ='')", status).Find(&list).Error
 	if err != nil {
 		return nil, err
 	}

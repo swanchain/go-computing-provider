@@ -226,16 +226,15 @@ type TaskListResp struct {
 }
 
 type SequenceTask struct {
-	Id            int    `json:"id"`
-	Type          int    `json:"type"`
-	InputParam    string `json:"input_param"`
-	VerifyParam   string `json:"verify_param"`
-	ResourceType  int    `json:"resource_type"`
-	Deadline      int    `json:"deadline"`
-	Proof         string `json:"proof"`
-	CheckCode     string `json:"check_code"`
-	Reward        string `json:"reward"`
-	Status        string `json:"status"`
-	SequenceCid   string `json:"sequence_cid"`
-	SettlementCid string `json:"settlement_cid"`
+	Id           int    `json:"id"`
+	Type         int    `json:"type"`
+	InputParam   string `json:"input_param"`
+	VerifyParam  string `json:"verify_param"`
+	ResourceType int    `json:"resource_type"`
+	Deadline     int    `json:"deadline"`
+	Proof        string `json:"proof"`
+	CheckCode    string `json:"check_code"`
+	Reward       string `json:"reward"`
+	Status       string `json:"status"`
+	SequenceCid  string `json:"sequence_cid"`
 }
