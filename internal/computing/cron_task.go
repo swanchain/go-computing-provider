@@ -40,6 +40,7 @@ func (task *CronTask) RunTask() {
 	task.reportClusterResource()
 	task.watchExpiredTask()
 	task.GetUbiTaskReward()
+	task.CheckJobReward()
 }
 
 func checkJobStatus() {

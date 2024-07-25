@@ -146,7 +146,7 @@ func (jobServ JobService) UpdateJobScannedBlock(taskUuid string, end uint64) (er
 }
 
 func (jobServ JobService) GetJobListByNoReward() (list []*models.JobEntity, err error) {
-	err = jobServ.Model(&models.JobEntity{}).Where("reward is not null").Find(&list).Error
+	err = jobServ.Model(&models.JobEntity{}).Where("status in ? and reward is null", []int{models.JOB_COMPLETED_STATUS, models.TERMINATED}).Find(&list).Error
 	return
 }
 
