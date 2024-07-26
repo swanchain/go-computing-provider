@@ -935,7 +935,7 @@ func GetTaskInfoOnChain(taskContract string) (models.EcpTaskInfo, error) {
 
 	taskStub, err := ecp.NewTaskStub(client, ecp.WithTaskContractAddress(taskContract))
 	if err != nil {
-		logs.GetLogger().Errorf("create ubi task client failed, error: %v", err)
+		logs.GetLogger().Errorf("faile to get ubi task client, error: %v", err)
 		return taskInfo, err
 	}
 

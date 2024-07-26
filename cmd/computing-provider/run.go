@@ -403,11 +403,7 @@ var taskInfoCmd = &cli.Command{
 		}
 
 		taskInfo, err := computing.GetTaskInfoOnChain(taskContract)
-		if err != nil {
-			return fmt.Errorf("failed to get task info on the chain, error: %v", err)
-		}
-
-		if taskInfo.TaskID != nil {
+		if err == nil {
 			var taskData [][]string
 			taskData = append(taskData, []string{"Task Id:", taskInfo.TaskID.String()})
 			taskData = append(taskData, []string{"ZK Type:", models.TaskTypeStr(int(taskInfo.TaskType.Int64()))})
