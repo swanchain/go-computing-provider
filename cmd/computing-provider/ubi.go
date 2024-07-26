@@ -191,6 +191,7 @@ var daemonCmd = &cli.Command{
 		computing.SyncCpAccountInfo()
 		computing.CronTaskForEcp()
 
+		gin.SetMode(gin.ReleaseMode)
 		r := gin.Default()
 		r.Use(cors.Middleware(cors.Config{
 			Origins:         "*",
