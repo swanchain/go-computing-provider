@@ -844,21 +844,25 @@ func submitUBIProof(c2Proof models.UbiC2Proof, task *models.TaskEntity) error {
 	if conf.GetConfig().UBI.EnableSequencer {
 		cpAccountAddress, err := contract.GetCpAccountAddress()
 		if err != nil {
-			return fmt.Errorf("failed to get cp account contract address, error: %v", err)
+			logs.GetLogger().Errorf("failed to get cp account contract address, error: %v", err)
+			return err
 		}
 
 		sequencerStub, err := ecp.NewSequencerStub(client, ecp.WithSequencerCpAccountAddress(cpAccountAddress))
 		if err != nil {
-			return fmt.Errorf("failed to get cp sequencer contract, error: %v", err)
+			logs.GetLogger().Errorf("failed to get cp sequencer contract, error: %v", err)
+			return err
 		}
 		sequencerBalanceStr, err := sequencerStub.GetCPBalance()
 		if err != nil {
-			return fmt.Errorf("failed to get cp sequencer contract, error: %v", err)
+			logs.GetLogger().Errorf("failed to get cp sequencer contract, error: %v", err)
+			return err
 		}
 
 		sequencerBalance, err = strconv.ParseFloat(sequencerBalanceStr, 64)
 		if err != nil {
-			return fmt.Errorf("failed to convert numbers for cp sequencer balance, sequencerBalance: %s, error: %v", sequencerBalanceStr, err)
+			logs.GetLogger().Errorf("failed to convert numbers for cp sequencer balance, sequencerBalance: %s, error: %v", sequencerBalanceStr, err)
+			return err
 		}
 	}
 
@@ -906,6 +910,7 @@ loopTask:
 			}
 		} else {
 			if err = submitTaskToSequencer(c2Proof.Proof, task, remainingTime, true); err != nil {
+				logs.GetLogger().Errorf("failed to  submitted to the sequencer, taskId: %d, error: %v", task.Id, err)
 				task.Status = models.TASK_FAILED_STATUS
 			} else {
 				task.Status = models.TASK_SUBMITTED_STATUS
@@ -914,6 +919,7 @@ loopTask:
 	} else if conf.GetConfig().UBI.EnableSequencer && !conf.GetConfig().UBI.AutoChainProof {
 		if sequencerBalance > 0 {
 			if err = submitTaskToSequencer(c2Proof.Proof, task, remainingTime, false); err != nil {
+				logs.GetLogger().Errorf("failed to  submitted to the sequencer, taskId: %d, error: %v", task.Id, err)
 				task.Status = models.TASK_FAILED_STATUS
 			} else {
 				task.Status = models.TASK_SUBMITTED_STATUS
