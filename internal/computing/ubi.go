@@ -868,7 +868,7 @@ loopTask:
 	task.Proof = c2Proof.Proof
 	remainingTime := task.Deadline - int64(blockNumber)
 	if remainingTime < 0 {
-		logs.GetLogger().Warnf("taskId: %s proof submission deadline has passed,current: %d, deadline: %d, , deadlineTime: %d", c2Proof.TaskId, blockNumber, task.Deadline, remainingTime)
+		logs.GetLogger().Warnf("taskId: %s proof submission deadline has passed, current: %d, deadline: %d, deadlineTime: %d", c2Proof.TaskId, blockNumber, task.Deadline, remainingTime)
 		task.Status = models.TASK_FAILED_STATUS
 		task.Error = fmt.Sprintf("create contract deadline has passed")
 		return NewTaskService().SaveTaskEntity(task)
@@ -881,11 +881,11 @@ loopTask:
 				task.Status = models.TASK_SUBMITTED_STATUS
 				task.Contract = taskContractAddress
 				task.Sequencer = 0
-				logs.GetLogger().Infof("successfully submitted to the chain，taskId: %s task contract address: %s", c2Proof.TaskId, taskContractAddress)
+				logs.GetLogger().Infof("successfully submitted to the chain, taskId: %s task contract address: %s", c2Proof.TaskId, taskContractAddress)
 			} else {
 				task.Status = models.TASK_FAILED_STATUS
 				task.Error = fmt.Sprintf("%s", err.Error())
-				logs.GetLogger().Errorf("taskId: %s, failed to create task contract , error: %v", c2Proof.TaskId, err)
+				logs.GetLogger().Errorf("taskId: %s, failed to create task contract, error: %v", c2Proof.TaskId, err)
 			}
 		} else {
 			if err = submitTaskToSequencer(c2Proof.Proof, task, remainingTime, true); err != nil {
@@ -1200,7 +1200,7 @@ func submitTaskToSequencer(proof string, task *models.TaskEntity, timeOut int64,
 			task.BlockHash = sendTaskProof.Data.BlockHash
 			task.Sign = sendTaskProof.Data.Sign
 			task.Sequencer = 1
-			logs.GetLogger().Infof("successfully submitted to the sequencer，taskId: %d sequencer Receipt is block_hash: %s, sign: %s", task.Id, task.BlockHash, task.Sign)
+			logs.GetLogger().Infof("successfully submitted to the sequencer, taskId: %d sequencer Receipt is block_hash: %s, sign: %s", task.Id, task.BlockHash, task.Sign)
 			flag = true
 			break
 		}
@@ -1242,7 +1242,7 @@ func submitTaskToSequencer(proof string, task *models.TaskEntity, timeOut int64,
 				task.Status = models.TASK_SUBMITTED_STATUS
 				task.Contract = taskContractAddress
 				task.Sequencer = 0
-				logs.GetLogger().Infof("successfully submitted to the chain，taskId: %d task contract address: %s", task.Id, taskContractAddress)
+				logs.GetLogger().Infof("successfully submitted to the chain, taskId: %d task contract address: %s", task.Id, taskContractAddress)
 				return nil
 			} else {
 				task.Status = models.TASK_FAILED_STATUS
@@ -1268,7 +1268,7 @@ func submitTaskToSequencer(proof string, task *models.TaskEntity, timeOut int64,
 				task.BlockHash = sendTaskProof.Data.BlockHash
 				task.Sign = sendTaskProof.Data.Sign
 				task.Sequencer = 1
-				logs.GetLogger().Infof("successfully submitted to the sequencer，taskId: %d sequencer Receipt is block_hash: %s, sign: %s", task.Id, task.BlockHash, task.Sign)
+				logs.GetLogger().Infof("successfully submitted to the sequencer, taskId: %d sequencer Receipt is block_hash: %s, sign: %s", task.Id, task.BlockHash, task.Sign)
 				break outerLoop
 			}
 		}
