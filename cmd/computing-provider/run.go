@@ -430,7 +430,7 @@ var taskInfoCmd = &cli.Command{
 			}
 
 			var taskData [][]string
-			taskData = append(taskData, []string{"MCS Cid:", cid})
+			taskData = append(taskData, []string{"MCS CID:", cid})
 			header := []string{"Task Contract:", taskContract}
 			NewVisualTable(header, taskData, []RowColor{}).Generate(false)
 		}
