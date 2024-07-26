@@ -1097,11 +1097,7 @@ func syncTaskStatusForSequencerService() error {
 
 		for _, item := range group.Items {
 			if t, ok := taskMap[item.Id]; ok {
-				var reward = "0.00"
-				if len(t.Reward) >= 4 {
-					reward = t.Reward[:4]
-				}
-				item.Reward = reward
+				item.Reward = "0.00"
 				item.SequenceCid = t.SequenceCid
 				item.SettlementCid = t.SettlementCid
 				item.SequenceTaskAddr = t.SequenceTaskAddr
@@ -1112,6 +1108,11 @@ func syncTaskStatusForSequencerService() error {
 					status = models.TASK_NSC_STATUS
 				} else if t.SettlementTaskAddr != "" {
 					status = models.TASK_REWARDED_STATUS
+					if len(t.Reward) >= 4 {
+						item.Reward = t.Reward[:4]
+					} else {
+						item.Reward = t.Reward
+					}
 				} else {
 					switch t.Status {
 					case "verified":
