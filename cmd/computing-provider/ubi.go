@@ -88,9 +88,6 @@ var listCmd = &cli.Command{
 					if task.SequenceTaskAddr != "" {
 						contract = task.SequenceTaskAddr
 					}
-					if task.SettlementTaskAddr != "" {
-						contract = task.SettlementTaskAddr
-					}
 				} else if task.Sequencer == 0 {
 					sequencerStr = "NO"
 					contract = task.Contract
@@ -127,9 +124,6 @@ var listCmd = &cli.Command{
 					sequencerStr = "YES"
 					if task.SequenceTaskAddr != "" {
 						contract = task.SequenceTaskAddr
-					}
-					if task.SettlementTaskAddr != "" {
-						contract = task.SettlementTaskAddr
 					}
 				} else if task.Sequencer == 0 {
 					sequencerStr = "NO"
