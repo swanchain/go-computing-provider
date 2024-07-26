@@ -910,7 +910,7 @@ loopTask:
 			}
 		} else {
 			if err = submitTaskToSequencer(c2Proof.Proof, task, remainingTime, true); err != nil {
-				logs.GetLogger().Errorf("failed to  submitted to the sequencer, taskId: %d, error: %v", task.Id, err)
+				logs.GetLogger().Errorf("failed to submitted to the sequencer, taskId: %d, error: %v", task.Id, err)
 				task.Status = models.TASK_FAILED_STATUS
 			} else {
 				task.Status = models.TASK_SUBMITTED_STATUS
@@ -919,7 +919,7 @@ loopTask:
 	} else if conf.GetConfig().UBI.EnableSequencer && !conf.GetConfig().UBI.AutoChainProof {
 		if sequencerBalance > 0 {
 			if err = submitTaskToSequencer(c2Proof.Proof, task, remainingTime, false); err != nil {
-				logs.GetLogger().Errorf("failed to  submitted to the sequencer, taskId: %d, error: %v", task.Id, err)
+				logs.GetLogger().Errorf("failed to submitted to the sequencer, taskId: %d, error: %v", task.Id, err)
 				task.Status = models.TASK_FAILED_STATUS
 			} else {
 				task.Status = models.TASK_SUBMITTED_STATUS
@@ -1298,7 +1298,7 @@ func submitTaskToSequencer(proof string, task *models.TaskEntity, timeOut int64,
 				task.BlockHash = sendTaskProof.Data.BlockHash
 				task.Sign = sendTaskProof.Data.Sign
 				task.Sequencer = 1
-				logs.GetLogger().Infof("successfully submitted to the sequencer, taskId: %d sequencer Receipt is block_hash: %s, sign: %s", task.Id, task.BlockHash, task.Sign)
+				logs.GetLogger().Infof("successfully submitted to the sequencer, taskId: %d, the sequencer receipt is block_hash: %s, sign: %s", task.Id, task.BlockHash, task.Sign)
 				break outerLoop
 			}
 		}
