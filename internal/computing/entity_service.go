@@ -12,39 +12,28 @@ type TaskService struct {
 	*gorm.DB
 }
 
-func (taskServ TaskService) GetAllTask(tailNum int) (list []*models.TaskEntity, err error) {
+func (taskServ TaskService) GetTaskList(tailNum int, taskStatus ...int) (list []*models.TaskEntity, err error) {
 	if tailNum > 0 {
-		err = taskServ.Model(&models.TaskEntity{}).Order("create_time desc").Limit(tailNum).Find(&list).Error
-		if err != nil {
-			return nil, err
-		}
-		for i, j := 0, len(list)-1; i < j; i, j = i+1, j-1 {
-			list[i], list[j] = list[j], list[i]
+		if len(taskStatus) > 0 {
+			err = taskServ.Model(&models.TaskEntity{}).Where("status in ?", taskStatus).Order("create_time desc").Limit(tailNum).Find(&list).Error
+		} else {
+			err = taskServ.Model(&models.TaskEntity{}).Order("create_time desc").Limit(tailNum).Find(&list).Error
 		}
 	} else {
-		err = taskServ.Model(&models.TaskEntity{}).Order("create_time").Find(&list).Error
-		if err != nil {
-			return nil, err
+		if len(taskStatus) > 0 {
+			err = taskServ.Model(&models.TaskEntity{}).Where("status in ?", taskStatus).Order("create_time desc").Find(&list).Error
+		} else {
+			err = taskServ.Model(&models.TaskEntity{}).Order("create_time desc").Find(&list).Error
 		}
 	}
-	return
-}
+	if err != nil {
+		return nil, err
+	}
 
-func (taskServ TaskService) GetTaskList(taskStatus, tailNum int) (list []*models.TaskEntity, err error) {
-	if tailNum > 0 {
-		err = taskServ.Where(&models.TaskEntity{Status: taskStatus}).Order("create_time desc").Limit(tailNum).Find(&list).Error
-		if err != nil {
-			return nil, err
-		}
-		for i, j := 0, len(list)-1; i < j; i, j = i+1, j-1 {
-			list[i], list[j] = list[j], list[i]
-		}
-	} else {
-		err = taskServ.Where(&models.TaskEntity{Status: taskStatus}).Order("create_time").Find(&list).Error
-		if err != nil {
-			return nil, err
-		}
+	for i, j := 0, len(list)-1; i < j; i, j = i+1, j-1 {
+		list[i], list[j] = list[j], list[i]
 	}
+
 	return
 }
 

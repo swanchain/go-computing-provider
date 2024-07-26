@@ -59,12 +59,18 @@ var listCmd = &cli.Command{
 		var taskList []*models.TaskEntity
 		var err error
 		if showFailed {
-			taskList, err = computing.NewTaskService().GetAllTask(tailNum)
+			taskList, err = computing.NewTaskService().GetTaskList(tailNum)
 			if err != nil {
 				return fmt.Errorf("failed get ubi task, error: %+v", err)
 			}
 		} else {
-			taskList, err = computing.NewTaskService().GetTaskList(models.TASK_SUBMITTED_STATUS, tailNum)
+			taskList, err = computing.NewTaskService().GetTaskList(tailNum, []int{
+				models.TASK_RECEIVED_STATUS,
+				models.TASK_RUNNING_STATUS,
+				models.TASK_SUBMITTED_STATUS,
+				models.TASK_VERIFIED_STATUS,
+				models.TASK_REWARDED_STATUS,
+			}...)
 			if err != nil {
 				return fmt.Errorf("failed get ubi task, error: %+v", err)
 			}
@@ -91,23 +97,13 @@ var listCmd = &cli.Command{
 					[]string{strconv.Itoa(int(task.Id)), task.Contract, models.GetResourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type),
 						task.CheckCode, task.Sign, models.TaskStatusStr(task.Status), task.Reward, sequencerStr, createTime})
 
-				var rowColor []tablewriter.Colors
-				if task.Status == models.TASK_RECEIVED_STATUS {
-					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgYellowColor}}
-				} else if task.Status == models.TASK_RUNNING_STATUS {
-					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgCyanColor}}
-				} else if task.Status == models.TASK_SUBMITTED_STATUS {
-					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
-				} else if task.Status == models.TASK_FAILED_STATUS {
-					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
-				}
-
 				rowColorList = append(rowColorList, RowColor{
 					row:    i,
 					column: []int{6},
-					color:  rowColor,
+					color:  getStatusColor(task.Status),
 				})
 			}
+
 			header := []string{"TASK ID", "TASK CONTRACT", "TASK TYPE", "ZK TYPE", "CHECK CODE", "SIGNATURE", "STATUS", "REWARD", "SEQUENCER", "CREATE TIME"}
 			NewVisualTable(header, taskData, rowColorList).Generate(false)
 
@@ -130,21 +126,10 @@ var listCmd = &cli.Command{
 					[]string{strconv.Itoa(int(task.Id)), task.Contract, models.GetResourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type),
 						models.TaskStatusStr(task.Status), task.Reward, sequencerStr, createTime})
 
-				var rowColor []tablewriter.Colors
-				if task.Status == models.TASK_RECEIVED_STATUS {
-					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgYellowColor}}
-				} else if task.Status == models.TASK_RUNNING_STATUS {
-					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgCyanColor}}
-				} else if task.Status == models.TASK_SUBMITTED_STATUS {
-					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
-				} else if task.Status == models.TASK_FAILED_STATUS {
-					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
-				}
-
 				rowColorList = append(rowColorList, RowColor{
 					row:    i,
 					column: []int{4},
-					color:  rowColor,
+					color:  getStatusColor(task.Status),
 				})
 			}
 
@@ -213,4 +198,35 @@ var daemonCmd = &cli.Command{
 
 		return nil
 	},
+}
+
+func getStatusColor(taskStatus int) []tablewriter.Colors {
+	var rowColor []tablewriter.Colors
+	switch taskStatus {
+	case models.TASK_RECEIVED_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgYellowColor}}
+	case models.TASK_RUNNING_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgCyanColor}}
+	case models.TASK_SUBMITTED_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
+	case models.TASK_FAILED_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
+	case models.TASK_VERIFIED_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
+	case models.TASK_REWARDED_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
+	case models.TASK_INVALID_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
+	case models.TASK_TIMEOUT_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
+	case models.TASK_VERIFYFAILED_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
+	case models.TASK_REPEATED_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
+	case models.TASK_NSC_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
+	case models.TASK_UNKNOWN_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgBlackColor}}
+	}
+	return rowColor
 }

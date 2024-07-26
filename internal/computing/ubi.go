@@ -1034,7 +1034,7 @@ func CronTaskForEcp() {
 				logs.GetLogger().Errorf("GetUbiTaskReward, error: %+v", err)
 			}
 		}()
-		ticker := time.NewTicker(5 * time.Minute)
+		ticker := time.NewTicker(10 * time.Minute)
 		for range ticker.C {
 
 			taskList, err := NewTaskService().GetTaskListNoReward()
@@ -1083,6 +1083,8 @@ func CronTaskForEcp() {
 								status = models.TASK_TIMEOUT_STATUS
 							case "verifyFailed":
 								status = models.TASK_VERIFYFAILED_STATUS
+							default:
+								status = models.TASK_UNKNOWN_STATUS
 							}
 						}
 

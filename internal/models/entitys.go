@@ -39,6 +39,7 @@ const (
 	TASK_TIMEOUT_STATUS
 	TASK_REPEATED_STATUS
 	TASK_NSC_STATUS
+	TASK_UNKNOWN_STATUS
 )
 
 func TaskStatusStr(status int) string {
@@ -66,7 +67,10 @@ func TaskStatusStr(status int) string {
 		statusStr = "repeated"
 	case TASK_NSC_STATUS:
 		statusStr = "NSC"
+	case TASK_UNKNOWN_STATUS:
+		statusStr = "unknown"
 	}
+
 	return statusStr
 }
 
