@@ -879,6 +879,7 @@ loopTask:
 			if taskContractAddress != "" {
 				task.Status = models.TASK_SUBMITTED_STATUS
 				task.Contract = taskContractAddress
+				task.Sequencer = 0
 				logs.GetLogger().Infof("successfully submitted to the chain，taskId: %s task contract address: %s", c2Proof.TaskId, taskContractAddress)
 			} else {
 				task.Status = models.TASK_FAILED_STATUS
@@ -905,6 +906,7 @@ loopTask:
 		if taskContractAddress != "" {
 			task.Status = models.TASK_SUBMITTED_STATUS
 			task.Contract = taskContractAddress
+			task.Sequencer = 0
 			logs.GetLogger().Infof("taskId: %s, taskContractAddress: %s", c2Proof.TaskId, taskContractAddress)
 		} else if err != nil {
 			task.Status = models.TASK_FAILED_STATUS
@@ -1051,7 +1053,7 @@ func syncTaskStatusForSequencerService() error {
 
 	taskGroups := handleTasksToGroup(taskList)
 	for _, group := range taskGroups {
-		taskList, err := NewSequencer().QueryTask(group.Ids...)
+		taskList, err := NewSequencer().QueryTask(group.Type, group.Ids...)
 		if err != nil {
 			logs.GetLogger().Errorf("failed to query task, task ids: %v, error: %v", group.Ids, err)
 			continue

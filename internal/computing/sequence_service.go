@@ -140,7 +140,7 @@ func (s *Sequencer) SendTaskProof(data []byte) (SendProofResp, error) {
 	return spr, fmt.Errorf(spr.Msg)
 }
 
-func (s *Sequencer) QueryTask(taskIds ...int64) (TaskListResp, error) {
+func (s *Sequencer) QueryTask(taskType int, taskIds ...int64) (TaskListResp, error) {
 	if tokenCache == "" {
 		if err := s.GetToken(); err != nil {
 			return TaskListResp{}, fmt.Errorf("failed to get token, error: %v", err)
@@ -152,7 +152,7 @@ func (s *Sequencer) QueryTask(taskIds ...int64) (TaskListResp, error) {
 		return TaskListResp{}, err
 	}
 
-	var reqUrl = s.url + task + fmt.Sprintf("?ids=%s", string(reqData))
+	var reqUrl = s.url + task + fmt.Sprintf("?type=%d&ids=%s", taskType, string(reqData))
 	req, err := http.NewRequest("GET", reqUrl, nil)
 	if err != nil {
 		return TaskListResp{}, fmt.Errorf("error creating request: %v", err)

@@ -473,28 +473,39 @@ func checkHealth(url string) bool {
 type TaskGroup struct {
 	Items []*models.TaskEntity
 	Ids   []int64
+	Type  int // 1: contract  2: sequncer
 }
 
 func handleTasksToGroup(list []*models.TaskEntity) []TaskGroup {
 	var groups []TaskGroup
+	var group TaskGroup
+	var group1 TaskGroup
+
 	const batchSize = 20
-	for i := 0; i < len(list); i += batchSize {
-		end := i + batchSize
-		if end > len(list) {
-			end = len(list)
+	for i := 0; i < len(list); i++ {
+		if list[i].Sequencer == 1 {
+			if len(group1.Items) > batchSize {
+				groups = append(groups, group1)
+				group1 = TaskGroup{}
+			}
+			group1.Items = append(group1.Items, list[i])
+			group1.Ids = append(group1.Ids, list[i].Id)
+			group1.Type = 1
+		} else if list[i].Sequencer == 0 {
+			if len(group.Items) > batchSize {
+				groups = append(groups, group)
+				group = TaskGroup{}
+			}
+			group.Items = append(group.Items, list[i])
+			group.Ids = append(group.Ids, list[i].Id)
+			group.Type = 0
 		}
-		batch := list[i:end]
-
-		var ids []int64
-		for _, item := range batch {
-			ids = append(ids, item.Id)
-		}
-
-		group := TaskGroup{
-			Items: batch,
-			Ids:   ids,
-		}
+	}
+	if len(group.Items) > 0 {
 		groups = append(groups, group)
+	}
+	if len(group1.Items) > 0 {
+		groups = append(groups, group1)
 	}
 	return groups
 }
