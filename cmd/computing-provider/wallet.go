@@ -653,7 +653,7 @@ var sequencerCmd = &cli.Command{
 	ArgsUsage: "[fromAddress] [amount]",
 	Subcommands: []*cli.Command{
 		sequencerAddCmd,
-		sequencerSendCmd,
+		sequencerWithdrawCmd,
 	},
 	Before: func(c *cli.Context) error {
 		cpRepoPath, _ := os.LookupEnv("CP_PATH")
@@ -706,7 +706,7 @@ var sequencerAddCmd = &cli.Command{
 	},
 }
 
-var sequencerSendCmd = &cli.Command{
+var sequencerWithdrawCmd = &cli.Command{
 	Name:  "withdraw",
 	Usage: "Withdraw funds from the sequencer contract",
 	Flags: []cli.Flag{
@@ -738,7 +738,7 @@ var sequencerSendCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		txHash, err := localWallet.SequencerDeposit(ctx, ownerAddress, amount, cpAccountAddress)
+		txHash, err := localWallet.SequencerWithdraw(ctx, ownerAddress, amount, cpAccountAddress)
 		if err != nil {
 			return err
 		}
