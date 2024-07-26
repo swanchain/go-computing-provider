@@ -112,6 +112,7 @@ type TaskEntity struct {
 	SequenceTaskAddr   string `json:"sequence_task_addr"`
 	SettlementTaskAddr string `json:"settlement_task_addr"`
 	Sequencer          int    `json:"sequencer" gorm:"default:-1"`
+	Proof              string
 }
 
 func (task *TaskEntity) TableName() string {

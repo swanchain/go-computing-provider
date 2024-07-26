@@ -37,10 +37,10 @@ type API struct {
 	WalletBlackList string
 }
 type UBI struct {
-	UbiEnginePk                  string
-	AggregateCommits             bool
-	ErrSeqBalanceForSingleSubmit bool
-	SequencerUrl                 string
+	UbiEnginePk     string
+	EnableSequencer bool
+	AutoChainProof  bool
+	SequencerUrl    string
 }
 
 type LOG struct {
@@ -77,7 +77,7 @@ type CONTRACT struct {
 
 	JobCollateral     string `toml:"SWAN_COLLATERAL_CONTRACT"`
 	JobManager        string `toml:"SWAN_JOB_CONTRACT"`
-	JobManagerCreated uint64
+	JobManagerCreated uint64 `toml:"JobManagerCreated"`
 
 	TaskRegister string `toml:"REGISTER_TASK_CONTRACT"`
 	ZkCollateral string `toml:"ZK_COLLATERAL_CONTRACT"`
@@ -310,9 +310,9 @@ func generateDefaultConfig() ComputeNode {
 			WalletBlackList: "",
 		},
 		UBI: UBI{
-			UbiEnginePk:                  "",
-			AggregateCommits:             true,
-			ErrSeqBalanceForSingleSubmit: false,
+			UbiEnginePk:     "",
+			EnableSequencer: true,
+			AutoChainProof:  false,
 		},
 		LOG: LOG{
 			CrtFile: "",
@@ -340,6 +340,8 @@ func generateDefaultConfig() ComputeNode {
 		CONTRACT: CONTRACT{
 			SwanToken:         "",
 			JobCollateral:     "",
+			JobManager:        "",
+			JobManagerCreated: 0,
 			CpAccountRegister: "",
 			TaskRegister:      "",
 			ZkCollateral:      "",

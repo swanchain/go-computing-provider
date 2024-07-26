@@ -9,7 +9,7 @@ WalletBlackList = ""                                                     # CP re
 [UBI]
 UbiEnginePk = "0xB5aeb540B4895cd024c1625E146684940A849ED9"                # UBI Engine's public key, CP only accept the task from this UBI engine
 EnableSequencer = true                                                    # Batch submission of proof messages through Sequencer service
-autoChainProof = false                                                    # Sequencer insufficient balance or service unavailable ，use chain to submit proof
+AutoChainProof = false                                                    # Sequencer insufficient balance or service unavailable ，use chain to submit proof
 SequencerUrl = "http://127.0.0.1:8005/task"
 
 [LOG]

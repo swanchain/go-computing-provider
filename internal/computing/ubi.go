@@ -865,6 +865,7 @@ loopTask:
 		}
 	}
 
+	task.Proof = c2Proof.Proof
 	remainingTime := task.Deadline - int64(blockNumber)
 	if remainingTime < 0 {
 		logs.GetLogger().Warnf("taskId: %s proof submission deadline has passed,current: %d, deadline: %d, , deadlineTime: %d", c2Proof.TaskId, blockNumber, task.Deadline, remainingTime)
@@ -873,7 +874,7 @@ loopTask:
 		return NewTaskService().SaveTaskEntity(task)
 	}
 
-	if conf.GetConfig().UBI.AggregateCommits && conf.GetConfig().UBI.ErrSeqBalanceForSingleSubmit {
+	if conf.GetConfig().UBI.EnableSequencer && conf.GetConfig().UBI.AutoChainProof {
 		if strings.HasPrefix(sequencerBalance, "-") {
 			taskContractAddress, err := taskStub.CreateTaskContract(c2Proof.Proof, task, remainingTime)
 			if taskContractAddress != "" {
@@ -884,18 +885,18 @@ loopTask:
 			} else {
 				task.Status = models.TASK_FAILED_STATUS
 				task.Error = fmt.Sprintf("%s", err.Error())
-				logs.GetLogger().Errorf("taskId: %s, create task contract failed, error: %v", c2Proof.TaskId, err)
+				logs.GetLogger().Errorf("taskId: %s, failed to create task contract , error: %v", c2Proof.TaskId, err)
 			}
 		} else {
-			if err = submitTaskToSequencer(c2Proof.Proof, task, remainingTime); err != nil {
+			if err = submitTaskToSequencer(c2Proof.Proof, task, remainingTime, true); err != nil {
 				task.Status = models.TASK_FAILED_STATUS
 			} else {
 				task.Status = models.TASK_SUBMITTED_STATUS
 			}
 		}
-	} else if conf.GetConfig().UBI.AggregateCommits && !conf.GetConfig().UBI.ErrSeqBalanceForSingleSubmit {
+	} else if conf.GetConfig().UBI.EnableSequencer && !conf.GetConfig().UBI.AutoChainProof {
 		if !strings.HasPrefix(sequencerBalance, "-") {
-			if err = submitTaskToSequencer(c2Proof.Proof, task, remainingTime); err != nil {
+			if err = submitTaskToSequencer(c2Proof.Proof, task, remainingTime, false); err != nil {
 				task.Status = models.TASK_FAILED_STATUS
 			} else {
 				task.Status = models.TASK_SUBMITTED_STATUS
@@ -911,7 +912,7 @@ loopTask:
 		} else if err != nil {
 			task.Status = models.TASK_FAILED_STATUS
 			task.Error = fmt.Sprintf("%s", err.Error())
-			logs.GetLogger().Errorf("taskId: %s, create task contract failed, error: %v", c2Proof.TaskId, err)
+			logs.GetLogger().Errorf("taskId: %s, failed to create task contract, error: %v", c2Proof.TaskId, err)
 		}
 	}
 	return NewTaskService().SaveTaskEntity(task)
@@ -1158,7 +1159,7 @@ func RestartResourceExporter() error {
 	return nil
 }
 
-func submitTaskToSequencer(proof string, task *models.TaskEntity, timeOut int64) error {
+func submitTaskToSequencer(proof string, task *models.TaskEntity, timeOut int64, autoChainProof bool) error {
 	var err error
 	var taskReq struct {
 		Id           int64  `json:"id"`
@@ -1186,13 +1187,10 @@ func submitTaskToSequencer(proof string, task *models.TaskEntity, timeOut int64)
 	}
 
 	timeOutCh := time.After(time.Second * time.Duration(timeOut))
-outerLoop:
-	for {
-		select {
-		case <-timeOutCh:
-			err = fmt.Errorf("submit task to sequencer timed out")
-			break outerLoop
-		default:
+
+	if autoChainProof {
+		var flag bool
+		for i := 0; i < 5; i++ {
 			sendTaskProof, err := NewSequencer().SendTaskProof(data)
 			if err != nil {
 				logs.GetLogger().Warnf("taskId: %d submit task to sequencer failed, error: %v, retrying", task.Id, err)
@@ -1203,9 +1201,78 @@ outerLoop:
 			task.Sign = sendTaskProof.Data.Sign
 			task.Sequencer = 1
 			logs.GetLogger().Infof("successfully submitted to the sequencer，taskId: %d sequencer Receipt is block_hash: %s, sign: %s", task.Id, task.BlockHash, task.Sign)
-			break outerLoop
+			flag = true
+			break
 		}
-	}
+		remainingTime := timeOut - 10
+		if !flag && remainingTime > 0 {
+			chainUrl, err := conf.GetRpcByNetWorkName()
+			if err != nil {
+				return fmt.Errorf("failed to get rpc url, taskId: %d, error: %v", task.Id, err)
+			}
+			client, err := ethclient.Dial(chainUrl)
+			if err != nil {
+				return fmt.Errorf("failed to dial rpc, taskId: %d, error: %v", task.Id, err)
+			}
+			client.Close()
 
+			localWallet, err := wallet.SetupWallet(wallet.WalletRepo)
+			if err != nil {
+				return fmt.Errorf("failed to setup wallet, taskId: %d,error: %v", task.Id, err)
+			}
+
+			_, workerAddress, err := GetOwnerAddressAndWorkerAddress()
+			if err != nil {
+				return fmt.Errorf("failed to get worker address, taskId: %d,error: %v", task.Id, err)
+			}
+
+			ki, err := localWallet.FindKey(workerAddress)
+			if err != nil || ki == nil {
+				return fmt.Errorf("taskId: %d,the address: %s, private key %v", task.Id, workerAddress, wallet.ErrKeyInfoNotFound)
+			}
+			var workerPrivateKey = ki.PrivateKey
+			ki = nil
+			taskStub, err := ecp.NewTaskStub(client, ecp.WithTaskContractAddress(task.Contract), ecp.WithTaskPrivateKey(workerPrivateKey))
+			if err != nil {
+				return fmt.Errorf("failed to create ubi task client, taskId: %s, contract: %s, error: %v", task.Id, task.Contract, err)
+			}
+
+			taskContractAddress, err := taskStub.CreateTaskContract(task.Proof, task, remainingTime)
+			if taskContractAddress != "" {
+				task.Status = models.TASK_SUBMITTED_STATUS
+				task.Contract = taskContractAddress
+				task.Sequencer = 0
+				logs.GetLogger().Infof("successfully submitted to the chain，taskId: %d task contract address: %s", task.Id, taskContractAddress)
+				return nil
+			} else {
+				task.Status = models.TASK_FAILED_STATUS
+				task.Error = fmt.Sprintf("%s", err.Error())
+				return fmt.Errorf("taskId: %d, failed to create task contract , error: %v", task.Id, err)
+			}
+		}
+		return fmt.Errorf("taskId: %d, remainingTime: %d, failed to create contract deadline has passed", task.Id, remainingTime)
+	} else {
+	outerLoop:
+		for {
+			select {
+			case <-timeOutCh:
+				err = fmt.Errorf("submit task to sequencer timed out")
+				break outerLoop
+			default:
+				sendTaskProof, err := NewSequencer().SendTaskProof(data)
+				if err != nil {
+					logs.GetLogger().Warnf("taskId: %d submit task to sequencer failed, error: %v, retrying", task.Id, err)
+					time.Sleep(2 * time.Second)
+					continue
+				}
+				task.BlockHash = sendTaskProof.Data.BlockHash
+				task.Sign = sendTaskProof.Data.Sign
+				task.Sequencer = 1
+				logs.GetLogger().Infof("successfully submitted to the sequencer，taskId: %d sequencer Receipt is block_hash: %s, sign: %s", task.Id, task.BlockHash, task.Sign)
+				break outerLoop
+			}
+		}
+
+	}
 	return err
 }
