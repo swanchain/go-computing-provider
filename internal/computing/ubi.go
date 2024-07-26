@@ -1336,8 +1336,8 @@ func checkBalance(cpAccountAddress string) (bool, error) {
 		return false, fmt.Errorf("failed to convert numbers for cp sequencer balance, cpAccount: %s, sequencerBalance: %s, error: %v", cpAccountAddress, sequencerBalanceStr, err)
 	}
 
-	logs.GetLogger().Infof("cpAccount: %s, sequencer balance: %s, worker address balance: %s", cpAccountAddress, fmt.Sprintf("%.4f\n", sequencerBalance),
-		fmt.Sprintf("%.4f\n", workerBalance))
+	logs.GetLogger().Infof("cpAccount: %s, sequencer balance: %s, worker address balance: %s", cpAccountAddress, fmt.Sprintf("%.4f", sequencerBalance),
+		fmt.Sprintf("%.4f", workerBalance))
 
 	if sequencerBalance > 0 || workerBalance > 0 {
 		return true, nil
