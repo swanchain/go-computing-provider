@@ -490,7 +490,7 @@ func handleTasksToGroup(list []*models.TaskEntity) []TaskGroup {
 			}
 			group1.Items = append(group1.Items, list[i])
 			group1.Ids = append(group1.Ids, list[i].Id)
-			group1.Type = 1
+			group1.Type = 2
 		} else if list[i].Sequencer == 0 {
 			if len(group.Items) > batchSize {
 				groups = append(groups, group)
@@ -498,7 +498,7 @@ func handleTasksToGroup(list []*models.TaskEntity) []TaskGroup {
 			}
 			group.Items = append(group.Items, list[i])
 			group.Ids = append(group.Ids, list[i].Id)
-			group.Type = 0
+			group.Type = 1
 		}
 	}
 	if len(group.Items) > 0 {
