@@ -92,7 +92,7 @@ var listCmd = &cli.Command{
 					sequencerStr = "NO"
 					contract = task.Contract
 				} else {
-					sequencerStr = ""
+					sequencerStr = "-"
 				}
 
 				if len(strings.TrimSpace(task.Reward)) == 0 {
@@ -129,7 +129,7 @@ var listCmd = &cli.Command{
 					sequencerStr = "NO"
 					contract = task.Contract
 				} else {
-					sequencerStr = ""
+					sequencerStr = "-"
 				}
 
 				if len(strings.TrimSpace(task.Reward)) == 0 {
