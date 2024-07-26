@@ -32,7 +32,7 @@ var runCmd = &cli.Command{
 	Name:  "run",
 	Usage: "Start a cp process",
 	Action: func(cctx *cli.Context) error {
-		logs.GetLogger().Info("Start a computing provider client.")
+		logs.GetLogger().Info("Starting a computing provider client.")
 
 		cpRepoPath, ok := os.LookupEnv("CP_PATH")
 		if !ok {
@@ -60,6 +60,7 @@ var runCmd = &cli.Command{
 		if err != nil {
 			logs.GetLogger().Fatal("failed to start cp-api endpoint: %s", err)
 		}
+		logs.GetLogger().Infof("CP service started successfully, listening on port: %d", conf.GetConfig().API.Port)
 
 		finishCh := util.MonitorShutdown(shutdownChan,
 			util.ShutdownHandler{Component: "cp-api", StopFunc: httpStopper},
