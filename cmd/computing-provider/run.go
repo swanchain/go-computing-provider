@@ -404,26 +404,39 @@ var taskInfoCmd = &cli.Command{
 
 		taskInfo, err := computing.GetTaskInfoOnChain(taskContract)
 		if err != nil {
-			return fmt.Errorf("get task info on the chain failed, error: %v", err)
+			return fmt.Errorf("failed to get task info on the chain, error: %v", err)
 		}
 
-		var taskData [][]string
-		taskData = append(taskData, []string{"Task Id:", taskInfo.TaskID.String()})
-		taskData = append(taskData, []string{"ZK Type:", models.TaskTypeStr(int(taskInfo.TaskType.Int64()))})
-		taskData = append(taskData, []string{"Resource Type:", models.GetResourceTypeStr(int(taskInfo.ResourceType.Int64()))})
-		taskData = append(taskData, []string{"Owner:", taskInfo.Owner.Hex()})
-		taskData = append(taskData, []string{"CP Account:", taskInfo.CpAccount.Hex()})
-		taskData = append(taskData, []string{"Deadline:", taskInfo.Deadline.String()})
-		taskData = append(taskData, []string{"Input Param:", taskInfo.InputParam})
-		taskData = append(taskData, []string{"Verify Param:", taskInfo.VerifyParam})
-		taskData = append(taskData, []string{"Check Code:", taskInfo.CheckCode})
+		if taskInfo.TaskID != nil {
+			var taskData [][]string
+			taskData = append(taskData, []string{"Task Id:", taskInfo.TaskID.String()})
+			taskData = append(taskData, []string{"ZK Type:", models.TaskTypeStr(int(taskInfo.TaskType.Int64()))})
+			taskData = append(taskData, []string{"Resource Type:", models.GetResourceTypeStr(int(taskInfo.ResourceType.Int64()))})
+			taskData = append(taskData, []string{"Owner:", taskInfo.Owner.Hex()})
+			taskData = append(taskData, []string{"CP Account:", taskInfo.CpAccount.Hex()})
+			taskData = append(taskData, []string{"Deadline:", taskInfo.Deadline.String()})
+			taskData = append(taskData, []string{"Input Param:", taskInfo.InputParam})
+			taskData = append(taskData, []string{"Verify Param:", taskInfo.VerifyParam})
+			taskData = append(taskData, []string{"Check Code:", taskInfo.CheckCode})
 
-		if showProof {
-			taskData = append(taskData, []string{"Proof:", taskInfo.Proof})
+			if showProof {
+				taskData = append(taskData, []string{"Proof:", taskInfo.Proof})
+			}
+
+			header := []string{fmt.Sprintf("Task Contract(%s):", taskInfo.Version), taskContract}
+			NewVisualTable(header, taskData, []RowColor{}).Generate(false)
+		} else {
+			cid, err := computing.GetAggregatedTaskInfo(taskContract)
+			if err != nil {
+				return err
+			}
+
+			var taskData [][]string
+			taskData = append(taskData, []string{"MCS Cid:", cid})
+			header := []string{"Task Contract:", taskContract}
+			NewVisualTable(header, taskData, []RowColor{}).Generate(false)
 		}
 
-		header := []string{fmt.Sprintf("Task Contract(%s):", taskInfo.Version), taskContract}
-		NewVisualTable(header, taskData, []RowColor{}).Generate(false)
 		return nil
 
 	},

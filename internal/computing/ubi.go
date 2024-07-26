@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/filswan/go-swan-lib/logs"
 	"github.com/gin-gonic/gin"
@@ -958,6 +960,28 @@ loopTask:
 		return taskInfo, nil
 	}
 	return taskInfo, err
+}
+
+func GetAggregatedTaskInfo(taskContract string) (string, error) {
+	chainRpc, err := conf.GetRpcByNetWorkName()
+	if err != nil {
+		return "", err
+	}
+	client, err := ethclient.Dial(chainRpc)
+	if err != nil {
+		return "", err
+	}
+	defer client.Close()
+
+	aggregatedTask, err := ecp.NewAggregatedTask(common.HexToAddress(taskContract), client)
+	if err != nil {
+		return "", fmt.Errorf("create ubi task client failed, error: %v", err)
+	}
+	blobCid, err := aggregatedTask.TaskBlobCID(&bind.CallOpts{})
+	if err != nil {
+		return "", fmt.Errorf("failed to get cid from contact, error: %v", err)
+	}
+	return blobCid, nil
 }
 
 func reportClusterResourceForDocker() {

@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -94,6 +95,9 @@ var listCmd = &cli.Command{
 					sequencerStr = ""
 				}
 
+				if len(strings.TrimSpace(task.Reward)) == 0 {
+					task.Reward = "0.00"
+				}
 				if len(task.Reward) >= 4 {
 					task.Reward = task.Reward[:4]
 				}
@@ -128,6 +132,9 @@ var listCmd = &cli.Command{
 					sequencerStr = ""
 				}
 
+				if len(strings.TrimSpace(task.Reward)) == 0 {
+					task.Reward = "0.00"
+				}
 				if len(task.Reward) >= 4 {
 					task.Reward = task.Reward[:4]
 				}
