@@ -174,8 +174,8 @@ func requiredFieldsAreGiven(metaData toml.MetaData) bool {
 		{"LOG", "KeyFile"},
 
 		{"UBI", "UbiEnginePk"},
-		{"UBI", "AggregateCommits"},
-		{"UBI", "ErrSeqBalanceForSingleSubmit"},
+		{"UBI", "EnableSequencer"},
+		{"UBI", "AutoChainProof"},
 		{"UBI", "SequencerUrl"},
 
 		{"MCS", "ApiKey"},
@@ -204,8 +204,8 @@ func requiredFieldsAreGivenForSeparate(metaData toml.MetaData) bool {
 		{"API", "NodeName"},
 
 		{"UBI", "UbiEnginePk"},
-		{"UBI", "AggregateCommits"},
-		{"UBI", "ErrSeqBalanceForSingleSubmit"},
+		{"UBI", "EnableSequencer"},
+		{"UBI", "AutoChainProof"},
 		{"UBI", "SequencerUrl"},
 
 		{"RPC", "SWAN_CHAIN_RPC"},
