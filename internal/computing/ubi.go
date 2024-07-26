@@ -1117,6 +1117,8 @@ func syncTaskStatusForSequencerService() error {
 					switch t.Status {
 					case "verified":
 						status = models.TASK_VERIFIED_STATUS
+					case "submitted":
+						status = models.TASK_SUBMITTED_STATUS
 					case "rewarded":
 						status = models.TASK_REWARDED_STATUS
 					case "invalid":
