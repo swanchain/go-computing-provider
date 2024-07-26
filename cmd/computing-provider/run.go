@@ -21,6 +21,7 @@ import (
 	"github.com/swanchain/go-computing-provider/wallet"
 	"github.com/urfave/cli/v2"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -38,6 +39,7 @@ var runCmd = &cli.Command{
 			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
 		}
 		initializer.ProjectInit(cpRepoPath)
+		logs.GetLogger().Info("Your config file is:", filepath.Join(cpRepoPath, "config.toml"))
 
 		r := gin.Default()
 		r.Use(cors.Middleware(cors.Config{

@@ -14,6 +14,7 @@ import (
 	"github.com/swanchain/go-computing-provider/util"
 	"github.com/urfave/cli/v2"
 	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 )
@@ -78,12 +79,15 @@ var listCmd = &cli.Command{
 
 		if fullFlag {
 			for i, task := range taskList {
-
+				createTime := time.Unix(task.CreateTime, 0).Format("2006-01-02 15:04:05")
 				var sequencerStr string
+				var contract string
 				if task.Sequencer == 1 {
 					sequencerStr = "YES"
+					contract = task.SequenceTaskAddr
 				} else if task.Sequencer == 0 {
 					sequencerStr = "NO"
+					contract = task.Contract
 				} else {
 					sequencerStr = ""
 				}
@@ -92,10 +96,9 @@ var listCmd = &cli.Command{
 					task.Reward = task.Reward[:4]
 				}
 
-				createTime := time.Unix(task.CreateTime, 0).Format("2006-01-02 15:04:05")
 				taskData = append(taskData,
-					[]string{strconv.Itoa(int(task.Id)), task.Contract, models.GetResourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type),
-						task.CheckCode, task.Sign, models.TaskStatusStr(task.Status), task.Reward, sequencerStr, createTime})
+					[]string{strconv.Itoa(int(task.Id)), contract, models.GetResourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type),
+						task.CheckCode, task.Sign, models.TaskStatusStr(task.Status), task.Reward, sequencerStr, task.SettlementTaskAddr, createTime})
 
 				rowColorList = append(rowColorList, RowColor{
 					row:    i,
@@ -103,19 +106,22 @@ var listCmd = &cli.Command{
 					color:  getStatusColor(task.Status),
 				})
 			}
-
-			header := []string{"TASK ID", "TASK CONTRACT", "TASK TYPE", "ZK TYPE", "CHECK CODE", "SIGNATURE", "STATUS", "REWARD", "SEQUENCER", "CREATE TIME"}
+			header := []string{"TASK ID", "TASK CONTRACT", "TASK TYPE", "ZK TYPE", "CHECK CODE", "SIGNATURE", "STATUS", "REWARD", "SEQUENCER", "SETTLEMENT CONTRACT", "CREATE TIME"}
 			NewVisualTable(header, taskData, rowColorList).Generate(false)
 
 		} else {
 			for i, task := range taskList {
 				createTime := time.Unix(task.CreateTime, 0).Format("2006-01-02 15:04:05")
-
 				var sequencerStr string
+				var contract string
 				if task.Sequencer == 1 {
 					sequencerStr = "YES"
-				} else {
+					contract = task.SequenceTaskAddr
+				} else if task.Sequencer == 0 {
 					sequencerStr = "NO"
+					contract = task.Contract
+				} else {
+					sequencerStr = ""
 				}
 
 				if len(task.Reward) >= 4 {
@@ -123,7 +129,7 @@ var listCmd = &cli.Command{
 				}
 
 				taskData = append(taskData,
-					[]string{strconv.Itoa(int(task.Id)), task.Contract, models.GetResourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type),
+					[]string{strconv.Itoa(int(task.Id)), contract, models.GetResourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type),
 						models.TaskStatusStr(task.Status), task.Reward, sequencerStr, createTime})
 
 				rowColorList = append(rowColorList, RowColor{
@@ -163,6 +169,7 @@ var daemonCmd = &cli.Command{
 		if err := conf.InitConfig(cpRepoPath, true); err != nil {
 			logs.GetLogger().Fatal(err)
 		}
+		logs.GetLogger().Info("Your config file is:", filepath.Join(cpRepoPath, "config.toml"))
 
 		computing.SyncCpAccountInfo()
 		computing.CronTaskForEcp()

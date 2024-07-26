@@ -75,7 +75,7 @@ func TestDockerBuild(t *testing.T) {
 }
 
 func TestNewStorageService(t *testing.T) {
-	service := computing2.NewStorageService()
+	service, _ := computing2.NewStorageService()
 	service.McsApiKey = "wxE8QdLUANzq6zAwosEUOw"
 	service.McsAccessToken = "4efvcH9opkLp0pS3QDACbI0hpCO5lTcp"
 	service.NetWork = "polygon.mainnet"

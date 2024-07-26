@@ -204,7 +204,10 @@ func submitJob(jobData *models.JobData) error {
 
 	var resultMcsUrl string
 	for i := 0; i < 5; i++ {
-		storageService := NewStorageService()
+		storageService, err := NewStorageService()
+		if err != nil {
+			return err
+		}
 		mcsOssFile, err := storageService.UploadFileToBucket(jobDetailFile, taskDetailFilePath, true)
 		if err != nil {
 			logs.GetLogger().Errorf("upload file to bucket failed, error: %v", err)

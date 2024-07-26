@@ -13,6 +13,8 @@ import (
 	"golang.org/x/xerrors"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -33,7 +35,27 @@ func NewSequencer() *Sequencer {
 	}
 }
 
-func (s *Sequencer) getToken() error {
+func GetToken() (string, error) {
+	cpPath, _ := os.LookupEnv("CP_PATH")
+	tokenFileName := filepath.Join(cpPath, "token")
+
+	if tokenCache != "" {
+		if err := os.WriteFile(tokenFileName, []byte(tokenCache), 0666); err != nil {
+			return "", fmt.Errorf("failed to write sequencer token to file, error: %v", err)
+		}
+	} else {
+		if err := NewSequencer().GetToken(); err != nil {
+			return "", fmt.Errorf("failed to get token, error: %v", err)
+		}
+		if err := os.WriteFile(tokenFileName, []byte(tokenCache), 0666); err != nil {
+			return "", fmt.Errorf("failed to write sequencer token to file, error: %v", err)
+		}
+		return tokenCache, nil
+	}
+	return tokenCache, nil
+}
+
+func (s *Sequencer) GetToken() error {
 	accountInfo, err := account.GetAccountInfo()
 	if err != nil {
 		return err
@@ -74,7 +96,7 @@ func (s *Sequencer) getToken() error {
 
 func (s *Sequencer) SendTaskProof(data []byte) (SendProofResp, error) {
 	if tokenCache == "" {
-		if err := s.getToken(); err != nil {
+		if err := s.GetToken(); err != nil {
 			return SendProofResp{}, fmt.Errorf("failed to get token, error: %v", err)
 		}
 	}
@@ -120,7 +142,7 @@ func (s *Sequencer) SendTaskProof(data []byte) (SendProofResp, error) {
 
 func (s *Sequencer) QueryTask(taskIds ...int64) (TaskListResp, error) {
 	if tokenCache == "" {
-		if err := s.getToken(); err != nil {
+		if err := s.GetToken(); err != nil {
 			return TaskListResp{}, fmt.Errorf("failed to get token, error: %v", err)
 		}
 	}
@@ -226,15 +248,18 @@ type TaskListResp struct {
 }
 
 type SequenceTask struct {
-	Id           int    `json:"id"`
-	Type         int    `json:"type"`
-	InputParam   string `json:"input_param"`
-	VerifyParam  string `json:"verify_param"`
-	ResourceType int    `json:"resource_type"`
-	Deadline     int    `json:"deadline"`
-	Proof        string `json:"proof"`
-	CheckCode    string `json:"check_code"`
-	Reward       string `json:"reward"`
-	Status       string `json:"status"`
-	SequenceCid  string `json:"sequence_cid"`
+	Id                 int    `json:"id"`
+	Type               int    `json:"type"`
+	InputParam         string `json:"input_param"`
+	VerifyParam        string `json:"verify_param"`
+	ResourceType       int    `json:"resource_type"`
+	Deadline           int    `json:"deadline"`
+	Proof              string `json:"proof"`
+	CheckCode          string `json:"check_code"`
+	Reward             string `json:"reward"`
+	Status             string `json:"status"`
+	SequenceCid        string `json:"sequence_cid"`
+	SettlementCid      string `json:"settlement_cid"`
+	SequenceTaskAddr   string `json:"sequence_task_addr"`
+	SettlementTaskAddr string `json:"settlement_task_addr"`
 }

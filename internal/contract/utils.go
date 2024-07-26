@@ -31,7 +31,7 @@ func GetCpAccountAddress() (string, error) {
 		return "", fmt.Errorf("CP Account is empty. Please create an account first")
 	}
 
-	accountAddress, err := os.ReadFile(filepath.Join(cpPath, "account"))
+	accountAddress, err := os.ReadFile(accountFileName)
 	if err != nil {
 		return "", fmt.Errorf("failed to get cp account contract address, error: %v", err)
 	}

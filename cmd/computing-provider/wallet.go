@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/swanchain/go-computing-provider/conf"
+	"github.com/swanchain/go-computing-provider/internal/computing"
 	"github.com/swanchain/go-computing-provider/wallet"
 	"github.com/urfave/cli/v2"
 	"math/big"
@@ -652,6 +653,7 @@ var sequencerCmd = &cli.Command{
 	Usage:     "Manage the sequencer account",
 	ArgsUsage: "[fromAddress] [amount]",
 	Subcommands: []*cli.Command{
+		sequencerTokenCmd,
 		sequencerAddCmd,
 		sequencerWithdrawCmd,
 	},
@@ -660,6 +662,19 @@ var sequencerCmd = &cli.Command{
 		if err := conf.InitConfig(cpRepoPath, true); err != nil {
 			return err
 		}
+		return nil
+	},
+}
+
+var sequencerTokenCmd = &cli.Command{
+	Name:  "token",
+	Usage: "Print the token of sequencer service",
+	Action: func(cctx *cli.Context) error {
+		token, err := computing.GetToken()
+		if err != nil {
+			return err
+		}
+		fmt.Println(token)
 		return nil
 	},
 }

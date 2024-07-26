@@ -90,25 +90,28 @@ func GetResourceTypeStr(resourceType int) string {
 }
 
 type TaskEntity struct {
-	Id           int64  `json:"id" gorm:"primaryKey;id"`
-	Type         int    `json:"type" gorm:"type"`
-	Name         string `json:"name" gorm:"name"`
-	Contract     string `json:"contract" gorm:"contract"`
-	ResourceType int    `json:"resource_type" gorm:"resource_type"` // 1
-	InputParam   string `json:"input_param" gorm:"input_param"`
-	VerifyParam  string `json:"verify_param" gorm:"verify_param"`
-	TxHash       string `json:"tx_hash" gorm:"tx_hash"`
-	Status       int    `json:"status" gorm:"status"`
-	CreateTime   int64  `json:"create_time" gorm:"create_time"`
-	EndTime      int64  `json:"end_time" gorm:"end_time"`
-	Error        string `json:"error" gorm:"error"`
-	Deadline     int64  `json:"deadline"`
-	CheckCode    string `json:"check_code"`
-	BlockHash    string `json:"block_hash"`
-	Sign         string `json:"sign"`
-	Reward       string `json:"reward"`
-	SequenceCid  string `json:"sequence_cid"`
-	Sequencer    int    `json:"sequencer" gorm:"default:-1"`
+	Id                 int64  `json:"id" gorm:"primaryKey;id"`
+	Type               int    `json:"type" gorm:"type"`
+	Name               string `json:"name" gorm:"name"`
+	Contract           string `json:"contract" gorm:"contract"`
+	ResourceType       int    `json:"resource_type" gorm:"resource_type"` // 1
+	InputParam         string `json:"input_param" gorm:"input_param"`
+	VerifyParam        string `json:"verify_param" gorm:"verify_param"`
+	TxHash             string `json:"tx_hash" gorm:"tx_hash"`
+	Status             int    `json:"status" gorm:"status"`
+	CreateTime         int64  `json:"create_time" gorm:"create_time"`
+	EndTime            int64  `json:"end_time" gorm:"end_time"`
+	Error              string `json:"error" gorm:"error"`
+	Deadline           int64  `json:"deadline"`
+	CheckCode          string `json:"check_code"`
+	BlockHash          string `json:"block_hash"`
+	Sign               string `json:"sign"`
+	Reward             string `json:"reward"`
+	SequenceCid        string `json:"sequence_cid"`
+	SettlementCid      string `json:"settlement_cid"`
+	SequenceTaskAddr   string `json:"sequence_task_addr"`
+	SettlementTaskAddr string `json:"settlement_task_addr"`
+	Sequencer          int    `json:"sequencer" gorm:"default:-1"`
 }
 
 func (task *TaskEntity) TableName() string {

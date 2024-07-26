@@ -1036,65 +1036,71 @@ func CronTaskForEcp() {
 		}()
 		ticker := time.NewTicker(10 * time.Minute)
 		for range ticker.C {
-
-			taskList, err := NewTaskService().GetTaskListNoReward()
-			if err != nil {
-				logs.GetLogger().Errorf("failed to get task list, error: %+v", err)
-				return
-			}
-
-			taskGroups := handleTasksToGroup(taskList)
-			for _, group := range taskGroups {
-				taskList, err := NewSequencer().QueryTask(group.Ids...)
-				if err != nil {
-					logs.GetLogger().Errorf("failed to query task, task ids: %v, error: %v", group.Ids, err)
-					continue
-				}
-
-				var taskMap = make(map[int64]SequenceTask)
-				for _, t := range taskList.Data.List {
-					taskMap[int64(t.Id)] = t
-				}
-
-				for _, item := range group.Items {
-					if t, ok := taskMap[item.Id]; ok {
-						if len(t.Reward) >= 3 {
-							item.Reward = t.Reward[:3]
-						} else {
-							item.Reward = t.Reward
-						}
-
-						item.SequenceCid = t.SequenceCid
-
-						var status int
-						if t.SequenceCid == "-1" {
-							status = models.TASK_NSC_STATUS
-						} else {
-							switch t.Status {
-							case "verified":
-								status = models.TASK_VERIFIED_STATUS
-							case "rewarded":
-								status = models.TASK_REWARDED_STATUS
-							case "invalid":
-								status = models.TASK_INVALID_STATUS
-							case "repeated":
-								status = models.TASK_REPEATED_STATUS
-							case "timeout":
-								status = models.TASK_TIMEOUT_STATUS
-							case "verifyFailed":
-								status = models.TASK_VERIFYFAILED_STATUS
-							default:
-								status = models.TASK_UNKNOWN_STATUS
-							}
-						}
-
-						item.Status = status
-						NewTaskService().UpdateTaskEntityByTaskId(item)
-					}
-				}
+			if err := syncTaskStatusForSequencerService(); err != nil {
+				logs.GetLogger().Errorf("failed to sync task from sequencer, error: %v", err)
 			}
 		}
 	}()
+}
+
+func syncTaskStatusForSequencerService() error {
+	taskList, err := NewTaskService().GetTaskListNoReward()
+	if err != nil {
+		return fmt.Errorf("failed to get task list, error: %+v", err)
+	}
+
+	taskGroups := handleTasksToGroup(taskList)
+	for _, group := range taskGroups {
+		taskList, err := NewSequencer().QueryTask(group.Ids...)
+		if err != nil {
+			logs.GetLogger().Errorf("failed to query task, task ids: %v, error: %v", group.Ids, err)
+			continue
+		}
+
+		var taskMap = make(map[int64]SequenceTask)
+		for _, t := range taskList.Data.List {
+			taskMap[int64(t.Id)] = t
+		}
+
+		for _, item := range group.Items {
+			if t, ok := taskMap[item.Id]; ok {
+				var reward = "0.00"
+				if len(t.Reward) >= 4 {
+					reward = t.Reward[:4]
+				}
+				item.Reward = reward
+				item.SequenceCid = t.SequenceCid
+				item.SettlementCid = t.SettlementCid
+				item.SequenceTaskAddr = t.SequenceTaskAddr
+				item.SettlementTaskAddr = t.SettlementTaskAddr
+
+				var status int
+				if t.SequenceCid == "-1" {
+					status = models.TASK_NSC_STATUS
+				} else {
+					switch t.Status {
+					case "verified":
+						status = models.TASK_VERIFIED_STATUS
+					case "rewarded":
+						status = models.TASK_REWARDED_STATUS
+					case "invalid":
+						status = models.TASK_INVALID_STATUS
+					case "repeated":
+						status = models.TASK_REPEATED_STATUS
+					case "timeout":
+						status = models.TASK_TIMEOUT_STATUS
+					case "verifyFailed":
+						status = models.TASK_VERIFYFAILED_STATUS
+					default:
+						status = models.TASK_UNKNOWN_STATUS
+					}
+				}
+				item.Status = status
+				NewTaskService().UpdateTaskEntityByTaskId(item)
+			}
+		}
+	}
+	return nil
 }
 
 func SyncCpAccountInfo() {

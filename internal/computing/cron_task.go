@@ -346,66 +346,14 @@ func (task *CronTask) CheckJobReward() {
 
 func (task *CronTask) GetUbiTaskReward() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("* 0/10 * * ?", func() {
+	c.AddFunc("* * 0/1 * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("task job: [GetUbiTaskReward], error: %+v", err)
 			}
 		}()
-
-		taskList, err := NewTaskService().GetTaskListNoReward()
-		if err != nil {
-			logs.GetLogger().Errorf("failed to get task list, error: %+v", err)
-			return
-		}
-
-		taskGroups := handleTasksToGroup(taskList)
-		for _, group := range taskGroups {
-			taskList, err := NewSequencer().QueryTask(group.Ids...)
-			if err != nil {
-				logs.GetLogger().Errorf("failed to query task, task ids: %v, error: %v", group.Ids, err)
-				continue
-			}
-
-			var taskMap = make(map[int64]SequenceTask)
-			for _, t := range taskList.Data.List {
-				taskMap[int64(t.Id)] = t
-			}
-
-			for _, item := range group.Items {
-				if t, ok := taskMap[item.Id]; ok {
-					var status int
-					if t.SequenceCid == "-1" {
-						status = models.TASK_NSC_STATUS
-					} else {
-						if len(t.SequenceCid) > 0 {
-							item.SequenceCid = t.SequenceCid
-							if len(t.Reward) >= 3 {
-								item.Reward = t.Reward[:3]
-							} else {
-								item.Reward = t.Reward
-							}
-						}
-						switch t.Status {
-						case "Verified":
-							status = models.TASK_VERIFIED_STATUS
-						case "rewarded":
-							status = models.TASK_REWARDED_STATUS
-						case "invalid":
-							status = models.TASK_INVALID_STATUS
-						case "repeated":
-							status = models.TASK_REPEATED_STATUS
-						case "timeout":
-							status = models.TASK_TIMEOUT_STATUS
-						case "verifyFailed":
-							status = models.TASK_VERIFYFAILED_STATUS
-						}
-					}
-
-					item.Status = status
-					NewTaskService().UpdateTaskEntityByTaskId(item)
-				}
-			}
+		if err := syncTaskStatusForSequencerService(); err != nil {
+			logs.GetLogger().Errorf("failed to sync task from sequencer, error: %v", err)
 		}
 	})
 	c.Start()
