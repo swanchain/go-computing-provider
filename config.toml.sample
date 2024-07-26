@@ -10,7 +10,7 @@ WalletBlackList = ""                                                     # CP re
 UbiEnginePk = "0xB5aeb540B4895cd024c1625E146684940A849ED9"                # UBI Engine's public key, CP only accept the task from this UBI engine
 EnableSequencer = true                                                    # Batch submission of proof messages through Sequencer service
 AutoChainProof = false                                                    # Sequencer insufficient balance or service unavailable ，use chain to submit proof
-SequencerUrl = "http://127.0.0.1:8005/task"
+SequencerUrl = "http://127.0.0.1:8005/task"                               # Sequencer service's API address
 
 [LOG]
 CrtFile = "/YOUR_DOMAIN_NAME_CRT_PATH/server.crt"                         # Your domain name SSL .crt file path

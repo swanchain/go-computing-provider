@@ -331,7 +331,7 @@ make install
 
           Edit the necessary configuration files according to your deployment requirements. 
 
-          ```
+          ```toml
              [API]
              Port = 8085                                    # The port number that the web server listens on
              MultiAddress = "/ip4/<public_ip>/tcp/<port>"   # The multiAddress for libp2p
@@ -344,14 +344,12 @@ make install
              UbiEnginePk = "0xB5aeb540B4895cd024c1625E146684940A849ED9"              # UBI Engine's public key, CP only accept the task from this UBI engine
              EnableSequencer = true                                                  # Batch submission of proof messages through Sequencer service
              AutoChainProof = false                                                  # Sequencer insufficient balance or service unavailable ，use chain to submit proof
-       
+             SequencerUrl = "http://127.0.0.1:8005/task"                             # Sequencer service's API address
              [LOG]
              CrtFile = "/YOUR_DOMAIN_NAME_CRT_PATH/server.crt"                       # Your domain name SSL .crt file path
              KeyFile = "/YOUR_DOMAIN_NAME_KEY_PATH/server.key"                       # Your domain name SSL .key file path
 	
              [HUB]
-             ServerUrl = "https://orchestrator-mainnet-api.swanchain.io"             # The Orchestrator's API address
-             AccessToken = ""                                               	       # The Orchestrator's access token, Acquired from "https://orchestrator.swanchain.io", and switch to the `mainnet network` and use the owner address
              BalanceThreshold= 10                                                    # The cp’s collateral balance threshold
              OrchestratorPk = "0x4B98086A20f3C19530AF32D21F85Bc6399358e20"           # Orchestrator's public key, CP only accept the task from this Orchestrator
              VerifySign = true                                                       # Verify that the task signature is from Orchestrator
@@ -492,7 +490,19 @@ computing-provider account changeTaskTypes --ownerAddress <YOUR_OWNER_WALLET_ADD
 If you need to run FCP and ECP at the same time, you need to set it to `1,2,3,4`
 
 
-### **Step 4: Account Management**
+### [**OPTIONAL**] Configure the Sequencer service to submit ZK task proofs in batches
+- Modify the following items in the configuration file:
+```toml
+EnableSequencer = true                                                  # Batch submission of proof messages through Sequencer service
+AutoChainProof = false                                                  # Sequencer insufficient balance or service unavailable ，use chain to submit proof
+SequencerUrl = "http://127.0.0.1:8005/task"                             # Sequencer service's API address
+```
+- Deposit `SwanETH` for Sequencer service
+```
+
+```
+
+### **Step 5: Account Management**
 
 Use `computing-provider account` subcommands to update CP details:
 
