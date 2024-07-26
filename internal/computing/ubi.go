@@ -939,23 +939,7 @@ func GetTaskInfoOnChain(taskContract string) (models.EcpTaskInfo, error) {
 		return taskInfo, err
 	}
 
-loopTask:
-	for {
-		select {
-		case <-time.After(10 * time.Second):
-			logs.GetLogger().Errorf("get ubi task info, contract address: %s, timeout", taskContract)
-			break loopTask
-		default:
-			taskInfo, err = taskStub.GetTaskInfo()
-			if err != nil {
-				logs.GetLogger().Warnf("get ubi task info failed, contract address: %s, retrying", taskContract)
-				time.Sleep(time.Second)
-				continue
-			} else {
-				break loopTask
-			}
-		}
-	}
+	taskInfo, err = taskStub.GetTaskInfo()
 	if taskInfo.InputParam != "" {
 		return taskInfo, nil
 	}
