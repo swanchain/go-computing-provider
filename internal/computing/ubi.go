@@ -972,6 +972,7 @@ func reportClusterResourceForDocker() {
 
 	var nodeResource models.NodeResource
 	if err := json.Unmarshal([]byte(containerLogStr), &nodeResource); err != nil {
+		logs.GetLogger().Errorf("failed to convent json, container log: %s, error: %v", containerLogStr, err)
 		if err = RestartResourceExporter(); err != nil {
 			logs.GetLogger().Errorf("restartResourceExporter failed, error: %v", err)
 		}
@@ -1037,7 +1038,7 @@ func CronTaskForEcp() {
 				logs.GetLogger().Errorf("GetUbiTaskReward, error: %+v", err)
 			}
 		}()
-		ticker := time.NewTicker(10 * time.Minute)
+		ticker := time.NewTicker(5 * time.Minute)
 		for range ticker.C {
 			if err := syncTaskStatusForSequencerService(); err != nil {
 				logs.GetLogger().Errorf("failed to sync task from sequencer, error: %v", err)
