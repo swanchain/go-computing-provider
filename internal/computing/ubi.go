@@ -1079,6 +1079,8 @@ func syncTaskStatusForSequencerService() error {
 				var status int
 				if t.SequenceCid == "-1" {
 					status = models.TASK_NSC_STATUS
+				} else if t.SettlementTaskAddr != "" {
+					status = models.TASK_REWARDED_STATUS
 				} else {
 					switch t.Status {
 					case "verified":
