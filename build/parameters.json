@@ -50,7 +50,7 @@
       "register_cp_contract": "0x0c5ff16ecac04d89413aaa3ebf904ac0ea440675",
       "zk_collateral_contract": "0x0eb78230dc037388938019d45db0a4c992c130ab",
       "register_task_contract": "0xE8b7f7A65C945F39514c535A35Fcb55Ff77DabeE",
-      "sequencer_contract": "0x06adfbc33f9cfbc0791cba8e60a9f6e9ca816027"
+      "sequencer_contract": "0x3ec53c3db17a9b7a50967100f9e0b9e1c910c7d4"
     }
   }
 

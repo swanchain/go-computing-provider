@@ -30,6 +30,20 @@ func Balance(ctx context.Context, client *ethclient.Client, addr string) (string
 	return ethValue, nil
 }
 
+func BalanceNumber(client *ethclient.Client, addr string) (float64, error) {
+	account := common.HexToAddress(addr)
+	balance, err := client.BalanceAt(context.Background(), account, nil)
+	if err != nil {
+		return 0, err
+	}
+
+	balanceEther := new(big.Float).SetInt(balance)
+	weiPerEther := new(big.Float).SetFloat64(1e18) // 1 ether = 1e18 wei
+	balanceEther.Quo(balanceEther, weiPerEther)
+	balanceFloat64, _ := balanceEther.Float64()
+	return balanceFloat64, nil
+}
+
 func sendTransaction(client *ethclient.Client, privateK string, to string, amount *big.Int) (string, error) {
 	privateKey, err := crypto.HexToECDSA(privateK)
 	if err != nil {

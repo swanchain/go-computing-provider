@@ -521,6 +521,13 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		return
 	}
 
+	balance, err := checkBalance(cpAccountAddress)
+	if err != nil || !balance {
+		logs.GetLogger().Errorf("failed check cp account balance, error: %v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckBalanceError))
+		return
+	}
+
 	signature, err := verifySignature(conf.GetConfig().UBI.UbiEnginePk, fmt.Sprintf("%s%d", cpAccountAddress, ubiTask.ID), ubiTask.Signature)
 	if err != nil {
 		logs.GetLogger().Errorf("verifySignature for ubi task failed, error: %+v", err)
@@ -833,7 +840,7 @@ func submitUBIProof(c2Proof models.UbiC2Proof, task *models.TaskEntity) error {
 		return err
 	}
 
-	var sequencerBalance int64
+	var sequencerBalance float64
 	if conf.GetConfig().UBI.EnableSequencer {
 		cpAccountAddress, err := contract.GetCpAccountAddress()
 		if err != nil {
@@ -849,7 +856,7 @@ func submitUBIProof(c2Proof models.UbiC2Proof, task *models.TaskEntity) error {
 			return fmt.Errorf("failed to get cp sequencer contract, error: %v", err)
 		}
 
-		sequencerBalance, err = strconv.ParseInt(sequencerBalanceStr, 10, 64)
+		sequencerBalance, err = strconv.ParseFloat(sequencerBalanceStr, 64)
 		if err != nil {
 			return fmt.Errorf("failed to convert numbers for cp sequencer balance, sequencerBalance: %s, error: %v", sequencerBalanceStr, err)
 		}
@@ -1292,4 +1299,48 @@ func submitTaskToSequencer(proof string, task *models.TaskEntity, timeOut int64,
 
 	}
 	return err
+}
+
+func checkBalance(cpAccountAddress string) (bool, error) {
+	chainUrl, err := conf.GetRpcByNetWorkName()
+	if err != nil {
+		return false, fmt.Errorf("failed to get rpc url, cpAccount: %s, error: %v", cpAccountAddress, err)
+	}
+	client, err := ethclient.Dial(chainUrl)
+	if err != nil {
+		return false, fmt.Errorf("failed to dial rpc, cpAccount: %d, error: %v", cpAccountAddress, err)
+	}
+	client.Close()
+
+	_, workerAddress, err := GetOwnerAddressAndWorkerAddress()
+	if err != nil {
+		return false, fmt.Errorf("failed to get worker address, cpAccount: %d,error: %v", cpAccountAddress, err)
+	}
+
+	workerBalance, err := wallet.BalanceNumber(client, workerAddress)
+	if err != nil {
+		return false, fmt.Errorf("failed to get worker banlance, cpAccount: %d,error: %v", cpAccountAddress, err)
+	}
+
+	sequencerStub, err := ecp.NewSequencerStub(client, ecp.WithSequencerCpAccountAddress(cpAccountAddress))
+	if err != nil {
+		return false, fmt.Errorf("failed to get cp sequencer contract, cpAccount: %s, error: %v", cpAccountAddress, err)
+	}
+	sequencerBalanceStr, err := sequencerStub.GetCPBalance()
+	if err != nil {
+		return false, fmt.Errorf("failed to get cp sequencer contract, cpAccount: %s, error: %v", cpAccountAddress, err)
+	}
+
+	sequencerBalance, err := strconv.ParseFloat(sequencerBalanceStr, 64)
+	if err != nil {
+		return false, fmt.Errorf("failed to convert numbers for cp sequencer balance, cpAccount: %s, sequencerBalance: %s, error: %v", cpAccountAddress, sequencerBalanceStr, err)
+	}
+
+	logs.GetLogger().Infof("cpAccount: %s, sequencer balance: %s, worker address balance: %s", cpAccountAddress, fmt.Sprintf("%.4f\n", sequencerBalance),
+		fmt.Sprintf("%.4f\n", workerBalance))
+
+	if sequencerBalance > 0 || workerBalance > 0 {
+		return true, nil
+	}
+	return false, nil
 }
