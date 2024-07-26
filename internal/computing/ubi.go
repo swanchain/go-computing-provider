@@ -833,18 +833,26 @@ func submitUBIProof(c2Proof models.UbiC2Proof, task *models.TaskEntity) error {
 		return err
 	}
 
-	cpAccountAddress, err := contract.GetCpAccountAddress()
-	if err != nil {
-		return fmt.Errorf("failed to get cp account contract address, error: %v", err)
-	}
+	var sequencerBalance int64
+	if conf.GetConfig().UBI.EnableSequencer {
+		cpAccountAddress, err := contract.GetCpAccountAddress()
+		if err != nil {
+			return fmt.Errorf("failed to get cp account contract address, error: %v", err)
+		}
 
-	sequencerStub, err := ecp.NewSequencerStub(client, ecp.WithSequencerCpAccountAddress(cpAccountAddress))
-	if err != nil {
-		return fmt.Errorf("failed to get cp sequencer contract, error: %v", err)
-	}
-	sequencerBalance, err := sequencerStub.GetCPBalance()
-	if err != nil {
-		return fmt.Errorf("failed to get cp sequencer contract, error: %v", err)
+		sequencerStub, err := ecp.NewSequencerStub(client, ecp.WithSequencerCpAccountAddress(cpAccountAddress))
+		if err != nil {
+			return fmt.Errorf("failed to get cp sequencer contract, error: %v", err)
+		}
+		sequencerBalanceStr, err := sequencerStub.GetCPBalance()
+		if err != nil {
+			return fmt.Errorf("failed to get cp sequencer contract, error: %v", err)
+		}
+
+		sequencerBalance, err = strconv.ParseInt(sequencerBalanceStr, 10, 64)
+		if err != nil {
+			return fmt.Errorf("failed to convert numbers for cp sequencer balance, sequencerBalance: %s, error: %v", sequencerBalanceStr, err)
+		}
 	}
 
 	var blockNumber uint64
@@ -877,7 +885,7 @@ loopTask:
 	}
 
 	if conf.GetConfig().UBI.EnableSequencer && conf.GetConfig().UBI.AutoChainProof {
-		if strings.HasPrefix(sequencerBalance, "-") {
+		if sequencerBalance <= 0 {
 			taskContractAddress, err := taskStub.CreateTaskContract(c2Proof.Proof, task, remainingTime)
 			if taskContractAddress != "" {
 				task.Status = models.TASK_SUBMITTED_STATUS
@@ -897,7 +905,7 @@ loopTask:
 			}
 		}
 	} else if conf.GetConfig().UBI.EnableSequencer && !conf.GetConfig().UBI.AutoChainProof {
-		if !strings.HasPrefix(sequencerBalance, "-") {
+		if sequencerBalance > 0 {
 			if err = submitTaskToSequencer(c2Proof.Proof, task, remainingTime, false); err != nil {
 				task.Status = models.TASK_FAILED_STATUS
 			} else {
@@ -980,7 +988,7 @@ func reportClusterResourceForDocker() {
 
 	var nodeResource models.NodeResource
 	if err := json.Unmarshal([]byte(containerLogStr), &nodeResource); err != nil {
-		logs.GetLogger().Errorf("failed to convent json, container log: %s, error: %v", containerLogStr, err)
+		logs.GetLogger().Errorf("failed to convert json, container log: %s, error: %v", containerLogStr, err)
 		if err = RestartResourceExporter(); err != nil {
 			logs.GetLogger().Errorf("restartResourceExporter failed, error: %v", err)
 		}

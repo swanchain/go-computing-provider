@@ -41,6 +41,7 @@ var runCmd = &cli.Command{
 		initializer.ProjectInit(cpRepoPath)
 		logs.GetLogger().Info("Your config file is:", filepath.Join(cpRepoPath, "config.toml"))
 
+		gin.SetMode(gin.ReleaseMode)
 		r := gin.Default()
 		r.Use(cors.Middleware(cors.Config{
 			Origins:         "*",
