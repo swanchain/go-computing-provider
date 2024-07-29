@@ -143,6 +143,16 @@ func ReceiveJob(c *gin.Context) {
 			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid, models.JOB_TERMINATED_STATUS)
 		}
 
+		var currentBlockNumber uint64
+		for i := 0; i < 5; i++ {
+			currentBlockNumber, err = getChainBlockNumber()
+			if err != nil {
+				logs.GetLogger().Errorf("failed to get blockNumber, error: %v", err)
+				time.Sleep(time.Second)
+				continue
+			}
+		}
+
 		var jobEntity = new(models.JobEntity)
 		jobEntity.Source = jobData.StorageSource
 		jobEntity.SpaceUuid = spaceUuid
@@ -157,6 +167,7 @@ func ReceiveJob(c *gin.Context) {
 		jobEntity.CreateTime = time.Now().Unix()
 		jobEntity.ExpireTime = time.Now().Unix() + int64(jobData.Duration)
 		jobEntity.StartedBlock = conf.GetConfig().CONTRACT.JobManagerCreated
+		jobEntity.ScannedBlock = currentBlockNumber
 		err = NewJobService().SaveJobEntity(jobEntity)
 		if err != nil {
 			logs.GetLogger().Errorf("failed to save job to db, spaceUuid: %s, error: %+v", spaceUuid, err)
@@ -174,6 +185,25 @@ func ReceiveJob(c *gin.Context) {
 	}()
 
 	c.JSON(http.StatusOK, util.CreateSuccessResponse(jobData))
+}
+
+func getChainBlockNumber() (uint64, error) {
+	var currentBlockNumber uint64
+	chainUrl, err := conf.GetRpcByNetWorkName()
+	if err != nil {
+		return 0, err
+	}
+	client, err := ethclient.Dial(chainUrl)
+	if err != nil {
+		return 0, err
+	}
+	defer client.Close()
+
+	currentBlockNumber, err = client.BlockNumber(context.Background())
+	if err != nil {
+		return 0, err
+	}
+	return currentBlockNumber, nil
 }
 
 func submitJob(jobData *models.JobData) error {

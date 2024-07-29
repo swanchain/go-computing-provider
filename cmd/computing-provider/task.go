@@ -3,6 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/olekukonko/tablewriter"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/constants"
@@ -10,9 +14,6 @@ import (
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"github.com/urfave/cli/v2"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"os"
-	"strings"
-	"time"
 )
 
 var taskCmd = &cli.Command{
@@ -92,7 +93,7 @@ var taskList = &cli.Command{
 				}
 
 				taskData = append(taskData,
-					[]string{taskUuid, job.ResourceType, walletAddress, spaceUuid, job.Name, models.GetJobStatus(job.Status), expireTime})
+					[]string{taskUuid, job.ResourceType, walletAddress, spaceUuid, job.Name, models.GetJobStatus(job.Status), job.Reward, expireTime})
 			}
 
 			var rowColor []tablewriter.Colors
@@ -114,7 +115,7 @@ var taskList = &cli.Command{
 			})
 		}
 
-		header := []string{"TASK UUID", "TASK TYPE", "WALLET ADDRESS", "SPACE UUID", "SPACE NAME", "STATUS", "EXPIRE TIME"}
+		header := []string{"TASK UUID", "TASK TYPE", "WALLET ADDRESS", "SPACE UUID", "SPACE NAME", "STATUS", "REWARD", "EXPIRE TIME"}
 		NewVisualTable(header, taskData, rowColorList).Generate(true)
 		return nil
 	},

@@ -96,6 +96,13 @@ func DoUbiTaskForK8s(c *gin.Context) {
 		return
 	}
 
+	balance, err := checkBalance(cpAccountAddress)
+	if err != nil || !balance {
+		logs.GetLogger().Errorf("failed check cp account balance, error: %v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckBalanceError))
+		return
+	}
+
 	signature, err := verifySignature(conf.GetConfig().UBI.UbiEnginePk, fmt.Sprintf("%s%d", cpAccountAddress, ubiTask.ID), ubiTask.Signature)
 	if err != nil {
 		logs.GetLogger().Errorf("verifySignature for ubi task failed, error: %+v", err)

@@ -57,7 +57,7 @@ var runCmd = &cli.Command{
 		cpManager(v1.Group("/computing"))
 
 		shutdownChan := make(chan struct{})
-		httpStopper, err := util.ServeHttp(r, "cp-api", ":"+strconv.Itoa(conf.GetConfig().API.Port), true)
+		httpStopper, err := util.ServeHttp(r, "cp-api", ":"+strconv.Itoa(conf.GetConfig().API.Port), false)
 		if err != nil {
 			logs.GetLogger().Fatal("failed to start cp-api endpoint: %s", err)
 		}

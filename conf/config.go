@@ -319,7 +319,6 @@ func generateDefaultConfig() ComputeNode {
 			KeyFile: "",
 		},
 		HUB: HUB{
-			AccessToken:      "",
 			BalanceThreshold: 0.1,
 			OrchestratorPk:   "",
 			VerifySign:       true,

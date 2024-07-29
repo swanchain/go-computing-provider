@@ -4,7 +4,6 @@
     "config": {
       "sequencer_url": "",
       "zk_engine_pk": "0xB5aeb540B4895cd024c1625E146684940A849ED9",
-      "orchestrator_url": "https://orchestrator-mainnet-api.swanchain.io",
       "orchestrator_pk": "0x4B98086A20f3C19530AF32D21F85Bc6399358e20",
       "chain_rpc": "https://mainnet-rpc01.swanchain.io",
       "swan_token_contract": "0xAF90ac6428775E1Be06BAFA932c2d80119a7bd02",
@@ -12,9 +11,9 @@
       "job_manager_contract": "",
       "job_manager_contract_created":0,
       "register_cp_contract": "0xbef1ec33e5Ac3a491fFeE1600e0b00eac97cb138",
-      "zk_collateral_contract": "0x1d2557C9d14882D9eE291BB66eaC6c1C4a587054",
-      "register_task_contract": "",
-      "sequencer_contract": ""
+      "zk_collateral_contract": "0x0b84cc9CcE1459c85337b511872528cE947C3962",
+      "register_task_contract": "0x4Cd9b2450c3e412a1F0F0aE78C79271337241E31",
+      "sequencer_contract": "0xE0a88F1fA56D8a8D73E9bb9Fc03506439cb386Bd"
     }
   },
   {
@@ -22,7 +21,6 @@
     "config": {
       "sequencer_url": "",
       "zk_engine_pk": "0xB5aeb540B4895cd024c1625E146684940A849ED9",
-      "orchestrator_url": "https://orchestrator-api.swanchain.io",
       "orchestrator_pk": "0x29eD49c8E973696D07E7927f748F6E5Eacd5516D",
       "chain_rpc": "https://rpc-proxima.swanchain.io",
       "swan_token_contract": "0x91B25A65b295F0405552A4bbB77879ab5e38166c",
@@ -40,7 +38,6 @@
     "config": {
       "sequencer_url": "http://sequencer.storefrontiers.cn/v1",
       "zk_engine_pk": "0xB5aeb540B4895cd024c1625E146684940A849ED9",
-      "orchestrator_url": "https://swanhub-cali.swanchain.io",
       "orchestrator_pk": "0x29eD49c8E973696D07E7927f748F6E5Eacd5516D",
       "chain_rpc": "https://rpc-proxima.swanchain.io",
       "swan_token_contract": "0x91B25A65b295F0405552A4bbB77879ab5e38166c",

@@ -8,6 +8,7 @@ import (
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/contract"
+	"github.com/swanchain/go-computing-provider/internal/contract/ecp"
 	"github.com/swanchain/go-computing-provider/internal/contract/fcp"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"time"
@@ -36,12 +37,12 @@ func (taskManager *TaskManagerContract) Scan(job *models.JobEntity) {
 		start = scannedBlock + 1
 	}
 
-	logs.GetLogger().Debugf("task manager contract task_uuid %s start scan from %d", job.TaskUuid, start)
+	logs.GetLogger().Debugf("task manager contract task_uuid: %s start scan from %d", job.TaskUuid, start)
 	var endBlockNumber uint64
 	var err error
 	defer func() {
 		if err != nil {
-			logs.GetLogger().Errorf("task manager contract task_uuid %s end scan at %d, failed: %v", job.TaskUuid, endBlockNumber, err)
+			logs.GetLogger().Errorf("task manager contract task_uuid: %s end scan at %d, failed: %v", job.TaskUuid, endBlockNumber, ecp.ParseError(err))
 			return
 		}
 		logs.GetLogger().Debugf("task manager contract task_uuid %s end scan at %d", job.TaskUuid, endBlockNumber)
@@ -71,7 +72,7 @@ func (taskManager *TaskManagerContract) Scan(job *models.JobEntity) {
 		return
 	}
 
-	var step uint64 = 1000
+	var step uint64 = 5000
 	for i := start; i <= endBlockNumber; i = i + step {
 		end := i + step - 1
 		if end > endBlockNumber {
@@ -88,14 +89,16 @@ func (taskManager *TaskManagerContract) Scan(job *models.JobEntity) {
 			logs.GetLogger().Errorf("task manager contract scan task_uuid %s from %d to %d, failed: %v", job.TaskUuid, filterOps.Start, *filterOps.End, err)
 			return
 		} else {
-			amount := contract.BalanceToStr(filterRewardReleased.Event.RewardAmount)
-			NewJobService().UpdateJobReward(job.TaskUuid, amount)
+			if filterRewardReleased.Event != nil {
+				amount := contract.BalanceToStr(filterRewardReleased.Event.RewardAmount)
+				NewJobService().UpdateJobReward(job.TaskUuid, amount)
+			}
+			if err := NewJobService().UpdateJobScannedBlock(job.TaskUuid, end); err != nil {
+				logs.GetLogger().Errorf("save job %s scanned block %d err: %v", job.TaskUuid, end, err)
+			}
 			time.Sleep(time.Second)
 		}
-		// save scanned block number
-		if err := NewJobService().UpdateJobScannedBlock(job.TaskUuid, end); err != nil {
-			logs.GetLogger().Errorf("save job %s scanned block %d err: %v", job.TaskUuid, end, err)
-		}
+
 	}
 }
 

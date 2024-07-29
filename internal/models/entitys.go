@@ -186,18 +186,18 @@ type JobEntity struct {
 	Id              int64  `json:"id" gorm:"primaryKey;autoIncrement"`
 	Source          string `json:"source" gorm:"source"` // market name
 	Name            string `json:"name" gorm:"name"`
-	SpaceUuid       string `json:"space_uuid"`
-	JobUuid         string `json:"job_uuid"`
-	TaskUuid        string `json:"task_uuid"`
-	ResourceType    string `json:"resource_type"`
-	SpaceType       int    `json:"space_type"` // 0: public; 1: private
+	SpaceUuid       string `json:"space_uuid" gorm:"space_uuid"`
+	JobUuid         string `json:"job_uuid" gorm:"job_uuid"`
+	TaskUuid        string `json:"task_uuid" gorm:"task_uuid"`
+	ResourceType    string `json:"resource_type"  gorm:"resource_type"`
+	SpaceType       int    `json:"space_type" gorm:"space_type"` // 0: public; 1: private
 	SourceUrl       string `json:"source_url" gorm:"source_url"`
 	Hardware        string `json:"hardware" gorm:"hardware"`
-	Duration        int    `json:"duration"`
+	Duration        int    `json:"duration" gorm:"duration"`
 	DeployStatus    int    `json:"deploy_status" gorm:"deploy_status"`
-	WalletAddress   string `json:"wallet_address"`
+	WalletAddress   string `json:"wallet_address"  gorm:"wallet_address"`
 	ResultUrl       string `json:"result_url" gorm:"result_url"`
-	RealUrl         string `json:"real_url"`
+	RealUrl         string `json:"real_url" gorm:"real_url"`
 	K8sDeployName   string `json:"k8s_deploy_name" gorm:"k8s_deploy_name"`
 	K8sResourceType string `json:"k8s_resource_type" gorm:"k8s_resource_type"`
 	NameSpace       string `json:"name_space" gorm:"name_space"`

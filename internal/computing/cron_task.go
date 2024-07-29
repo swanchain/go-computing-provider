@@ -3,6 +3,12 @@ package computing
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/robfig/cron/v3"
@@ -12,11 +18,6 @@ import (
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"net/http"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
 )
 
 var deployingChan = make(chan models.Job)
@@ -39,8 +40,8 @@ func (task *CronTask) RunTask() {
 	task.watchNameSpaceForDeleted()
 	task.reportClusterResource()
 	task.watchExpiredTask()
-	task.GetUbiTaskReward()
-	task.CheckJobReward()
+	task.getUbiTaskReward()
+	task.checkJobReward()
 }
 
 func checkJobStatus() {
@@ -117,7 +118,7 @@ func (task *CronTask) watchNameSpaceForDeleted() {
 
 func (task *CronTask) watchExpiredTask() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("0 0/10 * * * ?", func() {
+	c.AddFunc("* 0/10 * * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("watchExpiredTask catch panic error: %+v", err)
@@ -323,12 +324,12 @@ func (task *CronTask) setFailedUbiTaskStatus() {
 	c.Start()
 }
 
-func (task *CronTask) CheckJobReward() {
+func (task *CronTask) checkJobReward() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("* 0/5 * * * ?", func() {
+	c.AddFunc("* 0/10 * * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
-				logs.GetLogger().Errorf("task job: [cleanAbnormalDeployment], error: %+v", err)
+				logs.GetLogger().Errorf("task job: [checkJobReward], error: %+v", err)
 			}
 		}()
 
@@ -338,13 +339,14 @@ func (task *CronTask) CheckJobReward() {
 			return
 		}
 		for _, job := range jobList {
-			NewTaskManagerContract().Scan(job)
+			jobCopy := job
+			go NewTaskManagerContract().Scan(jobCopy)
 		}
 	})
 	c.Start()
 }
 
-func (task *CronTask) GetUbiTaskReward() {
+func (task *CronTask) getUbiTaskReward() {
 	c := cron.New(cron.WithSeconds())
 	c.AddFunc("* * 0/1 * ?", func() {
 		defer func() {
@@ -459,6 +461,15 @@ func checkFcpJobInfoInChain(job *models.JobEntity) {
 	} else if taskInfo.TaskStatus == models.TERMINATED {
 		job.Status = models.JOB_TERMINATED_STATUS
 	}
+
+	expiredTime := taskInfo.StartTimestamp + taskInfo.Duration
+	if expiredTime > 0 {
+		job.ExpireTime = expiredTime
+		if err := NewJobService().UpdateJobEntityByJobUuid(job); err != nil {
+			logs.GetLogger().Errorf("update job info by jobUuid failed, error: %v", err)
+		}
+	}
+
 }
 
 func checkHealth(url string) bool {
