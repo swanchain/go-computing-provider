@@ -155,7 +155,7 @@ func ReceiveJob(c *gin.Context) {
 		jobEntity.JobUuid = jobData.UUID
 		jobEntity.DeployStatus = models.DEPLOY_RECEIVE_JOB
 		jobEntity.CreateTime = time.Now().Unix()
-		jobEntity.ExpireTime = getJobExpiredTime(job)
+		jobEntity.ExpireTime = time.Now().Unix() + int64(jobData.Duration)
 		jobEntity.StartedBlock = conf.GetConfig().CONTRACT.JobManagerCreated
 		err = NewJobService().SaveJobEntity(jobEntity)
 		if err != nil {
@@ -316,7 +316,7 @@ func RedeployJob(c *gin.Context) {
 		jobEntity.Duration = jobData.Duration
 		jobEntity.DeployStatus = models.DEPLOY_RECEIVE_JOB
 		jobEntity.CreateTime = time.Now().Unix()
-		jobEntity.ExpireTime = getJobExpiredTime(job)
+		jobEntity.ExpireTime = time.Now().Unix() + int64(jobData.Duration)
 		jobEntity.StartedBlock = conf.GetConfig().CONTRACT.JobManagerCreated
 		NewJobService().SaveJobEntity(jobEntity)
 
@@ -369,7 +369,12 @@ func ReNewJob(c *gin.Context) {
 		c.JSON(http.StatusOK, util.CreateErrorResponse(util.BadParamError, "The job was terminated due to its expiration date"))
 		return
 	} else {
-		jobEntity.ExpireTime = getJobExpiredTime(jobEntity)
+		if getJobExpiredTime(jobEntity) <= 0 {
+			jobEntity.ExpireTime = time.Now().Unix() + leftTime + int64(jobData.Duration)
+		} else {
+			jobEntity.ExpireTime = getJobExpiredTime(jobEntity)
+		}
+
 		err = NewJobService().SaveJobEntity(&jobEntity)
 		if err != nil {
 			logs.GetLogger().Errorf("update job expireTime failed, taskUuid: %s, error: %+v", jobData.TaskUuid, err)
