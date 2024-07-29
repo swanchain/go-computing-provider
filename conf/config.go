@@ -239,6 +239,7 @@ func GenerateAndUpdateConfigFile(cpRepoPath string, multiAddress, nodeName strin
 				defaultComputeNode.UBI.UbiEnginePk = ncCopy.Config.ZkEnginePk
 				defaultComputeNode.HUB.OrchestratorPk = ncCopy.Config.OrchestratorPk
 				defaultComputeNode.RPC.SwanChainRpc = ncCopy.Config.ChainRpc
+				defaultComputeNode.UBI.SequencerUrl = ncCopy.Config.SequencerUrl
 			}
 		}
 
