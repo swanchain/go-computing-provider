@@ -176,13 +176,6 @@ func (task *CronTask) watchExpiredTask() {
 						deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
 						continue
 					}
-				} else if job.Status == models.JOB_RUNNING_STATUS {
-					if !checkHealth(job.RealUrl) {
-						if err = deleteJob(job.NameSpace, job.SpaceUuid, "cron task, job service is not available"); err == nil {
-							deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
-							continue
-						}
-					}
 				}
 
 				if time.Now().Unix() > job.ExpireTime {
