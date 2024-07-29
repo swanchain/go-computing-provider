@@ -73,9 +73,14 @@ var taskList = &cli.Command{
 
 			expireTime := time.Unix(job.ExpireTime, 0).Format("2006-01-02 15:04:05")
 
+			var reward = "0.00"
+			if len(strings.TrimSpace(job.Reward)) > 0 {
+				reward = job.Reward
+			}
+
 			if fullFlag {
 				taskData = append(taskData,
-					[]string{job.TaskUuid, job.ResourceType, job.WalletAddress, fullSpaceUuid, job.Name, models.GetJobStatus(job.Status), expireTime})
+					[]string{job.TaskUuid, job.ResourceType, job.WalletAddress, fullSpaceUuid, job.Name, models.GetJobStatus(job.Status), reward, expireTime})
 			} else {
 				var walletAddress string
 				if len(job.WalletAddress) > 0 {
@@ -93,7 +98,7 @@ var taskList = &cli.Command{
 				}
 
 				taskData = append(taskData,
-					[]string{taskUuid, job.ResourceType, walletAddress, spaceUuid, job.Name, models.GetJobStatus(job.Status), job.Reward, expireTime})
+					[]string{taskUuid, job.ResourceType, walletAddress, spaceUuid, job.Name, models.GetJobStatus(job.Status), reward, expireTime})
 			}
 
 			var rowColor []tablewriter.Colors
