@@ -132,7 +132,7 @@ var infoCmd = &cli.Command{
 			netWork = fmt.Sprintf("Testnet(%d)", chainId.Int64())
 		}
 
-		var sequencerBalance = "0.0000"
+		var sequencerBalance = "0.000000"
 		var fcpCollateralBalance = "0.0000"
 		var fcpEscrowBalance = "0.0000"
 		var ecpCollateralBalance = "0.0000"

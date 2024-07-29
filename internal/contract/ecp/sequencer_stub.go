@@ -117,7 +117,7 @@ func (s *SequencerStub) GetCPBalance() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("address: %s, ECP sequencer client withdraw tx error: %+v", s.cpAccountAddress, err)
 	}
-	return contract.BalanceToStr(balance), nil
+	return contract.BalanceToStr2(balance), nil
 }
 
 func (s *SequencerStub) privateKeyToPublicKey() (common.Address, error) {

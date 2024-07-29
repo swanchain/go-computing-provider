@@ -228,11 +228,11 @@ func getStatusColor(taskStatus int) []tablewriter.Colors {
 	case models.TASK_RUNNING_STATUS:
 		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgCyanColor}}
 	case models.TASK_SUBMITTED_STATUS:
-		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgBlueColor}}
 	case models.TASK_FAILED_STATUS:
 		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
 	case models.TASK_VERIFIED_STATUS:
-		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgBlueColor}}
 	case models.TASK_REWARDED_STATUS:
 		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
 	case models.TASK_INVALID_STATUS:
@@ -240,7 +240,7 @@ func getStatusColor(taskStatus int) []tablewriter.Colors {
 	case models.TASK_TIMEOUT_STATUS:
 		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
 	case models.TASK_VERIFYFAILED_STATUS:
-		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
 	case models.TASK_REPEATED_STATUS:
 		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
 	case models.TASK_NSC_STATUS:

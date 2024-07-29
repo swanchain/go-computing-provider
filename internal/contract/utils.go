@@ -20,6 +20,19 @@ func BalanceToStr(balance *big.Int) string {
 	return ethValue
 }
 
+func BalanceToStr2(balance *big.Int) string {
+	var ethValue string
+	if balance.String() == "0" {
+		ethValue = "0.000000"
+	} else {
+		fbalance := new(big.Float)
+		fbalance.SetString(balance.String())
+		etherQuotient := new(big.Float).Quo(fbalance, new(big.Float).SetInt(big.NewInt(1e18)))
+		ethValue = etherQuotient.Text('f', 6)
+	}
+	return ethValue
+}
+
 func GetCpAccountAddress() (string, error) {
 	cpPath, exit := os.LookupEnv("CP_PATH")
 	if !exit {

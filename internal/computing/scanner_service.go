@@ -8,7 +8,6 @@ import (
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/contract"
-	"github.com/swanchain/go-computing-provider/internal/contract/ecp"
 	"github.com/swanchain/go-computing-provider/internal/contract/fcp"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"time"
@@ -31,7 +30,6 @@ func NewTaskManagerContract() *TaskManagerContract {
 
 func (taskManager *TaskManagerContract) Scan(job *models.JobEntity) {
 	scannedBlock := taskManager.ScannedBlock(job)
-
 	start := scannedBlock
 	if scannedBlock != 0 {
 		start = scannedBlock + 1
@@ -40,7 +38,7 @@ func (taskManager *TaskManagerContract) Scan(job *models.JobEntity) {
 	var err error
 	defer func() {
 		if err != nil {
-			logs.GetLogger().Errorf("task manager contract task_uuid: %s  start at: %d, end scan at %d, failed: %v", job.TaskUuid, start, endBlockNumber, ecp.ParseError(err))
+			//logs.GetLogger().Errorf("task manager contract task_uuid: %s  start at: %d, end scan at %d, failed: %v", job.TaskUuid, start, endBlockNumber, ecp.ParseError(err))
 			return
 		}
 	}()
@@ -83,7 +81,7 @@ func (taskManager *TaskManagerContract) Scan(job *models.JobEntity) {
 		filterRewardReleased, err := taskManagerClient.FilterRewardReleased(filterOps, []string{job.TaskUuid},
 			[]common.Address{common.HexToAddress(taskManager.cpAccount)})
 		if err != nil {
-			logs.GetLogger().Errorf("task manager contract scan task_uuid %s from %d to %d, failed: %v", job.TaskUuid, filterOps.Start, *filterOps.End, ecp.ParseError(err))
+			//logs.GetLogger().Errorf("task manager contract scan task_uuid %s from %d to %d, failed: %v", job.TaskUuid, filterOps.Start, *filterOps.End, ecp.ParseError(err))
 			return
 		} else {
 			if filterRewardReleased.Event != nil {
