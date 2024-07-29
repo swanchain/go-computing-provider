@@ -2,7 +2,7 @@
   {
     "network": "mainnet",
     "config": {
-      "sequencer_url": "http://sequencer.swanchain.io",
+      "sequencer_url": "https://sequencer.swanchain.io",
       "zk_engine_pk": "0xB5aeb540B4895cd024c1625E146684940A849ED9",
       "orchestrator_pk": "0x4B98086A20f3C19530AF32D21F85Bc6399358e20",
       "chain_rpc": "https://mainnet-rpc01.swanchain.io",
