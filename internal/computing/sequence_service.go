@@ -23,8 +23,8 @@ type Sequencer struct {
 }
 
 const (
-	token = "/token"
-	task  = "/tasks"
+	token = "/v1/token"
+	task  = "/v1/tasks"
 )
 
 var tokenCache string
