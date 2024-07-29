@@ -1436,7 +1436,6 @@ func getJobExpiredTime(jobEntity models.JobEntity) int64 {
 		}
 		break
 	}
-	fmt.Printf("getJobExpiredTime::taskInfoOnChain: %+v", taskInfoOnChain)
 	expiredTime = taskInfoOnChain.StartTimestamp + taskInfoOnChain.Duration
 	return expiredTime
 }
