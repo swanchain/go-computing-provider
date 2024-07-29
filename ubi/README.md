@@ -80,9 +80,9 @@ computing-provider collateral withdraw --ecp --owner <YOUR_WALLET_ADDRESS> --acc
 - [**OPTIONAL**] Configure the Sequencer service to submit ZK task proofs in batches
   - Modify the following items in the configuration file:
     ```toml
-    EnableSequencer = true                          # Batch submission of proof messages through Sequencer service
-    AutoChainProof = false                          # Sequencer insufficient balance or service unavailable, use chain to submit proof
-    SequencerUrl = "http://127.0.0.1:8005/task"     # Sequencer service's API address
+    EnableSequencer = true                          # Enable aa Sequencer to receive zk-task proofs
+    AutoChainProof = true                           # Sequencer insufficient balance or service unavailable, use chain to submit proof
+    SequencerUrl = "http://sequencer.swanchain.io"  # Sequencer service's API address
     ```
   - Deposit `SwanETH` for Sequencer account
     ```bash
