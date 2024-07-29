@@ -86,7 +86,7 @@ func (taskManager *TaskManagerContract) Scan(job *models.JobEntity) {
 		filterRewardReleased, err := taskManagerClient.FilterRewardReleased(filterOps, []string{job.TaskUuid},
 			[]common.Address{common.HexToAddress(taskManager.cpAccount)})
 		if err != nil {
-			logs.GetLogger().Errorf("task manager contract scan task_uuid %s from %d to %d, failed: %v", job.TaskUuid, filterOps.Start, *filterOps.End, err)
+			logs.GetLogger().Errorf("task manager contract scan task_uuid %s from %d to %d, failed: %v", job.TaskUuid, filterOps.Start, *filterOps.End, ecp.ParseError(err))
 			return
 		} else {
 			if filterRewardReleased.Event != nil {
