@@ -2,12 +2,13 @@ package fcp
 
 import (
 	"fmt"
+	"math/big"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/models"
-	"math/big"
 )
 
 type TaskManagerStub struct {
@@ -52,6 +53,7 @@ func (s *TaskManagerStub) GetTaskInfo(taskUuid string) (models.TaskInfoOnChain, 
 		cpAccount = append(cpAccount, address.Hex())
 	}
 	taskInfo.CpList = cpAccount
+	fmt.Printf("TaskManagerStub::GetTaskInfo: %+v", taskInfo)
 	return taskInfo, nil
 }
 

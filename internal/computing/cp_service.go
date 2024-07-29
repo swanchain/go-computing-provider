@@ -5,6 +5,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"math/rand"
+	"net/http"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -19,20 +29,11 @@ import (
 	"github.com/swanchain/go-computing-provider/internal/contract/fcp"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"github.com/swanchain/go-computing-provider/util"
-	"io"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"math/rand"
-	"net/http"
-	"os"
-	"path/filepath"
-	"runtime"
-	"strconv"
-	"strings"
-	"time"
 )
 
 func GetServiceProviderInfo(c *gin.Context) {
@@ -1400,6 +1401,7 @@ func getJobExpiredTime(jobEntity models.JobEntity) int64 {
 		}
 		break
 	}
+	fmt.Printf("getJobExpiredTime::taskInfoOnChain: %+v", taskInfoOnChain)
 	expiredTime = taskInfoOnChain.StartTimestamp + taskInfoOnChain.Duration
 	return expiredTime
 }
