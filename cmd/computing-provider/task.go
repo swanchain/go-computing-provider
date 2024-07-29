@@ -73,14 +73,35 @@ var taskList = &cli.Command{
 
 			expireTime := time.Unix(job.ExpireTime, 0).Format("2006-01-02 15:04:05")
 
-			var reward = "0.00"
-			if len(strings.TrimSpace(job.Reward)) > 0 {
-				reward = job.Reward
-			}
-
 			if fullFlag {
+				var reward = "0.00"
+				if len(strings.TrimSpace(job.Reward)) > 0 {
+					reward = job.Reward
+				}
+
 				taskData = append(taskData,
 					[]string{job.TaskUuid, job.ResourceType, job.WalletAddress, fullSpaceUuid, job.Name, models.GetJobStatus(job.Status), reward, expireTime})
+
+				var rowColor []tablewriter.Colors
+				switch job.Status {
+				case models.JOB_DEPLOY_STATUS:
+					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgYellowColor}}
+				case models.JOB_RUNNING_STATUS:
+					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
+				case models.JOB_TERMINATED_STATUS:
+					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
+				case models.JOB_COMPLETED_STATUS:
+					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiMagentaColor}}
+				}
+
+				rowColorList = append(rowColorList, RowColor{
+					row:    i,
+					column: []int{5},
+					color:  rowColor,
+				})
+				header := []string{"TASK UUID", "TASK TYPE", "WALLET ADDRESS", "SPACE UUID", "SPACE NAME", "STATUS", "REWARD", "EXPIRE TIME"}
+				NewVisualTable(header, taskData, rowColorList).Generate(true)
+
 			} else {
 				var walletAddress string
 				if len(job.WalletAddress) > 0 {
@@ -98,30 +119,31 @@ var taskList = &cli.Command{
 				}
 
 				taskData = append(taskData,
-					[]string{taskUuid, job.ResourceType, walletAddress, spaceUuid, job.Name, models.GetJobStatus(job.Status), reward, expireTime})
+					[]string{taskUuid, job.ResourceType, walletAddress, spaceUuid, job.Name, models.GetJobStatus(job.Status), expireTime})
+
+				var rowColor []tablewriter.Colors
+				switch job.Status {
+				case models.JOB_DEPLOY_STATUS:
+					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgYellowColor}}
+				case models.JOB_RUNNING_STATUS:
+					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
+				case models.JOB_TERMINATED_STATUS:
+					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
+				case models.JOB_COMPLETED_STATUS:
+					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiMagentaColor}}
+				}
+
+				rowColorList = append(rowColorList, RowColor{
+					row:    i,
+					column: []int{5},
+					color:  rowColor,
+				})
 			}
 
-			var rowColor []tablewriter.Colors
-			switch job.Status {
-			case models.JOB_DEPLOY_STATUS:
-				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgYellowColor}}
-			case models.JOB_RUNNING_STATUS:
-				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
-			case models.JOB_TERMINATED_STATUS:
-				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
-			case models.JOB_COMPLETED_STATUS:
-				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiMagentaColor}}
-			}
-
-			rowColorList = append(rowColorList, RowColor{
-				row:    i,
-				column: []int{5},
-				color:  rowColor,
-			})
+			header := []string{"TASK UUID", "TASK TYPE", "WALLET ADDRESS", "SPACE UUID", "SPACE NAME", "STATUS", "EXPIRE TIME"}
+			NewVisualTable(header, taskData, rowColorList).Generate(true)
 		}
 
-		header := []string{"TASK UUID", "TASK TYPE", "WALLET ADDRESS", "SPACE UUID", "SPACE NAME", "STATUS", "REWARD", "EXPIRE TIME"}
-		NewVisualTable(header, taskData, rowColorList).Generate(true)
 		return nil
 	},
 }

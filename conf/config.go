@@ -312,7 +312,7 @@ func generateDefaultConfig() ComputeNode {
 		UBI: UBI{
 			UbiEnginePk:     "",
 			EnableSequencer: true,
-			AutoChainProof:  false,
+			AutoChainProof:  true,
 		},
 		LOG: LOG{
 			CrtFile: "",
