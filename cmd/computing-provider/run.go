@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/itsjamie/gin-cors"
 	"github.com/olekukonko/tablewriter"
+	"github.com/swanchain/go-computing-provider/build"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/computing"
 	"github.com/swanchain/go-computing-provider/internal/contract/account"
@@ -902,25 +903,11 @@ var contractCmd = &cli.Command{
 					return fmt.Errorf("load config file failed, error: %+v", err)
 				}
 
-				chainRpc, err := conf.GetRpcByNetWorkName()
-				if err != nil {
-					return err
-				}
-				client, err := ethclient.Dial(chainRpc)
-				if err != nil {
-					return err
-				}
-				defer client.Close()
-
 				var netWork = ""
-				chainId, err := client.ChainID(context.Background())
-				if err != nil {
-					return err
-				}
-				if chainId.Int64() == 254 {
-					netWork = fmt.Sprintf("Mainnet(%d)", chainId.Int64())
+				if build.NetWorkTag == "mainnet" {
+					netWork = "Mainnet(254)"
 				} else {
-					netWork = fmt.Sprintf("Testnet(%d)", chainId.Int64())
+					netWork = "Testnet(20241133)"
 				}
 
 				contract := conf.GetConfig().CONTRACT
