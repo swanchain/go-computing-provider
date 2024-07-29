@@ -53,7 +53,6 @@ func (s *TaskManagerStub) GetTaskInfo(taskUuid string) (models.TaskInfoOnChain, 
 		cpAccount = append(cpAccount, address.Hex())
 	}
 	taskInfo.CpList = cpAccount
-	fmt.Printf("TaskManagerStub::GetTaskInfo: %+v", taskInfo)
 	return taskInfo, nil
 }
 
