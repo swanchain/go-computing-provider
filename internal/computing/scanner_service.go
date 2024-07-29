@@ -69,7 +69,7 @@ func (taskManager *TaskManagerContract) Scan(job *models.JobEntity) {
 		return
 	}
 
-	var step uint64 = 5000
+	var step uint64 = 1000
 	for i := start; i <= endBlockNumber; i = i + step {
 		end := i + step - 1
 		if end > endBlockNumber {
