@@ -37,8 +37,9 @@ func NewStorageService() (*StorageService, error) {
 		} else {
 			mcsClient, err = user.LoginByApikeyV2(storage.McsApiKey, storage.NetWork)
 		}
-
-		err = fmt.Errorf("failed to create mcsClient, error: %v", err)
+		if err != nil {
+			err = fmt.Errorf("failed to create mcsClient, error: %v", err)
+		}
 		storage.mcsClient = mcsClient
 	})
 
