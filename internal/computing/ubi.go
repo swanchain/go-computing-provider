@@ -821,6 +821,15 @@ func submitUBIProof(c2Proof models.UbiC2Proof, task *models.TaskEntity) error {
 	}
 	client.Close()
 
+	var timeUnit int64 = 2
+	chainId, err := client.ChainID(context.Background())
+	if err != nil {
+		return err
+	}
+	if chainId.Int64() == 254 {
+		timeUnit = 5
+	}
+
 	localWallet, err := wallet.SetupWallet(wallet.WalletRepo)
 	if err != nil {
 		logs.GetLogger().Errorf("setup wallet failed, taskId: %s,error: %v", c2Proof.TaskId, err)
@@ -894,7 +903,7 @@ loopTask:
 	}
 
 	task.Proof = c2Proof.Proof
-	remainingTime := task.Deadline - int64(blockNumber)
+	remainingTime := (task.Deadline - int64(blockNumber)) * timeUnit
 	if remainingTime < 0 {
 		logs.GetLogger().Warnf("taskId: %s proof submission deadline has passed, current: %d, deadline: %d, deadlineTime: %d", c2Proof.TaskId, blockNumber, task.Deadline, remainingTime)
 		task.Status = models.TASK_FAILED_STATUS
@@ -1228,6 +1237,7 @@ func submitTaskToSequencer(proof string, task *models.TaskEntity, timeOut int64,
 
 	timeOutCh := time.After(time.Second * time.Duration(timeOut))
 
+	start := time.Now()
 	if autoChainProof {
 		var flag bool
 		for i := 0; i < 5; i++ {
@@ -1240,11 +1250,15 @@ func submitTaskToSequencer(proof string, task *models.TaskEntity, timeOut int64,
 			task.BlockHash = sendTaskProof.Data.BlockHash
 			task.Sign = sendTaskProof.Data.Sign
 			task.Sequencer = 1
-			logs.GetLogger().Infof("successfully submitted to the sequencer, taskId: %d sequencer Receipt is block_hash: %s, sign: %s", task.Id, task.BlockHash, task.Sign)
+			logs.GetLogger().Infof("successfully submitted to the sequencer, taskId: %d the sequencer receipt is block_hash: %s, sign: %s", task.Id, task.BlockHash, task.Sign)
 			flag = true
 			break
 		}
-		remainingTime := timeOut - 10
+
+		if flag {
+			return nil
+		}
+		remainingTime := timeOut - int64(time.Now().Sub(start).Seconds())
 		if !flag && remainingTime > 0 {
 			chainUrl, err := conf.GetRpcByNetWorkName()
 			if err != nil {
@@ -1290,7 +1304,6 @@ func submitTaskToSequencer(proof string, task *models.TaskEntity, timeOut int64,
 				return fmt.Errorf("taskId: %d, failed to create task contract , error: %v", task.Id, err)
 			}
 		}
-		return fmt.Errorf("taskId: %d, remainingTime: %d, failed to create contract deadline has passed", task.Id, remainingTime)
 	} else {
 	outerLoop:
 		for {
@@ -1318,6 +1331,10 @@ func submitTaskToSequencer(proof string, task *models.TaskEntity, timeOut int64,
 }
 
 func checkBalance(cpAccountAddress string) (bool, error) {
+	if !conf.GetConfig().UBI.EnableSequencer && !conf.GetConfig().UBI.AutoChainProof {
+		return false, fmt.Errorf("do not accept tasks")
+	}
+
 	chainUrl, err := conf.GetRpcByNetWorkName()
 	if err != nil {
 		return false, fmt.Errorf("failed to get rpc url, cpAccount: %s, error: %v", cpAccountAddress, err)
@@ -1355,8 +1372,29 @@ func checkBalance(cpAccountAddress string) (bool, error) {
 	logs.GetLogger().Infof("cpAccount: %s, sequencer balance: %s, worker address balance: %s", cpAccountAddress, fmt.Sprintf("%.4f", sequencerBalance),
 		fmt.Sprintf("%.4f", workerBalance))
 
-	if sequencerBalance > 0 || workerBalance > 0 {
-		return true, nil
+	if conf.GetConfig().UBI.EnableSequencer && !conf.GetConfig().UBI.AutoChainProof {
+		if sequencerBalance > 0 {
+			return true, nil
+		} else {
+			return false, fmt.Errorf("sequencer insufficient balance")
+		}
 	}
-	return false, nil
+
+	if conf.GetConfig().UBI.EnableSequencer && conf.GetConfig().UBI.AutoChainProof {
+		if sequencerBalance > 0 || workerBalance > 0 {
+			return true, nil
+		} else {
+			return false, fmt.Errorf("insufficient balance")
+		}
+	}
+
+	if !conf.GetConfig().UBI.EnableSequencer && conf.GetConfig().UBI.AutoChainProof {
+		if workerBalance > 0 {
+			return true, nil
+		} else {
+			return false, fmt.Errorf("worker address insufficient balance")
+		}
+	}
+
+	return false, fmt.Errorf("unknown error")
 }
