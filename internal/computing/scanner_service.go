@@ -37,7 +37,7 @@ func (taskManager *TaskManagerContract) Scan(job *models.JobEntity) {
 		start = scannedBlock + 1
 	}
 
-	logs.GetLogger().Debugf("task manager contract task_uuid: %s start scan from %d", job.TaskUuid, start)
+	logs.GetLogger().Infof("task manager contract task_uuid: %s start scan from %d", job.TaskUuid, start)
 	var endBlockNumber uint64
 	var err error
 	defer func() {
@@ -45,7 +45,7 @@ func (taskManager *TaskManagerContract) Scan(job *models.JobEntity) {
 			logs.GetLogger().Errorf("task manager contract task_uuid: %s end scan at %d, failed: %v", job.TaskUuid, endBlockNumber, ecp.ParseError(err))
 			return
 		}
-		logs.GetLogger().Debugf("task manager contract task_uuid %s end scan at %d", job.TaskUuid, endBlockNumber)
+		logs.GetLogger().Infof("task manager contract task_uuid: %s end scan at %d", job.TaskUuid, endBlockNumber)
 	}()
 
 	chainUrl, err := conf.GetRpcByNetWorkName()
