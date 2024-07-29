@@ -123,11 +123,11 @@ func (jobServ JobService) UpdateJobReward(taskUuid string, amount string) (err e
 }
 
 func (jobServ JobService) UpdateJobScannedBlock(taskUuid string, end uint64) (err error) {
-	return jobServ.Debug().Model(&models.JobEntity{}).Where(fmt.Sprintf("task_uuid='%s'", taskUuid)).Update("scanned_block", end).Error
+	return jobServ.Model(&models.JobEntity{}).Where(fmt.Sprintf("task_uuid='%s'", taskUuid)).Update("scanned_block", end).Error
 }
 
 func (jobServ JobService) GetJobListByNoReward() (list []*models.JobEntity, err error) {
-	err = jobServ.Debug().Model(&models.JobEntity{}).Where("status in ? and (reward is null or reward ='')", []int{models.JOB_COMPLETED_STATUS, models.TERMINATED}).Find(&list).Error
+	err = jobServ.Model(&models.JobEntity{}).Where("status in ? and (reward is null or reward ='')", []int{models.JOB_COMPLETED_STATUS, models.TERMINATED}).Find(&list).Error
 	return
 }
 
