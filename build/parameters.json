@@ -2,14 +2,14 @@
   {
     "network": "mainnet",
     "config": {
-      "sequencer_url": "",
+      "sequencer_url": "http://sequencer.swanchain.io",
       "zk_engine_pk": "0xB5aeb540B4895cd024c1625E146684940A849ED9",
       "orchestrator_pk": "0x4B98086A20f3C19530AF32D21F85Bc6399358e20",
       "chain_rpc": "https://mainnet-rpc01.swanchain.io",
       "swan_token_contract": "0xAF90ac6428775E1Be06BAFA932c2d80119a7bd02",
       "orchestrator_collateral_contract": "0x48966A3eb8C1b584Ac9E7767bC9607e235245C81",
-      "job_manager_contract": "",
-      "job_manager_contract_created":0,
+      "job_manager_contract": "0xCE7EAB4843b3950b230773BC6dca804057656b89",
+      "job_manager_contract_created":500000,
       "register_cp_contract": "0xbef1ec33e5Ac3a491fFeE1600e0b00eac97cb138",
       "zk_collateral_contract": "0x0b84cc9CcE1459c85337b511872528cE947C3962",
       "register_task_contract": "0x4Cd9b2450c3e412a1F0F0aE78C79271337241E31",
