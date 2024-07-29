@@ -287,9 +287,7 @@ func (task *CronTask) setFailedUbiTaskStatus() {
 
 		var taskList []models.TaskEntity
 		oneHourAgo := time.Now().Add(-1 * time.Hour).Unix()
-		err := NewTaskService().Model(&models.TaskEntity{}).Where("status in (?,?)", models.TASK_RECEIVED_STATUS, models.TASK_RUNNING_STATUS).
-			Or("status ==? and tx_hash !=''", models.TASK_FAILED_STATUS).
-			Or("status=? and tx_hash==''", models.TASK_SUBMITTED_STATUS).Find(&taskList).Error
+		err := NewTaskService().Model(&models.TaskEntity{}).Where("status in (?,?) and create_time <?", models.TASK_RECEIVED_STATUS, models.TASK_RUNNING_STATUS, oneHourAgo).Find(&taskList).Error
 		if err != nil {
 			logs.GetLogger().Errorf("Failed get task list, error: %+v", err)
 			return
@@ -305,7 +303,7 @@ func (task *CronTask) setFailedUbiTaskStatus() {
 				ubiTask.Status = models.TASK_FAILED_STATUS
 			}
 
-			if ubiTask.TxHash != "" {
+			if ubiTask.Contract != "" || ubiTask.BlockHash != "" {
 				ubiTask.Status = models.TASK_SUBMITTED_STATUS
 			} else {
 				ubiTask.Status = models.TASK_FAILED_STATUS
@@ -319,7 +317,7 @@ func (task *CronTask) setFailedUbiTaskStatus() {
 
 func (task *CronTask) checkJobReward() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("* 0/10 * * * ?", func() {
+	c.AddFunc("* * 0/20 * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("task job: [checkJobReward], error: %+v", err)

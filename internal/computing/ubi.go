@@ -245,7 +245,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 				return
 			}
 
-			if ubiTaskRun.TxHash != "" {
+			if ubiTaskRun.Contract != "" || ubiTaskRun.BlockHash != "" {
 				ubiTaskRun.Status = models.TASK_SUBMITTED_STATUS
 			} else {
 				ubiTaskRun.Status = models.TASK_FAILED_STATUS
@@ -1058,7 +1058,7 @@ func CronTaskForEcp() {
 		for range ticker.C {
 			var taskList []models.TaskEntity
 			oneHourAgo := time.Now().Add(-1 * time.Hour).Unix()
-			err := NewTaskService().Model(&models.TaskEntity{}).Where("status !=? and status !=? and create_time <?", models.TASK_SUBMITTED_STATUS, models.TASK_FAILED_STATUS, oneHourAgo).
+			err := NewTaskService().Model(&models.TaskEntity{}).Where("status in (?,?) and create_time <?", models.TASK_RECEIVED_STATUS, models.TASK_RUNNING_STATUS, oneHourAgo).
 				Or("tx_hash !='' and status =?", models.TASK_FAILED_STATUS).Find(&taskList).Error
 			if err != nil {
 				logs.GetLogger().Errorf("Failed get task list, error: %+v", err)
@@ -1067,7 +1067,7 @@ func CronTaskForEcp() {
 
 			for _, entity := range taskList {
 				ubiTask := entity
-				if ubiTask.TxHash != "" {
+				if ubiTask.Contract != "" || ubiTask.BlockHash != "" {
 					ubiTask.Status = models.TASK_SUBMITTED_STATUS
 				} else {
 					ubiTask.Status = models.TASK_FAILED_STATUS
