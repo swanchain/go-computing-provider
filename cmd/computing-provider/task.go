@@ -3,15 +3,17 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/olekukonko/tablewriter"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/constants"
 	"github.com/swanchain/go-computing-provider/internal/computing"
+	"github.com/swanchain/go-computing-provider/internal/models"
 	"github.com/urfave/cli/v2"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"os"
-	"strings"
-	"time"
 )
 
 var taskCmd = &cli.Command{
@@ -29,34 +31,41 @@ var taskList = &cli.Command{
 	Usage: "List task",
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
+			Name:  "show-completed",
+			Usage: "Display completed jobs",
+		},
+		&cli.BoolFlag{
 			Name:    "verbose",
 			Usage:   "--verbose",
 			Aliases: []string{"v"},
 		},
 	},
 	Action: func(cctx *cli.Context) error {
+		showCompleted := cctx.Bool("show-completed")
 		fullFlag := cctx.Bool("verbose")
 		cpRepoPath, ok := os.LookupEnv("CP_PATH")
 		if !ok {
 			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
 		}
-		if err := conf.InitConfig(cpRepoPath, false); err != nil {
+		if err := conf.InitConfig(cpRepoPath, true); err != nil {
 			return fmt.Errorf("load config file failed, error: %+v", err)
 		}
 
 		var taskData [][]string
 		var rowColorList []RowColor
 
-		list, err := computing.NewJobService().GetJobList()
+		var jobStatus int
+		if showCompleted {
+			jobStatus = models.All_FLAG
+		} else {
+			jobStatus = models.UN_DELETEED_FLAG
+		}
+
+		list, err := computing.NewJobService().GetJobList(jobStatus)
 		if err != nil {
 			return fmt.Errorf("get jobs failed, error: %+v", err)
 		}
 		for i, job := range list {
-			k8sService := computing.NewK8sService()
-			status, err := k8sService.GetDeploymentStatus(job.WalletAddress, job.SpaceUuid)
-			if err != nil {
-				return fmt.Errorf("failed get job status: %s, error: %+v", job.JobUuid, err)
-			}
 			var fullSpaceUuid string
 			if len(job.K8sDeployName) > 0 {
 				fullSpaceUuid = job.K8sDeployName[7:]
@@ -64,9 +73,14 @@ var taskList = &cli.Command{
 
 			expireTime := time.Unix(job.ExpireTime, 0).Format("2006-01-02 15:04:05")
 
+			var reward = "0.00"
+			if len(strings.TrimSpace(job.Reward)) > 0 {
+				reward = job.Reward
+			}
+
 			if fullFlag {
 				taskData = append(taskData,
-					[]string{job.TaskUuid, job.ResourceType, job.WalletAddress, fullSpaceUuid, job.Name, status, expireTime})
+					[]string{job.TaskUuid, job.ResourceType, job.WalletAddress, fullSpaceUuid, job.Name, models.GetJobStatus(job.Status), reward, expireTime})
 			} else {
 				var walletAddress string
 				if len(job.WalletAddress) > 0 {
@@ -84,16 +98,19 @@ var taskList = &cli.Command{
 				}
 
 				taskData = append(taskData,
-					[]string{taskUuid, job.ResourceType, walletAddress, spaceUuid, job.Name, status, expireTime})
+					[]string{taskUuid, job.ResourceType, walletAddress, spaceUuid, job.Name, models.GetJobStatus(job.Status), expireTime})
 			}
 
 			var rowColor []tablewriter.Colors
-			if status == "Pending" {
+			switch job.Status {
+			case models.JOB_DEPLOY_STATUS:
 				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgYellowColor}}
-			} else if status == "Running" {
+			case models.JOB_RUNNING_STATUS:
 				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
-			} else {
+			case models.JOB_TERMINATED_STATUS:
 				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
+			case models.JOB_COMPLETED_STATUS:
+				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiMagentaColor}}
 			}
 
 			rowColorList = append(rowColorList, RowColor{
@@ -103,8 +120,14 @@ var taskList = &cli.Command{
 			})
 		}
 
-		header := []string{"TASK UUID", "TASK TYPE", "WALLET ADDRESS", "SPACE UUID", "SPACE NAME", "STATUS", "EXPIRE TIME"}
-		NewVisualTable(header, taskData, rowColorList).Generate(true)
+		if fullFlag {
+			header := []string{"TASK UUID", "TASK TYPE", "WALLET ADDRESS", "SPACE UUID", "SPACE NAME", "STATUS", "REWARD", "EXPIRE TIME"}
+			NewVisualTable(header, taskData, rowColorList).Generate(true)
+		} else {
+			header := []string{"TASK UUID", "TASK TYPE", "WALLET ADDRESS", "SPACE UUID", "SPACE NAME", "STATUS", "EXPIRE TIME"}
+			NewVisualTable(header, taskData, rowColorList).Generate(true)
+		}
+
 		return nil
 	},
 }
@@ -122,7 +145,7 @@ var taskDetail = &cli.Command{
 		if !ok {
 			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
 		}
-		if err := conf.InitConfig(cpRepoPath, false); err != nil {
+		if err := conf.InitConfig(cpRepoPath, true); err != nil {
 			return fmt.Errorf("load config file failed, error: %+v", err)
 		}
 
@@ -132,27 +155,24 @@ var taskDetail = &cli.Command{
 			return fmt.Errorf("task_uuid: %s, get job detail failed, error: %+v", taskUuid, err)
 		}
 
-		k8sService := computing.NewK8sService()
-		status, err := k8sService.GetDeploymentStatus(job.WalletAddress, job.SpaceUuid)
-		if err != nil {
-			return fmt.Errorf("failed get job status: %s, error: %+v", job.JobUuid, err)
-		}
-
 		var taskData [][]string
 		taskData = append(taskData, []string{"TASK TYPE:", job.ResourceType})
 		taskData = append(taskData, []string{"WALLET ADDRESS:", job.WalletAddress})
 		taskData = append(taskData, []string{"SPACE NAME:", job.Name})
 		taskData = append(taskData, []string{"SPACE URL:", job.RealUrl})
 		taskData = append(taskData, []string{"HARDWARE:", job.Hardware})
-		taskData = append(taskData, []string{"STATUS:", status})
+		taskData = append(taskData, []string{"STATUS:", models.GetJobStatus(job.Status)})
 
 		var rowColor []tablewriter.Colors
-		if status == "Pending" {
-			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgYellowColor}, {tablewriter.Bold, tablewriter.FgYellowColor}}
-		} else if status == "Running" {
-			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}, {tablewriter.Bold, tablewriter.FgGreenColor}}
-		} else {
-			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}, {tablewriter.Bold, tablewriter.FgCyanColor}}
+		switch job.Status {
+		case models.JOB_DEPLOY_STATUS:
+			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgYellowColor}}
+		case models.JOB_RUNNING_STATUS:
+			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
+		case models.JOB_TERMINATED_STATUS:
+			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
+		case models.JOB_COMPLETED_STATUS:
+			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiMagentaColor}}
 		}
 
 		header := []string{"TASK UUID:", job.TaskUuid}
@@ -181,7 +201,7 @@ var taskDelete = &cli.Command{
 		if !ok {
 			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
 		}
-		if err := conf.InitConfig(cpRepoPath, false); err != nil {
+		if err := conf.InitConfig(cpRepoPath, true); err != nil {
 			return fmt.Errorf("load config file failed, error: %+v", err)
 		}
 
@@ -202,7 +222,7 @@ var taskDelete = &cli.Command{
 		if err := k8sService.DeleteDeployRs(context.TODO(), namespace, job.SpaceUuid); err != nil && !errors.IsNotFound(err) {
 			return err
 		}
-		computing.NewJobService().DeleteJobEntityBySpaceUuId(job.SpaceUuid)
+		computing.NewJobService().DeleteJobEntityBySpaceUuId(job.SpaceUuid, models.JOB_TERMINATED_STATUS)
 		fmt.Printf("space_uuid: %s space serivce successfully deleted \n", job.SpaceUuid)
 		return nil
 	},

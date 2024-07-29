@@ -20,10 +20,12 @@ func InitDb(cpRepoPath string) {
 		panic("failed to connect database")
 	}
 
-	DB.AutoMigrate(
+	if err = DB.AutoMigrate(
 		&models.TaskEntity{},
 		&models.JobEntity{},
-		&models.CpInfoEntity{})
+		&models.CpInfoEntity{}); err != nil {
+		panic("failed to auto migrate for provider db")
+	}
 }
 
 func NewDbService() *gorm.DB {

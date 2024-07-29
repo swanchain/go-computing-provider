@@ -67,10 +67,32 @@ Output:
                     --task-types 1,2,4
 ```
 **Note:** `--task-types`: Supports 4 task types (1: Fil-C2-512M, 2: Aleo, 3: AI, 4: Fil-C2-32G), separated by commas. For ECP, it needs to be set to 1,2,4.
-- Collateral Swan-ETH for ECP
+- Collateral `SWANC` for ECP
 ```bash
-./computing-provider collateral add --ecp --from <YOUR_WALLET_ADDRESS>  <AMOUNT>   
+computing-provider collateral add --ecp --from <YOUR_WALLET_ADDRESS>  <AMOUNT>   
 ```
+- Withdraw `SWANC` for ECP
+```bash
+computing-provider collateral withdraw --ecp --owner <YOUR_WALLET_ADDRESS> --account <YOUR_CP_ACCOUNT> <amount>
+```
+****Note:** Currently one zk-task requires 10 SWANC.**
+
+- [**OPTIONAL**] Configure the Sequencer service to submit ZK task proofs in batches
+  - Modify the following items in the configuration file:
+    ```toml
+    EnableSequencer = true                          # Enable aa Sequencer to receive zk-task proofs
+    AutoChainProof = true                           # Sequencer insufficient balance or service unavailable, use chain to submit proof
+    SequencerUrl = "http://sequencer.swanchain.io"  # Sequencer service's API address
+    ```
+  - Deposit `SwanETH` for Sequencer account
+    ```bash
+    computing-provider sequencer add --from <YOUR_WALLET_ADDRESS>  <amount>
+    ```
+  - Withdraw `SwanETH` for Sequencer account
+    ```bash
+    computing-provider sequencer withdraw --owner <YOUR_OWNER_WALLET_ADDRESS>  <amount>
+    ```
+    
 **Note:** Currently one zk-task requires 0.0005 Swan-ETH.
 
 ## Start ECP service

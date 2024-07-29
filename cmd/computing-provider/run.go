@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
@@ -11,19 +10,19 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/itsjamie/gin-cors"
 	"github.com/olekukonko/tablewriter"
+	"github.com/swanchain/go-computing-provider/build"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/computing"
-	account2 "github.com/swanchain/go-computing-provider/internal/contract/account"
+	"github.com/swanchain/go-computing-provider/internal/contract/account"
 	"github.com/swanchain/go-computing-provider/internal/contract/ecp"
 	"github.com/swanchain/go-computing-provider/internal/contract/fcp"
-	"github.com/swanchain/go-computing-provider/internal/contract/token"
 	"github.com/swanchain/go-computing-provider/internal/initializer"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"github.com/swanchain/go-computing-provider/util"
 	"github.com/swanchain/go-computing-provider/wallet"
 	"github.com/urfave/cli/v2"
-	"math/big"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -34,14 +33,16 @@ var runCmd = &cli.Command{
 	Name:  "run",
 	Usage: "Start a cp process",
 	Action: func(cctx *cli.Context) error {
-		logs.GetLogger().Info("Start a computing provider client.")
+		logs.GetLogger().Info("Starting a computing provider client.")
 
 		cpRepoPath, ok := os.LookupEnv("CP_PATH")
 		if !ok {
 			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
 		}
 		initializer.ProjectInit(cpRepoPath)
+		logs.GetLogger().Info("Your config file is:", filepath.Join(cpRepoPath, "config.toml"))
 
+		gin.SetMode(gin.ReleaseMode)
 		r := gin.Default()
 		r.Use(cors.Middleware(cors.Config{
 			Origins:         "*",
@@ -61,6 +62,7 @@ var runCmd = &cli.Command{
 		if err != nil {
 			logs.GetLogger().Fatal("failed to start cp-api endpoint: %s", err)
 		}
+		logs.GetLogger().Infof("CP service started successfully, listening on port: %d", conf.GetConfig().API.Port)
 
 		finishCh := util.MonitorShutdown(shutdownChan,
 			util.ShutdownHandler{Component: "cp-api", StopFunc: httpStopper},
@@ -85,7 +87,7 @@ func cpManager(router *gin.RouterGroup) {
 	router.GET("/lagrange/job/:job_uuid", computing.GetJobStatus)
 
 	router.POST("/cp/ubi", computing.DoUbiTaskForK8s)
-	router.POST("/cp/receive/ubi", computing.ReceiveUbiProofForK8s)
+	router.POST("/cp/receive/ubi", computing.ReceiveUbiProof)
 
 }
 
@@ -93,7 +95,10 @@ var infoCmd = &cli.Command{
 	Name:  "info",
 	Usage: "Print computing-provider info",
 	Action: func(cctx *cli.Context) error {
-		cpRepoPath, _ := os.LookupEnv("CP_PATH")
+		cpRepoPath, ok := os.LookupEnv("CP_PATH")
+		if !ok {
+			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
+		}
 		if err := conf.InitConfig(cpRepoPath, true); err != nil {
 			return fmt.Errorf("load config file failed, error: %+v", err)
 		}
@@ -128,6 +133,7 @@ var infoCmd = &cli.Command{
 			netWork = fmt.Sprintf("Testnet(%d)", chainId.Int64())
 		}
 
+		var sequencerBalance = "0.000000"
 		var fcpCollateralBalance = "0.0000"
 		var fcpEscrowBalance = "0.0000"
 		var ecpCollateralBalance = "0.0000"
@@ -137,7 +143,7 @@ var infoCmd = &cli.Command{
 		var contractAddress, ownerAddress, workerAddress, beneficiaryAddress, taskTypes, chainNodeId, version string
 		var cpAccount models.Account
 
-		cpStub, err := account2.NewAccountStub(client)
+		cpStub, err := account.NewAccountStub(client)
 		if err == nil {
 			cpAccount, err = cpStub.GetCpAccountInfo()
 			if err != nil {
@@ -179,6 +185,11 @@ var infoCmd = &cli.Command{
 			}
 		}
 
+		sequencerStub, err := ecp.NewSequencerStub(client, ecp.WithSequencerCpAccountAddress(contractAddress))
+		if err == nil {
+			sequencerBalance, err = sequencerStub.GetCPBalance()
+		}
+
 		var domain = conf.GetConfig().API.Domain
 		if strings.HasPrefix(domain, ".") {
 			domain = domain[1:]
@@ -201,6 +212,7 @@ var infoCmd = &cli.Command{
 		taskData = append(taskData, []string{""})
 		taskData = append(taskData, []string{"Owner Balance(sETH):", ownerBalance})
 		taskData = append(taskData, []string{"Worker Balance(sETH):", workerBalance})
+		taskData = append(taskData, []string{"Sequencer Balance(sETH):", sequencerBalance})
 		taskData = append(taskData, []string{""})
 		taskData = append(taskData, []string{"ECP Balance(SWANC):"})
 		taskData = append(taskData, []string{"   Collateral:", ecpCollateralBalance})
@@ -272,6 +284,7 @@ var stateInfoCmd = &cli.Command{
 		}
 		defer client.Close()
 
+		var sequencerBalance = "0.0000"
 		var fcpCollateralBalance = "0.0000"
 		var fcpEscrowBalance = "0.0000"
 		var ecpCollateralBalance = "0.0000"
@@ -281,7 +294,7 @@ var stateInfoCmd = &cli.Command{
 		var chainMultiAddress string
 		var contractAddress, ownerAddress, workerAddress, beneficiaryAddress, taskTypes, chainNodeId, version string
 
-		cpStub, err := account2.NewAccountStub(client, account2.WithContractAddress(cctx.Args().Get(0)))
+		cpStub, err := account.NewAccountStub(client, account.WithContractAddress(cctx.Args().Get(0)))
 		if err == nil {
 			cpAccount, err := cpStub.GetCpAccountInfo()
 			if err != nil {
@@ -328,6 +341,11 @@ var stateInfoCmd = &cli.Command{
 			}
 		}
 
+		sequencerStub, err := ecp.NewSequencerStub(client, ecp.WithSequencerCpAccountAddress(contractAddress))
+		if err == nil {
+			sequencerBalance, err = sequencerStub.GetCPBalance()
+		}
+
 		var taskData [][]string
 		taskData = append(taskData, []string{"Node ID:", chainNodeId})
 		taskData = append(taskData, []string{"Multi-Address:", chainMultiAddress})
@@ -338,6 +356,7 @@ var stateInfoCmd = &cli.Command{
 		taskData = append(taskData, []string{""})
 		taskData = append(taskData, []string{"Owner Balance(sETH):", ownerBalance})
 		taskData = append(taskData, []string{"Worker Balance(sETH):", workerBalance})
+		taskData = append(taskData, []string{"Sequencer Balance(sETH):", sequencerBalance})
 		taskData = append(taskData, []string{""})
 		taskData = append(taskData, []string{"ECP Balance(SWANC):"})
 		taskData = append(taskData, []string{"   Collateral:", ecpCollateralBalance})
@@ -372,101 +391,51 @@ var taskInfoCmd = &cli.Command{
 			Usage:    "Check ECP task on the chain",
 			Required: true,
 		},
+		&cli.BoolFlag{
+			Name:  "show-proof",
+			Usage: "show proof of ZK task",
+			Value: false,
+		},
 	},
 	Action: func(cctx *cli.Context) error {
+		showProof := cctx.Bool("show-proof")
 
 		taskContract := cctx.Args().Get(0)
 		if strings.TrimSpace(taskContract) == "" {
 			return fmt.Errorf("the task contract address is required")
 		}
 
-		chainRpc, err := conf.GetRpcByNetWorkName()
-		if err != nil {
-			return err
-		}
-
 		taskInfo, err := computing.GetTaskInfoOnChain(taskContract)
-		if err != nil {
-			return fmt.Errorf("get task info on the chain failed, error: %v", err)
-		}
+		if err == nil {
+			var taskData [][]string
+			taskData = append(taskData, []string{"Task Id:", taskInfo.TaskID.String()})
+			taskData = append(taskData, []string{"ZK Type:", models.TaskTypeStr(int(taskInfo.TaskType.Int64()))})
+			taskData = append(taskData, []string{"Resource Type:", models.GetResourceTypeStr(int(taskInfo.ResourceType.Int64()))})
+			taskData = append(taskData, []string{"Owner:", taskInfo.Owner.Hex()})
+			taskData = append(taskData, []string{"CP Account:", taskInfo.CpAccount.Hex()})
+			taskData = append(taskData, []string{"Deadline:", taskInfo.Deadline.String()})
+			taskData = append(taskData, []string{"Input Param:", taskInfo.InputParam})
+			taskData = append(taskData, []string{"Verify Param:", taskInfo.VerifyParam})
+			taskData = append(taskData, []string{"Check Code:", taskInfo.CheckCode})
 
-		var lockFundTx, unlockFundTx, rewardTx, challengeTx, slashTx, reward string
-		if taskInfo.LockFundTx != "" {
-			lockFundTx = taskInfo.LockFundTx
-		} else {
-			lockFundTx = "-"
-		}
-		if taskInfo.UnlockFundTx != "" {
-			unlockFundTx = taskInfo.UnlockFundTx
-		} else {
-			unlockFundTx = "-"
-		}
-		if taskInfo.RewardTx != "" {
-			rewardTx = taskInfo.RewardTx
-		} else {
-			rewardTx = "-"
-		}
-		if taskInfo.ChallengeTx != "" {
-			challengeTx = taskInfo.ChallengeTx
-		} else {
-			challengeTx = "-"
-		}
-		if taskInfo.SlashTx != "" {
-			slashTx = taskInfo.SlashTx
-		} else {
-			slashTx = "-"
-		}
-
-		if taskInfo.RewardTx != "" {
-			client, err := ethclient.Dial(chainRpc)
-			if err == nil {
-				defer client.Close()
-				receipt, err := client.TransactionReceipt(context.Background(), common.HexToHash(taskInfo.RewardTx))
-				if err == nil {
-					contractAbi, err := abi.JSON(strings.NewReader(token.TokenMetaData.ABI))
-					if err == nil {
-						for _, l := range receipt.Logs {
-							event := struct {
-								From  common.Address
-								To    common.Address
-								Value *big.Int
-							}{}
-							if err := contractAbi.UnpackIntoInterface(&event, "Transfer", l.Data); err != nil {
-								continue
-							}
-
-							if len(l.Topics) == 3 && l.Topics[0] == contractAbi.Events["Transfer"].ID {
-								balance := event.Value
-								if balance.String() == "0" {
-									reward = "0.0000"
-								} else {
-									fbalance := new(big.Float)
-									fbalance.SetString(balance.String())
-									etherQuotient := new(big.Float).Quo(fbalance, new(big.Float).SetInt(big.NewInt(1e18)))
-									reward = etherQuotient.Text('f', 4)
-								}
-							}
-						}
-					}
-				}
+			if showProof {
+				taskData = append(taskData, []string{"Proof:", taskInfo.Proof})
 			}
+
+			header := []string{fmt.Sprintf("Task Contract(%s):", taskInfo.Version), taskContract}
+			NewVisualTable(header, taskData, []RowColor{}).Generate(false)
+		} else {
+			cid, err := computing.GetAggregatedTaskInfo(taskContract)
+			if err != nil {
+				return err
+			}
+
+			var taskData [][]string
+			taskData = append(taskData, []string{"MCS CID:", cid})
+			header := []string{"Task Contract:", taskContract}
+			NewVisualTable(header, taskData, []RowColor{}).Generate(false)
 		}
 
-		var taskData [][]string
-		taskData = append(taskData, []string{"ZK Type:", models.TaskTypeStr(int(taskInfo.TaskType.Int64()))})
-		taskData = append(taskData, []string{"Resource Type:", models.GetSourceTypeStr(int(taskInfo.ResourceType.Int64()))})
-		taskData = append(taskData, []string{"CP Account:", taskInfo.CpContractAddress.Hex()})
-		taskData = append(taskData, []string{"Task Status:", taskInfo.Status})
-		taskData = append(taskData, []string{"Deadline:", taskInfo.Deadline.String()})
-		taskData = append(taskData, []string{"Reward(SWAN):", reward})
-		taskData = append(taskData, []string{"LockFund TxHash:", lockFundTx})
-		taskData = append(taskData, []string{"UnLockFund TxHash:", unlockFundTx})
-		taskData = append(taskData, []string{"Reward TxHash:", rewardTx})
-		taskData = append(taskData, []string{"Challenge TxHash:", challengeTx})
-		taskData = append(taskData, []string{"Slash TxHash:", slashTx})
-
-		header := []string{"Task Contract:", taskContract}
-		NewVisualTable(header, taskData, []RowColor{}).Generate(false)
 		return nil
 
 	},
@@ -897,13 +866,7 @@ var changeTaskTypesCmd = &cli.Command{
 			taskTypesUint = append(taskTypesUint, uint8(tt))
 		}
 
-		cpRepoPath, ok := os.LookupEnv("CP_PATH")
-		if !ok {
-			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
-		}
-		if err := conf.InitConfig(cpRepoPath, false); err != nil {
-			logs.GetLogger().Fatal(err)
-		}
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 
 		client, cpStub, err := getVerifyAccountClient(ownerAddress)
 		if err != nil {
@@ -940,25 +903,11 @@ var contractCmd = &cli.Command{
 					return fmt.Errorf("load config file failed, error: %+v", err)
 				}
 
-				chainRpc, err := conf.GetRpcByNetWorkName()
-				if err != nil {
-					return err
-				}
-				client, err := ethclient.Dial(chainRpc)
-				if err != nil {
-					return err
-				}
-				defer client.Close()
-
 				var netWork = ""
-				chainId, err := client.ChainID(context.Background())
-				if err != nil {
-					return err
-				}
-				if chainId.Int64() == 254 {
-					netWork = fmt.Sprintf("Mainnet(%d)", chainId.Int64())
+				if build.NetWorkTag == "mainnet" {
+					netWork = "Mainnet(254)"
 				} else {
-					netWork = fmt.Sprintf("Testnet(%d)", chainId.Int64())
+					netWork = "Testnet(20241133)"
 				}
 
 				contract := conf.GetConfig().CONTRACT
@@ -966,9 +915,12 @@ var contractCmd = &cli.Command{
 
 				taskData = append(taskData, []string{"Network:", netWork})
 				taskData = append(taskData, []string{"Swan Token:", contract.SwanToken})
-				taskData = append(taskData, []string{"Orchestrator Collateral:", contract.Collateral})
-				taskData = append(taskData, []string{"Register CP:", contract.Register})
+				taskData = append(taskData, []string{"Orchestrator Collateral:", contract.JobCollateral})
+				taskData = append(taskData, []string{"Task Manager:", contract.JobManager})
+				taskData = append(taskData, []string{"Register CP:", contract.CpAccountRegister})
+				taskData = append(taskData, []string{"Register Task:", contract.TaskRegister})
 				taskData = append(taskData, []string{"ZK Collateral:", contract.ZkCollateral})
+				taskData = append(taskData, []string{"Sequencer:", contract.Sequencer})
 
 				var rowColorList []RowColor
 				rowColorList = append(rowColorList,

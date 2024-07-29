@@ -331,7 +331,7 @@ make install
 
     Edit the necessary configuration files according to your deployment requirements. 
 
-        ```
+    ```toml
        [API]
        Port = 8085                                    # The port number that the web server listens on
        MultiAddress = "/ip4/<public_ip>/tcp/<port>"   # The multiAddress for libp2p
@@ -342,14 +342,15 @@ make install
  
        [UBI]
        UbiEnginePk = "0xB5aeb540B4895cd024c1625E146684940A849ED9"              # UBI Engine's public key, CP only accept the task from this UBI engine
-	
+       EnableSequencer = true                                                  # Enable aa Sequencer to receive zk-task proofs
+       AutoChainProof = true                                                   # Sequencer insufficient balance or service unavailable, use chain to submit proof
+       SequencerUrl = "http://sequencer.swanchain.io"                          # Sequencer service's API address
+   
        [LOG]
        CrtFile = "/YOUR_DOMAIN_NAME_CRT_PATH/server.crt"                       # Your domain name SSL .crt file path
        KeyFile = "/YOUR_DOMAIN_NAME_KEY_PATH/server.key"                       # Your domain name SSL .key file path
 	
        [HUB]
-       ServerUrl = "https://orchestrator-mainnet-api.swanchain.io"             # The Orchestrator's API address
-       AccessToken = ""                                               	       # The Orchestrator's access token, Acquired from "https://orchestrator.swanchain.io", and switch to the `mainnet network` and use the owner address
        BalanceThreshold= 10                                                    # The cp’s collateral balance threshold
        OrchestratorPk = "0x4B98086A20f3C19530AF32D21F85Bc6399358e20"           # Orchestrator's public key, CP only accept the task from this Orchestrator
        VerifySign = true                                                       # Verify that the task signature is from Orchestrator
@@ -366,7 +367,7 @@ make install
 	
        [RPC]
        SWAN_CHAIN_RPC = "https://mainnet-rpc01.swanchain.io"     # Swan chain RPC
-
+    ```
 
 **Note:**  
 * Example `[api].WalletWhiteList` hosted on GitHub can be found [here](https://raw.githubusercontent.com/swanchain/market-providers/main/clients/whitelist.txt).
@@ -464,19 +465,25 @@ export CP_PATH=<YOUR_CP_PATH>
 * Adjust the value of `RUST_GPU_TOOLS_CUSTOM_GPU` based on the GPU used by the CP's Kubernetes cluster for fil-c2 tasks.
 * For more device choices, please refer to this page:[https://github.com/filecoin-project/bellperson](https://github.com/filecoin-project/bellperson)
 
-### Step 2: Collateral `SWANC` for receiving ZK Task
+### Step 2: Collateral `SWANC` for ECP
 
 ```bash
 computing-provider collateral add --ecp --from <YOUR_WALLET_ADDRESS>  <amount>
 ```
-**Note:** Currently one zk-task requires 0.0005 SWANC.
+### Step 3: Withdraw `SWANC` from ECP
+
+```bash
+computing-provider collateral withdraw --ecp --owner <YOUR_WALLET_ADDRESS> --account <YOUR_CP_ACCOUNT> <amount>
+```
+
+****Note:** Currently one zk-task requires 10 SWANC.**
 
 Example output:
 
 ```
 0x7791f48931DB81668854921fA70bFf0eB85B8211
 ```
-### Step 3: Add the type of ZK task
+### Step 4: Add the type of ZK task
 
 ```bash
 computing-provider account changeTaskTypes --ownerAddress <YOUR_OWNER_WALLET_ADDRESS> 1,2,3,4
@@ -490,7 +497,23 @@ computing-provider account changeTaskTypes --ownerAddress <YOUR_OWNER_WALLET_ADD
 If you need to run FCP and ECP at the same time, you need to set it to `1,2,3,4`
 
 
-### **Step 4: Account Management**
+### [**OPTIONAL**] Configure the Sequencer service to submit ZK task proofs in batches
+- Modify the following items in the configuration file:
+```toml
+EnableSequencer = true                            # Enable aa Sequencer to receive zk-task proofs
+AutoChainProof = true                         	  # Sequencer insufficient balance or service unavailable, use chain to submit proof
+SequencerUrl = "http://sequencer.swanchain.io"    # Sequencer service's API address
+```
+- Deposit `SwanETH` for Sequencer account
+```bash
+computing-provider sequencer add --from <YOUR_WALLET_ADDRESS>  <amount>
+```
+- Withdraw `SwanETH` for Sequencer account
+```bash
+computing-provider sequencer withdraw --owner <YOUR_OWNER_WALLET_ADDRESS>  <amount>
+```
+
+### **Step 5: Account Management**
 
 Use `computing-provider account` subcommands to update CP details:
 

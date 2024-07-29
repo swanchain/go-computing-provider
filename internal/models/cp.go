@@ -1,21 +1,9 @@
 package models
 
 import (
-	"time"
+	"github.com/ethereum/go-ethereum/common"
+	"math/big"
 )
-
-const (
-	ActiveStatus string = "Active"
-)
-
-type ComputingProvider struct {
-	Name          string `json:"name"`
-	NodeId        string `json:"node_id"`
-	MultiAddress  string `json:"multi_address"`
-	Autobid       int    `json:"autobid"`
-	Status        string `json:"status"`
-	PublicAddress string `json:"public_address"`
-}
 
 type JobData struct {
 	UUID                        string `json:"uuid"`
@@ -35,13 +23,6 @@ type Job struct {
 	Uuid   string
 	Status int
 	Url    string
-}
-
-type JobStatus string
-
-type DeleteJobReq struct {
-	CreatorWallet string `json:"creator_wallet"`
-	SpaceName     string `json:"space_name"`
 }
 
 type SpaceJSON struct {
@@ -87,29 +68,17 @@ type Specification struct {
 	Unit     string
 }
 
-type CacheSpaceDetail struct {
-	WalletAddress string
-	SpaceName     string
-	SpaceUuid     string
-	ExpireTime    int64
-	JobUuid       string
-	TaskType      string
-	DeployName    string
-	Hardware      string
-	Url           string
-	TaskUuid      string
-	SpaceType     string
-}
-
 type UBITaskReq struct {
 	ID           int           `json:"id"`
 	Name         string        `json:"name,omitempty"`
 	Type         int           `json:"type"`
 	InputParam   string        `json:"input_param"`
+	VerifyParam  string        `json:"verify_param"`
 	Signature    string        `json:"signature"`
 	Resource     *TaskResource `json:"resource"`
 	ResourceType int           `json:"resource_type"`
-	ContractAddr string        `json:"contract_addr"`
+	DeadLine     int64         `json:"deadline"`
+	CheckCode    string        `json:"check_code"`
 }
 
 type UbiC2Proof struct {
@@ -127,17 +96,6 @@ type TaskResource struct {
 	Storage string `json:"storage"`
 }
 
-type CacheUbiTaskDetail struct {
-	TaskId     string `json:"task_id"`
-	TaskType   string `json:"task_type"`
-	ZkType     string `json:"zk_type"`
-	Tx         string `json:"tx"`
-	Status     string `json:"status"`
-	Reward     string `json:"reward"`
-	CreateTime string `json:"create_time"`
-	Contract   string `json:"contract"`
-}
-
 type Account struct {
 	OwnerAddress   string
 	NodeId         string
@@ -149,32 +107,68 @@ type Account struct {
 	Contract       string
 }
 
-type EcpCollateralInfo struct {
+type CollateralContractInfoForECP struct {
+	CollateralToken string
+	WithdrawDelay   int64
+}
+
+type CpCollateralInfoForECP struct {
 	CpAddress         string
 	CollateralBalance string
 	FrozenBalance     string
 	Status            string
 }
 
-type FcpCollateralInfo struct {
+type CpCollateralInfoForFCP struct {
 	CpAddress        string
 	AvailableBalance string
 	LockedCollateral string
 	Status           string
 }
 
-type TaskList []CacheUbiTaskDetail
-
-func (t TaskList) Len() int {
-	return len(t)
+type EcpTaskInfo struct {
+	TaskID               *big.Int
+	TaskType             *big.Int
+	ResourceType         *big.Int
+	InputParam           string
+	VerifyParam          string
+	CpAccount            common.Address
+	Proof                string
+	Deadline             *big.Int
+	TaskRegistryContract common.Address
+	CheckCode            string
+	Owner                common.Address
+	Version              string
 }
 
-func (t TaskList) Less(i, j int) bool {
-	timeI, _ := time.Parse("2006-01-02 15:04:05", t[i].CreateTime)
-	timeJ, _ := time.Parse("2006-01-02 15:04:05", t[j].CreateTime)
-	return timeI.Before(timeJ)
+type WithdrawRequest struct {
+	Amount        string
+	RequestBlock  int64
+	WithdrawDelay int64
 }
 
-func (t TaskList) Swap(i, j int) {
-	t[i], t[j] = t[j], t[i]
+type TaskInfoOnChain struct {
+	TaskUuid           string
+	CpList             []string
+	OwnerAddress       string
+	Reward             *big.Int
+	Collateral         *big.Int
+	StartTimestamp     int64
+	TerminateTimestamp int64
+	Duration           int64
+	TaskStatus         int
+	CollateralStatus   int
 }
+
+const (
+	NOT_ASSIGNED = iota
+	IN_PROGRESS
+	COMPLETED
+	TERMINATED
+)
+
+const (
+	LOCKED = iota
+	UNLOCKED
+	SLASHED
+)

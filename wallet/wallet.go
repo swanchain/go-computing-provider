@@ -16,6 +16,7 @@ import (
 	"github.com/swanchain/go-computing-provider/internal/contract/ecp"
 	"github.com/swanchain/go-computing-provider/internal/contract/fcp"
 	"github.com/swanchain/go-computing-provider/internal/contract/token"
+	"github.com/swanchain/go-computing-provider/internal/models"
 	"github.com/swanchain/go-computing-provider/wallet/tablewriter"
 	"golang.org/x/xerrors"
 	"math/big"
@@ -339,7 +340,7 @@ func (w *LocalWallet) WalletCollateral(ctx context.Context, from string, amount 
 		cpAccount := common.HexToAddress(cpAccountAddress)
 		bytecode, err := client.CodeAt(context.Background(), cpAccount, nil)
 		if err != nil {
-			return "", fmt.Errorf("check cp account contract address failed, error: %v", err)
+			return "", fmt.Errorf("failed to check cp account contract address, error: %v", err)
 		}
 
 		if len(bytecode) <= 0 {
@@ -356,7 +357,48 @@ func (w *LocalWallet) WalletCollateral(ctx context.Context, from string, amount 
 	}
 
 	if collateralType == "fcp" {
-		tokenStub, err := token.NewTokenStub(client, token.WithPrivateKey(ki.PrivateKey))
+		tokenStub, err := token.NewTokenStub(client, token.WithCollateralContract(conf.GetConfig().CONTRACT.JobCollateral), token.WithPrivateKey(ki.PrivateKey))
+		if err != nil {
+			return "", err
+		}
+		swanTokenTxHash, err := tokenStub.Approve(sendAmount)
+		if err != nil {
+			return "", err
+		}
+
+		timeout := time.After(3 * time.Minute)
+		ticker := time.Tick(3 * time.Second)
+		for {
+			select {
+			case <-timeout:
+				return "", fmt.Errorf("timeout waiting for transaction confirmation, tx: %s", swanTokenTxHash)
+			case <-ticker:
+				receipt, err := client.TransactionReceipt(context.Background(), common.HexToHash(swanTokenTxHash))
+				if err != nil {
+					if errors.Is(err, ethereum.NotFound) {
+						continue
+					}
+					return "", fmt.Errorf("check swan token Approve tx, error: %+v", err)
+				}
+				if receipt != nil && receipt.Status == types.ReceiptStatusSuccessful {
+					fmt.Printf("swan token approve TX Hash: %s \n", swanTokenTxHash)
+					collateralStub, err := fcp.NewCollateralStub(client, fcp.WithPrivateKey(ki.PrivateKey), fcp.WithCpAccountAddress(cpAccountAddress))
+					if err != nil {
+						return "", err
+					}
+					collateralTxHash, err := collateralStub.Deposit(sendAmount)
+					if err != nil {
+						return "", err
+					}
+					return collateralTxHash, nil
+
+				} else if receipt != nil && receipt.Status == 0 {
+					return "", fmt.Errorf("failed to check swan token approve transaction, tx: %s", swanTokenTxHash)
+				}
+			}
+		}
+	} else if collateralType == "ecp" {
+		tokenStub, err := token.NewTokenStub(client, token.WithCollateralContract(conf.GetConfig().CONTRACT.ZkCollateral), token.WithPrivateKey(ki.PrivateKey))
 		if err != nil {
 			return "", err
 		}
@@ -382,42 +424,31 @@ func (w *LocalWallet) WalletCollateral(ctx context.Context, from string, amount 
 				}
 
 				if receipt != nil && receipt.Status == types.ReceiptStatusSuccessful {
-					fmt.Printf("swan token approve TX: %s \n", swanTokenTxHash)
-					collateralStub, err := fcp.NewCollateralStub(client, fcp.WithPrivateKey(ki.PrivateKey), fcp.WithCpAccountAddress(cpAccountAddress))
+					fmt.Printf("swan token approve TX Hash: %s \n", swanTokenTxHash)
+					cpStub, err := account.NewAccountStub(client, account.WithContractAddress(cpAccountAddress))
 					if err != nil {
 						return "", err
 					}
-					collateralTxHash, err := collateralStub.Deposit(sendAmount)
+					if _, err = cpStub.GetCpAccountInfo(); err != nil {
+						return "", fmt.Errorf("cp account: %s does not exist on the chain", cpAccountAddress)
+					}
+					zkCollateral, err := ecp.NewCollateralStub(client, ecp.WithPrivateKey(ki.PrivateKey), ecp.WithCpAccountAddress(cpAccountAddress))
+					if err != nil {
+						return "", err
+					}
+
+					collateralTxHash, err := zkCollateral.Deposit(sendAmount)
 					if err != nil {
 						return "", err
 					}
 					return collateralTxHash, nil
 				} else if receipt != nil && receipt.Status == 0 {
-					return "", fmt.Errorf("swan token approve transaction execution failed, tx: %s", swanTokenTxHash)
+					return "", fmt.Errorf("failed to check swan token approve transaction, tx: %s", swanTokenTxHash)
 				}
 			}
 		}
-	} else {
-
-		cpStub, err := account.NewAccountStub(client, account.WithContractAddress(cpAccountAddress))
-		if err != nil {
-			return "", err
-		}
-		if _, err = cpStub.GetCpAccountInfo(); err != nil {
-			return "", fmt.Errorf("cp account: %s does not exist on the chain", cpAccountAddress)
-		}
-
-		zkCollateral, err := ecp.NewCollateralStub(client, ecp.WithPrivateKey(ki.PrivateKey))
-		if err != nil {
-			return "", err
-		}
-
-		collateralTxHash, err := zkCollateral.Deposit(cpAccountAddress, sendAmount)
-		if err != nil {
-			return "", err
-		}
-		return collateralTxHash, nil
 	}
+	return "", nil
 }
 
 func (w *LocalWallet) CollateralWithdraw(ctx context.Context, address string, amount string, cpAccountAddress string, collateralType string) (string, error) {
@@ -459,18 +490,252 @@ func (w *LocalWallet) CollateralWithdraw(ctx context.Context, address string, am
 	}
 
 	if collateralType == "fcp" {
-		collateralStub, err := fcp.NewCollateralStub(client, fcp.WithPrivateKey(ki.PrivateKey))
+		collateralStub, err := fcp.NewCollateralStub(client, fcp.WithPrivateKey(ki.PrivateKey), fcp.WithCpAccountAddress(cpAccountAddress))
 		if err != nil {
 			return "", err
 		}
-		return collateralStub.Withdraw(cpAccountAddress, withDrawAmount)
+		return collateralStub.Withdraw(withDrawAmount)
+	} else if collateralType == "ecp" {
+		zkCollateral, err := ecp.NewCollateralStub(client, ecp.WithPrivateKey(ki.PrivateKey), ecp.WithCpAccountAddress(cpAccountAddress))
+		if err != nil {
+			return "", err
+		}
+		return zkCollateral.Withdraw(withDrawAmount)
 	} else {
-		zkCollateral, err := ecp.NewCollateralStub(client, ecp.WithPrivateKey(ki.PrivateKey))
+		sequencerStub, err := ecp.NewSequencerStub(client, ecp.WithSequencerPrivateKey(ki.PrivateKey), ecp.WithSequencerCpAccountAddress(cpAccountAddress))
 		if err != nil {
 			return "", err
 		}
-		return zkCollateral.Withdraw(cpAccountAddress, withDrawAmount)
+		return sequencerStub.Withdraw(withDrawAmount)
 	}
+}
+
+func (w *LocalWallet) SequencerDeposit(ctx context.Context, from string, amount string, cpAccountAddress string) (string, error) {
+	defer w.keystore.Close()
+	sendAmount, err := convertToWei(amount)
+	if err != nil {
+		return "", err
+	}
+
+	chainUrl, err := conf.GetRpcByNetWorkName()
+	if err != nil {
+		return "", err
+	}
+	ki, err := w.FindKey(from)
+	if err != nil {
+		return "", err
+	}
+	if ki == nil {
+		return "", xerrors.Errorf("the address: %s, private key %w,", from, ErrKeyInfoNotFound)
+	}
+
+	client, err := ethclient.Dial(chainUrl)
+	if err != nil {
+		return "", err
+	}
+	defer client.Close()
+
+	if len(cpAccountAddress) > 0 {
+		cpAccount := common.HexToAddress(cpAccountAddress)
+		bytecode, err := client.CodeAt(context.Background(), cpAccount, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to check cp account contract address, error: %v", err)
+		}
+
+		if len(bytecode) <= 0 {
+			return "", fmt.Errorf("the account parameter must be a cpAccount contract address")
+		}
+
+		cpStub, err := account.NewAccountStub(client, account.WithContractAddress(cpAccountAddress))
+		if err != nil {
+			return "", err
+		}
+		if _, err = cpStub.GetCpAccountInfo(); err != nil {
+			return "", fmt.Errorf("cp account: %s does not exist on the chain", cpAccountAddress)
+		}
+	}
+
+	sequencerStub, err := ecp.NewSequencerStub(client, ecp.WithSequencerPrivateKey(ki.PrivateKey), ecp.WithSequencerCpAccountAddress(cpAccountAddress))
+	if err != nil {
+		return "", err
+	}
+	return sequencerStub.Deposit(sendAmount)
+}
+
+func (w *LocalWallet) SequencerWithdraw(ctx context.Context, address string, amount string, cpAccountAddress string) (string, error) {
+	defer w.keystore.Close()
+	withDrawAmount, err := convertToWei(amount)
+	if err != nil {
+		return "", err
+	}
+
+	chainUrl, err := conf.GetRpcByNetWorkName()
+	if err != nil {
+		return "", err
+	}
+
+	ki, err := w.FindKey(address)
+	if err != nil {
+		return "", err
+	}
+	if ki == nil {
+		return "", xerrors.Errorf("the address: %s, private key %w,", address, ErrKeyInfoNotFound)
+	}
+
+	client, err := ethclient.Dial(chainUrl)
+	if err != nil {
+		return "", err
+	}
+	defer client.Close()
+
+	if len(cpAccountAddress) > 0 {
+		cpAccount := common.HexToAddress(cpAccountAddress)
+		bytecode, err := client.CodeAt(context.Background(), cpAccount, nil)
+		if err != nil {
+			return "", fmt.Errorf("check cp account contract address failed, error: %v", err)
+		}
+
+		if len(bytecode) <= 0 {
+			return "", fmt.Errorf("the account parameter must be a cpAccount contract address")
+		}
+	}
+
+	sequencerStub, err := ecp.NewSequencerStub(client, ecp.WithSequencerPrivateKey(ki.PrivateKey), ecp.WithSequencerCpAccountAddress(cpAccountAddress))
+	if err != nil {
+		return "", err
+	}
+	return sequencerStub.Withdraw(withDrawAmount)
+}
+
+func (w *LocalWallet) CollateralWithdrawRequest(ctx context.Context, address string, amount string, cpAccountAddress string) (string, error) {
+	defer w.keystore.Close()
+	withDrawAmount, err := convertToWei(amount)
+	if err != nil {
+		return "", err
+	}
+
+	chainUrl, err := conf.GetRpcByNetWorkName()
+	if err != nil {
+		return "", err
+	}
+
+	ki, err := w.FindKey(address)
+	if err != nil {
+		return "", err
+	}
+	if ki == nil {
+		return "", xerrors.Errorf("the address: %s, private key %w,", address, ErrKeyInfoNotFound)
+	}
+
+	client, err := ethclient.Dial(chainUrl)
+	if err != nil {
+		return "", err
+	}
+	defer client.Close()
+
+	if len(cpAccountAddress) > 0 {
+		cpAccount := common.HexToAddress(cpAccountAddress)
+		bytecode, err := client.CodeAt(context.Background(), cpAccount, nil)
+		if err != nil {
+			return "", fmt.Errorf("check cp account contract address failed, error: %v", err)
+		}
+
+		if len(bytecode) <= 0 {
+			return "", fmt.Errorf("the account parameter must be a cpAccount contract address")
+		}
+	}
+
+	zkCollateral, err := ecp.NewCollateralStub(client, ecp.WithPrivateKey(ki.PrivateKey), ecp.WithCpAccountAddress(cpAccountAddress))
+	if err != nil {
+		return "", err
+	}
+	return zkCollateral.WithdrawRequest(withDrawAmount)
+}
+
+func (w *LocalWallet) CollateralWithdrawConfirm(ctx context.Context, address string, cpAccountAddress string) (string, error) {
+	defer w.keystore.Close()
+
+	chainUrl, err := conf.GetRpcByNetWorkName()
+	if err != nil {
+		return "", err
+	}
+
+	ki, err := w.FindKey(address)
+	if err != nil {
+		return "", err
+	}
+	if ki == nil {
+		return "", xerrors.Errorf("the address: %s, private key %w,", address, ErrKeyInfoNotFound)
+	}
+
+	client, err := ethclient.Dial(chainUrl)
+	if err != nil {
+		return "", err
+	}
+	defer client.Close()
+
+	if len(cpAccountAddress) > 0 {
+		cpAccount := common.HexToAddress(cpAccountAddress)
+		bytecode, err := client.CodeAt(context.Background(), cpAccount, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to check cp account contract address, error: %v", err)
+		}
+
+		if len(bytecode) <= 0 {
+			return "", fmt.Errorf("the account parameter must be a cpAccount contract address")
+		}
+	}
+
+	zkCollateral, err := ecp.NewCollateralStub(client, ecp.WithPrivateKey(ki.PrivateKey), ecp.WithCpAccountAddress(cpAccountAddress))
+	if err != nil {
+		return "", err
+	}
+	return zkCollateral.WithdrawConfirm()
+}
+
+func (w *LocalWallet) CollateralWithdrawView(ctx context.Context, cpAccountAddress string) (models.WithdrawRequest, error) {
+	defer w.keystore.Close()
+
+	var withdrawRequest models.WithdrawRequest
+	chainUrl, err := conf.GetRpcByNetWorkName()
+	if err != nil {
+		return withdrawRequest, err
+	}
+
+	client, err := ethclient.Dial(chainUrl)
+	if err != nil {
+		return withdrawRequest, err
+	}
+	defer client.Close()
+
+	if len(cpAccountAddress) > 0 {
+		cpAccount := common.HexToAddress(cpAccountAddress)
+		bytecode, err := client.CodeAt(context.Background(), cpAccount, nil)
+		if err != nil {
+			return withdrawRequest, fmt.Errorf("check cp account contract address failed, error: %v", err)
+		}
+
+		if len(bytecode) <= 0 {
+			return withdrawRequest, fmt.Errorf("the account parameter must be a cpAccount contract address")
+		}
+	}
+
+	zkCollateral, err := ecp.NewCollateralStub(client, ecp.WithCpAccountAddress(cpAccountAddress))
+	if err != nil {
+		return withdrawRequest, err
+	}
+
+	contractInfo, err := zkCollateral.ContractInfo()
+	if err != nil {
+		return withdrawRequest, err
+	}
+
+	withdrawRequest, err = zkCollateral.WithdrawView()
+	if err != nil {
+		return withdrawRequest, err
+	}
+	withdrawRequest.WithdrawDelay = contractInfo.WithdrawDelay
+	return withdrawRequest, nil
 }
 
 func (w *LocalWallet) CollateralSend(ctx context.Context, from, to string, amount string) (string, error) {

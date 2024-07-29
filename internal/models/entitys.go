@@ -30,8 +30,16 @@ func UbiTaskTypeStr(typeInt int) string {
 const (
 	TASK_RECEIVED_STATUS = iota + 1
 	TASK_RUNNING_STATUS
-	TASK_SUCCESS_STATUS
+	TASK_SUBMITTED_STATUS
 	TASK_FAILED_STATUS
+	TASK_VERIFIED_STATUS
+	TASK_INVALID_STATUS
+	TASK_VERIFYFAILED_STATUS
+	TASK_REWARDED_STATUS
+	TASK_TIMEOUT_STATUS
+	TASK_REPEATED_STATUS
+	TASK_NSC_STATUS
+	TASK_UNKNOWN_STATUS
 )
 
 func TaskStatusStr(status int) string {
@@ -41,57 +49,108 @@ func TaskStatusStr(status int) string {
 		statusStr = "received"
 	case TASK_RUNNING_STATUS:
 		statusStr = "running"
-	case TASK_SUCCESS_STATUS:
-		statusStr = "success"
+	case TASK_SUBMITTED_STATUS:
+		statusStr = "submitted"
 	case TASK_FAILED_STATUS:
 		statusStr = "failed"
+	case TASK_VERIFIED_STATUS:
+		statusStr = "verified"
+	case TASK_REWARDED_STATUS:
+		statusStr = "rewarded"
+	case TASK_INVALID_STATUS:
+		statusStr = "invalid"
+	case TASK_TIMEOUT_STATUS:
+		statusStr = "timeout"
+	case TASK_VERIFYFAILED_STATUS:
+		statusStr = "verifyFailed"
+	case TASK_REPEATED_STATUS:
+		statusStr = "repeated"
+	case TASK_NSC_STATUS:
+		statusStr = "NSC"
+	case TASK_UNKNOWN_STATUS:
+		statusStr = "unknown"
 	}
+
 	return statusStr
 }
 
 const (
-	SOURCE_TYPE_CPU = 0
-	SOURCE_TYPE_GPU = 1
+	RESOURCE_TYPE_CPU = 0
+	RESOURCE_TYPE_GPU = 1
 )
 
-func GetSourceTypeStr(resourceType int) string {
+func GetResourceTypeStr(resourceType int) string {
 	switch resourceType {
-	case SOURCE_TYPE_CPU:
+	case RESOURCE_TYPE_CPU:
 		return "CPU"
-	case SOURCE_TYPE_GPU:
+	case RESOURCE_TYPE_GPU:
 		return "GPU"
 	}
 	return ""
 }
 
-const (
-	REWARD_UNCLAIMED = iota
-	REWARD_CHALLENGED
-	REWARD_SLASHED
-	REWARD_CLAIMED
-)
-
 type TaskEntity struct {
-	Id           int64  `json:"id" gorm:"primaryKey;id"`
-	Type         int    `json:"type" gorm:"type"`
-	Name         string `json:"name" gorm:"name"`
-	Contract     string `json:"contract" gorm:"name"`
-	ResourceType int    `json:"resource_type" gorm:"resource_type"` // 1
-	InputParam   string `json:"input_param" gorm:"input_param"`
-	TxHash       string `json:"tx_hash" gorm:"tx_hash"`
-	RewardTx     string `json:"reward_tx"`
-	ChallengeTx  string `json:"challenge_tx"`
-	SlashTx      string `json:"slash_tx"`
-	Status       int    `json:"status" gorm:"status"`
-	RewardStatus int    `json:"reward_status" gorm:"status"` // 0: unclaimed; 1: challenged; 2: slashed; 3: claimed
-	Reward       string `json:"reward" gorm:"column:reward; default:0.0000"`
-	CreateTime   int64  `json:"create_time" gorm:"create_time"`
-	EndTime      int64  `json:"end_time" gorm:"end_time"`
-	Error        string `json:"error" gorm:"error"`
+	Id                 int64  `json:"id" gorm:"primaryKey;id"`
+	Type               int    `json:"type" gorm:"type"`
+	Name               string `json:"name" gorm:"name"`
+	Contract           string `json:"contract" gorm:"contract"`
+	ResourceType       int    `json:"resource_type" gorm:"resource_type"` // 1
+	InputParam         string `json:"input_param" gorm:"input_param"`
+	VerifyParam        string `json:"verify_param" gorm:"verify_param"`
+	TxHash             string `json:"tx_hash" gorm:"tx_hash"`
+	Status             int    `json:"status" gorm:"status"`
+	CreateTime         int64  `json:"create_time" gorm:"create_time"`
+	EndTime            int64  `json:"end_time" gorm:"end_time"`
+	Error              string `json:"error" gorm:"error"`
+	Deadline           int64  `json:"deadline"`
+	CheckCode          string `json:"check_code"`
+	BlockHash          string `json:"block_hash"`
+	Sign               string `json:"sign"`
+	Reward             string `json:"reward"`
+	SequenceCid        string `json:"sequence_cid"`
+	SettlementCid      string `json:"settlement_cid"`
+	SequenceTaskAddr   string `json:"sequence_task_addr"`
+	SettlementTaskAddr string `json:"settlement_task_addr"`
+	Sequencer          int    `json:"sequencer" gorm:"default:-1"`
+	Proof              string
 }
 
 func (task *TaskEntity) TableName() string {
 	return "t_task"
+}
+
+const (
+	All_FLAG         = -1
+	UN_DELETEED_FLAG = 0
+	DELETED_FLAG     = 1
+)
+
+const (
+	POD_UNKNOWN_STATUS = 0
+	POD_RUNNING_STATUS = 1
+	POD_DELETE_STATUS  = 2
+)
+
+const (
+	JOB_DEPLOY_STATUS     = 1
+	JOB_RUNNING_STATUS    = 2
+	JOB_TERMINATED_STATUS = 3
+	JOB_COMPLETED_STATUS  = 4
+)
+
+func GetJobStatus(status int) string {
+	var statusStr string
+	switch status {
+	case JOB_DEPLOY_STATUS:
+		statusStr = "deploying"
+	case JOB_RUNNING_STATUS:
+		statusStr = "running"
+	case JOB_TERMINATED_STATUS:
+		statusStr = "terminated"
+	case JOB_COMPLETED_STATUS:
+		statusStr = "completed"
+	}
+	return statusStr
 }
 
 const (
@@ -127,27 +186,34 @@ type JobEntity struct {
 	Id              int64  `json:"id" gorm:"primaryKey;autoIncrement"`
 	Source          string `json:"source" gorm:"source"` // market name
 	Name            string `json:"name" gorm:"name"`
-	SpaceUuid       string `json:"space_uuid"`
-	JobUuid         string `json:"job_uuid"`
-	TaskUuid        string `json:"task_uuid"`
-	ResourceType    string `json:"resource_type"`
-	SpaceType       int    `json:"space_type"` // 0: public; 1: private
+	SpaceUuid       string `json:"space_uuid" gorm:"space_uuid"`
+	JobUuid         string `json:"job_uuid" gorm:"job_uuid"`
+	TaskUuid        string `json:"task_uuid" gorm:"task_uuid"`
+	ResourceType    string `json:"resource_type"  gorm:"resource_type"`
+	SpaceType       int    `json:"space_type" gorm:"space_type"` // 0: public; 1: private
 	SourceUrl       string `json:"source_url" gorm:"source_url"`
 	Hardware        string `json:"hardware" gorm:"hardware"`
-	Duration        int    `json:"duration"`
+	Duration        int    `json:"duration" gorm:"duration"`
 	DeployStatus    int    `json:"deploy_status" gorm:"deploy_status"`
-	WalletAddress   string `json:"wallet_address"`
+	WalletAddress   string `json:"wallet_address"  gorm:"wallet_address"`
 	ResultUrl       string `json:"result_url" gorm:"result_url"`
-	RealUrl         string `json:"real_url"`
+	RealUrl         string `json:"real_url" gorm:"real_url"`
 	K8sDeployName   string `json:"k8s_deploy_name" gorm:"k8s_deploy_name"`
 	K8sResourceType string `json:"k8s_resource_type" gorm:"k8s_resource_type"`
 	NameSpace       string `json:"name_space" gorm:"name_space"`
 	ImageName       string `json:"image_name" gorm:"image_name"`
 	BuildLog        string `json:"build_log" gorm:"build_log"`
 	ContainerLog    string `json:"container_log" gorm:"container_log"`
+	Reward          string `json:"reward" gorm:"reward"`
 	ExpireTime      int64  `json:"expire_time" gorm:"expire_time"`
 	CreateTime      int64  `json:"create_time" gorm:"create_time"`
 	Error           string `json:"error" gorm:"error"`
+	DeleteAt        int    `json:"delete_at" gorm:"delete_at; default:0"` // 1 deleted
+	PodStatus       int    `json:"pod_status"`
+	Status          int    `json:"status"`
+	StartedBlock    uint64 `json:"started_block" gorm:"column:started_block;not null;default:0"`
+	ScannedBlock    uint64 `json:"scanned_block" gorm:"column:scanned_block;not null;default:0"`
+	EndedBlock      uint64 `json:"ended_block" gorm:"column:ended_block;not null;default:0"`
 }
 
 func (*JobEntity) TableName() string {
