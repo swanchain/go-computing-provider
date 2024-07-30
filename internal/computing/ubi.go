@@ -1139,10 +1139,14 @@ func syncTaskStatusForSequencerService() error {
 					}
 				} else {
 					switch t.Status {
-					case "verified":
-						status = models.TASK_VERIFIED_STATUS
+					case "received":
+						status = models.TASK_RECEIVED_STATUS
+					case "running":
+						status = models.TASK_RUNNING_STATUS
 					case "submitted":
 						status = models.TASK_SUBMITTED_STATUS
+					case "verified":
+						status = models.TASK_VERIFIED_STATUS
 					case "rewarded":
 						status = models.TASK_REWARDED_STATUS
 					case "invalid":
@@ -1153,6 +1157,8 @@ func syncTaskStatusForSequencerService() error {
 						status = models.TASK_TIMEOUT_STATUS
 					case "verifyFailed":
 						status = models.TASK_VERIFYFAILED_STATUS
+					case "failed":
+						status = models.TASK_FAILED_STATUS
 					default:
 						status = models.TASK_UNKNOWN_STATUS
 					}
