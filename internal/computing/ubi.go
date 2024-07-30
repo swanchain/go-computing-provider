@@ -612,7 +612,7 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		}
 
 		if err := NewDockerService().PullImage(ubiTaskImage); err != nil {
-			logs.GetLogger().Errorf("pull %s image failed, error: %v", ubiTaskImage, err)
+			logs.GetLogger().Errorf("failed to pull %s image, error: %v", ubiTaskImage, err)
 			return
 		}
 
@@ -668,6 +668,8 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		}
 
 		containerName := JobName + generateString(5)
+		logs.GetLogger().Warnf("task_id: %d, starting container, container name: %s", ubiTask.ID, containerName)
+
 		dockerService := NewDockerService()
 		if err = dockerService.ContainerCreateAndStart(containerConfig, hostConfig, containerName); err != nil {
 			logs.GetLogger().Errorf("create ubi task container failed, error: %v", err)
@@ -676,8 +678,10 @@ func DoUbiTaskForDocker(c *gin.Context) {
 
 		time.Sleep(3 * time.Second)
 		if !dockerService.IsExistContainer(containerName) {
+			logs.GetLogger().Warnf("task_id: %d, not found container", ubiTask.ID)
 			return
 		}
+		logs.GetLogger().Warnf("task_id: %d, started container, container name: %s", ubiTask.ID, containerName)
 
 		containerLogStream, err := dockerService.GetContainerLogStream(containerName)
 		if err != nil {
