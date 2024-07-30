@@ -8,10 +8,10 @@ A computing provider is an individual or organization that participates in the d
 As a resource provider, you can run a **ECP**(Edge Computing Provider) and **FCP**(Fog Computing Provider) to contribute yourcomputing resource.
 
 
- - **ECP (Edge Computing Provider)** specializes in processing data at the source of data generation, using minimal latency setups ideal for real-time applications. This provider handles specific, localized tasks directly on devices at the network’s edge, such as IoT devices. At the current stage, ECP supports the generation of **ZK-Snark proof of Filecoin network**, and more ZK proof types will be gradually supported, such as Aleo, Scroll, starkNet, etc. [Install Guideline](ubi/README.md)
+- **ECP (Edge Computing Provider)** specializes in processing data at the source of data generation, using minimal latency setups ideal for real-time applications. This provider handles specific, localized tasks directly on devices at the network’s edge, such as IoT devices. At the current stage, ECP supports the generation of **ZK-Snark proof of Filecoin network**, and more ZK proof types will be gradually supported, such as Aleo, Scroll, starkNet, etc. [Install Guideline](ubi/README.md)
 
 
- - **FCP (Fog Computing Provider)** Offers a layered network that extends cloud capabilities to the edge of the network, providing services such as AI model training and deployment. This provider utilizes infrastructure like Kubernetes (K8S) to support scalable, distributed computing tasks.  **FCP** will execute tasks assigned by Market Provider, like [Orchestrator](https://orchestrator.swanchain.io) on the [Swan chain](https://swanchain.io).
+- **FCP (Fog Computing Provider)** Offers a layered network that extends cloud capabilities to the edge of the network, providing services such as AI model training and deployment. This provider utilizes infrastructure like Kubernetes (K8S) to support scalable, distributed computing tasks.  **FCP** will execute tasks assigned by Market Provider, like [Orchestrator](https://orchestrator.swanchain.io) on the [Swan chain](https://swanchain.io).
 
 
 # Table of Content
@@ -20,28 +20,28 @@ As a resource provider, you can run a **ECP**(Edge Computing Provider) and **FCP
 	- [Run Edge Computing Provider](ubi/README.md)
 
 - As a FCP
- 	- [Prerequisites](#Prerequisites)
- 	- [Install the Kubernetes](#Install-the-Kubernetes)
- 		- [Install Container Runtime Environment](#install-Container-Runtime-Environment)
- 		- [Optional - Setup a docker registry server](#Optional-setup-a-Docker-Registry-Server)
+	- [Prerequisites](#Prerequisites)
+	- [Install the Kubernetes](#Install-the-Kubernetes)
+		- [Install Container Runtime Environment](#install-Container-Runtime-Environment)
+		- [Optional - Setup a docker registry server](#Optional-setup-a-Docker-Registry-Server)
 		- [Create a Kubernetes Cluster](#Create-a-Kubernetes-Cluster)
- 		- [Install the Network Plugin](#Install-the-Network-Plugin)
+		- [Install the Network Plugin](#Install-the-Network-Plugin)
 		- [Install the NVIDIA Plugin](#Install-the-NVIDIA-Plugin)
 		- [Install the Ingress-nginx Controller](#Install-the-Ingress-nginx-Controller)
- 	- [Install and config the Nginx](#Install-and-config-the-nginx)
- 	- [Install the Hardware resource-exporter](#Install-the-Hardware-resource-exporter)
- 	- [Build and config the Computing Provider](#Build-and-config-the-Computing-Provider)
- 	- [Install AI Inference Dependency(Optional)](#optional-Install-AI-Inference-Dependency)
- 	- [Config and Receive UBI Tasks(Optional)](#optional-Config-and-Receive-UBI-Tasks)
-	 - [Start the Computing Provider](#Start-the-Computing-Provider)
-	 - [CLI of Computing Provider](#CLI-of-Computing-Provider)
- 
+	- [Install and config the Nginx](#Install-and-config-the-nginx)
+	- [Install the Hardware resource-exporter](#Install-the-Hardware-resource-exporter)
+	- [Build and config the Computing Provider](#Build-and-config-the-Computing-Provider)
+	- [Install AI Inference Dependency(Optional)](#optional-Install-AI-Inference-Dependency)
+	- [Config and Receive UBI Tasks(Optional)](#optional-Config-and-Receive-UBI-Tasks)
+	- [Start the Computing Provider](#Start-the-Computing-Provider)
+	- [CLI of Computing Provider](#CLI-of-Computing-Provider)
+
 ## Prerequisites
 Before you install the Computing Provider, you need to know there are some resources required:
- - Possess a public IP
- - Have a domain name (*.example.com)
- - Have an SSL certificate
- - `Go` version must 1.21+, you can refer here:
+- Possess a public IP
+- Have a domain name (*.example.com)
+- Have an SSL certificate
+- `Go` version must 1.21+, you can refer here:
 
 ```bash
 wget -c https://golang.org/dl/go1.21.7.linux-amd64.tar.gz -O - | sudo tar -xz -C /usr/local
@@ -58,20 +58,20 @@ If you plan to run a Kubernetes cluster, you need to install a container runtime
 #### Option 1: Install the `Docker` and `cri-dockerd` （**Recommended**）
 To install the `Docker Container Runtime` and the `cri-dockerd`, follow the steps below:
 * Install the `Docker`:
-    - Please refer to the official documentation from [here](https://docs.docker.com/engine/install/).
+	- Please refer to the official documentation from [here](https://docs.docker.com/engine/install/).
 * Install `cri-dockerd`:
-    - `cri-dockerd` is a CRI (Container Runtime Interface) implementation for Docker. You can install it refer to [here](https://github.com/Mirantis/cri-dockerd).
+	- `cri-dockerd` is a CRI (Container Runtime Interface) implementation for Docker. You can install it refer to [here](https://github.com/Mirantis/cri-dockerd).
 
 #### Option 2: Install the `Docker` and the`Containerd`
 * Install the `Docker`:
-    - Please refer to the official documentation from [here](https://docs.docker.com/engine/install/).
+	- Please refer to the official documentation from [here](https://docs.docker.com/engine/install/).
 * To install `Containerd` on your system:
-  - `Containerd` is an industry-standard container runtime that can be used as an alternative to Docker. To install `containerd` on your system, follow the instructions on [getting started with containerd](https://github.com/containerd/containerd/blob/main/docs/getting-started.md).
+	- `Containerd` is an industry-standard container runtime that can be used as an alternative to Docker. To install `containerd` on your system, follow the instructions on [getting started with containerd](https://github.com/containerd/containerd/blob/main/docs/getting-started.md).
 
 ### Optional-Setup a docker registry server
 **If you are using the docker and you have only one node, the step can be skipped**.
 
-If you have deployed a Kubernetes cluster with multiple nodes, it is recommended to set up a **private Docker Registry** to allow other nodes to quickly pull images within the intranet. 
+If you have deployed a Kubernetes cluster with multiple nodes, it is recommended to set up a **private Docker Registry** to allow other nodes to quickly pull images within the intranet.
 
 * Create a directory `/docker_repo` on your docker server. It will be mounted on the registry container as persistent storage for our docker registry.
 ```bash
@@ -93,7 +93,7 @@ sudo docker run --detach \
 
 * Add the registry server to the node
 
- 	- If you have installed the `Docker` and `cri-dockerd`(**Option 1**), you can update every node's configuration:
+	- If you have installed the `Docker` and `cri-dockerd`(**Option 1**), you can update every node's configuration:
 
 
 	```bash
@@ -142,7 +142,7 @@ To create a Kubernetes cluster, you can use a container management tool like `ku
 
 * [Install the kubeadm toolbox](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/).
 
-* [Create a Kubernetes cluster with kubeadm](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/) 
+* [Create a Kubernetes cluster with kubeadm](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/)
 
 
 ### Install the Network Plugin
@@ -172,8 +172,8 @@ If you have installed it correctly, you can see the result shown in the figure b
 
 ![3](https://github.com/lagrangedao/go-computing-provider/assets/102578774/91ef353f-72af-41b2-82e8-061b92bfb999)
 
-**Note:** 
- - If you are a single-host Kubernetes cluster, remember to remove the taint mark, otherwise, the task can not be scheduled to it.
+**Note:**
+- If you are a single-host Kubernetes cluster, remember to remove the taint mark, otherwise, the task can not be scheduled to it.
 ```bash
 kubectl taint node ${nodeName}  node-role.kubernetes.io/control-plane:NoSchedule-
 ```
@@ -186,7 +186,7 @@ If your computing provider wants to provide a GPU resource, the NVIDIA Plugin sh
 
 * [Install NVIDIA Device Plugin for Kubernetes](https://github.com/NVIDIA/k8s-device-plugin#quick-start).
 
-If you have installed it correctly, you can see the result shown in the figure by the command 
+If you have installed it correctly, you can see the result shown in the figure by the command
 `kubectl get po -n kube-system`
 
 ![4](https://github.com/lagrangedao/go-computing-provider/assets/102578774/8209c589-d561-43ad-adea-5ecb52618909)
@@ -196,24 +196,24 @@ The `ingress-nginx` is an ingress controller for Kubernetes using `NGINX` as a r
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.7.1/deploy/static/provider/cloud/deploy.yaml
 ```
-If you have installed it correctly, you can see the result shown in the figure by the command: 
+If you have installed it correctly, you can see the result shown in the figure by the command:
 
- - Run `kubectl get po -n ingress-nginx`
+- Run `kubectl get po -n ingress-nginx`
 
 ![5](https://github.com/lagrangedao/go-computing-provider/assets/102578774/f3c0585a-df19-4971-91fe-d03365f4edee)
 
- - Run `kubectl get svc -n ingress-nginx`
+- Run `kubectl get svc -n ingress-nginx`
 
 ![6](https://github.com/lagrangedao/go-computing-provider/assets/102578774/e3b3dadc-77c1-4dc0-843c-5b946e252b65)
 
 ### Install and config the Nginx
- -  Install `Nginx` service to the Server
+-  Install `Nginx` service to the Server
 ```bash
 sudo apt update
 sudo apt install nginx
 ```
- -  Add a configuration for your Domain name
-Assume your domain name is `*.example.com`
+-  Add a configuration for your Domain name
+   Assume your domain name is `*.example.com`
 ```
 vi /etc/nginx/conf.d/example.conf
 ```
@@ -247,24 +247,24 @@ server {
 }
 ```
 
- - **Note:** 
+- **Note:**
 
-	 - `server_name`: a generic domain name
+	- `server_name`: a generic domain name
 
-	 - `ssl_certificate` and `ssl_certificate_key`: certificate for https.
+	- `ssl_certificate` and `ssl_certificate_key`: certificate for https.
 
-	 - `proxy_pass`:  The port should be the Intranet port corresponding to `ingress-nginx-controller` service port 80
+	- `proxy_pass`:  The port should be the Intranet port corresponding to `ingress-nginx-controller` service port 80
 
- - Reload the `Nginx` config
-	```bash
-	sudo nginx -s reload
-	```
- - Map your "catch-all (wildcard) subdomain(*.example.com)" to a public IP address
+- Reload the `Nginx` config
+  ```bash
+  sudo nginx -s reload
+  ```
+- Map your "catch-all (wildcard) subdomain(*.example.com)" to a public IP address
 
 
 
 ### Install the Hardware resource-exporter
- The `resource-exporter` plugin is developed to collect the node resource constantly, computing provider will report the resource to the Lagrange Auction Engine to match the space requirement. To get the computing task, every node in the cluster must install the plugin. You just need to run the following command:
+The `resource-exporter` plugin is developed to collect the node resource constantly, computing provider will report the resource to the Lagrange Auction Engine to match the space requirement. To get the computing task, every node in the cluster must install the plugin. You just need to run the following command:
 
 ```bash
 cat <<EOF | kubectl apply -f -
@@ -292,6 +292,7 @@ spec:
           privileged: true
 EOF
 ```
+
 If you have installed it correctly, you can see the result shown in the figure by the command:
 `kubectl get po -n kube-system`
 
@@ -299,9 +300,9 @@ If you have installed it correctly, you can see the result shown in the figure b
 
 ## Build and config the Computing Provider
 
- - Build the Computing Provider 
+- Build the Computing Provider
 
-	Firstly, clone the code to your local:
+  Firstly, clone the code to your local:
 ```bash
 git clone https://github.com/swanchain/go-computing-provider.git
 cd go-computing-provider
@@ -321,17 +322,17 @@ make install
 > make install
 > ```
 
-## Initialize CP repo and Update Configuration 
+## Initialize CP repo and Update Configuration
 1. Initialize repo
     ```
     computing-provider init --multi-address=/ip4/<YOUR_PUBLIC_IP>/tcp/<YOUR_PORT> --node-name=<YOUR_NODE_NAME>
     ```
-    **Note:**
-    - By default, the CP's repo is `~/.swan/computing`, you can configure it by `export CP_PATH="<YOUR_CP_PATH>"`
-    - The CP service port (`8085` by default) must be mapped to the public IP address and port
+   **Note:**
+	- By default, the CP's repo is `~/.swan/computing`, you can configure it by `export CP_PATH="<YOUR_CP_PATH>"`
+	- The CP service port (`8085` by default) must be mapped to the public IP address and port
 2. Update `config.toml`
 
-    Edit the necessary configuration files according to your deployment requirements. 
+   Edit the necessary configuration files according to your deployment requirements.
 
     ```toml
        [API]
@@ -371,7 +372,7 @@ make install
        SWAN_CHAIN_RPC = "https://mainnet-rpc01.swanchain.io"     # Swan chain RPC
     ```
 
-**Note:**  
+**Note:**
 * Example `[api].WalletWhiteList` hosted on GitHub can be found [here](https://raw.githubusercontent.com/swanchain/market-providers/main/clients/whitelist.txt).
 * Example `[api].WalletBlackList` hosted on GitHub can be found [here](https://raw.githubusercontent.com/swanchain/market-providers/main/clients/blacklist.txt).
 
@@ -381,12 +382,12 @@ make install
 	```bash
 	computing-provider wallet new
 	```
-	
+
 	Example output:
 	```
 	0x7791f48931DB81668854921fA70bFf0eB85B8211
 	```
-	
+
 	**or** import your wallet:
 	```bash
 	# Import wallet using the private key
@@ -447,16 +448,16 @@ export CP_PATH=<YOUR_CP_PATH>
 ## [**OPTIONAL**] Config and Receive UBI Tasks
 ### **Step 1: Prerequisites:** Perform Filecoin Commit2 (fil-c2) ZK tasks.
 1. Download parameters (specify the path with PARENT_PATH variable):
-	```bash
-	# At least 200G storage is needed
-	export PARENT_PATH="<V28_PARAMS_PATH>"
-	
-	# 512MiB parameters
-	curl -fsSL https://raw.githubusercontent.com/swanchain/go-computing-provider/releases/ubi/fetch-param-512.sh | bash
-	
-	# 32GiB parameters
-	curl -fsSL https://raw.githubusercontent.com/swanchain/go-computing-provider/releases/ubi/fetch-param-32.sh | bash
-	```
+   ```bash
+   # At least 200G storage is needed
+   export PARENT_PATH="<V28_PARAMS_PATH>"
+   
+   # 512MiB parameters
+   curl -fsSL https://raw.githubusercontent.com/swanchain/go-computing-provider/releases/ubi/fetch-param-512.sh | bash
+   
+   # 32GiB parameters
+   curl -fsSL https://raw.githubusercontent.com/swanchain/go-computing-provider/releases/ubi/fetch-param-32.sh | bash
+   ```
 2. Configure environment variables in `fil-c2.env` under CP repo (`$CP_PATH`):
 
     ```bash
@@ -491,10 +492,10 @@ Example output:
 computing-provider account changeTaskTypes --ownerAddress <YOUR_OWNER_WALLET_ADDRESS> 1,2,3,4
 ```
 **Note:** `--task-types` Supports 4 task types:
- - `1`: FIL-C2-512M
- - `2`: Aleo
- - `3`: AI
- - `4`: FIL-C2-32G
+- `1`: FIL-C2-512M
+- `2`: Aleo
+- `3`: AI
+- `4`: FIL-C2-32G
 
 If you need to run FCP and ECP at the same time, you need to set it to `1,2,3,4`
 
