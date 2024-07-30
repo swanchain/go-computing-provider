@@ -6,11 +6,10 @@ import (
 )
 
 type VisualTable struct {
-	Header     []string
-	Data       [][]string
-	RowColor   []RowColor
-	WrapText   bool
-	WhiteSpace bool
+	Header   []string
+	Data     [][]string
+	RowColor []RowColor
+	WrapText bool
 }
 
 type RowColor struct {
@@ -22,21 +21,15 @@ type RowColor struct {
 func NewVisualTable(header []string, data [][]string, rowColor []RowColor) *VisualTable {
 
 	return &VisualTable{
-		Header:     header,
-		Data:       data,
-		RowColor:   rowColor,
-		WrapText:   true,
-		WhiteSpace: true,
+		Header:   header,
+		Data:     data,
+		RowColor: rowColor,
+		WrapText: true,
 	}
 }
 
 func (v *VisualTable) SetAutoWrapText(wrapText bool) *VisualTable {
 	v.WrapText = wrapText
-	return v
-}
-
-func (v *VisualTable) SetNoWhiteSpace(whiteSpace bool) *VisualTable {
-	v.WhiteSpace = whiteSpace
 	return v
 }
 
@@ -75,6 +68,6 @@ func (v *VisualTable) Generate(formatHeaders bool) {
 	table.SetRowSeparator("")
 	table.SetBorder(false)
 	table.SetTablePadding("\t")
-	table.SetNoWhiteSpace(v.WhiteSpace)
+	table.SetNoWhiteSpace(true)
 	table.Render()
 }
