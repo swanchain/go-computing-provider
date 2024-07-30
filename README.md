@@ -289,7 +289,7 @@ spec:
         image: filswan/resource-exporter:v11.2.8
         imagePullPolicy: IfNotPresent
         securityContext:
-      	  privileged: true
+          privileged: true
 EOF
 ```
 If you have installed it correctly, you can see the result shown in the figure by the command:
