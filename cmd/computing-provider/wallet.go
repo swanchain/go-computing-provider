@@ -598,7 +598,7 @@ var collateralWithDrawViewCmd = &cli.Command{
 		taskData = append(taskData, []string{"Confirmable Block:", appendWhiteSpace(confirmableBlockStr)})
 
 		header := []string{"Withdraw View:"}
-		NewVisualTable(header, taskData, []RowColor{}).SetAutoWrapText(false).Generate(false)
+		NewVisualTable(header, taskData, []RowColor{}).SetNoWhiteSpace(false).Generate(false)
 
 		return nil
 	},
