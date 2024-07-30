@@ -1,6 +1,7 @@
 package computing
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 
@@ -21,14 +22,14 @@ type StorageService struct {
 	mcsClient      *user.McsClient
 }
 
-func NewStorageService() *StorageService {
+func NewStorageService() (*StorageService, error) {
+	var err error
 	storageOnce.Do(func() {
 		storage = &StorageService{
 			McsApiKey:  conf.GetConfig().MCS.ApiKey,
 			NetWork:    conf.GetConfig().MCS.Network,
 			BucketName: conf.GetConfig().MCS.BucketName,
 		}
-		var err error
 		var mcsClient *user.McsClient
 
 		if storage.McsAccessToken != "" {
@@ -36,15 +37,13 @@ func NewStorageService() *StorageService {
 		} else {
 			mcsClient, err = user.LoginByApikeyV2(storage.McsApiKey, storage.NetWork)
 		}
-
 		if err != nil {
-			logs.GetLogger().Errorf("Failed creating mcsClient, error: %v", err)
-			return
+			err = fmt.Errorf("failed to create mcsClient, error: %v", err)
 		}
 		storage.mcsClient = mcsClient
 	})
 
-	return storage
+	return storage, err
 }
 
 func (storage *StorageService) UploadFileToBucket(objectName, filePath string, replace bool) (*bucket.OssFile, error) {

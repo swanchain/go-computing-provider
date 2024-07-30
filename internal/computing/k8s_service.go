@@ -346,7 +346,7 @@ func (s *K8sService) StatisticalSources(ctx context.Context) ([]*models.NodeReso
 
 	nodeGpuInfoMap, err := s.GetResourceExporterPodLog(ctx)
 	if err != nil {
-		logs.GetLogger().Errorf("Collect cluster gpu info Failed, if have available gpu, please check resource-exporter. error: %+v", err)
+		logs.GetLogger().Errorf("failed to collect cluster gpu info, if have available gpu, please check resource-exporter. error: %+v", err)
 	}
 
 	for _, node := range nodes.Items {

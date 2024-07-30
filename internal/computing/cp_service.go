@@ -5,24 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
-	"github.com/gorilla/websocket"
-	"github.com/swanchain/go-computing-provider/build"
-	"github.com/swanchain/go-computing-provider/conf"
-	"github.com/swanchain/go-computing-provider/constants"
-	"github.com/swanchain/go-computing-provider/internal/contract"
-	"github.com/swanchain/go-computing-provider/internal/models"
-	"github.com/swanchain/go-computing-provider/util"
 	"io"
-	batchv1 "k8s.io/api/batch/v1"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"math/rand"
 	"net/http"
 	"os"
@@ -31,6 +14,26 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
+	"github.com/swanchain/go-computing-provider/build"
+	"github.com/swanchain/go-computing-provider/conf"
+	"github.com/swanchain/go-computing-provider/constants"
+	"github.com/swanchain/go-computing-provider/internal/contract"
+	"github.com/swanchain/go-computing-provider/internal/contract/fcp"
+	"github.com/swanchain/go-computing-provider/internal/models"
+	"github.com/swanchain/go-computing-provider/util"
+	batchv1 "k8s.io/api/batch/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 func GetServiceProviderInfo(c *gin.Context) {
@@ -137,7 +140,17 @@ func ReceiveJob(c *gin.Context) {
 			return
 		}
 		if job.SpaceUuid != "" {
-			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid)
+			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid, models.JOB_TERMINATED_STATUS)
+		}
+
+		var currentBlockNumber uint64
+		for i := 0; i < 5; i++ {
+			currentBlockNumber, err = getChainBlockNumber()
+			if err != nil {
+				logs.GetLogger().Errorf("failed to get blockNumber, error: %v", err)
+				time.Sleep(time.Second)
+				continue
+			}
 		}
 
 		var jobEntity = new(models.JobEntity)
@@ -153,23 +166,44 @@ func ReceiveJob(c *gin.Context) {
 		jobEntity.DeployStatus = models.DEPLOY_RECEIVE_JOB
 		jobEntity.CreateTime = time.Now().Unix()
 		jobEntity.ExpireTime = time.Now().Unix() + int64(jobData.Duration)
+		jobEntity.StartedBlock = conf.GetConfig().CONTRACT.JobManagerCreated
+		jobEntity.ScannedBlock = currentBlockNumber
 		err = NewJobService().SaveJobEntity(jobEntity)
 		if err != nil {
-			logs.GetLogger().Errorf("spaceUuid: %s, save job to db failed, error: %+v", spaceUuid, err)
+			logs.GetLogger().Errorf("failed to save job to db, spaceUuid: %s, error: %+v", spaceUuid, err)
 		}
 
 		go func() {
 			if err = submitJob(&jobData); err != nil {
-				logs.GetLogger().Errorf("upload job data to MCS failed, jobUuid: %s, spaceUuid: %s, error: %v", jobData.UUID, spaceUuid, err)
+				logs.GetLogger().Errorf("failed to upload job data to MCS, jobUuid: %s, spaceUuid: %s, error: %v", jobData.UUID, spaceUuid, err)
 				return
 			}
-			logs.GetLogger().Infof("jobuuid: %s successfully uploaded to MCS", jobData.UUID)
+			logs.GetLogger().Infof("successfully uploaded to MCS, jobuuid: %s", jobData.UUID)
 		}()
 
 		DeploySpaceTask(jobData.JobSourceURI, hostName, jobData.Duration, jobData.UUID, jobData.TaskUUID, gpuProductName)
 	}()
 
 	c.JSON(http.StatusOK, util.CreateSuccessResponse(jobData))
+}
+
+func getChainBlockNumber() (uint64, error) {
+	var currentBlockNumber uint64
+	chainUrl, err := conf.GetRpcByNetWorkName()
+	if err != nil {
+		return 0, err
+	}
+	client, err := ethclient.Dial(chainUrl)
+	if err != nil {
+		return 0, err
+	}
+	defer client.Close()
+
+	currentBlockNumber, err = client.BlockNumber(context.Background())
+	if err != nil {
+		return 0, err
+	}
+	return currentBlockNumber, nil
 }
 
 func submitJob(jobData *models.JobData) error {
@@ -201,7 +235,10 @@ func submitJob(jobData *models.JobData) error {
 
 	var resultMcsUrl string
 	for i := 0; i < 5; i++ {
-		storageService := NewStorageService()
+		storageService, err := NewStorageService()
+		if err != nil {
+			return err
+		}
 		mcsOssFile, err := storageService.UploadFileToBucket(jobDetailFile, taskDetailFilePath, true)
 		if err != nil {
 			logs.GetLogger().Errorf("upload file to bucket failed, error: %v", err)
@@ -295,7 +332,7 @@ func RedeployJob(c *gin.Context) {
 			return
 		}
 		if job.SpaceUuid != "" {
-			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid)
+			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid, models.JOB_TERMINATED_STATUS)
 		}
 
 		var jobEntity = new(models.JobEntity)
@@ -310,15 +347,16 @@ func RedeployJob(c *gin.Context) {
 		jobEntity.DeployStatus = models.DEPLOY_RECEIVE_JOB
 		jobEntity.CreateTime = time.Now().Unix()
 		jobEntity.ExpireTime = time.Now().Unix() + int64(jobData.Duration)
+		jobEntity.StartedBlock = conf.GetConfig().CONTRACT.JobManagerCreated
 		NewJobService().SaveJobEntity(jobEntity)
 
 		go func() {
 			if err = submitJob(&jobData); err != nil {
-				logs.GetLogger().Errorf("upload job data to MCS failed, jobUuid: %s, spaceUuid: %s, error: %v",
+				logs.GetLogger().Errorf("failed to upload job data to MCS, jobUuid: %s, spaceUuid: %s, error: %v",
 					jobData.UUID, spaceUuid, err)
 				return
 			}
-			logs.GetLogger().Infof("jobuuid: %s successfully uploaded to MCS", jobData.UUID)
+			logs.GetLogger().Infof("successfully uploaded to MCS, jobuuid: %s", jobData.UUID)
 		}()
 
 		DeploySpaceTask(jobData.JobSourceURI, hostName, jobData.Duration, jobData.UUID, jobData.TaskUUID, gpuProductName)
@@ -361,13 +399,19 @@ func ReNewJob(c *gin.Context) {
 		c.JSON(http.StatusOK, util.CreateErrorResponse(util.BadParamError, "The job was terminated due to its expiration date"))
 		return
 	} else {
-		jobEntity.ExpireTime = time.Now().Unix() + leftTime + int64(jobData.Duration)
+		if getJobExpiredTime(jobEntity) <= 0 {
+			jobEntity.ExpireTime = time.Now().Unix() + leftTime + int64(jobData.Duration)
+		} else {
+			jobEntity.ExpireTime = getJobExpiredTime(jobEntity)
+		}
+
 		err = NewJobService().SaveJobEntity(&jobEntity)
 		if err != nil {
 			logs.GetLogger().Errorf("update job expireTime failed, taskUuid: %s, error: %+v", jobData.TaskUuid, err)
 			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SaveJobEntityError))
 			return
 		}
+
 	}
 	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
 }
@@ -431,7 +475,7 @@ func CancelJob(c *gin.Context) {
 		}()
 		k8sNameSpace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(jobEntity.WalletAddress)
 		deleteJob(k8sNameSpace, jobEntity.SpaceUuid, "")
-		NewJobService().DeleteJobEntityBySpaceUuId(jobEntity.SpaceUuid)
+		NewJobService().DeleteJobEntityBySpaceUuId(jobEntity.SpaceUuid, models.JOB_TERMINATED_STATUS)
 	}()
 
 	c.JSON(http.StatusOK, util.CreateSuccessResponse("deleted success"))
@@ -521,8 +565,7 @@ func StatisticalSources(c *gin.Context) {
 	location, err := getLocation()
 	if err != nil {
 		logs.GetLogger().Error(err)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.GetLocationError))
-		return
+		location = "-"
 	}
 
 	k8sService := NewK8sService()
@@ -793,8 +836,8 @@ func DeploySpaceTask(jobSourceURI, hostName string, duration int, jobUuid string
 	defer func() {
 		if !success {
 			k8sNameSpace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(walletAddress)
-			deleteJob(k8sNameSpace, spaceUuid, "deploy space failed")
-			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid)
+			deleteJob(k8sNameSpace, spaceUuid, "failed to deploy space")
+			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid, models.JOB_TERMINATED_STATUS)
 		}
 
 		if err := recover(); err != nil {
@@ -1378,4 +1421,38 @@ func CheckWalletBlackList(jobSourceURI string) bool {
 		}
 	}
 	return false
+}
+
+func getJobExpiredTime(jobEntity models.JobEntity) int64 {
+	var expiredTime = jobEntity.ExpireTime
+	var taskInfoOnChain models.TaskInfoOnChain
+	var err error
+
+	for i := 0; i < 5; i++ {
+		taskInfoOnChain, err = getJobOnChain(jobEntity.TaskUuid)
+		if err != nil {
+			time.Sleep(5 * time.Second)
+			continue
+		}
+		break
+	}
+	expiredTime = taskInfoOnChain.StartTimestamp + taskInfoOnChain.Duration
+	return expiredTime
+}
+
+func getJobOnChain(taskUuid string) (models.TaskInfoOnChain, error) {
+	chainRpc, err := conf.GetRpcByNetWorkName()
+	if err != nil {
+		return models.TaskInfoOnChain{}, err
+	}
+	client, err := ethclient.Dial(chainRpc)
+	if err != nil {
+		return models.TaskInfoOnChain{}, fmt.Errorf("failed to rpc, error: %v", err)
+	}
+	defer client.Close()
+	taskManagerStub, err := fcp.NewTaskManagerStub(client)
+	if err != nil {
+		return models.TaskInfoOnChain{}, err
+	}
+	return taskManagerStub.GetTaskInfo(taskUuid)
 }

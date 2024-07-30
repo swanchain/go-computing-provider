@@ -5,13 +5,18 @@ import (
 	"context"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/swanchain/go-computing-provider/conf"
+	"github.com/swanchain/go-computing-provider/internal/computing"
 	"github.com/swanchain/go-computing-provider/wallet"
 	"github.com/urfave/cli/v2"
+	"math/big"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
+	"time"
 )
 
 var walletCmd = &cli.Command{
@@ -303,6 +308,9 @@ var collateralCmd = &cli.Command{
 		collateralAddCmd,
 		collateralSendCmd,
 		collateralWithdrawCmd,
+		collateralWithDrawRequestCmd,
+		collateralWithDrawConfirmCmd,
+		collateralWithDrawViewCmd,
 	},
 	Before: func(c *cli.Context) error {
 		cpRepoPath, _ := os.LookupEnv("CP_PATH")
@@ -340,8 +348,9 @@ var collateralAddCmd = &cli.Command{
 
 		fcpCollateral := cctx.Bool("fcp")
 		ecpCollateral := cctx.Bool("ecp")
+
 		if !fcpCollateral && !ecpCollateral {
-			return fmt.Errorf("must specify one of fcp or ecp")
+			return fmt.Errorf("must specify one of fcp or ecp or sequencer")
 		}
 		var collateralType string
 		if fcpCollateral {
@@ -371,7 +380,12 @@ var collateralAddCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		fmt.Printf("collateral TX: %s \n", txHash)
+
+		if collateralType == "sequencer" {
+			fmt.Printf("Transfer to Sequencer Account Tx Hash: %s \n", txHash)
+		} else {
+			fmt.Printf("collateral TX Hash: %s \n", txHash)
+		}
 		return nil
 	},
 }
@@ -403,6 +417,7 @@ var collateralWithdrawCmd = &cli.Command{
 
 		fcpCollateral := cctx.Bool("fcp")
 		ecpCollateral := cctx.Bool("ecp")
+
 		if !fcpCollateral && !ecpCollateral {
 			return fmt.Errorf("must specify one of fcp or ecp")
 		}
@@ -434,6 +449,157 @@ var collateralWithdrawCmd = &cli.Command{
 			return err
 		}
 		fmt.Println(txHash)
+		return nil
+	},
+}
+
+var collateralWithDrawRequestCmd = &cli.Command{
+	Name:  "withdraw-request",
+	Usage: "Send a request to withdraw tokens from the collateral escrow account from the collateral contract",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "owner",
+			Usage: "Specify the owner address",
+		},
+		&cli.StringFlag{
+			Name:  "account",
+			Usage: "Specify the cp account address, if not specified, cp account is the content of the account file under the CP_PATH variable",
+		},
+	},
+	ArgsUsage: "[amount]",
+	Action: func(cctx *cli.Context) error {
+		ctx := reqContext(cctx)
+
+		ownerAddress := cctx.String("owner")
+		if strings.TrimSpace(ownerAddress) == "" {
+			return fmt.Errorf("the owner address is required")
+		}
+
+		cpAccountAddress := cctx.String("account")
+		amount := cctx.Args().Get(0)
+		if strings.TrimSpace(amount) == "" {
+			return fmt.Errorf("the amount param is required")
+		}
+
+		localWallet, err := wallet.SetupWallet(wallet.WalletRepo)
+		if err != nil {
+			return err
+		}
+		txHash, err := localWallet.CollateralWithdrawRequest(ctx, ownerAddress, amount, cpAccountAddress)
+		if err != nil {
+			return err
+		}
+		fmt.Println(txHash)
+		return nil
+	},
+}
+
+var collateralWithDrawConfirmCmd = &cli.Command{
+	Name:  "withdraw-confirm",
+	Usage: "Confirm a request to withdraw tokens from the collateral escrow account from the collateral contract",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "owner",
+			Usage: "Specify the owner address",
+		},
+		&cli.StringFlag{
+			Name:  "account",
+			Usage: "Specify the cp account address, if not specified, cp account is the content of the account file under the CP_PATH variable",
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+		ctx := reqContext(cctx)
+
+		ownerAddress := cctx.String("owner")
+		if strings.TrimSpace(ownerAddress) == "" {
+			return fmt.Errorf("the owner address is required")
+		}
+
+		cpAccountAddress := cctx.String("account")
+
+		localWallet, err := wallet.SetupWallet(wallet.WalletRepo)
+		if err != nil {
+			return err
+		}
+		txHash, err := localWallet.CollateralWithdrawConfirm(ctx, ownerAddress, cpAccountAddress)
+		if err != nil {
+			return err
+		}
+		fmt.Println(txHash)
+		return nil
+	},
+}
+
+var collateralWithDrawViewCmd = &cli.Command{
+	Name:  "withdraw-view",
+	Usage: "View a request to withdraw tokens from the collateral escrow account from the collateral contract",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "account",
+			Usage: "Specify the cp account address, if not specified, cp account is the content of the account file under the CP_PATH variable",
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+		ctx := reqContext(cctx)
+		cpAccountAddress := cctx.String("account")
+
+		localWallet, err := wallet.SetupWallet(wallet.WalletRepo)
+		if err != nil {
+			return err
+		}
+		withdrawView, err := localWallet.CollateralWithdrawView(ctx, cpAccountAddress)
+		if err != nil {
+			return err
+		}
+
+		chainRpc, err := conf.GetRpcByNetWorkName()
+		if err != nil {
+			return err
+		}
+		client, err := ethclient.Dial(chainRpc)
+		if err != nil {
+			return err
+		}
+		defer client.Close()
+		latestBlockNumber, _ := client.BlockNumber(ctx)
+
+		var amount = "0.0000"
+		var requestBlock int64
+		var confirmableBlock int64
+		var confirmableBlockStr string
+		if withdrawView.RequestBlock != 0 {
+			amount = withdrawView.Amount
+			requestBlock = withdrawView.RequestBlock
+			confirmableBlock = withdrawView.RequestBlock + withdrawView.WithdrawDelay
+
+			var secondFlag int64 = 2
+			chainId, err := client.ChainID(context.Background())
+			if err != nil {
+				return fmt.Errorf("failed to get chain id, error: %v", err)
+			}
+			if chainId.Int64() == 254 {
+				secondFlag = 5
+			}
+
+			block, err := client.HeaderByNumber(context.Background(), big.NewInt(withdrawView.RequestBlock))
+			if err != nil {
+				return fmt.Errorf("failed to get block time, block: %d, error: %v", withdrawView.RequestBlock, err)
+			}
+
+			currentTime := time.Unix(int64(block.Time)+withdrawView.WithdrawDelay*secondFlag, 0)
+			timeStr := currentTime.Format("2006-01-02T15:04:05")
+			timeZone, _ := currentTime.Zone()
+			confirmableBlockStr = fmt.Sprintf("%d\u200B(%s+\u200B%s)", confirmableBlock, timeStr, timeZone)
+		}
+		var taskData [][]string
+		taskData = append(taskData, []string{"Amount(SWANC):", amount})
+		taskData = append(taskData, []string{"Latest Block:", strconv.FormatUint(latestBlockNumber, 10)})
+		taskData = append(taskData, []string{"Request Block:", strconv.Itoa(int(requestBlock))})
+		taskData = append(taskData, []string{"Confirmable Block:", confirmableBlockStr})
+
+		header := []string{"Withdraw View:"}
+		NewVisualTable(header, taskData, []RowColor{}).SetAutoWrapText(false).Generate(false)
+
 		return nil
 	},
 }
@@ -474,6 +640,120 @@ var collateralSendCmd = &cli.Command{
 			return err
 		}
 		txHash, err := localWallet.CollateralSend(ctx, from, to, amount)
+		if err != nil {
+			return err
+		}
+		fmt.Println(txHash)
+		return nil
+	},
+}
+
+var sequencerCmd = &cli.Command{
+	Name:      "sequencer",
+	Usage:     "Manage the sequencer account",
+	ArgsUsage: "[fromAddress] [amount]",
+	Subcommands: []*cli.Command{
+		sequencerTokenCmd,
+		sequencerAddCmd,
+		sequencerWithdrawCmd,
+	},
+	Before: func(c *cli.Context) error {
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
+		if err := conf.InitConfig(cpRepoPath, true); err != nil {
+			return err
+		}
+		return nil
+	},
+}
+
+var sequencerTokenCmd = &cli.Command{
+	Name:  "token",
+	Usage: "Print the token of sequencer service",
+	Action: func(cctx *cli.Context) error {
+		token, err := computing.GetToken()
+		if err != nil {
+			return err
+		}
+		fmt.Println(token)
+		return nil
+	},
+}
+
+var sequencerAddCmd = &cli.Command{
+	Name:  "add",
+	Usage: "Send the amount to the sequencer contract address",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "from",
+			Usage: "Specify the wallet address, if the fcp is true, --form must specify the owner wallet address",
+		},
+		&cli.StringFlag{
+			Name:  "account",
+			Usage: "Specify the cp account address, if not specified, cp account is the content of the account file under the CP_PATH variable",
+		},
+	},
+	ArgsUsage: "[amount]",
+	Action: func(cctx *cli.Context) error {
+		ctx := reqContext(cctx)
+
+		fromAddress := cctx.String("from")
+		if strings.TrimSpace(fromAddress) == "" {
+			return fmt.Errorf("the wallet address is required")
+		}
+
+		cpAccountAddress := cctx.String("account")
+
+		amount := cctx.Args().Get(0)
+		if strings.TrimSpace(amount) == "" {
+			return fmt.Errorf("failed to get amount: %s", amount)
+		}
+
+		localWallet, err := wallet.SetupWallet(wallet.WalletRepo)
+		if err != nil {
+			return err
+		}
+		txHash, err := localWallet.SequencerDeposit(ctx, fromAddress, amount, cpAccountAddress)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Transfer to Sequencer Account Tx Hash: %s \n", txHash)
+		return nil
+	},
+}
+
+var sequencerWithdrawCmd = &cli.Command{
+	Name:  "withdraw",
+	Usage: "Withdraw funds from the sequencer contract",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "owner",
+			Usage: "Specify the owner address",
+		},
+		&cli.StringFlag{
+			Name:  "account",
+			Usage: "Specify the cp account address, if not specified, cp account is the content of the account file under the CP_PATH variable",
+		},
+	},
+	ArgsUsage: "[amount]",
+	Action: func(cctx *cli.Context) error {
+		ctx := reqContext(cctx)
+
+		ownerAddress := cctx.String("owner")
+		if strings.TrimSpace(ownerAddress) == "" {
+			return fmt.Errorf("the owner address is required")
+		}
+
+		cpAccountAddress := cctx.String("account")
+		amount := cctx.Args().Get(0)
+		if strings.TrimSpace(amount) == "" {
+			return fmt.Errorf("the amount param is required")
+		}
+
+		localWallet, err := wallet.SetupWallet(wallet.WalletRepo)
+		if err != nil {
+			return err
+		}
+		txHash, err := localWallet.SequencerWithdraw(ctx, ownerAddress, amount, cpAccountAddress)
 		if err != nil {
 			return err
 		}

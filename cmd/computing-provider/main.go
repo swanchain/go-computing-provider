@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/mitchellh/go-homedir"
 	"github.com/swanchain/go-computing-provider/build"
+	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/db"
 	"github.com/urfave/cli/v2"
 	"os"
@@ -39,6 +40,7 @@ func main() {
 			taskCmd,
 			walletCmd,
 			collateralCmd,
+			sequencerCmd,
 			ubiTaskCmd,
 			contractCmd,
 		},
@@ -53,7 +55,7 @@ func main() {
 					if _, err := os.Stat(cpRepoPath); os.IsNotExist(err) {
 						err := os.MkdirAll(cpRepoPath, 0755)
 						if err != nil {
-							return fmt.Errorf("create cp repo failed, error: %v", cpRepoPath)
+							return fmt.Errorf("failed to create cp repo, error: %v", cpRepoPath)
 						}
 					}
 				}
@@ -63,7 +65,12 @@ func main() {
 				return fmt.Errorf("CP_PATH: %s, no such directory", cpRepoPath)
 			}
 			os.Setenv("CP_PATH", cpRepoPath)
-			db.InitDb(cpRepoPath)
+			if !strings.EqualFold(c.Args().First(), initCmd.Name) {
+				if !conf.Exists(cpRepoPath) {
+					return fmt.Errorf("repo at '%s' not exist, please initialize it", cpRepoPath)
+				}
+				db.InitDb(cpRepoPath)
+			}
 
 			return nil
 		},

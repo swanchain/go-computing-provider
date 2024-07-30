@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/contract"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"math/big"
@@ -222,4 +223,24 @@ func (s *CpStub) createTransactOpts() (*bind.TransactOpts, error) {
 	txOptions.GasFeeCap = suggestGasPrice
 	txOptions.Context = context.Background()
 	return txOptions, nil
+}
+
+func GetAccountInfo() (models.Account, error) {
+	chainUrl, err := conf.GetRpcByNetWorkName()
+	if err != nil {
+		return models.Account{}, fmt.Errorf("failed to get rpc url, error: %v", err)
+	}
+
+	client, err := ethclient.Dial(chainUrl)
+	if err != nil {
+		return models.Account{}, fmt.Errorf("failed to dial rpc connect, error: %v", err)
+	}
+	defer client.Close()
+
+	cpStub, err := NewAccountStub(client)
+	if err != nil {
+		return models.Account{}, err
+	}
+
+	return cpStub.GetCpAccountInfo()
 }

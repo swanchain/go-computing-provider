@@ -2,8 +2,13 @@ package computing
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/robfig/cron/v3"
@@ -11,38 +16,19 @@ import (
 	"github.com/swanchain/go-computing-provider/constants"
 	"github.com/swanchain/go-computing-provider/internal/contract/fcp"
 	"github.com/swanchain/go-computing-provider/internal/models"
-	"io"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"net/http"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
 )
 
 var deployingChan = make(chan models.Job)
 var TaskMap sync.Map
 
 type CronTask struct {
-	nodeId       string
-	ownerAddress string
-	location     string
+	nodeId string
 }
 
 func NewCronTask(nodeId string) *CronTask {
-	ownerAddress, _, err := GetOwnerAddressAndWorkerAddress()
-	if err != nil {
-		logs.GetLogger().Errorf("get owner address failed, error: %v", err)
-		return nil
-	}
-
-	location, err := getLocation()
-	if err != nil {
-		logs.GetLogger().Error(err)
-	}
-
-	return &CronTask{nodeId: nodeId, ownerAddress: ownerAddress, location: location}
+	return &CronTask{nodeId: nodeId}
 }
 
 func (task *CronTask) RunTask() {
@@ -52,9 +38,10 @@ func (task *CronTask) RunTask() {
 	task.cleanAbnormalDeployment()
 	task.setFailedUbiTaskStatus()
 	task.watchNameSpaceForDeleted()
-	task.updateUbiTaskReward()
-	task.reportClusterResourceToHub()
+	task.reportClusterResource()
 	task.watchExpiredTask()
+	task.getUbiTaskReward()
+	task.checkJobReward()
 }
 
 func checkJobStatus() {
@@ -77,7 +64,7 @@ func checkJobStatus() {
 	}()
 }
 
-func (task *CronTask) reportClusterResourceToHub() {
+func (task *CronTask) reportClusterResource() {
 	c := cron.New(cron.WithSeconds())
 	c.AddFunc("0/10 * * * * ?", func() {
 		defer func() {
@@ -89,7 +76,7 @@ func (task *CronTask) reportClusterResourceToHub() {
 		k8sService := NewK8sService()
 		statisticalSources, err := k8sService.StatisticalSources(context.TODO())
 		if err != nil {
-			logs.GetLogger().Errorf("Failed k8s statistical sources, error: %+v", err)
+			logs.GetLogger().Errorf("failed to collect k8s statistical sources, error: %+v", err)
 			return
 		}
 		checkClusterProviderStatus(statisticalSources)
@@ -131,16 +118,16 @@ func (task *CronTask) watchNameSpaceForDeleted() {
 
 func (task *CronTask) watchExpiredTask() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("0 0/5 * * * ?", func() {
+	c.AddFunc("* 0/10 * * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("watchExpiredTask catch panic error: %+v", err)
 			}
 		}()
 
-		jobList, err := NewJobService().GetJobList()
+		jobList, err := NewJobService().GetJobList(models.UN_DELETEED_FLAG)
 		if err != nil {
-			logs.GetLogger().Errorf("Failed watchExpiredTask get job data, error: %+v", err)
+			logs.GetLogger().Errorf("failed to get job data, error: %+v", err)
 			return
 		}
 
@@ -157,76 +144,58 @@ func (task *CronTask) watchExpiredTask() {
 			}
 		}
 
-		if len(jobList) == 0 {
-			service := NewK8sService()
-			namespaces, err := service.ListNamespace(context.TODO())
-			if err != nil {
-				logs.GetLogger().Errorf("Failed get all namespace, error: %+v", err)
-				return
-			}
-
-			for _, namespace := range namespaces {
-				if strings.HasPrefix(namespace, constants.K8S_NAMESPACE_NAME_PREFIX) {
-					service.DeleteNameSpace(context.TODO(), namespace)
+		if len(deployOnK8s) == 0 && len(jobList) > 0 {
+			for _, job := range jobList {
+				if err = NewJobService().DeleteJobEntityBySpaceUuId(job.SpaceUuid, models.JOB_COMPLETED_STATUS); err != nil {
+					logs.GetLogger().Infof("failed to delete job from db, space_uuid: %s, error: %v", job.SpaceUuid, err)
 				}
 			}
-			return
-		}
-
-		var deleteSpaceIds []string
-		for _, job := range jobList {
-			if _, ok := deployOnK8s[job.K8sDeployName]; ok {
-				delete(deployOnK8s, job.K8sDeployName)
+		} else if len(deployOnK8s) > 0 && len(jobList) == 0 {
+			for _, namespace := range deployOnK8s {
+				if err = NewK8sService().DeleteNameSpace(context.TODO(), namespace); err != nil {
+					logs.GetLogger().Errorf("failed to delete job from k8s, namespace: %s, error: %v", namespace, err)
+				}
 			}
+		} else if len(deployOnK8s) > 0 && len(jobList) > 0 {
+			var deleteSpaceIds []string
+			for _, job := range jobList {
+				if _, ok := deployOnK8s[job.K8sDeployName]; ok {
+					delete(deployOnK8s, job.K8sDeployName)
+				}
 
-			if _, err = NewK8sService().k8sClient.AppsV1().Deployments(job.NameSpace).Get(context.TODO(), job.K8sDeployName, metav1.GetOptions{}); err != nil && errors.IsNotFound(err) {
 				if time.Now().Sub(time.Unix(job.CreateTime, 0)).Hours() > 2 {
 					deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
 					continue
 				}
-			}
 
-			if len(strings.TrimSpace(job.TaskUuid)) != 0 {
-				taskStatus, err := checkTaskStatusByHub(job.TaskUuid, task.nodeId)
-				if err != nil {
-					logs.GetLogger().Errorf("Failed check task status by Orchestrator service, error: %+v", err)
-					return
-				}
-				if strings.Contains(taskStatus, "no task found") {
-					logs.GetLogger().Infof("task_uuid: %s, task not found on the orchestrator service, starting to delete it.", job.TaskUuid)
-					deleteJob(job.NameSpace, job.SpaceUuid, "cron task, no task found")
-					deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
-					continue
-				}
-				if strings.Contains(taskStatus, "Terminated") || strings.Contains(taskStatus, "Terminated") ||
-					strings.Contains(taskStatus, "Cancelled") || strings.Contains(taskStatus, "Failed") {
-					logs.GetLogger().Infof("task_uuid: %s, current status is %s, starting to delete it.", job.TaskUuid, taskStatus)
+				checkFcpJobInfoInChain(job)
+
+				if job.Status == models.JOB_TERMINATED_STATUS || job.Status == models.JOB_COMPLETED_STATUS {
+					logs.GetLogger().Infof("task_uuid: %s, current status is %s, starting to delete it.", job.TaskUuid, models.GetJobStatus(job.Status))
 					if err = deleteJob(job.NameSpace, job.SpaceUuid, "cron task, abnormal state"); err == nil {
+						deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
+						continue
+					}
+				}
+
+				if time.Now().Unix() > job.ExpireTime {
+					if err = deleteJob(job.NameSpace, job.SpaceUuid, "cron-task the task execution time has expired"); err == nil {
 						deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
 						continue
 					}
 				}
 			}
 
-			if time.Now().Unix() > job.ExpireTime {
-				logs.GetLogger().Infof("<timer-task> space_uuid: %s has expired, the job starting terminated", job.SpaceUuid)
-				if err = deleteJob(job.NameSpace, job.SpaceUuid, "cron task, run time expired"); err == nil {
-					deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
-					continue
+			for deploymentName, nameSpace := range deployOnK8s {
+				if nameSpace != "" && deploymentName != "" {
+					spaceUuid := strings.TrimPrefix(deploymentName, constants.K8S_DEPLOY_NAME_PREFIX)
+					deleteJob(nameSpace, spaceUuid, "cron-task the obsolete task left in the k8s")
 				}
 			}
-		}
-
-		for deploymentName, nameSpace := range deployOnK8s {
-			if nameSpace != "" && deploymentName != "" {
-				spaceUuid := strings.TrimPrefix(deploymentName, constants.K8S_DEPLOY_NAME_PREFIX)
-				deleteJob(nameSpace, spaceUuid, "cron task, task left on k8s")
+			for _, spaceUuid := range deleteSpaceIds {
+				NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid, models.JOB_COMPLETED_STATUS)
 			}
 		}
-		for _, spaceUuid := range deleteSpaceIds {
-			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid)
-		}
-
 	})
 	c.Start()
 }
@@ -318,9 +287,7 @@ func (task *CronTask) setFailedUbiTaskStatus() {
 
 		var taskList []models.TaskEntity
 		oneHourAgo := time.Now().Add(-1 * time.Hour).Unix()
-		err := NewTaskService().Model(&models.TaskEntity{}).Where("status in (?,?)", models.TASK_RECEIVED_STATUS, models.TASK_RUNNING_STATUS).
-			Or("status ==? and tx_hash !=''", models.TASK_FAILED_STATUS).
-			Or("status=? and tx_hash==''", models.TASK_SUCCESS_STATUS).Find(&taskList).Error
+		err := NewTaskService().Model(&models.TaskEntity{}).Where("status in (?,?) and create_time <?", models.TASK_RECEIVED_STATUS, models.TASK_RUNNING_STATUS, oneHourAgo).Find(&taskList).Error
 		if err != nil {
 			logs.GetLogger().Errorf("Failed get task list, error: %+v", err)
 			return
@@ -336,8 +303,8 @@ func (task *CronTask) setFailedUbiTaskStatus() {
 				ubiTask.Status = models.TASK_FAILED_STATUS
 			}
 
-			if ubiTask.TxHash != "" {
-				ubiTask.Status = models.TASK_SUCCESS_STATUS
+			if ubiTask.Contract != "" || ubiTask.BlockHash != "" {
+				ubiTask.Status = models.TASK_SUBMITTED_STATUS
 			} else {
 				ubiTask.Status = models.TASK_FAILED_STATUS
 			}
@@ -348,28 +315,38 @@ func (task *CronTask) setFailedUbiTaskStatus() {
 	c.Start()
 }
 
-func (task *CronTask) updateUbiTaskReward() {
+func (task *CronTask) checkJobReward() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("0 0/30 * * * ?", func() {
+	c.AddFunc("* * 0/20 * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
-				logs.GetLogger().Errorf("task job: [updateUbiTaskReward], error: %+v", err)
+				logs.GetLogger().Errorf("task job: [checkJobReward], error: %+v", err)
 			}
 		}()
 
-		taskList, err := NewTaskService().GetTaskListNoReward()
+		jobList, err := NewJobService().GetJobListByNoReward()
 		if err != nil {
-			logs.GetLogger().Errorf("get task list failed, error: %+v", err)
+			logs.GetLogger().Errorf("failed to get job data, error: %+v", err)
 			return
 		}
+		for _, job := range jobList {
+			jobCopy := job
+			go NewTaskManagerContract().Scan(jobCopy)
+		}
+	})
+	c.Start()
+}
 
-		for _, entity := range taskList {
-			ubiTask := entity
-			err = getReward(ubiTask)
-			if err != nil {
-				logs.GetLogger().Errorf("taskId: %d, %v", ubiTask.Id, err)
-				continue
+func (task *CronTask) getUbiTaskReward() {
+	c := cron.New(cron.WithSeconds())
+	c.AddFunc("* * 0/1 * ?", func() {
+		defer func() {
+			if err := recover(); err != nil {
+				logs.GetLogger().Errorf("task job: [GetUbiTaskReward], error: %+v", err)
 			}
+		}()
+		if err := syncTaskStatusForSequencerService(); err != nil {
+			logs.GetLogger().Errorf("failed to sync task from sequencer, error: %v", err)
 		}
 	})
 	c.Start()
@@ -407,52 +384,18 @@ func addNodeLabel() {
 	}
 }
 
-func checkTaskStatusByHub(taskUuid, nodeId string) (string, error) {
-	url := fmt.Sprintf("%s/check_task_status_with_node_id/%s/%s", conf.GetConfig().HUB.ServerUrl, taskUuid, nodeId)
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return "", err
-	}
-
-	req.Header.Add("offset", "0")
-	req.Header.Add("limit", "10")
-	req.Header.Add("Authorization", "Bearer "+conf.GetConfig().HUB.AccessToken)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Println("Error making HTTP request:", err)
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-	var taskStatus struct {
-		Data struct {
-			JobStatus  string `json:"job_status"`
-			TaskStatus string `json:"task_status"`
-		} `json:"data"`
-		Message string `json:"message"`
-		Status  string `json:"status"`
-	}
-	err = json.Unmarshal(respBody, &taskStatus)
-	if err != nil {
-		logs.GetLogger().Errorf("check_task_status_with_node_id resp: %s", string(respBody))
-		return "", err
-	}
-	if taskStatus.Status == "failed" {
-		return taskStatus.Message, nil
-	}
-	return taskStatus.Status, nil
-}
-
 func reportJobStatus(jobUuid string, deployStatus int) bool {
 	var job = new(models.JobEntity)
 	job.JobUuid = jobUuid
 	job.DeployStatus = deployStatus
+	if deployStatus < models.DEPLOY_TO_K8S {
+		job.PodStatus = models.POD_UNKNOWN_STATUS
+		job.Status = models.JOB_DEPLOY_STATUS
+	} else {
+		job.PodStatus = models.POD_RUNNING_STATUS
+		job.Status = models.JOB_RUNNING_STATUS
+	}
+
 	if err := NewJobService().UpdateJobEntityByJobUuid(job); err != nil {
 		logs.GetLogger().Errorf("update job info by jobUuid failed, error: %v", err)
 	}
@@ -481,4 +424,90 @@ func checkFcpCollateralBalance() (string, error) {
 		return "", err
 	}
 	return fcpCollateralInfo.AvailableBalance, nil
+}
+
+func checkFcpJobInfoInChain(job *models.JobEntity) {
+	var taskInfo models.TaskInfoOnChain
+	var err error
+	chainRpc, err := conf.GetRpcByNetWorkName()
+	if err != nil {
+		return
+	}
+	client, err := ethclient.Dial(chainRpc)
+	if err != nil {
+		return
+	}
+	defer client.Close()
+	taskManagerStub, err := fcp.NewTaskManagerStub(client)
+	if err != nil {
+		return
+	}
+	taskInfo, err = taskManagerStub.GetTaskInfo(job.TaskUuid)
+	if err != nil {
+		return
+	}
+
+	if taskInfo.TaskStatus == models.COMPLETED {
+		job.Status = models.JOB_COMPLETED_STATUS
+	} else if taskInfo.TaskStatus == models.TERMINATED {
+		job.Status = models.JOB_TERMINATED_STATUS
+	}
+
+	expiredTime := taskInfo.StartTimestamp + taskInfo.Duration
+	if expiredTime > 0 {
+		job.ExpireTime = expiredTime
+		if err := NewJobService().UpdateJobEntityByJobUuid(job); err != nil {
+			logs.GetLogger().Errorf("update job info by jobUuid failed, error: %v", err)
+		}
+	}
+
+}
+
+func checkHealth(url string) bool {
+	response, err := http.Get(url)
+	if err != nil {
+		return false
+	}
+	defer response.Body.Close()
+	return response.StatusCode == 200
+}
+
+type TaskGroup struct {
+	Items []*models.TaskEntity
+	Ids   []int64
+	Type  int // 1: contract  2: sequncer
+}
+
+func handleTasksToGroup(list []*models.TaskEntity) []TaskGroup {
+	var groups []TaskGroup
+	var group TaskGroup
+	var group1 TaskGroup
+
+	const batchSize = 20
+	for i := 0; i < len(list); i++ {
+		if list[i].Sequencer == 1 {
+			if len(group1.Items) > batchSize {
+				groups = append(groups, group1)
+				group1 = TaskGroup{}
+			}
+			group1.Items = append(group1.Items, list[i])
+			group1.Ids = append(group1.Ids, list[i].Id)
+			group1.Type = 2
+		} else if list[i].Sequencer == 0 {
+			if len(group.Items) > batchSize {
+				groups = append(groups, group)
+				group = TaskGroup{}
+			}
+			group.Items = append(group.Items, list[i])
+			group.Ids = append(group.Ids, list[i].Id)
+			group.Type = 1
+		}
+	}
+	if len(group.Items) > 0 {
+		groups = append(groups, group)
+	}
+	if len(group1.Items) > 0 {
+		groups = append(groups, group1)
+	}
+	return groups
 }

@@ -14,7 +14,9 @@ import (
 	"github.com/swanchain/go-computing-provider/util"
 	"github.com/urfave/cli/v2"
 	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -59,12 +61,18 @@ var listCmd = &cli.Command{
 		var taskList []*models.TaskEntity
 		var err error
 		if showFailed {
-			taskList, err = computing.NewTaskService().GetAllTask(tailNum)
+			taskList, err = computing.NewTaskService().GetTaskList(tailNum)
 			if err != nil {
 				return fmt.Errorf("failed get ubi task, error: %+v", err)
 			}
 		} else {
-			taskList, err = computing.NewTaskService().GetTaskList(models.TASK_SUCCESS_STATUS, tailNum)
+			taskList, err = computing.NewTaskService().GetTaskList(tailNum, []int{
+				models.TASK_RECEIVED_STATUS,
+				models.TASK_RUNNING_STATUS,
+				models.TASK_SUBMITTED_STATUS,
+				models.TASK_VERIFIED_STATUS,
+				models.TASK_REWARDED_STATUS,
+			}...)
 			if err != nil {
 				return fmt.Errorf("failed get ubi task, error: %+v", err)
 			}
@@ -72,70 +80,79 @@ var listCmd = &cli.Command{
 
 		if fullFlag {
 			for i, task := range taskList {
-				var errorMsg string
-				if showFailed {
-					errorMsg = task.Error
-				}
 				createTime := time.Unix(task.CreateTime, 0).Format("2006-01-02 15:04:05")
-				taskData = append(taskData,
-					[]string{strconv.Itoa(int(task.Id)), task.Contract, models.GetSourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type), task.TxHash, models.TaskStatusStr(task.Status),
-						fmt.Sprintf("%s", task.Reward), createTime, errorMsg})
-
-				var rowColor []tablewriter.Colors
-				if task.Status == models.TASK_RECEIVED_STATUS {
-					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgYellowColor}}
-				} else if task.Status == models.TASK_RUNNING_STATUS {
-					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgCyanColor}}
-				} else if task.Status == models.TASK_SUCCESS_STATUS {
-					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
-				} else if task.Status == models.TASK_FAILED_STATUS {
-					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
+				var sequencerStr string
+				var contract string
+				if task.Sequencer == 1 {
+					sequencerStr = "YES"
+					if task.SequenceTaskAddr != "" {
+						contract = task.SequenceTaskAddr
+					}
+				} else if task.Sequencer == 0 {
+					sequencerStr = "NO"
+					contract = task.Contract
+				} else {
+					sequencerStr = ""
 				}
+
+				if len(strings.TrimSpace(task.Reward)) == 0 {
+					task.Reward = "0.00"
+				}
+				if len(task.Reward) >= 4 {
+					task.Reward = task.Reward[:4]
+				}
+
+				taskData = append(taskData,
+					[]string{strconv.Itoa(int(task.Id)), contract, models.GetResourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type),
+						task.CheckCode, task.Sign, models.TaskStatusStr(task.Status), task.Reward, sequencerStr, task.SettlementTaskAddr, createTime})
 
 				rowColorList = append(rowColorList, RowColor{
 					row:    i,
-					column: []int{5},
-					color:  rowColor,
+					column: []int{6},
+					color:  getStatusColor(task.Status),
 				})
 			}
+			header := []string{"TASK ID", "TASK CONTRACT", "TASK TYPE", "ZK TYPE", "CHECK CODE", "SIGNATURE", "STATUS", "REWARD", "SEQUENCER", "SETTLEMENT CONTRACT", "CREATE TIME"}
+			NewVisualTable(header, taskData, rowColorList).Generate(false)
 
 		} else {
 			for i, task := range taskList {
 				createTime := time.Unix(task.CreateTime, 0).Format("2006-01-02 15:04:05")
-				contract := shortenAddress(task.Contract)
-				proofHash := shortenAddress(task.TxHash)
-
-				var errorMsg string
-				if showFailed {
-					errorMsg = task.Error
+				var sequencerStr string
+				var contract string
+				if task.Sequencer == 1 {
+					sequencerStr = "YES"
+					if task.SequenceTaskAddr != "" {
+						contract = task.SequenceTaskAddr
+					}
+				} else if task.Sequencer == 0 {
+					sequencerStr = "NO"
+					contract = task.Contract
+				} else {
+					sequencerStr = ""
 				}
+
+				if len(strings.TrimSpace(task.Reward)) == 0 {
+					task.Reward = "0.00"
+				}
+				if len(task.Reward) >= 4 {
+					task.Reward = task.Reward[:4]
+				}
+
 				taskData = append(taskData,
-					[]string{strconv.Itoa(int(task.Id)), contract, models.GetSourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type), proofHash, models.TaskStatusStr(task.Status),
-						fmt.Sprintf("%s", task.Reward), createTime, errorMsg})
-
-				var rowColor []tablewriter.Colors
-				if task.Status == models.TASK_RECEIVED_STATUS {
-					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgYellowColor}}
-				} else if task.Status == models.TASK_RUNNING_STATUS {
-					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgCyanColor}}
-				} else if task.Status == models.TASK_SUCCESS_STATUS {
-					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
-				} else if task.Status == models.TASK_FAILED_STATUS {
-					rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
-				}
+					[]string{strconv.Itoa(int(task.Id)), contract, models.GetResourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type),
+						models.TaskStatusStr(task.Status), task.Reward, sequencerStr, createTime})
 
 				rowColorList = append(rowColorList, RowColor{
 					row:    i,
-					column: []int{5},
-					color:  rowColor,
+					column: []int{4},
+					color:  getStatusColor(task.Status),
 				})
 			}
 
+			header := []string{"TASK ID", "TASK CONTRACT", "TASK TYPE", "ZK TYPE", "STATUS", "REWARD", "SEQUENCER", "CREATE TIME"}
+			NewVisualTable(header, taskData, rowColorList).Generate(false)
 		}
-
-		header := []string{"TASK ID", "Task Contract", "TASK TYPE", "ZK TYPE", "PROOF HASH", "STATUS", "REWARD", "CREATE TIME", "ERROR"}
-		NewVisualTable(header, taskData, rowColorList).Generate(false)
-
 		return nil
 
 	},
@@ -146,7 +163,7 @@ var daemonCmd = &cli.Command{
 	Usage: "Start a cp process",
 
 	Action: func(cctx *cli.Context) error {
-		logs.GetLogger().Info("Start a computing-provider client.")
+		logs.GetLogger().Info("Starting a computing-provider client.")
 		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 
 		resourceExporterContainerName := "resource-exporter"
@@ -163,10 +180,12 @@ var daemonCmd = &cli.Command{
 		if err := conf.InitConfig(cpRepoPath, true); err != nil {
 			logs.GetLogger().Fatal(err)
 		}
+		logs.GetLogger().Info("Your config file is:", filepath.Join(cpRepoPath, "config.toml"))
 
 		computing.SyncCpAccountInfo()
 		computing.CronTaskForEcp()
 
+		gin.SetMode(gin.ReleaseMode)
 		r := gin.Default()
 		r.Use(cors.Middleware(cors.Config{
 			Origins:         "*",
@@ -183,13 +202,14 @@ var daemonCmd = &cli.Command{
 
 		router.GET("/cp", computing.GetCpResource)
 		router.POST("/cp/ubi", computing.DoUbiTaskForDocker)
-		router.POST("/cp/docker/receive/ubi", computing.ReceiveUbiProofForDocker)
+		router.POST("/cp/docker/receive/ubi", computing.ReceiveUbiProof)
 
 		shutdownChan := make(chan struct{})
 		httpStopper, err := util.ServeHttp(r, "cp-api", ":"+strconv.Itoa(conf.GetConfig().API.Port), false)
 		if err != nil {
 			logs.GetLogger().Fatal("failed to start cp-api endpoint: %s", err)
 		}
+		logs.GetLogger().Infof("CP service started successfully, listening on port: %d", conf.GetConfig().API.Port)
 
 		finishCh := util.MonitorShutdown(shutdownChan,
 			util.ShutdownHandler{Component: "cp-api", StopFunc: httpStopper},
@@ -200,9 +220,33 @@ var daemonCmd = &cli.Command{
 	},
 }
 
-func shortenAddress(address string) string {
-	if len(address) <= 12 {
-		return address
+func getStatusColor(taskStatus int) []tablewriter.Colors {
+	var rowColor []tablewriter.Colors
+	switch taskStatus {
+	case models.TASK_RECEIVED_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgYellowColor}}
+	case models.TASK_RUNNING_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgCyanColor}}
+	case models.TASK_SUBMITTED_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgBlueColor}}
+	case models.TASK_FAILED_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
+	case models.TASK_VERIFIED_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgBlueColor}}
+	case models.TASK_REWARDED_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
+	case models.TASK_INVALID_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
+	case models.TASK_TIMEOUT_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
+	case models.TASK_VERIFYFAILED_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
+	case models.TASK_REPEATED_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
+	case models.TASK_NSC_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
+	case models.TASK_UNKNOWN_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgBlackColor}}
 	}
-	return address[:7] + "...." + address[len(address)-7:]
+	return rowColor
 }

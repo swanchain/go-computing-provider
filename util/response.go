@@ -53,6 +53,7 @@ const (
 	FoundWhiteListError        = 4010
 	FoundBlackListError        = 4011
 	SpaceCheckBlackListError   = 4012
+	CheckBalanceError          = 4013
 
 	ProofParamError   = 7001
 	ProofReadLogError = 7002
@@ -87,6 +88,7 @@ var codeMsg = map[int]string{
 	ProofReadLogError: "An error occurred while read the log of proof",
 	ProofError:        "An error occurred while executing the calculation task",
 
+	CheckBalanceError:    "An error occurred while check balance of cp account address",
 	UbiTaskContractError: "Not found this task contract on the chain",
 	FoundTaskEntityError: "An error occurred while get task info",
 	SaveTaskEntityError:  "An error occurred while save task info",

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/filswan/go-swan-lib/logs"
 	"github.com/gin-gonic/gin"
@@ -14,7 +16,7 @@ import (
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/constants"
 	"github.com/swanchain/go-computing-provider/internal/contract"
-	account2 "github.com/swanchain/go-computing-provider/internal/contract/account"
+	"github.com/swanchain/go-computing-provider/internal/contract/account"
 	"github.com/swanchain/go-computing-provider/internal/contract/ecp"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"github.com/swanchain/go-computing-provider/util"
@@ -27,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"math/rand"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -54,7 +55,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 		return
 	}
 
-	if ubiTask.ResourceType != 0 && ubiTask.ResourceType != 1 {
+	if ubiTask.ResourceType != models.RESOURCE_TYPE_CPU && ubiTask.ResourceType != models.RESOURCE_TYPE_GPU {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "the value of resource_type is 0 or 1"))
 		return
 	}
@@ -68,19 +69,41 @@ func DoUbiTaskForK8s(c *gin.Context) {
 		return
 	}
 
+	if strings.TrimSpace(ubiTask.VerifyParam) == "" {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: verify_param"))
+		return
+	}
+
+	if strings.TrimSpace(ubiTask.CheckCode) == "" {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: check_code"))
+		return
+	}
+
 	if strings.TrimSpace(ubiTask.Signature) == "" {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: signature"))
 		return
 	}
-	if strings.TrimSpace(ubiTask.ContractAddr) == "" {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: contract_addr"))
+
+	if ubiTask.DeadLine == 0 {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: deadline"))
 		return
 	}
 
-	cpRepoPath, _ := os.LookupEnv("CP_PATH")
-	nodeID := GetNodeId(cpRepoPath)
+	cpAccountAddress, err := contract.GetCpAccountAddress()
+	if err != nil {
+		logs.GetLogger().Errorf("get cp account contract address failed, error: %v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.GetCpAccountError))
+		return
+	}
 
-	signature, err := verifySignature(conf.GetConfig().UBI.UbiEnginePk, fmt.Sprintf("%s%s", nodeID, ubiTask.ContractAddr), ubiTask.Signature)
+	balance, err := checkBalance(cpAccountAddress)
+	if err != nil || !balance {
+		logs.GetLogger().Errorf("failed check cp account balance, error: %v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckBalanceError))
+		return
+	}
+
+	signature, err := verifySignature(conf.GetConfig().UBI.UbiEnginePk, fmt.Sprintf("%s%d", cpAccountAddress, ubiTask.ID), ubiTask.Signature)
 	if err != nil {
 		logs.GetLogger().Errorf("verifySignature for ubi task failed, error: %+v", err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.UbiTaskParamError, "sign data failed"))
@@ -102,11 +125,13 @@ func DoUbiTaskForK8s(c *gin.Context) {
 	taskEntity.Id = int64(ubiTask.ID)
 	taskEntity.Type = ubiTask.Type
 	taskEntity.Name = ubiTask.Name
-	taskEntity.Contract = ubiTask.ContractAddr
 	taskEntity.ResourceType = ubiTask.ResourceType
 	taskEntity.InputParam = ubiTask.InputParam
+	taskEntity.VerifyParam = ubiTask.VerifyParam
 	taskEntity.Status = models.TASK_RECEIVED_STATUS
 	taskEntity.CreateTime = time.Now().Unix()
+	taskEntity.Deadline = ubiTask.DeadLine
+	taskEntity.CheckCode = ubiTask.CheckCode
 	err = NewTaskService().SaveTaskEntity(taskEntity)
 	if err != nil {
 		logs.GetLogger().Errorf("save task entity failed, error: %v", err)
@@ -136,7 +161,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 		taskEntity.Status = models.TASK_FAILED_STATUS
 		taskEntity.Error = "No resources available"
 		NewTaskService().SaveTaskEntity(taskEntity)
-		logs.GetLogger().Warnf("ubi task id: %d, type: %s, not found a resources available", ubiTask.ID, models.GetSourceTypeStr(ubiTask.ResourceType))
+		logs.GetLogger().Warnf("ubi task id: %d, type: %s, not found a resources available", ubiTask.ID, models.GetResourceTypeStr(ubiTask.ResourceType))
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError))
 		return
 	}
@@ -220,8 +245,8 @@ func DoUbiTaskForK8s(c *gin.Context) {
 				return
 			}
 
-			if ubiTaskRun.TxHash != "" {
-				ubiTaskRun.Status = models.TASK_SUCCESS_STATUS
+			if ubiTaskRun.Contract != "" || ubiTaskRun.BlockHash != "" {
+				ubiTaskRun.Status = models.TASK_SUBMITTED_STATUS
 			} else {
 				ubiTaskRun.Status = models.TASK_FAILED_STATUS
 				k8sService := NewK8sService()
@@ -390,6 +415,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 		}
 		defer podLogs.Close()
 
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 		ubiLogFileName := filepath.Join(cpRepoPath, "ubi-fcp.log")
 		logFile, err := os.OpenFile(ubiLogFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
@@ -407,14 +433,14 @@ func DoUbiTaskForK8s(c *gin.Context) {
 	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
 }
 
-func ReceiveUbiProofForK8s(c *gin.Context) {
+func ReceiveUbiProof(c *gin.Context) {
 	var c2Proof models.UbiC2Proof
 	var err error
 	if err := c.ShouldBindJSON(&c2Proof); err != nil {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
 		return
 	}
-	logs.GetLogger().Infof("task_id: %s, C2 proof out received: %+v", c2Proof.TaskId, c2Proof)
+	logs.GetLogger().Infof("task_id: %s, The ZK proof computation is complete: %+v", c2Proof.TaskId, c2Proof)
 
 	taskId, err := strconv.Atoi(c2Proof.TaskId)
 	if err != nil {
@@ -427,11 +453,18 @@ func ReceiveUbiProofForK8s(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
 		return
 	}
-	err = submitUBIProof(c2Proof, ubiTask)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
-		return
-	}
+	go func() {
+		defer func() {
+			if err := recover(); err != nil {
+				logs.GetLogger().Errorf("taskId: %d, submit zk-task proof catch painc error: %v", taskId, err)
+			}
+		}()
+		err = submitUBIProof(c2Proof, ubiTask)
+		if err != nil {
+			return
+		}
+	}()
+
 	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
 }
 
@@ -442,8 +475,8 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		return
 	}
 
-	logs.GetLogger().Infof("ubi task received: id: %d, type: %d, zk_type: %s, input_param: %s, signature: %s, contract: %s",
-		ubiTask.ID, ubiTask.ResourceType, models.UbiTaskTypeStr(ubiTask.Type), ubiTask.InputParam, ubiTask.Signature, ubiTask.ContractAddr)
+	logs.GetLogger().Infof("ubi task received: id: %d, deadline: %d,resource_type: %d, type: %s, input_param: %s, signature: %s",
+		ubiTask.ID, ubiTask.DeadLine, ubiTask.ResourceType, models.UbiTaskTypeStr(ubiTask.Type), ubiTask.InputParam, ubiTask.Signature)
 
 	if ubiTask.ID == 0 {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: id"))
@@ -454,7 +487,7 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		return
 	}
 
-	if ubiTask.ResourceType != 0 && ubiTask.ResourceType != 1 {
+	if ubiTask.ResourceType != models.RESOURCE_TYPE_CPU && ubiTask.ResourceType != models.RESOURCE_TYPE_GPU {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "the value of resource_type is 0 or 1"))
 		return
 	}
@@ -468,24 +501,41 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		return
 	}
 
+	if strings.TrimSpace(ubiTask.VerifyParam) == "" {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: verify_param"))
+		return
+	}
+
+	if strings.TrimSpace(ubiTask.CheckCode) == "" {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: check_code"))
+		return
+	}
+
 	if strings.TrimSpace(ubiTask.Signature) == "" {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: signature"))
 		return
 	}
-	if strings.TrimSpace(ubiTask.ContractAddr) == "" {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: contract_addr"))
+
+	if ubiTask.DeadLine == 0 {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: deadline"))
 		return
 	}
 
-	if _, err := GetTaskInfoOnChain(ubiTask.ContractAddr); err != nil {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskContractError))
+	cpAccountAddress, err := contract.GetCpAccountAddress()
+	if err != nil {
+		logs.GetLogger().Errorf("get cp account contract address failed, error: %v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.GetCpAccountError))
 		return
 	}
 
-	cpRepoPath, _ := os.LookupEnv("CP_PATH")
-	nodeID := GetNodeId(cpRepoPath)
+	balance, err := checkBalance(cpAccountAddress)
+	if err != nil || !balance {
+		logs.GetLogger().Errorf("failed check cp account balance, error: %v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckBalanceError))
+		return
+	}
 
-	signature, err := verifySignature(conf.GetConfig().UBI.UbiEnginePk, fmt.Sprintf("%s%s", nodeID, ubiTask.ContractAddr), ubiTask.Signature)
+	signature, err := verifySignature(conf.GetConfig().UBI.UbiEnginePk, fmt.Sprintf("%s%d", cpAccountAddress, ubiTask.ID), ubiTask.Signature)
 	if err != nil {
 		logs.GetLogger().Errorf("verifySignature for ubi task failed, error: %+v", err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
@@ -507,11 +557,13 @@ func DoUbiTaskForDocker(c *gin.Context) {
 	taskEntity.Id = int64(ubiTask.ID)
 	taskEntity.Type = ubiTask.Type
 	taskEntity.Name = ubiTask.Name
-	taskEntity.Contract = ubiTask.ContractAddr
 	taskEntity.ResourceType = ubiTask.ResourceType
 	taskEntity.InputParam = ubiTask.InputParam
+	taskEntity.VerifyParam = ubiTask.VerifyParam
 	taskEntity.Status = models.TASK_RECEIVED_STATUS
 	taskEntity.CreateTime = time.Now().Unix()
+	taskEntity.Deadline = ubiTask.DeadLine
+	taskEntity.CheckCode = ubiTask.CheckCode
 	err = NewTaskService().SaveTaskEntity(taskEntity)
 	if err != nil {
 		logs.GetLogger().Errorf("save task entity failed, error: %v", err)
@@ -552,24 +604,6 @@ func DoUbiTaskForDocker(c *gin.Context) {
 				logs.GetLogger().Errorf("do zk task painc, error: %+v", err)
 				return
 			}
-
-			ubiTaskRun, err := NewTaskService().GetTaskEntity(int64(ubiTask.ID))
-			if err != nil {
-				logs.GetLogger().Errorf("get ubi task detail from db failed, ubiTaskId: %d, error: %+v", ubiTask.ID, err)
-				return
-			}
-			if ubiTaskRun.Id == 0 {
-				ubiTaskRun = new(models.TaskEntity)
-				ubiTaskRun.Id = int64(ubiTask.ID)
-				ubiTaskRun.Type = ubiTask.Type
-				ubiTaskRun.Name = ubiTask.Name
-				ubiTaskRun.Contract = ubiTask.ContractAddr
-				ubiTaskRun.ResourceType = ubiTask.ResourceType
-				ubiTaskRun.InputParam = ubiTask.InputParam
-				ubiTaskRun.CreateTime = time.Now().Unix()
-				ubiTaskRun.Contract = ubiTask.ContractAddr
-				NewTaskService().SaveTaskEntity(ubiTaskRun)
-			}
 		}()
 
 		if ubiTaskImage == "" {
@@ -578,7 +612,7 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		}
 
 		if err := NewDockerService().PullImage(ubiTaskImage); err != nil {
-			logs.GetLogger().Errorf("pull %s image failed, error: %v", ubiTaskImage, err)
+			logs.GetLogger().Errorf("failed to pull %s image, error: %v", ubiTaskImage, err)
 			return
 		}
 
@@ -623,6 +657,7 @@ func DoUbiTaskForDocker(c *gin.Context) {
 			Binds:       []string{fmt.Sprintf("%s:/var/tmp/filecoin-proof-parameters", filC2Param)},
 			Resources:   needResource,
 			NetworkMode: network.NetworkHost,
+			Privileged:  true,
 		}
 		containerConfig := &container.Config{
 			Image:        ubiTaskImage,
@@ -634,6 +669,8 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		}
 
 		containerName := JobName + generateString(5)
+		logs.GetLogger().Warnf("task_id: %d, starting container, container name: %s", ubiTask.ID, containerName)
+
 		dockerService := NewDockerService()
 		if err = dockerService.ContainerCreateAndStart(containerConfig, hostConfig, containerName); err != nil {
 			logs.GetLogger().Errorf("create ubi task container failed, error: %v", err)
@@ -642,8 +679,10 @@ func DoUbiTaskForDocker(c *gin.Context) {
 
 		time.Sleep(3 * time.Second)
 		if !dockerService.IsExistContainer(containerName) {
+			logs.GetLogger().Warnf("task_id: %d, not found container", ubiTask.ID)
 			return
 		}
+		logs.GetLogger().Warnf("task_id: %d, started container, container name: %s", ubiTask.ID, containerName)
 
 		containerLogStream, err := dockerService.GetContainerLogStream(containerName)
 		if err != nil {
@@ -652,6 +691,7 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		}
 		defer containerLogStream.Close()
 
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 		ubiLogFileName := filepath.Join(cpRepoPath, "ubi-ecp.log")
 		logFile, err := os.OpenFile(ubiLogFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
@@ -733,44 +773,11 @@ func checkResourceForUbi(resource *models.TaskResource, gpuName string, resource
 	return false, nodeResource.CpuName, needCpu, int64(needMemory), nil
 }
 
-func ReceiveUbiProofForDocker(c *gin.Context) {
-	var err error
-	var c2Proof models.UbiC2Proof
-
-	if err := c.ShouldBindJSON(&c2Proof); err != nil {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
-		return
-	}
-	logs.GetLogger().Infof("task_id: %s, c2 proof out received: %+v", c2Proof.TaskId, c2Proof)
-
-	taskId, err := strconv.Atoi(c2Proof.TaskId)
-	if err != nil {
-		logs.GetLogger().Errorf("ubi task id: %s str parse to int failed, error: %v", c2Proof.TaskId, err)
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
-		return
-	}
-	ubiTask, err := NewTaskService().GetTaskEntity(int64(taskId))
-	if err != nil {
-		logs.GetLogger().Errorf("ubi task id: %d, get task info failed, error: %v", taskId, err)
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.FoundTaskEntityError))
-		return
-	}
-
-	err = submitUBIProof(c2Proof, ubiTask)
-	if err != nil {
-		logs.GetLogger().Warnf("ubi task id: %d, submit proof failed, error: %v", taskId, err)
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SubmitProofError))
-		return
-	}
-	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
-}
-
 func GetCpResource(c *gin.Context) {
 	location, err := getLocation()
 	if err != nil {
 		logs.GetLogger().Error(err)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ServerError, err.Error()))
-		return
+		location = "-"
 	}
 
 	dockerService := NewDockerService()
@@ -819,6 +826,15 @@ func submitUBIProof(c2Proof models.UbiC2Proof, task *models.TaskEntity) error {
 	}
 	client.Close()
 
+	var timeUnit int64 = 2
+	chainId, err := client.ChainID(context.Background())
+	if err != nil {
+		return err
+	}
+	if chainId.Int64() == 254 {
+		timeUnit = 5
+	}
+
 	localWallet, err := wallet.SetupWallet(wallet.WalletRepo)
 	if err != nil {
 		logs.GetLogger().Errorf("setup wallet failed, taskId: %s,error: %v", c2Proof.TaskId, err)
@@ -841,11 +857,37 @@ func submitUBIProof(c2Proof models.UbiC2Proof, task *models.TaskEntity) error {
 
 	taskStub, err := ecp.NewTaskStub(client, ecp.WithTaskContractAddress(task.Contract), ecp.WithTaskPrivateKey(workerPrivateKey))
 	if err != nil {
-		logs.GetLogger().Errorf("create ubi task client failed,  taskId: %s, contract: %s, error: %v", c2Proof.TaskId, task.Contract, err)
+		logs.GetLogger().Errorf("create ubi task client failed, taskId: %s, contract: %s, error: %v", c2Proof.TaskId, task.Contract, err)
 		return err
 	}
 
-	var taskInfo ecp.ECPTaskTaskInfo
+	var sequencerBalance float64
+	if conf.GetConfig().UBI.EnableSequencer {
+		cpAccountAddress, err := contract.GetCpAccountAddress()
+		if err != nil {
+			logs.GetLogger().Errorf("failed to get cp account contract address, error: %v", err)
+			return err
+		}
+
+		sequencerStub, err := ecp.NewSequencerStub(client, ecp.WithSequencerCpAccountAddress(cpAccountAddress))
+		if err != nil {
+			logs.GetLogger().Errorf("failed to get cp sequencer contract, error: %v", err)
+			return err
+		}
+		sequencerBalanceStr, err := sequencerStub.GetCPBalance()
+		if err != nil {
+			logs.GetLogger().Errorf("failed to get cp sequencer contract, error: %v", err)
+			return err
+		}
+
+		sequencerBalance, err = strconv.ParseFloat(sequencerBalanceStr, 64)
+		if err != nil {
+			logs.GetLogger().Errorf("failed to convert numbers for cp sequencer balance, sequencerBalance: %s, error: %v", sequencerBalanceStr, err)
+			return err
+		}
+	}
+
+	var blockNumber uint64
 
 loopTask:
 	for {
@@ -854,7 +896,7 @@ loopTask:
 			logs.GetLogger().Errorf("get ubi task info, taskId: %s timeout", c2Proof.TaskId)
 			break loopTask
 		default:
-			taskInfo, err = taskStub.GetTaskInfo()
+			blockNumber, err = client.BlockNumber(context.Background())
 			if err != nil {
 				logs.GetLogger().Warnf("get ubi task info failed, taskId: %s, msg: %s, retrying", c2Proof.TaskId, err.Error())
 				time.Sleep(3 * time.Second)
@@ -865,32 +907,66 @@ loopTask:
 		}
 	}
 
-	receiveProofTime := time.Now().Unix()
-	finallyTime := task.CreateTime + taskInfo.Deadline.Int64()*2
-	deadlineTime := finallyTime - receiveProofTime
-
-	if deadlineTime < 0 {
-		logs.GetLogger().Warnf("taskId: %s proof submission deadline has passed, receiveProofTime: %d, finallyTime: %d, deadlineTime: %d", c2Proof.TaskId, receiveProofTime, finallyTime, deadlineTime)
+	task.Proof = c2Proof.Proof
+	remainingTime := (task.Deadline - int64(blockNumber)) * timeUnit
+	if remainingTime < 0 {
+		logs.GetLogger().Warnf("taskId: %s proof submission deadline has passed, current: %d, deadline: %d, deadlineTime: %d", c2Proof.TaskId, blockNumber, task.Deadline, remainingTime)
 		task.Status = models.TASK_FAILED_STATUS
-		task.Error = fmt.Sprintf("Proof submission deadline has passed")
+		task.Error = fmt.Sprintf("create contract deadline has passed")
 		return NewTaskService().SaveTaskEntity(task)
 	}
-	submitUBIProofTx, err := taskStub.SubmitUBIProof(c2Proof.TaskId, c2Proof.Proof, deadlineTime)
 
-	if submitUBIProofTx != "" {
-		task.Status = models.TASK_SUCCESS_STATUS
-		task.TxHash = submitUBIProofTx
-		logs.GetLogger().Infof("taskId: %s, submitUBIProofTx: %s", c2Proof.TaskId, submitUBIProofTx)
-	} else if err != nil {
-		task.Status = models.TASK_FAILED_STATUS
-		task.Error = fmt.Sprintf("%s", err.Error())
-		logs.GetLogger().Errorf("taskId: %s, submitUBIProofTx failed, error: %v", c2Proof.TaskId, err)
+	if conf.GetConfig().UBI.EnableSequencer && conf.GetConfig().UBI.AutoChainProof {
+		if sequencerBalance <= 0 {
+			taskContractAddress, err := taskStub.CreateTaskContract(c2Proof.Proof, task, remainingTime)
+			if taskContractAddress != "" {
+				task.Status = models.TASK_SUBMITTED_STATUS
+				task.Contract = taskContractAddress
+				task.Sequencer = 0
+				logs.GetLogger().Infof("successfully submitted to the chain, taskId: %s task contract address: %s", c2Proof.TaskId, taskContractAddress)
+			} else {
+				task.Status = models.TASK_FAILED_STATUS
+				task.Error = fmt.Sprintf("%s", err.Error())
+				logs.GetLogger().Errorf("taskId: %s, failed to create task contract, error: %v", c2Proof.TaskId, err)
+			}
+		} else {
+			if err = submitTaskToSequencer(c2Proof.Proof, task, remainingTime, true); err != nil {
+				logs.GetLogger().Errorf("failed to submitted to the sequencer, taskId: %d, error: %v", task.Id, err)
+				task.Status = models.TASK_FAILED_STATUS
+			} else {
+				task.Status = models.TASK_SUBMITTED_STATUS
+			}
+		}
+	} else if conf.GetConfig().UBI.EnableSequencer && !conf.GetConfig().UBI.AutoChainProof {
+		if sequencerBalance > 0 {
+			if err = submitTaskToSequencer(c2Proof.Proof, task, remainingTime, false); err != nil {
+				logs.GetLogger().Errorf("failed to submitted to the sequencer, taskId: %d, error: %v", task.Id, err)
+				task.Status = models.TASK_FAILED_STATUS
+			} else {
+				task.Status = models.TASK_SUBMITTED_STATUS
+			}
+		} else {
+			task.Status = models.TASK_FAILED_STATUS
+			logs.GetLogger().Warnf("taskId: %d, sequencer insufficient balance, sequencerBalance: %f", task.Id, sequencerBalance)
+		}
+	} else {
+		taskContractAddress, err := taskStub.CreateTaskContract(c2Proof.Proof, task, remainingTime)
+		if taskContractAddress != "" {
+			task.Status = models.TASK_SUBMITTED_STATUS
+			task.Contract = taskContractAddress
+			task.Sequencer = 0
+			logs.GetLogger().Infof("taskId: %s, taskContractAddress: %s", c2Proof.TaskId, taskContractAddress)
+		} else if err != nil {
+			task.Status = models.TASK_FAILED_STATUS
+			task.Error = fmt.Sprintf("%s", err.Error())
+			logs.GetLogger().Errorf("taskId: %s, failed to create task contract, error: %v", c2Proof.TaskId, err)
+		}
 	}
 	return NewTaskService().SaveTaskEntity(task)
 }
 
-func GetTaskInfoOnChain(taskContract string) (ecp.ECPTaskTaskInfo, error) {
-	var taskInfo ecp.ECPTaskTaskInfo
+func GetTaskInfoOnChain(taskContract string) (models.EcpTaskInfo, error) {
+	var taskInfo models.EcpTaskInfo
 
 	chainRpc, err := conf.GetRpcByNetWorkName()
 	if err != nil {
@@ -904,31 +980,37 @@ func GetTaskInfoOnChain(taskContract string) (ecp.ECPTaskTaskInfo, error) {
 
 	taskStub, err := ecp.NewTaskStub(client, ecp.WithTaskContractAddress(taskContract))
 	if err != nil {
-		logs.GetLogger().Errorf("create ubi task client failed, error: %v", err)
+		logs.GetLogger().Errorf("faile to get ubi task client, error: %v", err)
 		return taskInfo, err
 	}
 
-loopTask:
-	for {
-		select {
-		case <-time.After(10 * time.Second):
-			logs.GetLogger().Errorf("get ubi task info, contract address: %s, timeout", taskContract)
-			break loopTask
-		default:
-			taskInfo, err = taskStub.GetTaskInfo()
-			if err != nil {
-				logs.GetLogger().Warnf("get ubi task info failed, contract address: %s, retrying", taskContract)
-				time.Sleep(time.Second)
-				continue
-			} else {
-				break loopTask
-			}
-		}
-	}
+	taskInfo, err = taskStub.GetTaskInfo()
 	if taskInfo.InputParam != "" {
 		return taskInfo, nil
 	}
 	return taskInfo, err
+}
+
+func GetAggregatedTaskInfo(taskContract string) (string, error) {
+	chainRpc, err := conf.GetRpcByNetWorkName()
+	if err != nil {
+		return "", err
+	}
+	client, err := ethclient.Dial(chainRpc)
+	if err != nil {
+		return "", err
+	}
+	defer client.Close()
+
+	aggregatedTask, err := ecp.NewAggregatedTask(common.HexToAddress(taskContract), client)
+	if err != nil {
+		return "", fmt.Errorf("create ubi task client failed, error: %v", err)
+	}
+	blobCid, err := aggregatedTask.TaskBlobCID(&bind.CallOpts{})
+	if err != nil {
+		return "", fmt.Errorf("failed to get cid from contact, error: %v", err)
+	}
+	return blobCid, nil
 }
 
 func reportClusterResourceForDocker() {
@@ -943,6 +1025,7 @@ func reportClusterResourceForDocker() {
 
 	var nodeResource models.NodeResource
 	if err := json.Unmarshal([]byte(containerLogStr), &nodeResource); err != nil {
+		logs.GetLogger().Errorf("failed to convert json, container log: %s, error: %v", containerLogStr, err)
 		if err = RestartResourceExporter(); err != nil {
 			logs.GetLogger().Errorf("restartResourceExporter failed, error: %v", err)
 		}
@@ -983,7 +1066,7 @@ func CronTaskForEcp() {
 		for range ticker.C {
 			var taskList []models.TaskEntity
 			oneHourAgo := time.Now().Add(-1 * time.Hour).Unix()
-			err := NewTaskService().Model(&models.TaskEntity{}).Where("status !=? and status !=? and create_time <?", models.TASK_SUCCESS_STATUS, models.TASK_FAILED_STATUS, oneHourAgo).
+			err := NewTaskService().Model(&models.TaskEntity{}).Where("status in (?,?) and create_time <?", models.TASK_RECEIVED_STATUS, models.TASK_RUNNING_STATUS, oneHourAgo).
 				Or("tx_hash !='' and status =?", models.TASK_FAILED_STATUS).Find(&taskList).Error
 			if err != nil {
 				logs.GetLogger().Errorf("Failed get task list, error: %+v", err)
@@ -992,8 +1075,8 @@ func CronTaskForEcp() {
 
 			for _, entity := range taskList {
 				ubiTask := entity
-				if ubiTask.TxHash != "" {
-					ubiTask.Status = models.TASK_SUCCESS_STATUS
+				if ubiTask.Contract != "" || ubiTask.BlockHash != "" {
+					ubiTask.Status = models.TASK_SUBMITTED_STATUS
 				} else {
 					ubiTask.Status = models.TASK_FAILED_STATUS
 				}
@@ -1003,24 +1086,83 @@ func CronTaskForEcp() {
 	}()
 
 	go func() {
-		ticker := time.NewTicker(10 * time.Minute)
-		for range ticker.C {
-			taskList, err := NewTaskService().GetTaskListNoReward()
-			if err != nil {
-				logs.GetLogger().Errorf("get task list failed, error: %+v", err)
-				return
+		defer func() {
+			if err := recover(); err != nil {
+				logs.GetLogger().Errorf("GetUbiTaskReward, error: %+v", err)
 			}
-
-			for _, entity := range taskList {
-				ubiTask := entity
-				err = getReward(ubiTask)
-				if err != nil {
-					logs.GetLogger().Errorf("taskId: %d, %v", ubiTask.Id, err)
-					continue
-				}
+		}()
+		ticker := time.NewTicker(5 * time.Minute)
+		for range ticker.C {
+			if err := syncTaskStatusForSequencerService(); err != nil {
+				logs.GetLogger().Errorf("failed to sync task from sequencer, error: %v", err)
 			}
 		}
 	}()
+}
+
+func syncTaskStatusForSequencerService() error {
+	taskList, err := NewTaskService().GetTaskListNoReward()
+	if err != nil {
+		return fmt.Errorf("failed to get task list, error: %+v", err)
+	}
+
+	taskGroups := handleTasksToGroup(taskList)
+	for _, group := range taskGroups {
+		taskList, err := NewSequencer().QueryTask(group.Type, group.Ids...)
+		if err != nil {
+			logs.GetLogger().Errorf("failed to query task, task ids: %v, error: %v", group.Ids, err)
+			continue
+		}
+
+		var taskMap = make(map[int64]SequenceTask)
+		for _, t := range taskList.Data.List {
+			taskMap[int64(t.Id)] = t
+		}
+
+		for _, item := range group.Items {
+			if t, ok := taskMap[item.Id]; ok {
+				item.Reward = "0.00"
+				item.SequenceCid = t.SequenceCid
+				item.SettlementCid = t.SettlementCid
+				item.SequenceTaskAddr = t.SequenceTaskAddr
+				item.SettlementTaskAddr = t.SettlementTaskAddr
+
+				var status int
+				if t.SequenceCid == "-1" {
+					status = models.TASK_NSC_STATUS
+				} else if t.SettlementTaskAddr != "" {
+					status = models.TASK_REWARDED_STATUS
+					if len(t.Reward) >= 4 {
+						item.Reward = t.Reward[:4]
+					} else {
+						item.Reward = t.Reward
+					}
+				} else {
+					switch t.Status {
+					case "verified":
+						status = models.TASK_VERIFIED_STATUS
+					case "submitted":
+						status = models.TASK_SUBMITTED_STATUS
+					case "rewarded":
+						status = models.TASK_REWARDED_STATUS
+					case "invalid":
+						status = models.TASK_INVALID_STATUS
+					case "repeated":
+						status = models.TASK_REPEATED_STATUS
+					case "timeout":
+						status = models.TASK_TIMEOUT_STATUS
+					case "verifyFailed":
+						status = models.TASK_VERIFYFAILED_STATUS
+					default:
+						status = models.TASK_UNKNOWN_STATUS
+					}
+				}
+				item.Status = status
+				NewTaskService().UpdateTaskEntityByTaskId(item)
+			}
+		}
+	}
+	return nil
 }
 
 func SyncCpAccountInfo() {
@@ -1030,26 +1172,7 @@ func SyncCpAccountInfo() {
 		return
 	}
 
-	chainUrl, err := conf.GetRpcByNetWorkName()
-	if err != nil {
-		logs.GetLogger().Errorf("get rpc url failed, error: %v", err)
-		return
-	}
-
-	client, err := ethclient.Dial(chainUrl)
-	if err != nil {
-		logs.GetLogger().Errorf("dial rpc connect failed, error: %v", err)
-		return
-	}
-	defer client.Close()
-
-	cpStub, err := account2.NewAccountStub(client)
-	if err != nil {
-		logs.GetLogger().Errorf("create account client failed, error: %v", err)
-		return
-	}
-
-	cpAccount, err := cpStub.GetCpAccountInfo()
+	cpAccount, err := account.GetAccountInfo()
 	if err != nil {
 		logs.GetLogger().Errorf("get cpAccount failed, error: %v", err)
 		return
@@ -1086,56 +1209,202 @@ func RestartResourceExporter() error {
 		AttachStdout: true,
 		AttachStderr: true,
 		Tty:          true,
-	}, nil, resourceExporterContainerName)
+	}, &container.HostConfig{
+		Privileged: true,
+	}, resourceExporterContainerName)
 	if err != nil {
 		return fmt.Errorf("create resource-exporter container failed, error: %v", err)
 	}
 	return nil
 }
 
-func getReward(task *models.TaskEntity) error {
-	chainUrl, err := conf.GetRpcByNetWorkName()
-	if err != nil {
-		return fmt.Errorf("get rpc url failed, error: %s", err.Error())
+func submitTaskToSequencer(proof string, task *models.TaskEntity, timeOut int64, autoChainProof bool) error {
+	var err error
+	var taskReq struct {
+		Id           int64  `json:"id"`
+		Type         int    `json:"type"`
+		ResourceType int    `json:"resource_type"`
+		InputParam   string `json:"input_param"`
+		VerifyParam  string `json:"verify_param"`
+		Deadline     int64  `json:"deadline"`
+		CheckCode    string `json:"check_code"`
+		Proof        string `json:"proof"`
 	}
 
-	client, err := ethclient.Dial(chainUrl)
-	if err != nil {
-		return fmt.Errorf("dial rpc connect failed, error: %s", err.Error())
-	}
-	defer client.Close()
+	taskReq.Id = task.Id
+	taskReq.Type = task.Type
+	taskReq.ResourceType = task.ResourceType
+	taskReq.InputParam = task.InputParam
+	taskReq.VerifyParam = task.VerifyParam
+	taskReq.Deadline = task.Deadline
+	taskReq.CheckCode = task.CheckCode
+	taskReq.Proof = proof
 
-	taskStub, err := ecp.NewTaskStub(client, ecp.WithTaskContractAddress(task.Contract))
+	data, err := json.Marshal(&taskReq)
 	if err != nil {
-		return fmt.Errorf("create ubi task client failed, error: %s", err.Error())
+		return err
 	}
 
-	var status int
-	var rewardTx, challengeTx, slashTx, reward string
-	for i := 0; i < 5; i++ {
-		status, rewardTx, challengeTx, slashTx, reward, err = taskStub.GetReward()
-		if err != nil {
-			var errMsg string
-			if strings.Contains(err.Error(), "not found") {
-				errMsg = fmt.Sprintf("rewardTx %s not found on chain", rewardTx)
-			} else {
-				errMsg = ecp.ParseError(err)
+	timeOutCh := time.After(time.Second * time.Duration(timeOut))
+
+	start := time.Now()
+	if autoChainProof {
+		var flag bool
+		for i := 0; i < 5; i++ {
+			sendTaskProof, err := NewSequencer().SendTaskProof(data)
+			if err != nil {
+				logs.GetLogger().Warnf("taskId: %d submit task to sequencer failed, error: %v, retrying", task.Id, err)
+				time.Sleep(2 * time.Second)
+				continue
+			}
+			task.BlockHash = sendTaskProof.Data.BlockHash
+			task.Sign = sendTaskProof.Data.Sign
+			task.Sequencer = 1
+			logs.GetLogger().Infof("successfully submitted to the sequencer, taskId: %d the sequencer receipt is block_hash: %s, sign: %s", task.Id, task.BlockHash, task.Sign)
+			flag = true
+			break
+		}
+
+		if flag {
+			return nil
+		}
+		remainingTime := timeOut - int64(time.Now().Sub(start).Seconds())
+		if !flag && remainingTime > 0 {
+			chainUrl, err := conf.GetRpcByNetWorkName()
+			if err != nil {
+				return fmt.Errorf("failed to get rpc url, taskId: %d, error: %v", task.Id, err)
+			}
+			client, err := ethclient.Dial(chainUrl)
+			if err != nil {
+				return fmt.Errorf("failed to dial rpc, taskId: %d, error: %v", task.Id, err)
+			}
+			client.Close()
+
+			localWallet, err := wallet.SetupWallet(wallet.WalletRepo)
+			if err != nil {
+				return fmt.Errorf("failed to setup wallet, taskId: %d,error: %v", task.Id, err)
 			}
 
-			logs.GetLogger().Errorf("use %s task contract to get reward failed, error: %s", task.Contract, errMsg)
-			rand.Seed(time.Now().UnixNano())
-			time.Sleep(time.Duration(rand.Intn(3)+1) * time.Second)
-			continue
+			_, workerAddress, err := GetOwnerAddressAndWorkerAddress()
+			if err != nil {
+				return fmt.Errorf("failed to get worker address, taskId: %d,error: %v", task.Id, err)
+			}
+
+			ki, err := localWallet.FindKey(workerAddress)
+			if err != nil || ki == nil {
+				return fmt.Errorf("taskId: %d,the address: %s, private key %v", task.Id, workerAddress, wallet.ErrKeyInfoNotFound)
+			}
+			var workerPrivateKey = ki.PrivateKey
+			ki = nil
+			taskStub, err := ecp.NewTaskStub(client, ecp.WithTaskContractAddress(task.Contract), ecp.WithTaskPrivateKey(workerPrivateKey))
+			if err != nil {
+				return fmt.Errorf("failed to create ubi task client, taskId: %s, contract: %s, error: %v", task.Id, task.Contract, err)
+			}
+
+			taskContractAddress, err := taskStub.CreateTaskContract(task.Proof, task, remainingTime)
+			if taskContractAddress != "" {
+				task.Status = models.TASK_SUBMITTED_STATUS
+				task.Contract = taskContractAddress
+				task.Sequencer = 0
+				logs.GetLogger().Infof("successfully submitted to the chain, taskId: %d task contract address: %s", task.Id, taskContractAddress)
+				return nil
+			} else {
+				task.Status = models.TASK_FAILED_STATUS
+				task.Error = fmt.Sprintf("%s", err.Error())
+				return fmt.Errorf("taskId: %d, failed to create task contract , error: %v", task.Id, err)
+			}
+		}
+	} else {
+	outerLoop:
+		for {
+			select {
+			case <-timeOutCh:
+				err = fmt.Errorf("submit task to sequencer timed out")
+				break outerLoop
+			default:
+				sendTaskProof, err := NewSequencer().SendTaskProof(data)
+				if err != nil {
+					logs.GetLogger().Warnf("taskId: %d submit task to sequencer failed, error: %v, retrying", task.Id, err)
+					time.Sleep(2 * time.Second)
+					continue
+				}
+				task.BlockHash = sendTaskProof.Data.BlockHash
+				task.Sign = sendTaskProof.Data.Sign
+				task.Sequencer = 1
+				logs.GetLogger().Infof("successfully submitted to the sequencer, taskId: %d, the sequencer receipt is block_hash: %s, sign: %s", task.Id, task.BlockHash, task.Sign)
+				break outerLoop
+			}
+		}
+
+	}
+	return err
+}
+
+func checkBalance(cpAccountAddress string) (bool, error) {
+	if !conf.GetConfig().UBI.EnableSequencer && !conf.GetConfig().UBI.AutoChainProof {
+		return false, fmt.Errorf("do not accept tasks")
+	}
+
+	chainUrl, err := conf.GetRpcByNetWorkName()
+	if err != nil {
+		return false, fmt.Errorf("failed to get rpc url, cpAccount: %s, error: %v", cpAccountAddress, err)
+	}
+	client, err := ethclient.Dial(chainUrl)
+	if err != nil {
+		return false, fmt.Errorf("failed to dial rpc, cpAccount: %d, error: %v", cpAccountAddress, err)
+	}
+	client.Close()
+
+	_, workerAddress, err := GetOwnerAddressAndWorkerAddress()
+	if err != nil {
+		return false, fmt.Errorf("failed to get worker address, cpAccount: %d,error: %v", cpAccountAddress, err)
+	}
+
+	workerBalance, err := wallet.BalanceNumber(client, workerAddress)
+	if err != nil {
+		return false, fmt.Errorf("failed to get worker banlance, cpAccount: %d,error: %v", cpAccountAddress, err)
+	}
+
+	sequencerStub, err := ecp.NewSequencerStub(client, ecp.WithSequencerCpAccountAddress(cpAccountAddress))
+	if err != nil {
+		return false, fmt.Errorf("failed to get cp sequencer contract, cpAccount: %s, error: %v", cpAccountAddress, err)
+	}
+	sequencerBalanceStr, err := sequencerStub.GetCPBalance()
+	if err != nil {
+		return false, fmt.Errorf("failed to get cp sequencer contract, cpAccount: %s, error: %v", cpAccountAddress, err)
+	}
+
+	sequencerBalance, err := strconv.ParseFloat(sequencerBalanceStr, 64)
+	if err != nil {
+		return false, fmt.Errorf("failed to convert numbers for cp sequencer balance, cpAccount: %s, sequencerBalance: %s, error: %v", cpAccountAddress, sequencerBalanceStr, err)
+	}
+
+	logs.GetLogger().Infof("cpAccount: %s, sequencer balance: %s, worker address balance: %s", cpAccountAddress, fmt.Sprintf("%.4f", sequencerBalance),
+		fmt.Sprintf("%.4f", workerBalance))
+
+	if conf.GetConfig().UBI.EnableSequencer && !conf.GetConfig().UBI.AutoChainProof {
+		if sequencerBalance > 0 {
+			return true, nil
+		} else {
+			return false, fmt.Errorf("sequencer insufficient balance")
 		}
 	}
 
-	if status != models.REWARD_UNCLAIMED {
-		task.Reward = reward
-		task.RewardStatus = status
-		task.RewardTx = rewardTx
-		task.ChallengeTx = challengeTx
-		task.SlashTx = slashTx
-		return NewTaskService().SaveTaskEntity(task)
+	if conf.GetConfig().UBI.EnableSequencer && conf.GetConfig().UBI.AutoChainProof {
+		if sequencerBalance > 0 || workerBalance > 0 {
+			return true, nil
+		} else {
+			return false, fmt.Errorf("insufficient balance")
+		}
 	}
-	return nil
+
+	if !conf.GetConfig().UBI.EnableSequencer && conf.GetConfig().UBI.AutoChainProof {
+		if workerBalance > 0 {
+			return true, nil
+		} else {
+			return false, fmt.Errorf("worker address insufficient balance")
+		}
+	}
+
+	return false, fmt.Errorf("unknown error")
 }
