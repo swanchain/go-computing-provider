@@ -589,7 +589,7 @@ var collateralWithDrawViewCmd = &cli.Command{
 			currentTime := time.Unix(int64(block.Time)+withdrawView.WithdrawDelay*secondFlag, 0)
 			timeStr := currentTime.Format("2006-01-02 15:04:05")
 			timeZone, _ := currentTime.Zone()
-			confirmableBlockStr = fmt.Sprintf("%d​(%s​%s)", confirmableBlock, timeStr, timeZone)
+			confirmableBlockStr = fmt.Sprintf("%d\u200B(%s\u200B%s)", confirmableBlock, strings.ReplaceAll(timeStr, " ", "\u200B"), timeZone)
 		}
 		var taskData [][]string
 		taskData = append(taskData, []string{"Amount(SWANC):", amount})
