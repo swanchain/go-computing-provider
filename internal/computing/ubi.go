@@ -657,6 +657,7 @@ func DoUbiTaskForDocker(c *gin.Context) {
 			Binds:       []string{fmt.Sprintf("%s:/var/tmp/filecoin-proof-parameters", filC2Param)},
 			Resources:   needResource,
 			NetworkMode: network.NetworkHost,
+			Privileged:  true,
 		}
 		containerConfig := &container.Config{
 			Image:        ubiTaskImage,
@@ -1208,7 +1209,9 @@ func RestartResourceExporter() error {
 		AttachStdout: true,
 		AttachStderr: true,
 		Tty:          true,
-	}, nil, resourceExporterContainerName)
+	}, &container.HostConfig{
+		Privileged: true,
+	}, resourceExporterContainerName)
 	if err != nil {
 		return fmt.Errorf("create resource-exporter container failed, error: %v", err)
 	}
