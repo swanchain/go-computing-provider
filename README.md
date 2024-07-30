@@ -305,7 +305,7 @@ If you have installed it correctly, you can see the result shown in the figure b
 ```bash
 git clone https://github.com/swanchain/go-computing-provider.git
 cd go-computing-provider
-git checkout mainnet
+git checkout releases
 ```
 
 Then build the Computing provider on the **Swan Mainnet** by following the below steps:
