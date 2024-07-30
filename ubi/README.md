@@ -82,7 +82,7 @@ computing-provider collateral add --ecp --from <YOUR_WALLET_ADDRESS>  <AMOUNT>
     ```bash
     computing-provider sequencer add --from <YOUR_WALLET_ADDRESS>  <amount>
     ```
-> If you want to Withdraw `SwanETH` for Sequencer Account
+> If you want to Withdraw `SwanETH` from Sequencer Account
 >
 >    ```bash
 >    computing-provider sequencer withdraw --owner <YOUR_OWNER_WALLET_ADDRESS>  <amount>
