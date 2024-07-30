@@ -152,10 +152,3 @@ func getVerifyAccountClient(ownerAddress string) (*ethclient.Client, *account.Cp
 	}
 	return client, cpStub, nil
 }
-
-func appendWhiteSpace(str string) string {
-	for i := 0; i < 10; i++ {
-		str += " "
-	}
-	return str
-}

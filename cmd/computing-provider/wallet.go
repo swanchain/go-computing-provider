@@ -589,13 +589,13 @@ var collateralWithDrawViewCmd = &cli.Command{
 			currentTime := time.Unix(int64(block.Time)+withdrawView.WithdrawDelay*secondFlag, 0)
 			timeStr := currentTime.Format("2006-01-02 15:04:05")
 			timeZone, _ := currentTime.Zone()
-			confirmableBlockStr = fmt.Sprintf("%d(%s %s)", confirmableBlock, timeStr, timeZone)
+			confirmableBlockStr = fmt.Sprintf("%d​(%s​%s)", confirmableBlock, timeStr, timeZone)
 		}
 		var taskData [][]string
 		taskData = append(taskData, []string{"Amount(SWANC):", amount})
 		taskData = append(taskData, []string{"Latest Block:", strconv.FormatUint(latestBlockNumber, 10)})
 		taskData = append(taskData, []string{"Request Block:", strconv.Itoa(int(requestBlock))})
-		taskData = append(taskData, []string{"Confirmable Block:", appendWhiteSpace(confirmableBlockStr)})
+		taskData = append(taskData, []string{"Confirmable Block:", confirmableBlockStr})
 
 		header := []string{"Withdraw View:"}
 		NewVisualTable(header, taskData, []RowColor{}).SetAutoWrapText(false).Generate(false)

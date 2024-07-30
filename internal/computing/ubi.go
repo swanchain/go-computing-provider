@@ -944,6 +944,9 @@ loopTask:
 			} else {
 				task.Status = models.TASK_SUBMITTED_STATUS
 			}
+		} else {
+			task.Status = models.TASK_FAILED_STATUS
+			logs.GetLogger().Warnf("taskId: %d, sequencer insufficient balance, sequencerBalance: %f", task.Id, sequencerBalance)
 		}
 	} else {
 		taskContractAddress, err := taskStub.CreateTaskContract(c2Proof.Proof, task, remainingTime)
