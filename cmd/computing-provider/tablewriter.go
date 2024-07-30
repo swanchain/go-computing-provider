@@ -9,6 +9,7 @@ type VisualTable struct {
 	Header   []string
 	Data     [][]string
 	RowColor []RowColor
+	WrapText bool
 }
 
 type RowColor struct {
@@ -23,7 +24,13 @@ func NewVisualTable(header []string, data [][]string, rowColor []RowColor) *Visu
 		Header:   header,
 		Data:     data,
 		RowColor: rowColor,
+		WrapText: true,
 	}
+}
+
+func (v *VisualTable) SetAutoWrapText(wrapText bool) *VisualTable {
+	v.WrapText = wrapText
+	return v
 }
 
 func (v *VisualTable) Generate(formatHeaders bool) {
@@ -51,7 +58,7 @@ func (v *VisualTable) Generate(formatHeaders bool) {
 	}
 
 	table.SetHeader(v.Header)
-	table.SetAutoWrapText(true)
+	table.SetAutoWrapText(v.WrapText)
 	table.SetAutoFormatHeaders(formatHeaders)
 	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
 	table.SetHeaderLine(false)

@@ -6,9 +6,11 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/swanchain/go-computing-provider/build"
 	"log"
+	"net"
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -35,7 +37,10 @@ type API struct {
 	WalletBlackList string
 }
 type UBI struct {
-	UbiEnginePk string
+	UbiEnginePk     string
+	EnableSequencer bool
+	AutoChainProof  bool
+	SequencerUrl    string
 }
 
 type LOG struct {
@@ -44,7 +49,6 @@ type LOG struct {
 }
 
 type HUB struct {
-	ServerUrl        string
 	AccessToken      string
 	BalanceThreshold float64
 	OrchestratorPk   string
@@ -68,10 +72,16 @@ type RPC struct {
 }
 
 type CONTRACT struct {
-	SwanToken    string `toml:"SWAN_CONTRACT"`
-	Collateral   string `toml:"SWAN_COLLATERAL_CONTRACT"`
-	Register     string `toml:"REGISTER_CP_CONTRACT"`
+	SwanToken         string `toml:"SWAN_CONTRACT"`
+	CpAccountRegister string `toml:"REGISTER_CP_CONTRACT"`
+
+	JobCollateral     string `toml:"SWAN_COLLATERAL_CONTRACT"`
+	JobManager        string `toml:"SWAN_JOB_CONTRACT"`
+	JobManagerCreated uint64 `toml:"JobManagerCreated"`
+
+	TaskRegister string `toml:"REGISTER_TASK_CONTRACT"`
 	ZkCollateral string `toml:"ZK_COLLATERAL_CONTRACT"`
+	Sequencer    string `toml:"SEQUENCER_CONTRACT"`
 }
 
 func GetRpcByNetWorkName() (string, error) {
@@ -94,6 +104,11 @@ func InitConfig(cpRepoPath string, standalone bool) error {
 		return fmt.Errorf("failed load config file, path: %s, error: %w", configFile, err)
 	}
 
+	multiAddressSplit := strings.Split(config.API.MultiAddress, "/")
+	if len(multiAddressSplit) < 4 {
+		log.Fatalf("MultiAddress %s is invalid\n", multiAddressSplit[2])
+	}
+
 	if standalone {
 		if !requiredFieldsAreGivenForSeparate(metaData) {
 			log.Fatal("Required fields not given")
@@ -102,6 +117,16 @@ func InitConfig(cpRepoPath string, standalone bool) error {
 		if !requiredFieldsAreGiven(metaData) {
 			log.Fatal("Required fields not given")
 		}
+		var domain string
+		if strings.HasPrefix(config.API.Domain, ".") {
+			domain = config.API.Domain[1:]
+		} else {
+			domain = config.API.Domain
+		}
+
+		if !isValidDomain(domain) {
+			log.Fatalf("domain %s is invalid\n", domain)
+		}
 	}
 
 	networkConfig := build.LoadParam()
@@ -109,12 +134,22 @@ func InitConfig(cpRepoPath string, standalone bool) error {
 		ncCopy := nc
 		if ncCopy.Network == build.NetWorkTag {
 			config.CONTRACT.SwanToken = ncCopy.Config.SwanTokenContract
-			config.CONTRACT.Collateral = ncCopy.Config.OrchestratorCollateralContract
-			config.CONTRACT.Register = ncCopy.Config.RegisterCpContract
+			config.CONTRACT.JobCollateral = ncCopy.Config.OrchestratorCollateralContract
+			config.CONTRACT.JobManager = ncCopy.Config.JobManagerContract
+			config.CONTRACT.JobManagerCreated = ncCopy.Config.JobManagerContractCreated
+			config.CONTRACT.CpAccountRegister = ncCopy.Config.RegisterCpContract
 			config.CONTRACT.ZkCollateral = ncCopy.Config.ZkCollateralContract
+			config.CONTRACT.Sequencer = ncCopy.Config.SequencerContract
+			config.CONTRACT.TaskRegister = ncCopy.Config.RegisterTaskContract
 		}
 	}
 	return nil
+}
+
+func isValidDomain(domain string) bool {
+	domainRegex := `^(?i:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$`
+	re := regexp.MustCompile(domainRegex)
+	return re.MatchString(domain)
 }
 
 func GetConfig() *ComputeNode {
@@ -139,9 +174,9 @@ func requiredFieldsAreGiven(metaData toml.MetaData) bool {
 		{"LOG", "KeyFile"},
 
 		{"UBI", "UbiEnginePk"},
-
-		{"HUB", "ServerUrl"},
-		{"HUB", "AccessToken"},
+		{"UBI", "EnableSequencer"},
+		{"UBI", "AutoChainProof"},
+		{"UBI", "SequencerUrl"},
 
 		{"MCS", "ApiKey"},
 		{"MCS", "BucketName"},
@@ -169,6 +204,9 @@ func requiredFieldsAreGivenForSeparate(metaData toml.MetaData) bool {
 		{"API", "NodeName"},
 
 		{"UBI", "UbiEnginePk"},
+		{"UBI", "EnableSequencer"},
+		{"UBI", "AutoChainProof"},
+		{"UBI", "SequencerUrl"},
 
 		{"RPC", "SWAN_CHAIN_RPC"},
 	}
@@ -199,11 +237,9 @@ func GenerateAndUpdateConfigFile(cpRepoPath string, multiAddress, nodeName strin
 			ncCopy := nc
 			if ncCopy.Network == build.NetWorkTag {
 				defaultComputeNode.UBI.UbiEnginePk = ncCopy.Config.ZkEnginePk
-
-				defaultComputeNode.HUB.ServerUrl = ncCopy.Config.OrchestratorUrl
 				defaultComputeNode.HUB.OrchestratorPk = ncCopy.Config.OrchestratorPk
-
 				defaultComputeNode.RPC.SwanChainRpc = ncCopy.Config.ChainRpc
+				defaultComputeNode.UBI.SequencerUrl = ncCopy.Config.SequencerUrl
 			}
 		}
 
@@ -275,15 +311,15 @@ func generateDefaultConfig() ComputeNode {
 			WalletBlackList: "",
 		},
 		UBI: UBI{
-			UbiEnginePk: "",
+			UbiEnginePk:     "",
+			EnableSequencer: true,
+			AutoChainProof:  true,
 		},
 		LOG: LOG{
 			CrtFile: "",
 			KeyFile: "",
 		},
 		HUB: HUB{
-			ServerUrl:        "",
-			AccessToken:      "",
 			BalanceThreshold: 0.1,
 			OrchestratorPk:   "",
 			VerifySign:       true,
@@ -302,10 +338,14 @@ func generateDefaultConfig() ComputeNode {
 			SwanChainRpc: "",
 		},
 		CONTRACT: CONTRACT{
-			SwanToken:    "",
-			Collateral:   "",
-			Register:     "",
-			ZkCollateral: "",
+			SwanToken:         "",
+			JobCollateral:     "",
+			JobManager:        "",
+			JobManagerCreated: 0,
+			CpAccountRegister: "",
+			TaskRegister:      "",
+			ZkCollateral:      "",
+			Sequencer:         "",
 		},
 	}
 }
@@ -321,4 +361,20 @@ func Exists(cpPath string) bool {
 		return false
 	}
 	return true
+}
+
+func checkDomain(domain string, expectedIP string) bool {
+	ips, err := net.LookupIP(domain)
+	if err != nil {
+		return false
+	}
+
+	matched := false
+	for _, ip := range ips {
+		if ip.String() == expectedIP {
+			matched = true
+			break
+		}
+	}
+	return matched
 }
