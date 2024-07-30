@@ -612,7 +612,7 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		}
 
 		if err := NewDockerService().PullImage(ubiTaskImage); err != nil {
-			logs.GetLogger().Errorf("pull %s image failed, error: %v", ubiTaskImage, err)
+			logs.GetLogger().Errorf("failed to pull %s image, error: %v", ubiTaskImage, err)
 			return
 		}
 
@@ -657,6 +657,7 @@ func DoUbiTaskForDocker(c *gin.Context) {
 			Binds:       []string{fmt.Sprintf("%s:/var/tmp/filecoin-proof-parameters", filC2Param)},
 			Resources:   needResource,
 			NetworkMode: network.NetworkHost,
+			Privileged:  true,
 		}
 		containerConfig := &container.Config{
 			Image:        ubiTaskImage,
@@ -668,6 +669,8 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		}
 
 		containerName := JobName + generateString(5)
+		logs.GetLogger().Warnf("task_id: %d, starting container, container name: %s", ubiTask.ID, containerName)
+
 		dockerService := NewDockerService()
 		if err = dockerService.ContainerCreateAndStart(containerConfig, hostConfig, containerName); err != nil {
 			logs.GetLogger().Errorf("create ubi task container failed, error: %v", err)
@@ -676,8 +679,10 @@ func DoUbiTaskForDocker(c *gin.Context) {
 
 		time.Sleep(3 * time.Second)
 		if !dockerService.IsExistContainer(containerName) {
+			logs.GetLogger().Warnf("task_id: %d, not found container", ubiTask.ID)
 			return
 		}
+		logs.GetLogger().Warnf("task_id: %d, started container, container name: %s", ubiTask.ID, containerName)
 
 		containerLogStream, err := dockerService.GetContainerLogStream(containerName)
 		if err != nil {
@@ -940,6 +945,9 @@ loopTask:
 			} else {
 				task.Status = models.TASK_SUBMITTED_STATUS
 			}
+		} else {
+			task.Status = models.TASK_FAILED_STATUS
+			logs.GetLogger().Warnf("taskId: %d, sequencer insufficient balance, sequencerBalance: %f", task.Id, sequencerBalance)
 		}
 	} else {
 		taskContractAddress, err := taskStub.CreateTaskContract(c2Proof.Proof, task, remainingTime)
@@ -1201,7 +1209,9 @@ func RestartResourceExporter() error {
 		AttachStdout: true,
 		AttachStderr: true,
 		Tty:          true,
-	}, nil, resourceExporterContainerName)
+	}, &container.HostConfig{
+		Privileged: true,
+	}, resourceExporterContainerName)
 	if err != nil {
 		return fmt.Errorf("create resource-exporter container failed, error: %v", err)
 	}
