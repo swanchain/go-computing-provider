@@ -38,6 +38,9 @@ import (
 )
 
 func DoUbiTaskForK8s(c *gin.Context) {
+	if !conf.GetConfig().UBI.EnableSequencer && !conf.GetConfig().UBI.AutoChainProof {
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.RejectZkTaskError))
+	}
 
 	var ubiTask models.UBITaskReq
 	if err := c.ShouldBindJSON(&ubiTask); err != nil {
@@ -476,6 +479,10 @@ func ReceiveUbiProof(c *gin.Context) {
 }
 
 func DoUbiTaskForDocker(c *gin.Context) {
+	if !conf.GetConfig().UBI.EnableSequencer && !conf.GetConfig().UBI.AutoChainProof {
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.RejectZkTaskError))
+	}
+
 	var ubiTask models.UBITaskReq
 	if err := c.ShouldBindJSON(&ubiTask); err != nil {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
@@ -1354,10 +1361,6 @@ func submitTaskToSequencer(proof string, task *models.TaskEntity, timeOut int64,
 }
 
 func checkBalance(cpAccountAddress string) (bool, error) {
-	if !conf.GetConfig().UBI.EnableSequencer && !conf.GetConfig().UBI.AutoChainProof {
-		return false, fmt.Errorf("do not accept tasks")
-	}
-
 	chainUrl, err := conf.GetRpcByNetWorkName()
 	if err != nil {
 		return false, fmt.Errorf("failed to get rpc url, cpAccount: %s, error: %v", cpAccountAddress, err)
