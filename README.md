@@ -346,7 +346,7 @@ make install
        UbiEnginePk = "0xB5aeb540B4895cd024c1625E146684940A849ED9"              # UBI Engine's public key, CP only accept the task from this UBI engine
        EnableSequencer = true                                                  # Submit the proof to Sequencer service(default: true)
        AutoChainProof = true                                                   # When Sequencer doesn't have enough funds or the service is unavailable, automatically submit proof to the Swan chain 
-       SequencerUrl = "http://sequencer.swanchain.io"                          # Sequencer service's API address
+       SequencerUrl = "https://sequencer.swanchain.io"                          # Sequencer service's API address
    
        [LOG]
        CrtFile = "/YOUR_DOMAIN_NAME_CRT_PATH/server.crt"                       # Your domain name SSL .crt file path

@@ -348,7 +348,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 								},
 							},
 						},
-						RestartPolicy: "Never",
+						RestartPolicy: v1.RestartPolicyNever,
 					},
 				},
 				BackoffLimit:            new(int32),
@@ -357,7 +357,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 		}
 
 		*job.Spec.BackoffLimit = 1
-		*job.Spec.TTLSecondsAfterFinished = 120
+		*job.Spec.TTLSecondsAfterFinished = 300
 
 		if _, err = k8sService.k8sClient.BatchV1().Jobs(namespace).Create(context.TODO(), job, metaV1.CreateOptions{}); err != nil {
 			logs.GetLogger().Errorf("Failed creating ubi task job: %v", err)
@@ -369,7 +369,12 @@ func DoUbiTaskForK8s(c *gin.Context) {
 				LabelSelector: fmt.Sprintf("job-name=%s", JobName),
 			})
 			if err != nil {
+				logs.GetLogger().Errorf("failed get pod, taskId: %d, error: %v，retrying", ubiTask.ID, err)
 				return false, err
+			}
+
+			if len(pods.Items) == 0 {
+				return false, nil
 			}
 
 			for _, p := range pods.Items {
@@ -400,8 +405,10 @@ func DoUbiTaskForK8s(c *gin.Context) {
 			break
 		}
 		if podName == "" {
+			logs.GetLogger().Errorf("failed get pod name, taskId: %d", ubiTask.ID)
 			return
 		}
+		logs.GetLogger().Infof("successfully get pod name, taskId: %d, podName: %s", ubiTask.ID, podName)
 
 		req := k8sService.k8sClient.CoreV1().Pods(namespace).GetLogs(podName, &v1.PodLogOptions{
 			Container: "",
@@ -1139,10 +1146,14 @@ func syncTaskStatusForSequencerService() error {
 					}
 				} else {
 					switch t.Status {
-					case "verified":
-						status = models.TASK_VERIFIED_STATUS
+					case "received":
+						status = models.TASK_RECEIVED_STATUS
+					case "running":
+						status = models.TASK_RUNNING_STATUS
 					case "submitted":
 						status = models.TASK_SUBMITTED_STATUS
+					case "verified":
+						status = models.TASK_VERIFIED_STATUS
 					case "rewarded":
 						status = models.TASK_REWARDED_STATUS
 					case "invalid":
@@ -1153,6 +1164,8 @@ func syncTaskStatusForSequencerService() error {
 						status = models.TASK_TIMEOUT_STATUS
 					case "verifyFailed":
 						status = models.TASK_VERIFYFAILED_STATUS
+					case "failed":
+						status = models.TASK_FAILED_STATUS
 					default:
 						status = models.TASK_UNKNOWN_STATUS
 					}
