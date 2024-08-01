@@ -233,29 +233,29 @@ func DoUbiTaskForK8s(c *gin.Context) {
 	go func() {
 		var namespace = "ubi-task-" + strconv.Itoa(ubiTask.ID)
 		var err error
-		defer func() {
-			if err := recover(); err != nil {
-				logs.GetLogger().Errorf("do zk task painc, error: %+v", err)
-				return
-			}
-
-			ubiTaskRun, err := NewTaskService().GetTaskEntity(int64(ubiTask.ID))
-			if err != nil {
-				logs.GetLogger().Errorf("get ubi task detail from db failed, ubiTaskId: %d, error: %+v", ubiTask.ID, err)
-				return
-			}
-
-			println(777)
-
-			if ubiTaskRun.Contract != "" || ubiTaskRun.BlockHash != "" {
-				ubiTaskRun.Status = models.TASK_SUBMITTED_STATUS
-			} else {
-				ubiTaskRun.Status = models.TASK_FAILED_STATUS
-				k8sService := NewK8sService()
-				k8sService.k8sClient.CoreV1().Namespaces().Delete(context.TODO(), namespace, metaV1.DeleteOptions{})
-			}
-			err = NewTaskService().SaveTaskEntity(ubiTaskRun)
-		}()
+		//defer func() {
+		//	if err := recover(); err != nil {
+		//		logs.GetLogger().Errorf("do zk task painc, error: %+v", err)
+		//		return
+		//	}
+		//
+		//	ubiTaskRun, err := NewTaskService().GetTaskEntity(int64(ubiTask.ID))
+		//	if err != nil {
+		//		logs.GetLogger().Errorf("get ubi task detail from db failed, ubiTaskId: %d, error: %+v", ubiTask.ID, err)
+		//		return
+		//	}
+		//
+		//	println(777)
+		//
+		//	if ubiTaskRun.Contract != "" || ubiTaskRun.BlockHash != "" {
+		//		ubiTaskRun.Status = models.TASK_SUBMITTED_STATUS
+		//	} else {
+		//		ubiTaskRun.Status = models.TASK_FAILED_STATUS
+		//		k8sService := NewK8sService()
+		//		k8sService.k8sClient.CoreV1().Namespaces().Delete(context.TODO(), namespace, metaV1.DeleteOptions{})
+		//	}
+		//	err = NewTaskService().SaveTaskEntity(ubiTaskRun)
+		//}()
 
 		if ubiTaskImage == "" {
 			logs.GetLogger().Errorf("please check the log output of the resource-exporter pod to see if cpu_name is intel or amd")
@@ -370,6 +370,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 				LabelSelector: fmt.Sprintf("job-name=%s", JobName),
 			})
 			if err != nil {
+				logs.GetLogger().Errorf("failed get pod, taskId: %d, error: %v，retrying", ubiTask.ID, err)
 				return false, err
 			}
 
@@ -405,8 +406,10 @@ func DoUbiTaskForK8s(c *gin.Context) {
 			break
 		}
 		if podName == "" {
+			logs.GetLogger().Errorf("failed get pod name, taskId: %d", ubiTask.ID)
 			return
 		}
+		logs.GetLogger().Infof("successfully get pod name, taskId: %d, podName: %s", ubiTask.ID, podName)
 
 		println(9999)
 
