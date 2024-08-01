@@ -352,6 +352,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 								},
 							},
 						},
+						RestartPolicy: v1.RestartPolicyOnFailure,
 					},
 				},
 			},
