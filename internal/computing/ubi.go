@@ -356,7 +356,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 			},
 		}
 
-		*job.Spec.BackoffLimit = 1
+		*job.Spec.BackoffLimit = 2
 		*job.Spec.TTLSecondsAfterFinished = 300
 
 		if _, err = k8sService.k8sClient.BatchV1().Jobs(namespace).Create(context.TODO(), job, metaV1.CreateOptions{}); err != nil {
