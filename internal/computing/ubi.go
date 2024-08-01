@@ -233,36 +233,33 @@ func DoUbiTaskForK8s(c *gin.Context) {
 	go func() {
 		var namespace = "ubi-task-" + strconv.Itoa(ubiTask.ID)
 		var err error
-		//defer func() {
-		//	if err := recover(); err != nil {
-		//		logs.GetLogger().Errorf("do zk task painc, error: %+v", err)
-		//		return
-		//	}
-		//
-		//	ubiTaskRun, err := NewTaskService().GetTaskEntity(int64(ubiTask.ID))
-		//	if err != nil {
-		//		logs.GetLogger().Errorf("get ubi task detail from db failed, ubiTaskId: %d, error: %+v", ubiTask.ID, err)
-		//		return
-		//	}
-		//
-		//	println(777)
-		//
-		//	if ubiTaskRun.Contract != "" || ubiTaskRun.BlockHash != "" {
-		//		ubiTaskRun.Status = models.TASK_SUBMITTED_STATUS
-		//	} else {
-		//		ubiTaskRun.Status = models.TASK_FAILED_STATUS
-		//		k8sService := NewK8sService()
-		//		k8sService.k8sClient.CoreV1().Namespaces().Delete(context.TODO(), namespace, metaV1.DeleteOptions{})
-		//	}
-		//	err = NewTaskService().SaveTaskEntity(ubiTaskRun)
-		//}()
+		defer func() {
+			if err := recover(); err != nil {
+				logs.GetLogger().Errorf("do zk task painc, error: %+v", err)
+				return
+			}
+
+			ubiTaskRun, err := NewTaskService().GetTaskEntity(int64(ubiTask.ID))
+			if err != nil {
+				logs.GetLogger().Errorf("get ubi task detail from db failed, ubiTaskId: %d, error: %+v", ubiTask.ID, err)
+				return
+			}
+
+			if ubiTaskRun.Contract != "" || ubiTaskRun.BlockHash != "" {
+				ubiTaskRun.Status = models.TASK_SUBMITTED_STATUS
+			} else {
+				ubiTaskRun.Status = models.TASK_FAILED_STATUS
+				k8sService := NewK8sService()
+				k8sService.k8sClient.CoreV1().Namespaces().Delete(context.TODO(), namespace, metaV1.DeleteOptions{})
+			}
+			err = NewTaskService().SaveTaskEntity(ubiTaskRun)
+		}()
 
 		if ubiTaskImage == "" {
 			logs.GetLogger().Errorf("please check the log output of the resource-exporter pod to see if cpu_name is intel or amd")
 			return
 		}
 
-		println(11111)
 		k8sService := NewK8sService()
 		if _, err = k8sService.GetNameSpace(context.TODO(), namespace, metaV1.GetOptions{}); err != nil {
 			if errors.IsNotFound(err) {
@@ -278,7 +275,6 @@ func DoUbiTaskForK8s(c *gin.Context) {
 				}
 			}
 		}
-		println(2222)
 
 		receiveUrl := fmt.Sprintf("%s:%d/api/v1/computing/cp/receive/ubi", k8sService.GetAPIServerEndpoint(), conf.GetConfig().API.Port)
 		execCommand := []string{"ubi-bench", "c2"}
@@ -352,18 +348,21 @@ func DoUbiTaskForK8s(c *gin.Context) {
 								},
 							},
 						},
-						RestartPolicy: v1.RestartPolicyOnFailure,
+						RestartPolicy: v1.RestartPolicyNever,
 					},
 				},
+				BackoffLimit:            new(int32),
+				TTLSecondsAfterFinished: new(int32),
 			},
 		}
 
-		println(3333)
+		*job.Spec.BackoffLimit = 1
+		*job.Spec.TTLSecondsAfterFinished = 300
+
 		if _, err = k8sService.k8sClient.BatchV1().Jobs(namespace).Create(context.TODO(), job, metaV1.CreateOptions{}); err != nil {
 			logs.GetLogger().Errorf("Failed creating ubi task job: %v", err)
 			return
 		}
-		println(44444)
 
 		err = wait.PollImmediate(2*time.Second, 60*time.Second, func() (bool, error) {
 			pods, err := k8sService.k8sClient.CoreV1().Pods(namespace).List(context.TODO(), metaV1.ListOptions{
@@ -372,6 +371,10 @@ func DoUbiTaskForK8s(c *gin.Context) {
 			if err != nil {
 				logs.GetLogger().Errorf("failed get pod, taskId: %d, error: %v，retrying", ubiTask.ID, err)
 				return false, err
+			}
+
+			if len(pods.Items) == 0 {
+				return false, nil
 			}
 
 			for _, p := range pods.Items {
@@ -388,8 +391,6 @@ func DoUbiTaskForK8s(c *gin.Context) {
 			return
 		}
 
-		println(55555)
-
 		pods, err := k8sService.k8sClient.CoreV1().Pods(namespace).List(context.TODO(), metaV1.ListOptions{
 			LabelSelector: fmt.Sprintf("job-name=%s", JobName),
 		})
@@ -397,8 +398,6 @@ func DoUbiTaskForK8s(c *gin.Context) {
 			logs.GetLogger().Errorf("Failed list ubi pods: %v", err)
 			return
 		}
-
-		println(6666)
 
 		var podName string
 		for _, pod := range pods.Items {
@@ -410,8 +409,6 @@ func DoUbiTaskForK8s(c *gin.Context) {
 			return
 		}
 		logs.GetLogger().Infof("successfully get pod name, taskId: %d, podName: %s", ubiTask.ID, podName)
-
-		println(9999)
 
 		req := k8sService.k8sClient.CoreV1().Pods(namespace).GetLogs(podName, &v1.PodLogOptions{
 			Container: "",
