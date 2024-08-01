@@ -32,16 +32,16 @@ func NewCronTask(nodeId string) *CronTask {
 }
 
 func (task *CronTask) RunTask() {
-	//addNodeLabel()
-	//checkJobStatus()
-	//task.checkCollateralBalance()
-	//task.cleanAbnormalDeployment()
-	//task.setFailedUbiTaskStatus()
-	//task.watchNameSpaceForDeleted()
-	//task.reportClusterResource()
-	//task.watchExpiredTask()
-	//task.getUbiTaskReward()
-	//task.checkJobReward()
+	addNodeLabel()
+	checkJobStatus()
+	task.checkCollateralBalance()
+	task.cleanAbnormalDeployment()
+	task.setFailedUbiTaskStatus()
+	task.watchNameSpaceForDeleted()
+	task.reportClusterResource()
+	task.watchExpiredTask()
+	task.getUbiTaskReward()
+	task.checkJobReward()
 }
 
 func checkJobStatus() {
