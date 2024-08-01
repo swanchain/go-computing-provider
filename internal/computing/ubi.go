@@ -245,6 +245,8 @@ func DoUbiTaskForK8s(c *gin.Context) {
 				return
 			}
 
+			println(777)
+
 			if ubiTaskRun.Contract != "" || ubiTaskRun.BlockHash != "" {
 				ubiTaskRun.Status = models.TASK_SUBMITTED_STATUS
 			} else {
@@ -260,6 +262,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 			return
 		}
 
+		println(11111)
 		k8sService := NewK8sService()
 		if _, err = k8sService.GetNameSpace(context.TODO(), namespace, metaV1.GetOptions{}); err != nil {
 			if errors.IsNotFound(err) {
@@ -275,6 +278,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 				}
 			}
 		}
+		println(2222)
 
 		receiveUrl := fmt.Sprintf("%s:%d/api/v1/computing/cp/receive/ubi", k8sService.GetAPIServerEndpoint(), conf.GetConfig().API.Port)
 		execCommand := []string{"ubi-bench", "c2"}
@@ -359,10 +363,12 @@ func DoUbiTaskForK8s(c *gin.Context) {
 		*job.Spec.BackoffLimit = 2
 		*job.Spec.TTLSecondsAfterFinished = 300
 
+		println(3333)
 		if _, err = k8sService.k8sClient.BatchV1().Jobs(namespace).Create(context.TODO(), job, metaV1.CreateOptions{}); err != nil {
 			logs.GetLogger().Errorf("Failed creating ubi task job: %v", err)
 			return
 		}
+		println(44444)
 
 		err = wait.PollImmediate(2*time.Second, 60*time.Second, func() (bool, error) {
 			pods, err := k8sService.k8sClient.CoreV1().Pods(namespace).List(context.TODO(), metaV1.ListOptions{
@@ -386,6 +392,8 @@ func DoUbiTaskForK8s(c *gin.Context) {
 			return
 		}
 
+		println(55555)
+
 		pods, err := k8sService.k8sClient.CoreV1().Pods(namespace).List(context.TODO(), metaV1.ListOptions{
 			LabelSelector: fmt.Sprintf("job-name=%s", JobName),
 		})
@@ -393,6 +401,8 @@ func DoUbiTaskForK8s(c *gin.Context) {
 			logs.GetLogger().Errorf("Failed list ubi pods: %v", err)
 			return
 		}
+
+		println(6666)
 
 		var podName string
 		for _, pod := range pods.Items {
