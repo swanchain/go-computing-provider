@@ -355,13 +355,8 @@ func DoUbiTaskForK8s(c *gin.Context) {
 						RestartPolicy: "Never",
 					},
 				},
-				BackoffLimit:            new(int32),
-				TTLSecondsAfterFinished: new(int32),
 			},
 		}
-
-		*job.Spec.BackoffLimit = 2
-		*job.Spec.TTLSecondsAfterFinished = 300
 
 		println(3333)
 		if _, err = k8sService.k8sClient.BatchV1().Jobs(namespace).Create(context.TODO(), job, metaV1.CreateOptions{}); err != nil {
@@ -412,6 +407,8 @@ func DoUbiTaskForK8s(c *gin.Context) {
 		if podName == "" {
 			return
 		}
+
+		println(9999)
 
 		req := k8sService.k8sClient.CoreV1().Pods(namespace).GetLogs(podName, &v1.PodLogOptions{
 			Container: "",
