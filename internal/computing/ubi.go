@@ -284,6 +284,12 @@ func DoUbiTaskForK8s(c *gin.Context) {
 		execCommand := []string{"ubi-bench", "c2"}
 		JobName := strings.ToLower(models.UbiTaskTypeStr(ubiTask.Type)) + "-" + strconv.Itoa(ubiTask.ID)
 		filC2Param := envVars["FIL_PROOFS_PARAMETER_CACHE"]
+
+		if len(strings.TrimSpace(filC2Param)) == 0 {
+			logs.GetLogger().Warnf("task_id: %d, `FIL_PROOFS_PARAMETER_CACHE` variable is not configured", ubiTask.ID)
+			return
+		}
+
 		if gpuFlag == "0" {
 			delete(envVars, "RUST_GPU_TOOLS_CUSTOM_GPU")
 			envVars["BELLMAN_NO_GPU"] = "1"
@@ -668,6 +674,10 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		if !ok {
 			filC2Param = "/var/tmp/filecoin-proof-parameters"
 		}
+		if len(strings.TrimSpace(filC2Param)) == 0 {
+			logs.GetLogger().Warnf("task_id: %d, `FIL_PROOFS_PARAMETER_CACHE` variable is not configured", ubiTask.ID)
+			return
+		}
 
 		hostConfig := &container.HostConfig{
 			Binds:       []string{fmt.Sprintf("%s:/var/tmp/filecoin-proof-parameters", filC2Param)},
@@ -689,7 +699,7 @@ func DoUbiTaskForDocker(c *gin.Context) {
 
 		dockerService := NewDockerService()
 		if err = dockerService.ContainerCreateAndStart(containerConfig, hostConfig, containerName); err != nil {
-			logs.GetLogger().Errorf("create ubi task container failed, error: %v", err)
+			logs.GetLogger().Errorf("failed to create ubi task container, task_id: %d, error: %v", ubiTask.ID, err)
 			return
 		}
 
