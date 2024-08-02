@@ -54,7 +54,7 @@ else
 								sudo apt-mark hold nvidia* libnvidia*
                                 ;;
 
-                            "22.04")
+                            "22.04"|"24.04")
                                 sudo -- sh -c 'apt-get update; apt-get remove needrestart -y; apt-get upgrade -y; apt-get autoremove -y; apt-get autoclean -y'
                                 sudo -- sh -c 'apt-get update; apt-get remove needrestart -y; apt-get upgrade -y; apt-get autoremove -y; apt-get autoclean -y'
                                 sudo apt install linux-headers-$(uname -r) -y
