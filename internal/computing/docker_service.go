@@ -357,6 +357,7 @@ func (ds *DockerService) CleanResource() {
 		}
 	}
 
+	fmt.Printf("clean unused image_name\n")
 	ctx := context.Background()
 	danglingFilters := filters.NewArgs()
 	danglingFilters.Add("dangling", "true")
