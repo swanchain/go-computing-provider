@@ -1062,7 +1062,7 @@ func reportClusterResourceForDocker() {
 
 func CronTaskForEcp() {
 	go func() {
-		ticker := time.NewTicker(10 * time.Minute)
+		ticker := time.NewTicker(24 * time.Hour)
 		for range ticker.C {
 			NewDockerService().CleanResource()
 		}
