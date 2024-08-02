@@ -38,6 +38,10 @@ import (
 )
 
 func DoUbiTaskForK8s(c *gin.Context) {
+	if !conf.GetConfig().UBI.EnableSequencer && !conf.GetConfig().UBI.AutoChainProof {
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.RejectZkTaskError))
+		return
+	}
 
 	var ubiTask models.UBITaskReq
 	if err := c.ShouldBindJSON(&ubiTask); err != nil {
@@ -280,6 +284,12 @@ func DoUbiTaskForK8s(c *gin.Context) {
 		execCommand := []string{"ubi-bench", "c2"}
 		JobName := strings.ToLower(models.UbiTaskTypeStr(ubiTask.Type)) + "-" + strconv.Itoa(ubiTask.ID)
 		filC2Param := envVars["FIL_PROOFS_PARAMETER_CACHE"]
+
+		if len(strings.TrimSpace(filC2Param)) == 0 {
+			logs.GetLogger().Warnf("task_id: %d, `FIL_PROOFS_PARAMETER_CACHE` variable is not configured", ubiTask.ID)
+			return
+		}
+
 		if gpuFlag == "0" {
 			delete(envVars, "RUST_GPU_TOOLS_CUSTOM_GPU")
 			envVars["BELLMAN_NO_GPU"] = "1"
@@ -348,7 +358,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 								},
 							},
 						},
-						RestartPolicy: "Never",
+						RestartPolicy: v1.RestartPolicyNever,
 					},
 				},
 				BackoffLimit:            new(int32),
@@ -357,7 +367,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 		}
 
 		*job.Spec.BackoffLimit = 1
-		*job.Spec.TTLSecondsAfterFinished = 120
+		*job.Spec.TTLSecondsAfterFinished = 300
 
 		if _, err = k8sService.k8sClient.BatchV1().Jobs(namespace).Create(context.TODO(), job, metaV1.CreateOptions{}); err != nil {
 			logs.GetLogger().Errorf("Failed creating ubi task job: %v", err)
@@ -369,7 +379,12 @@ func DoUbiTaskForK8s(c *gin.Context) {
 				LabelSelector: fmt.Sprintf("job-name=%s", JobName),
 			})
 			if err != nil {
+				logs.GetLogger().Errorf("failed get pod, taskId: %d, error: %v，retrying", ubiTask.ID, err)
 				return false, err
+			}
+
+			if len(pods.Items) == 0 {
+				return false, nil
 			}
 
 			for _, p := range pods.Items {
@@ -400,8 +415,10 @@ func DoUbiTaskForK8s(c *gin.Context) {
 			break
 		}
 		if podName == "" {
+			logs.GetLogger().Errorf("failed get pod name, taskId: %d", ubiTask.ID)
 			return
 		}
+		logs.GetLogger().Infof("successfully get pod name, taskId: %d, podName: %s", ubiTask.ID, podName)
 
 		req := k8sService.k8sClient.CoreV1().Pods(namespace).GetLogs(podName, &v1.PodLogOptions{
 			Container: "",
@@ -469,6 +486,11 @@ func ReceiveUbiProof(c *gin.Context) {
 }
 
 func DoUbiTaskForDocker(c *gin.Context) {
+	if !conf.GetConfig().UBI.EnableSequencer && !conf.GetConfig().UBI.AutoChainProof {
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.RejectZkTaskError))
+		return
+	}
+
 	var ubiTask models.UBITaskReq
 	if err := c.ShouldBindJSON(&ubiTask); err != nil {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
@@ -652,6 +674,10 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		if !ok {
 			filC2Param = "/var/tmp/filecoin-proof-parameters"
 		}
+		if len(strings.TrimSpace(filC2Param)) == 0 {
+			logs.GetLogger().Warnf("task_id: %d, `FIL_PROOFS_PARAMETER_CACHE` variable is not configured", ubiTask.ID)
+			return
+		}
 
 		hostConfig := &container.HostConfig{
 			Binds:       []string{fmt.Sprintf("%s:/var/tmp/filecoin-proof-parameters", filC2Param)},
@@ -673,7 +699,7 @@ func DoUbiTaskForDocker(c *gin.Context) {
 
 		dockerService := NewDockerService()
 		if err = dockerService.ContainerCreateAndStart(containerConfig, hostConfig, containerName); err != nil {
-			logs.GetLogger().Errorf("create ubi task container failed, error: %v", err)
+			logs.GetLogger().Errorf("failed to create ubi task container, task_id: %d, error: %v", ubiTask.ID, err)
 			return
 		}
 
@@ -1048,7 +1074,7 @@ func reportClusterResourceForDocker() {
 
 func CronTaskForEcp() {
 	go func() {
-		ticker := time.NewTicker(10 * time.Minute)
+		ticker := time.NewTicker(24 * time.Hour)
 		for range ticker.C {
 			NewDockerService().CleanResource()
 		}
@@ -1139,10 +1165,14 @@ func syncTaskStatusForSequencerService() error {
 					}
 				} else {
 					switch t.Status {
-					case "verified":
-						status = models.TASK_VERIFIED_STATUS
+					case "received":
+						status = models.TASK_RECEIVED_STATUS
+					case "running":
+						status = models.TASK_RUNNING_STATUS
 					case "submitted":
 						status = models.TASK_SUBMITTED_STATUS
+					case "verified":
+						status = models.TASK_VERIFIED_STATUS
 					case "rewarded":
 						status = models.TASK_REWARDED_STATUS
 					case "invalid":
@@ -1153,6 +1183,8 @@ func syncTaskStatusForSequencerService() error {
 						status = models.TASK_TIMEOUT_STATUS
 					case "verifyFailed":
 						status = models.TASK_VERIFYFAILED_STATUS
+					case "failed":
+						status = models.TASK_FAILED_STATUS
 					default:
 						status = models.TASK_UNKNOWN_STATUS
 					}
@@ -1341,10 +1373,6 @@ func submitTaskToSequencer(proof string, task *models.TaskEntity, timeOut int64,
 }
 
 func checkBalance(cpAccountAddress string) (bool, error) {
-	if !conf.GetConfig().UBI.EnableSequencer && !conf.GetConfig().UBI.AutoChainProof {
-		return false, fmt.Errorf("do not accept tasks")
-	}
-
 	chainUrl, err := conf.GetRpcByNetWorkName()
 	if err != nil {
 		return false, fmt.Errorf("failed to get rpc url, cpAccount: %s, error: %v", cpAccountAddress, err)

@@ -3,7 +3,6 @@ package computing
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"strconv"
 	"strings"
 	"sync"
@@ -42,6 +41,7 @@ func (task *CronTask) RunTask() {
 	task.watchExpiredTask()
 	task.getUbiTaskReward()
 	task.checkJobReward()
+	task.cleanImageResource()
 }
 
 func checkJobStatus() {
@@ -111,6 +111,18 @@ func (task *CronTask) watchNameSpaceForDeleted() {
 				}
 			}
 		}
+	})
+	c.Start()
+}
+
+func (task *CronTask) cleanImageResource() {
+	c := cron.New(cron.WithSeconds())
+	c.AddFunc("@every 24h", func() {
+		defer func() {
+			if err := recover(); err != nil {
+				logs.GetLogger().Errorf("cleanImageResource catch panic error: %+v", err)
+			}
+		}()
 		NewDockerService().CleanResource()
 	})
 	c.Start()
@@ -339,7 +351,7 @@ func (task *CronTask) checkJobReward() {
 
 func (task *CronTask) getUbiTaskReward() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("* * 0/1 * ?", func() {
+	c.AddFunc("* 0/10 * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("task job: [GetUbiTaskReward], error: %+v", err)
@@ -461,15 +473,6 @@ func checkFcpJobInfoInChain(job *models.JobEntity) {
 		}
 	}
 
-}
-
-func checkHealth(url string) bool {
-	response, err := http.Get(url)
-	if err != nil {
-		return false
-	}
-	defer response.Body.Close()
-	return response.StatusCode == 200
 }
 
 type TaskGroup struct {
