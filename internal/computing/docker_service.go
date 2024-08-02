@@ -348,7 +348,6 @@ func (ds *DockerService) CleanResource() {
 	for _, img := range allImages {
 		for _, tag := range img.RepoTags {
 			if !keepSet[tag] {
-				fmt.Printf("delete image_name: %s \n", tag)
 				ds.c.ImageRemove(context.Background(), tag, image.RemoveOptions{
 					Force:         false,
 					PruneChildren: true,
@@ -357,7 +356,6 @@ func (ds *DockerService) CleanResource() {
 		}
 	}
 
-	fmt.Printf("clean unused image_name\n")
 	ctx := context.Background()
 	danglingFilters := filters.NewArgs()
 	danglingFilters.Add("dangling", "true")
