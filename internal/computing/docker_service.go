@@ -257,6 +257,9 @@ func (ds *DockerService) CleanResource() {
 	}
 
 	ctx := context.Background()
+	danglingFilters := filters.NewArgs()
+	danglingFilters.Add("dangling", "true")
+	ds.c.ImagesPrune(ctx, danglingFilters)
 	ds.c.ContainersPrune(ctx, filters.NewArgs())
 }
 
