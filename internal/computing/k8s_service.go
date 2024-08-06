@@ -514,9 +514,6 @@ func (s *K8sService) WaitForPodRunningByTcp(namespace, taskUuid string) (string,
 			logs.GetLogger().Error(err)
 			return false, err
 		}
-		if len(podList.Items) == 0 {
-			return false, nil
-		}
 		for _, pod := range podList.Items {
 			if pod.Status.Phase != coreV1.PodRunning {
 				return false, nil
