@@ -486,9 +486,6 @@ func (d *Deploy) ModelInferenceToK8s() error {
 }
 
 func (d *Deploy) DeploySshTaskToK8s(nodePort int32) error {
-	fmt.Printf("sshkey: %v", d.sshKey)
-	fmt.Printf("nodeport: %d", nodePort)
-
 	k8sService := NewK8sService()
 	deployment := &appV1.Deployment{
 		TypeMeta: metaV1.TypeMeta{
@@ -536,11 +533,7 @@ func (d *Deploy) DeploySshTaskToK8s(nodePort int32) error {
 		return fmt.Errorf("failed to get pod, error: %v", err)
 	}
 
-	fmt.Printf("podName: %v", podName)
-
 	podCmd := []string{"sh", "-c", fmt.Sprintf("echo '%s' > /root/.ssh/authorized_keys", d.sshKey)}
-
-	fmt.Printf("podCmd: %s", podCmd)
 	if err = k8sService.PodDoCommand(d.k8sNameSpace, podName, "", podCmd); err != nil {
 		return fmt.Errorf("failed to add sshkey, error: %v", err)
 	}
