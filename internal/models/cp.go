@@ -172,3 +172,49 @@ const (
 	UNLOCKED
 	SLASHED
 )
+
+// ===== private job =====
+
+type PrivateJobReq struct {
+	UUID      string  `json:"uuid"`
+	Name      string  `json:"name"`
+	Duration  int     `json:"duration"`
+	SourceURI string  `json:"job_source_uri"`
+	Type      int     `json:"type"` // 1 ssh  2 space
+	Source    string  `json:"storage_source"`
+	Signature string  `json:"signature"`
+	User      string  `json:"user"` // wallet
+	Config    *Config `json:"config"`
+}
+
+type Config struct {
+	Vcpu     int    `json:"vcpu"`
+	Memory   int    `json:"memory"`
+	Storage  int    `json:"storage"`
+	GPU      int    `json:"gpu,omitempty"`
+	GPUModel string `json:"gpu_model,omitempty"`
+	Image    string `json:"image,omitempty"`
+	SshKey   string `json:"ssh_key,omitempty"`
+}
+
+type PrivateJobResp struct {
+	UUID         string `json:"uuid"`
+	ResultURI    string `json:"result_uri,omitempty"`
+	RealURI      string `json:"real_uri,omitempty"`
+	UpdatedAt    int64  `json:"updated_at,omitempty"`
+	ContainerLog string `json:"container_log,omitempty"`
+	BuildLog     string `json:"build_log,omitempty"`
+	Status       int    `json:"status,omitempty"`
+}
+
+type PrivateJobStatusReq struct {
+	UUID   string `json:"uuid"`
+	Status int    `json:"status"` // 1: deploying; 2: running; 3: Available; 4: unavailable
+}
+
+type PrivateJobExtendReq struct {
+	UUID     string `json:"uuid"`
+	Duration int    `json:"duration"`
+}
+
+// ===== private job =====

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
+	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/constants"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"github.com/swanchain/go-computing-provider/internal/yaml"
@@ -43,6 +44,7 @@ type Deploy struct {
 	gpuProductName    string
 
 	spaceType string
+	sshKey    string
 }
 
 func NewDeploy(jobUuid, hostName, walletAddress, hardwareDesc string, duration int64, taskUuid string, spaceType string) *Deploy {
@@ -70,6 +72,11 @@ func (d *Deploy) WithHardware(cpu, memory, storage int, gpuModel string, gpuNum 
 	taskType, hardwareDetail := getHardwareDetailForPrivate(cpu, memory, storage, gpuModel, gpuNum)
 	d.hardwareResource = hardwareDetail
 	d.TaskType = taskType
+	return d
+}
+
+func (d *Deploy) WithSshKey(sshKey string) *Deploy {
+	d.sshKey = sshKey
 	return d
 }
 
@@ -459,6 +466,83 @@ func (d *Deploy) ModelInferenceToK8s() error {
 	updateJobStatus(d.jobUuid, models.DEPLOY_TO_K8S)
 	d.watchContainerRunningTime()
 	return nil
+}
+
+func (d *Deploy) DeploySshTaskToK8s() (string, error) {
+	deleteJob(d.k8sNameSpace, d.taskUuid, "start deploying new space service and delete previous service")
+
+	if err := d.deployNamespace(); err != nil {
+		logs.GetLogger().Error(err)
+		return "", err
+	}
+
+	k8sService := NewK8sService()
+	deployment := &appV1.Deployment{
+		TypeMeta: metaV1.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: "apps/v1",
+		},
+		ObjectMeta: metaV1.ObjectMeta{
+			Name:      constants.K8S_DEPLOY_NAME_PREFIX + d.taskUuid,
+			Namespace: d.k8sNameSpace,
+		},
+		Spec: appV1.DeploymentSpec{
+			Selector: &metaV1.LabelSelector{
+				MatchLabels: map[string]string{"hub-private": d.taskUuid},
+			},
+
+			Template: coreV1.PodTemplateSpec{
+				ObjectMeta: metaV1.ObjectMeta{
+					Labels:    map[string]string{"hub-private": d.taskUuid},
+					Namespace: d.k8sNameSpace,
+				},
+
+				Spec: coreV1.PodSpec{
+					NodeSelector: generateLabel(d.gpuProductName),
+					Containers: []coreV1.Container{{
+						Name:            constants.K8S_PRIVATE_CONTAINER_PREFIX + d.taskUuid,
+						Image:           d.image,
+						ImagePullPolicy: coreV1.PullIfNotPresent,
+						Ports: []coreV1.ContainerPort{{
+							ContainerPort: int32(22),
+						}},
+						Resources: d.createResources(),
+					},
+					},
+				},
+			},
+		}}
+	createDeployment, err := k8sService.CreateDeployment(context.TODO(), d.k8sNameSpace, deployment)
+	if err != nil {
+		logs.GetLogger().Error(err)
+		return "", err
+	}
+
+	d.DeployName = createDeployment.GetName()
+	podName, err := k8sService.WaitForPodRunningByTcp(d.k8sNameSpace, d.taskUuid)
+	if err != nil {
+		logs.GetLogger().Error(err)
+		return "", err
+	}
+
+	podCmd := []string{"sh", "-c", fmt.Sprintf("echo '%s' > /root/.ssh/authorized_keys", d.sshKey)}
+	if err = k8sService.PodDoCommand(d.k8sNameSpace, podName, "", podCmd); err != nil {
+		logs.GetLogger().Error(err)
+		return "", err
+	}
+
+	createService, err := k8sService.CreateServiceByNodePort(context.TODO(), d.k8sNameSpace, d.taskUuid, 22)
+	if err != nil {
+		return "", fmt.Errorf("failed to create service, error: %w", err)
+	}
+	logs.GetLogger().Infof("Created service successfully: %s", createService.GetObjectMeta().GetName())
+
+	multiAddressSplit := strings.Split(conf.GetConfig().API.MultiAddress, "/")
+
+	result := fmt.Sprintf("ssh root@%s -p%d", multiAddressSplit[2], createService.Spec.Ports[0].NodePort)
+
+	d.watchContainerRunningTime()
+	return result, nil
 }
 
 func (d *Deploy) deployNamespace() error {

@@ -41,6 +41,7 @@ type UBI struct {
 	EnableSequencer bool
 	AutoChainProof  bool
 	SequencerUrl    string
+	UbiUrl          string
 }
 
 type LOG struct {
@@ -53,6 +54,7 @@ type HUB struct {
 	BalanceThreshold float64
 	OrchestratorPk   string
 	VerifySign       bool
+	BidMode          int
 }
 
 type MCS struct {
@@ -177,6 +179,11 @@ func requiredFieldsAreGiven(metaData toml.MetaData) bool {
 		{"UBI", "EnableSequencer"},
 		{"UBI", "AutoChainProof"},
 		{"UBI", "SequencerUrl"},
+
+		{"HUB", "OrchestratorPk"},
+		{"HUB", "BalanceThreshold"},
+		{"HUB", "VerifySign"},
+		{"HUB", "BidMode"},
 
 		{"MCS", "ApiKey"},
 		{"MCS", "BucketName"},

@@ -10,7 +10,8 @@ WalletBlackList = ""                                                     # CP re
 UbiEnginePk = "0xB5aeb540B4895cd024c1625E146684940A849ED9"                # UBI Engine's public key, CP only accept the task from this UBI engine
 EnableSequencer = true                                                    # Enable aa Sequencer to receive zk-task proofs
 AutoChainProof = true                                                     # Sequencer insufficient balance or service unavailable, use chain to submit proof
-SequencerUrl = "https://sequencer.swanchain.io"                            # Sequencer service's API address
+SequencerUrl = "https://sequencer.swanchain.io"                           # Sequencer service's API address
+UbiUrl ="https://ubi-task.swanchain.io/v1"                                # UBI Engine's API address
 
 [LOG]
 CrtFile = "/YOUR_DOMAIN_NAME_CRT_PATH/server.crt"                         # Your domain name SSL .crt file path
@@ -20,6 +21,7 @@ KeyFile = "/YOUR_DOMAIN_NAME_KEY_PATH/server.key"                         # Your
 BalanceThreshold= 10                                                      # The cp’s collateral balance threshold
 OrchestratorPk = "0x4B98086A20f3C19530AF32D21F85Bc6399358e20"             # Orchestrator's public key, CP only accept the task from this Orchestrator
 VerifySign = true                                                         # Verify that the task signature is from Orchestrator
+BidMode = 1                                                               # 0: all, 1: auto, 2: private, 3: none
 
 [MCS]
 ApiKey = ""                                                               # Acquired from "https://www.multichain.storage" -> setting -> Create API Key
