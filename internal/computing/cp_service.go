@@ -181,8 +181,10 @@ func ReceiveJob(c *gin.Context) {
 					return
 				}
 			}
-			jobData.JobRealUri = fmt.Sprintf("ssh root@%s -p%d", multiAddressSplit[2], nodePort)
+			realUrl := fmt.Sprintf("ssh root@%s -p%d", multiAddressSplit[2], nodePort)
+			jobData.JobRealUri = realUrl
 			jobData.ContainerLog = jobData.ContainerLog + "&order=private"
+			logs.GetLogger().Infof("space_uuid: %s, real url: %s", spaceUuid, realUrl)
 		}
 	}
 
