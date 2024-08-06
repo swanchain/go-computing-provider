@@ -151,7 +151,7 @@ func (s *K8sService) CreateService(ctx context.Context, nameSpace, spaceUuid str
 	return s.k8sClient.CoreV1().Services(nameSpace).Create(ctx, service, metaV1.CreateOptions{})
 }
 
-func (s *K8sService) CreateServiceByNodePort(ctx context.Context, nameSpace, taskUuid string, containerPort int32) (result *coreV1.Service, err error) {
+func (s *K8sService) CreateServiceByNodePort(ctx context.Context, nameSpace, taskUuid string, containerPort int32, nodePort int32) (result *coreV1.Service, err error) {
 	service := &coreV1.Service{
 		TypeMeta: metaV1.TypeMeta{
 			Kind:       "Service",
@@ -165,8 +165,9 @@ func (s *K8sService) CreateServiceByNodePort(ctx context.Context, nameSpace, tas
 			Type: coreV1.ServiceTypeNodePort,
 			Ports: []coreV1.ServicePort{
 				{
-					Name: "tcp",
-					Port: containerPort,
+					Name:     "tcp",
+					Port:     containerPort,
+					NodePort: nodePort,
 				},
 			},
 			Selector: map[string]string{
@@ -512,6 +513,9 @@ func (s *K8sService) WaitForPodRunningByTcp(namespace, taskUuid string) (string,
 		if err != nil {
 			logs.GetLogger().Error(err)
 			return false, err
+		}
+		if len(podList.Items) == 0 {
+			return false, nil
 		}
 		for _, pod := range podList.Items {
 			if pod.Status.Phase != coreV1.PodRunning {

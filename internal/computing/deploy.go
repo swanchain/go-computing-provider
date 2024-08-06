@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
-	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/constants"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"github.com/swanchain/go-computing-provider/internal/yaml"
@@ -15,6 +14,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"math/rand"
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -191,7 +192,7 @@ func (d *Deploy) DockerfileToK8s() {
 	return
 }
 
-func (d *Deploy) YamlToK8s() {
+func (d *Deploy) YamlToK8s(nodePort int32) {
 	containerResources, err := yaml.HandlerYaml(d.yamlPath)
 	if err != nil {
 		logs.GetLogger().Error(err)
@@ -202,6 +203,22 @@ func (d *Deploy) YamlToK8s() {
 
 	if err := d.deployNamespace(); err != nil {
 		logs.GetLogger().Error(err)
+		return
+	}
+
+	if len(containerResources) == 1 && containerResources[0].ServiceType == yaml.ServiceTypeNodePort {
+		service := containerResources[0]
+		for _, envVar := range service.Env {
+			if envVar.Name == "sshkey" {
+				d.sshKey = envVar.Value
+				d.image = service.ImageName
+				break
+			}
+		}
+
+		if err := d.DeploySshTaskToK8s(nodePort); err != nil {
+			logs.GetLogger().Error(err)
+		}
 		return
 	}
 
@@ -468,14 +485,7 @@ func (d *Deploy) ModelInferenceToK8s() error {
 	return nil
 }
 
-func (d *Deploy) DeploySshTaskToK8s() (string, error) {
-	deleteJob(d.k8sNameSpace, d.taskUuid, "start deploying new space service and delete previous service")
-
-	if err := d.deployNamespace(); err != nil {
-		logs.GetLogger().Error(err)
-		return "", err
-	}
-
+func (d *Deploy) DeploySshTaskToK8s(hostPort int32) error {
 	k8sService := NewK8sService()
 	deployment := &appV1.Deployment{
 		TypeMeta: metaV1.TypeMeta{
@@ -514,35 +524,28 @@ func (d *Deploy) DeploySshTaskToK8s() (string, error) {
 		}}
 	createDeployment, err := k8sService.CreateDeployment(context.TODO(), d.k8sNameSpace, deployment)
 	if err != nil {
-		logs.GetLogger().Error(err)
-		return "", err
+		return fmt.Errorf("failed to create deployment, error: %v", err)
 	}
 
 	d.DeployName = createDeployment.GetName()
 	podName, err := k8sService.WaitForPodRunningByTcp(d.k8sNameSpace, d.taskUuid)
 	if err != nil {
-		logs.GetLogger().Error(err)
-		return "", err
+		return fmt.Errorf("failed to get pod, error: %v", err)
 	}
 
 	podCmd := []string{"sh", "-c", fmt.Sprintf("echo '%s' > /root/.ssh/authorized_keys", d.sshKey)}
 	if err = k8sService.PodDoCommand(d.k8sNameSpace, podName, "", podCmd); err != nil {
-		logs.GetLogger().Error(err)
-		return "", err
+		return fmt.Errorf("failed to add sshkey, error: %v", err)
 	}
 
-	createService, err := k8sService.CreateServiceByNodePort(context.TODO(), d.k8sNameSpace, d.taskUuid, 22)
+	createService, err := k8sService.CreateServiceByNodePort(context.TODO(), d.k8sNameSpace, d.taskUuid, 22, hostPort)
 	if err != nil {
-		return "", fmt.Errorf("failed to create service, error: %w", err)
+		return fmt.Errorf("failed to create service, error: %w", err)
 	}
 	logs.GetLogger().Infof("Created service successfully: %s", createService.GetObjectMeta().GetName())
 
-	multiAddressSplit := strings.Split(conf.GetConfig().API.MultiAddress, "/")
-
-	result := fmt.Sprintf("ssh root@%s -p%d", multiAddressSplit[2], createService.Spec.Ports[0].NodePort)
-
 	d.watchContainerRunningTime()
-	return result, nil
+	return nil
 }
 
 func (d *Deploy) deployNamespace() error {
@@ -715,4 +718,24 @@ func getHardwareDetailForPrivate(cpu, memory, storage int, gpuModel string, gpuN
 	}
 
 	return taskType, hardwareResource
+}
+
+func GetRandomAvailablePort() (int, error) {
+	rand.Seed(time.Now().UnixNano())
+	for i := 0; i < 100; i++ {
+		port := rand.Intn(32767-30000+1) + 30000
+		if IsPortAvailable(port) {
+			return port, nil
+		}
+	}
+	return 0, fmt.Errorf("no available port found")
+}
+
+func IsPortAvailable(port int) bool {
+	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		return false
+	}
+	ln.Close()
+	return true
 }

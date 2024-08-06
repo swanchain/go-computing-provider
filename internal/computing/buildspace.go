@@ -23,7 +23,9 @@ const (
 	modelSetName   = "model-setting.json"
 )
 
-func BuildSpaceTaskImage(spaceUuid string, files []models.SpaceFile) (bool, string, string, string, string, error) {
+func BuildSpaceTaskImage(spaceUuid string, files []models.SpaceFile) (DeployParam, error) {
+	var deployParam DeployParam
+
 	var err error
 	cpRepoPath, _ := os.LookupEnv("CP_PATH")
 	buildFolder := filepath.Join(cpRepoPath, "build")
@@ -37,10 +39,10 @@ func BuildSpaceTaskImage(spaceUuid string, files []models.SpaceFile) (bool, stri
 			fileNames = append(fileNames, file.Name)
 			dirPath := filepath.Dir(file.Name)
 			if err = os.MkdirAll(filepath.Join(buildFolder, dirPath), os.ModePerm); err != nil {
-				return false, "", "", "", "", err
+				return deployParam, err
 			}
 			if err = downloadFile(filepath.Join(buildFolder, file.Name), file.URL); err != nil {
-				return false, "", "", "", "", fmt.Errorf("error downloading file: %w", err)
+				return deployParam, fmt.Errorf("error downloading file: %w", err)
 			}
 
 			if strings.HasSuffix(strings.ToLower(file.Name), yamlDeployName) ||
@@ -64,11 +66,16 @@ func BuildSpaceTaskImage(spaceUuid string, files []models.SpaceFile) (bool, stri
 			yamlPath = filepath.Join(buildFolder, yamlName)
 		}
 
-		return containsYaml, yamlPath, imagePath, modelsSettingFilePath, "", nil
+		deployParam.ContainsYaml = containsYaml
+		deployParam.YamlFilePath = yamlPath
+		deployParam.BuildImagePath = imagePath
+		deployParam.ModelsSettingFilePath = modelsSettingFilePath
+
+		return deployParam, nil
 	} else {
 		logs.GetLogger().Warnf("Space %s is not found.", spaceUuid)
 	}
-	return false, "", "", "", "", NotFoundError
+	return deployParam, NotFoundError
 }
 
 func commonPrefix(strs []string) string {

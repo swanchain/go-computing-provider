@@ -55,6 +55,8 @@ const (
 	SpaceCheckBlackListError   = 4012
 	CheckBalanceError          = 4013
 	RejectZkTaskError          = 4014
+	DownloadResourceError      = 4015
+	PortNoAvailableError       = 4016
 
 	ProofParamError   = 7001
 	ProofReadLogError = 7002
@@ -85,6 +87,8 @@ var codeMsg = map[int]string{
 	SaveJobEntityError:         "An error occurred while save job info",
 	FoundWhiteListError:        "An error occurred while get whitelist",
 	FoundBlackListError:        "An error occurred while get blacklist",
+	DownloadResourceError:      "An error occurred while download space resource",
+	PortNoAvailableError:       "Port number unavailable",
 
 	ProofReadLogError: "An error occurred while read the log of proof",
 	ProofError:        "An error occurred while executing the calculation task",

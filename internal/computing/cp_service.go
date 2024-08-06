@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/swanchain/go-computing-provider/internal/yaml"
 	"io"
 	"math/rand"
 	"net/http"
@@ -132,12 +133,59 @@ func ReceiveJob(c *gin.Context) {
 
 	multiAddressSplit := strings.Split(conf.GetConfig().API.MultiAddress, "/")
 	jobSourceUri := jobData.JobSourceURI
-	spaceUuid := jobSourceUri[strings.LastIndex(jobSourceUri, "/")+1:]
+	spaceUuid := spaceDetail.Data.Space.Uuid
 	wsUrl := fmt.Sprintf("wss://%s:%s/api/v1/computing/lagrange/spaces/log?space_id=%s", logHost, multiAddressSplit[4], spaceUuid)
 	jobData.BuildLog = wsUrl + "&type=build"
 	jobData.ContainerLog = wsUrl + "&type=container"
 	jobData.JobRealUri = fmt.Sprintf("https://%s", hostName)
 	jobData.NodeIdJobSourceUriSignature = ""
+
+	deployParam, err := BuildSpaceTaskImage(spaceDetail.Data.Space.Uuid, spaceDetail.Data.Files)
+	if err != nil {
+		logs.GetLogger().Errorf("failed to download space resource, error: %+v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.DownloadResourceError))
+		return
+	}
+
+	var nodePort int
+	if deployParam.ContainsYaml {
+		containerResources, err := yaml.HandlerYaml(deployParam.YamlFilePath)
+		if err != nil {
+			logs.GetLogger().Error("failed to parse yaml, error: %v", err)
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.DownloadResourceError))
+			return
+		}
+
+		if len(containerResources) == 1 && containerResources[0].ServiceType == yaml.ServiceTypeNodePort {
+			service := containerResources[0]
+			var hostPort int32
+			for _, envVar := range service.Env {
+				if envVar.Name == "sshkey" {
+					hostPort = service.Ports[0].HostPort
+					break
+				}
+			}
+
+			if hostPort != 0 {
+				if !IsPortAvailable(int(hostPort)) {
+					logs.GetLogger().Error("failed to check port, error: %v", err)
+					c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.PortNoAvailableError))
+					return
+				}
+				nodePort = int(hostPort)
+			} else {
+				nodePort, err = GetRandomAvailablePort()
+				if err != nil {
+					logs.GetLogger().Error("failed to found available port, error: %v", err)
+					c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.PortNoAvailableError))
+					return
+				}
+			}
+			jobData.JobRealUri = fmt.Sprintf("ssh root@%s -p%d", multiAddressSplit[2], nodePort)
+			jobData.ContainerLog = jobData.ContainerLog + "&order=private"
+		}
+	}
+
 	go func() {
 		job, err := NewJobService().GetJobEntityBySpaceUuid(spaceUuid)
 		if err != nil {
@@ -186,7 +234,7 @@ func ReceiveJob(c *gin.Context) {
 			logs.GetLogger().Infof("successfully uploaded to MCS, jobuuid: %s", jobData.UUID)
 		}()
 
-		DeploySpaceTask(jobData.JobSourceURI, hostName, jobData.Duration, jobData.UUID, jobData.TaskUUID, gpuProductName)
+		DeploySpaceTask(jobData, deployParam, hostName, gpuProductName, nodePort)
 	}()
 
 	c.JSON(http.StatusOK, util.CreateSuccessResponse(jobData))
@@ -263,111 +311,6 @@ func submitJob(jobData *models.JobData) error {
 		break
 	}
 	return NewJobService().UpdateJobResultUrlByJobUuid(jobData.UUID, resultMcsUrl)
-}
-
-func RedeployJob(c *gin.Context) {
-	var jobData models.JobData
-
-	if err := c.ShouldBindJSON(&jobData); err != nil {
-		logs.GetLogger().Errorln(err)
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
-		return
-	}
-	logs.GetLogger().Infof("redeploy Job received: %+v", jobData)
-
-	spaceDetail, err := getSpaceDetail(jobData.JobSourceURI)
-	if err != nil {
-		logs.GetLogger().Errorln(err)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SpaceParseResourceUriError))
-		return
-	}
-
-	available, gpuProductName, err := checkResourceAvailableForSpace(spaceDetail.Data.Space.ActiveOrder.Config.Description)
-	if err != nil {
-		logs.GetLogger().Errorf("check job resource failed, error: %+v", err)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
-		return
-	}
-
-	if !available {
-		logs.GetLogger().Warnf(" task id: %s, name: %s, not found a resources available", jobData.TaskUUID, jobData.Name)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError))
-		return
-	}
-
-	var hostName string
-	if jobData.JobResultURI != "" {
-		resp, err := http.Get(jobData.JobResultURI)
-		if err != nil {
-			logs.GetLogger().Errorf("error making request to Space API: %+v", err)
-			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ServerError, err.Error()))
-			return
-		}
-		defer func(Body io.ReadCloser) {
-			err := Body.Close()
-			if err != nil {
-				logs.GetLogger().Errorf("error closed resp Space API: %+v", err)
-			}
-		}(resp.Body)
-		logs.GetLogger().Infof("Space API response received. Response: %d", resp.StatusCode)
-		if resp.StatusCode != http.StatusOK {
-			logs.GetLogger().Errorf("space API response not OK. Status Code: %d", resp.StatusCode)
-			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ServerError, err.Error()))
-		}
-
-		var hostInfo struct {
-			JobResultUri string `json:"job_result_uri"`
-		}
-		if err := json.NewDecoder(resp.Body).Decode(&hostInfo); err != nil {
-			logs.GetLogger().Errorf("error decoding Space API response JSON: %v", err)
-			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ServerError, err.Error()))
-			return
-		}
-		hostName = strings.ReplaceAll(hostInfo.JobResultUri, "https://", "")
-	} else {
-		hostName = generateString(10) + conf.GetConfig().API.Domain
-	}
-	jobData.JobRealUri = fmt.Sprintf("https://%s", hostName)
-
-	go func() {
-		spaceUuid := jobData.JobSourceURI[strings.LastIndex(jobData.JobSourceURI, "/")+1:]
-		job, err := NewJobService().GetJobEntityBySpaceUuid(spaceUuid)
-		if err != nil {
-			logs.GetLogger().Errorf("get job failed, error: %+v", err)
-			return
-		}
-		if job.SpaceUuid != "" {
-			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid, models.JOB_TERMINATED_STATUS)
-		}
-
-		var jobEntity = new(models.JobEntity)
-		jobEntity.Source = jobData.StorageSource
-		jobEntity.SpaceUuid = spaceUuid
-		jobEntity.TaskUuid = jobData.TaskUUID
-		jobEntity.SourceUrl = jobData.JobSourceURI
-		jobEntity.RealUrl = jobData.JobRealUri
-		jobEntity.BuildLog = jobData.BuildLog
-		jobEntity.ContainerLog = jobData.ContainerLog
-		jobEntity.Duration = jobData.Duration
-		jobEntity.DeployStatus = models.DEPLOY_RECEIVE_JOB
-		jobEntity.CreateTime = time.Now().Unix()
-		jobEntity.ExpireTime = time.Now().Unix() + int64(jobData.Duration)
-		jobEntity.StartedBlock = conf.GetConfig().CONTRACT.JobManagerCreated
-		NewJobService().SaveJobEntity(jobEntity)
-
-		go func() {
-			if err = submitJob(&jobData); err != nil {
-				logs.GetLogger().Errorf("failed to upload job data to MCS, jobUuid: %s, spaceUuid: %s, error: %v",
-					jobData.UUID, spaceUuid, err)
-				return
-			}
-			logs.GetLogger().Infof("successfully uploaded to MCS, jobuuid: %s", jobData.UUID)
-		}()
-
-		DeploySpaceTask(jobData.JobSourceURI, hostName, jobData.Duration, jobData.UUID, jobData.TaskUUID, gpuProductName)
-	}()
-
-	c.JSON(http.StatusOK, util.CreateSuccessResponse(jobData))
 }
 
 func ReNewJob(c *gin.Context) {
@@ -832,8 +775,8 @@ func handleConnection(conn *websocket.Conn, jobDetail models.JobEntity, logType 
 	}
 }
 
-func DeploySpaceTask(jobSourceURI, hostName string, duration int, jobUuid string, taskUuid string, gpuProductName string) string {
-	updateJobStatus(jobUuid, models.DEPLOY_UPLOAD_RESULT)
+func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName string, gpuProductName string, nodePort int) string {
+	updateJobStatus(jobData.UUID, models.DEPLOY_UPLOAD_RESULT)
 
 	var success bool
 	var spaceUuid string
@@ -851,7 +794,7 @@ func DeploySpaceTask(jobSourceURI, hostName string, duration int, jobUuid string
 		}
 	}()
 
-	spaceDetail, err := getSpaceDetail(jobSourceURI)
+	spaceDetail, err := getSpaceDetail(jobData.JobSourceURI)
 	if err != nil {
 		logs.GetLogger().Errorln(err)
 		return ""
@@ -878,20 +821,15 @@ func DeploySpaceTask(jobSourceURI, hostName string, duration int, jobUuid string
 		return ""
 	}
 
-	deploy := NewDeploy(jobUuid, hostName, walletAddress, spaceHardware.Description, int64(duration), taskUuid, constants.SPACE_TYPE_PUBLIC)
+	deploy := NewDeploy(jobData.UUID, hostName, walletAddress, spaceHardware.Description, int64(jobData.Duration), jobData.TaskUUID, constants.SPACE_TYPE_PUBLIC)
 	deploy.WithSpaceInfo(spaceUuid, spaceName)
 	deploy.WithGpuProductName(gpuProductName)
 
-	updateJobStatus(jobUuid, models.DEPLOY_DOWNLOAD_SOURCE)
-	containsYaml, yamlPath, imagePath, modelsSettingFile, _, err := BuildSpaceTaskImage(spaceUuid, spaceDetail.Data.Files)
-	if err != nil {
-		logs.GetLogger().Error(err)
-		return ""
-	}
+	updateJobStatus(jobData.UUID, models.DEPLOY_DOWNLOAD_SOURCE)
 
-	deploy.WithSpacePath(imagePath)
-	if len(modelsSettingFile) > 0 {
-		err := deploy.WithModelSettingFile(modelsSettingFile).ModelInferenceToK8s()
+	deploy.WithSpacePath(deployParam.BuildImagePath)
+	if len(deployParam.ModelsSettingFilePath) > 0 {
+		err := deploy.WithModelSettingFile(deployParam.ModelsSettingFilePath).ModelInferenceToK8s()
 		if err != nil {
 			logs.GetLogger().Error(err)
 			return ""
@@ -900,10 +838,10 @@ func DeploySpaceTask(jobSourceURI, hostName string, duration int, jobUuid string
 		return hostName
 	}
 
-	if containsYaml {
-		deploy.WithYamlInfo(yamlPath).YamlToK8s()
+	if deployParam.ContainsYaml {
+		deploy.WithYamlInfo(deployParam.YamlFilePath).YamlToK8s(int32(nodePort))
 	} else {
-		imageName, dockerfilePath := BuildImagesByDockerfile(jobUuid, spaceUuid, spaceName, imagePath)
+		imageName, dockerfilePath := BuildImagesByDockerfile(jobData.UUID, spaceUuid, spaceName, deployParam.BuildImagePath)
 		deploy.WithDockerfile(imageName, dockerfilePath).DockerfileToK8s()
 	}
 	success = true
@@ -1460,4 +1398,11 @@ func getJobOnChain(taskUuid string) (models.TaskInfoOnChain, error) {
 		return models.TaskInfoOnChain{}, err
 	}
 	return taskManagerStub.GetTaskInfo(taskUuid)
+}
+
+type DeployParam struct {
+	ContainsYaml          bool
+	YamlFilePath          string
+	BuildImagePath        string
+	ModelsSettingFilePath string
 }
