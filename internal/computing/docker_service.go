@@ -17,6 +17,7 @@ import (
 	"github.com/swanchain/go-computing-provider/build"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -215,18 +216,6 @@ func (ds *DockerService) RemoveContainerByName(containerName string) error {
 }
 
 func (ds *DockerService) CleanResource() {
-	containers, err := ds.c.ContainerList(context.Background(), container.ListOptions{All: true})
-	if err != nil {
-		logs.GetLogger().Errorf("get all container failed, error: %v", err)
-		return
-	}
-
-	for _, c := range containers {
-		if c.State != "running" {
-			ds.c.ContainerRemove(context.Background(), c.ID, container.RemoveOptions{Force: true})
-		}
-	}
-
 	imagesToKeep := []string{
 		build.UBITaskImageIntelCpu,
 		build.UBITaskImageIntelGpu,
@@ -256,11 +245,11 @@ func (ds *DockerService) CleanResource() {
 		}
 	}
 
-	ctx := context.Background()
-	danglingFilters := filters.NewArgs()
-	danglingFilters.Add("dangling", "true")
-	ds.c.ImagesPrune(ctx, danglingFilters)
-	ds.c.ContainersPrune(ctx, filters.NewArgs())
+	cmd := exec.Command("docker", "system", "prune", "-f")
+	if err = cmd.Run(); err != nil {
+		logs.GetLogger().Errorf("failed to clean resource, error: %+v", err)
+		return
+	}
 }
 
 func (ds *DockerService) PullImage(imageName string) error {
