@@ -123,7 +123,7 @@ func (task *CronTask) cleanImageResource() {
 				logs.GetLogger().Errorf("cleanImageResource catch panic error: %+v", err)
 			}
 		}()
-		NewDockerService().CleanResource()
+		NewDockerService().CleanResourceForK8s()
 	})
 	c.Start()
 }

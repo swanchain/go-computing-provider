@@ -215,7 +215,56 @@ func (ds *DockerService) RemoveContainerByName(containerName string) error {
 	return nil
 }
 
-func (ds *DockerService) CleanResource() {
+func (ds *DockerService) CleanResourceForK8s() {
+	containers, err := ds.c.ContainerList(context.Background(), container.ListOptions{All: true})
+	if err != nil {
+		logs.GetLogger().Errorf("get all container failed, error: %v", err)
+		return
+	}
+
+	for _, c := range containers {
+		if c.State != "running" {
+			ds.c.ContainerRemove(context.Background(), c.ID, container.RemoveOptions{Force: true})
+		}
+	}
+
+	imagesToKeep := []string{
+		build.UBITaskImageIntelCpu,
+		build.UBITaskImageIntelGpu,
+		build.UBITaskImageAmdCpu,
+		build.UBITaskImageAmdGpu,
+		build.UBIResourceExporterDockerImage,
+	}
+
+	keepSet := make(map[string]bool)
+	for _, imageName := range imagesToKeep {
+		keepSet[imageName] = true
+	}
+
+	allImages, err := ds.c.ImageList(context.Background(), image.ListOptions{})
+	if err != nil {
+		logs.GetLogger().Errorf("Failed get image list, error: %+v", err)
+		return
+	}
+	for _, img := range allImages {
+		for _, tag := range img.RepoTags {
+			if !keepSet[tag] {
+				ds.c.ImageRemove(context.Background(), tag, image.RemoveOptions{
+					Force:         false,
+					PruneChildren: true,
+				})
+			}
+		}
+	}
+
+	ctx := context.Background()
+	danglingFilters := filters.NewArgs()
+	danglingFilters.Add("dangling", "true")
+	ds.c.ImagesPrune(ctx, danglingFilters)
+	ds.c.ContainersPrune(ctx, filters.NewArgs())
+}
+
+func (ds *DockerService) CleanResourceForDocker() {
 	imagesToKeep := []string{
 		build.UBITaskImageIntelCpu,
 		build.UBITaskImageIntelGpu,

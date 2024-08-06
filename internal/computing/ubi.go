@@ -1076,7 +1076,7 @@ func CronTaskForEcp() {
 	go func() {
 		ticker := time.NewTicker(2 * time.Hour)
 		for range ticker.C {
-			NewDockerService().CleanResource()
+			NewDockerService().CleanResourceForDocker()
 		}
 	}()
 
