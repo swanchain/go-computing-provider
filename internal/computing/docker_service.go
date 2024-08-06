@@ -17,6 +17,7 @@ import (
 	"github.com/swanchain/go-computing-provider/build"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -214,7 +215,7 @@ func (ds *DockerService) RemoveContainerByName(containerName string) error {
 	return nil
 }
 
-func (ds *DockerService) CleanResource() {
+func (ds *DockerService) CleanResourceForK8s() {
 	containers, err := ds.c.ContainerList(context.Background(), container.ListOptions{All: true})
 	if err != nil {
 		logs.GetLogger().Errorf("get all container failed, error: %v", err)
@@ -261,6 +262,43 @@ func (ds *DockerService) CleanResource() {
 	danglingFilters.Add("dangling", "true")
 	ds.c.ImagesPrune(ctx, danglingFilters)
 	ds.c.ContainersPrune(ctx, filters.NewArgs())
+}
+
+func (ds *DockerService) CleanResourceForDocker() {
+	imagesToKeep := []string{
+		build.UBITaskImageIntelCpu,
+		build.UBITaskImageIntelGpu,
+		build.UBITaskImageAmdCpu,
+		build.UBITaskImageAmdGpu,
+		build.UBIResourceExporterDockerImage,
+	}
+
+	keepSet := make(map[string]bool)
+	for _, imageName := range imagesToKeep {
+		keepSet[imageName] = true
+	}
+
+	allImages, err := ds.c.ImageList(context.Background(), image.ListOptions{})
+	if err != nil {
+		logs.GetLogger().Errorf("Failed get image list, error: %+v", err)
+		return
+	}
+	for _, img := range allImages {
+		for _, tag := range img.RepoTags {
+			if !keepSet[tag] {
+				ds.c.ImageRemove(context.Background(), tag, image.RemoveOptions{
+					Force:         false,
+					PruneChildren: true,
+				})
+			}
+		}
+	}
+
+	cmd := exec.Command("docker", "system", "prune", "-f")
+	if err = cmd.Run(); err != nil {
+		logs.GetLogger().Errorf("failed to clean resource, error: %+v", err)
+		return
+	}
 }
 
 func (ds *DockerService) PullImage(imageName string) error {
