@@ -1136,6 +1136,7 @@ func syncTaskStatusForSequencerService() error {
 	var taskIdAndStatus = make(map[int64]string)
 	for _, group := range taskGroups {
 		taskList, err := NewSequencer().QueryTask(group.Type, group.Ids...)
+		logs.GetLogger().Infof("debug::QueryTask: type: %d, data: %+v", group.Type, taskList)
 		if err != nil {
 			logs.GetLogger().Errorf("failed to query task, task ids: %v, error: %v", group.Ids, err)
 			continue
