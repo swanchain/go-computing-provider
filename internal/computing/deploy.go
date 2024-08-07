@@ -539,7 +539,7 @@ func (d *Deploy) DeploySshTaskToK8s(nodePort int32) error {
 		return fmt.Errorf("failed to add sshkey, error: %v", err)
 	}
 
-	createService, err := k8sService.CreateServiceByNodePort(context.TODO(), d.k8sNameSpace, d.taskUuid, 22, nodePort)
+	createService, err := k8sService.CreateServiceByNodePort(context.TODO(), d.k8sNameSpace, d.spaceUuid, 22, nodePort)
 	if err != nil {
 		return fmt.Errorf("failed to create service, error: %w", err)
 	}

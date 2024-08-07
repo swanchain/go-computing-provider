@@ -923,6 +923,10 @@ func deleteJob(namespace, spaceUuid string, msg string) error {
 	return nil
 }
 
+func DeleteJobByCmd(namespace, spaceUuid string) error {
+	return deleteJob(namespace, spaceUuid, "")
+}
+
 func downloadModelUrl(namespace, spaceUuid, serviceIp string, podCmd []string) {
 	k8sService := NewK8sService()
 	podName, err := k8sService.WaitForPodRunningByHttp(namespace, spaceUuid, serviceIp)
