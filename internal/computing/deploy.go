@@ -493,24 +493,24 @@ func (d *Deploy) DeploySshTaskToK8s(nodePort int32) error {
 			APIVersion: "apps/v1",
 		},
 		ObjectMeta: metaV1.ObjectMeta{
-			Name:      constants.K8S_DEPLOY_NAME_PREFIX + d.taskUuid,
+			Name:      constants.K8S_DEPLOY_NAME_PREFIX + d.spaceUuid,
 			Namespace: d.k8sNameSpace,
 		},
 		Spec: appV1.DeploymentSpec{
 			Selector: &metaV1.LabelSelector{
-				MatchLabels: map[string]string{"hub-private": d.taskUuid},
+				MatchLabels: map[string]string{"hub-private": d.spaceUuid},
 			},
 
 			Template: coreV1.PodTemplateSpec{
 				ObjectMeta: metaV1.ObjectMeta{
-					Labels:    map[string]string{"hub-private": d.taskUuid},
+					Labels:    map[string]string{"hub-private": d.spaceUuid},
 					Namespace: d.k8sNameSpace,
 				},
 
 				Spec: coreV1.PodSpec{
 					NodeSelector: generateLabel(d.gpuProductName),
 					Containers: []coreV1.Container{{
-						Name:            constants.K8S_PRIVATE_CONTAINER_PREFIX + d.taskUuid,
+						Name:            constants.K8S_PRIVATE_CONTAINER_PREFIX + d.spaceUuid,
 						Image:           d.image,
 						ImagePullPolicy: coreV1.PullIfNotPresent,
 						Ports: []coreV1.ContainerPort{{
@@ -526,7 +526,7 @@ func (d *Deploy) DeploySshTaskToK8s(nodePort int32) error {
 	if err != nil {
 		return fmt.Errorf("failed to create deployment, error: %v", err)
 	}
-
+	updateJobStatus(d.jobUuid, models.DEPLOY_PULL_IMAGE)
 	d.DeployName = createDeployment.GetName()
 	podName, err := k8sService.WaitForPodRunningByTcp(d.k8sNameSpace, d.taskUuid)
 	if err != nil {
@@ -543,7 +543,7 @@ func (d *Deploy) DeploySshTaskToK8s(nodePort int32) error {
 		return fmt.Errorf("failed to create service, error: %w", err)
 	}
 	logs.GetLogger().Infof("Created service successfully: %s", createService.GetObjectMeta().GetName())
-
+	updateJobStatus(d.jobUuid, models.DEPLOY_TO_K8S)
 	d.watchContainerRunningTime()
 	return nil
 }
