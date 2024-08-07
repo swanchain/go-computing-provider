@@ -184,7 +184,7 @@ func (task *CronTask) watchExpiredTask() {
 
 				if job.Status == models.JOB_TERMINATED_STATUS || job.Status == models.JOB_COMPLETED_STATUS {
 					logs.GetLogger().Infof("task_uuid: %s, current status is %s, starting to delete it.", job.TaskUuid, models.GetJobStatus(job.Status))
-					if err = deleteJob(job.NameSpace, job.SpaceUuid, "cron task, abnormal state"); err == nil {
+					if err = deleteJob(job.NameSpace, job.SpaceUuid, "cron-task abnormal state"); err == nil {
 						deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
 						continue
 					}
@@ -468,11 +468,10 @@ func checkFcpJobInfoInChain(job *models.JobEntity) {
 	expiredTime := taskInfo.StartTimestamp + taskInfo.Duration
 	if expiredTime > 0 {
 		job.ExpireTime = expiredTime
-		if err := NewJobService().UpdateJobEntityByJobUuid(job); err != nil {
-			logs.GetLogger().Errorf("update job info by jobUuid failed, error: %v", err)
-		}
 	}
-
+	if err := NewJobService().UpdateJobEntityByJobUuid(job); err != nil {
+		logs.GetLogger().Errorf("failed to update job info, space_uuid: %s, error: %v", job.SpaceUuid, err)
+	}
 }
 
 type TaskGroup struct {

@@ -777,7 +777,7 @@ func handleConnection(conn *websocket.Conn, jobDetail models.JobEntity, logType 
 	}
 }
 
-func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName string, gpuProductName string, nodePort int) string {
+func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName string, gpuProductName string, nodePort int) {
 	updateJobStatus(jobData.UUID, models.DEPLOY_UPLOAD_RESULT)
 
 	var success bool
@@ -799,7 +799,7 @@ func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName s
 	spaceDetail, err := getSpaceDetail(jobData.JobSourceURI)
 	if err != nil {
 		logs.GetLogger().Errorln(err)
-		return ""
+		return
 	}
 
 	walletAddress = spaceDetail.Data.Owner.PublicAddress
@@ -809,7 +809,7 @@ func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName s
 
 	logs.GetLogger().Infof("uuid: %s, spaceName: %s, hardwareName: %s", spaceUuid, spaceName, spaceHardware.Description)
 	if len(spaceHardware.Description) == 0 {
-		return ""
+		return
 	}
 
 	var job = new(models.JobEntity)
@@ -820,7 +820,7 @@ func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName s
 	job.SpaceType = 0
 	if err = NewJobService().UpdateJobEntityBySpaceUuid(job); err != nil {
 		logs.GetLogger().Errorf("update job info failed, error: %v", err)
-		return ""
+		return
 	}
 
 	deploy := NewDeploy(jobData.UUID, hostName, walletAddress, spaceHardware.Description, int64(jobData.Duration), jobData.TaskUUID, constants.SPACE_TYPE_PUBLIC)
@@ -834,10 +834,10 @@ func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName s
 		err := deploy.WithModelSettingFile(deployParam.ModelsSettingFilePath).ModelInferenceToK8s()
 		if err != nil {
 			logs.GetLogger().Error(err)
-			return ""
+			return
 		}
 		success = true
-		return hostName
+		return
 	}
 
 	if deployParam.ContainsYaml {
@@ -847,8 +847,7 @@ func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName s
 		deploy.WithDockerfile(imageName, dockerfilePath).DockerfileToK8s()
 	}
 	success = true
-
-	return hostName
+	return
 }
 
 func deleteJob(namespace, spaceUuid string, msg string) error {
