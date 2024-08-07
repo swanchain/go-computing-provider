@@ -53,10 +53,11 @@ func (dy *DeployYamlV2) ServiceToK8sResource() ([]ContainerResource, error) {
 					if len(service.Env) > 0 {
 						var envVars []corev1.EnvVar
 						for _, env := range service.Env {
-							envSplit := strings.Split(strings.TrimSpace(env), "=")
+							trimSpaceEnv := strings.TrimSpace(env)
+							index := strings.Index(trimSpaceEnv, "=")
 							envVars = append(envVars, corev1.EnvVar{
-								Name:  envSplit[0],
-								Value: envSplit[1],
+								Name:  trimSpaceEnv[:index],
+								Value: trimSpaceEnv[index+1:],
 							})
 						}
 						container.Env = envVars
@@ -104,10 +105,11 @@ func (dy *DeployYamlV2) ServiceToK8sResource() ([]ContainerResource, error) {
 			if len(service.Env) > 0 {
 				var envVars []corev1.EnvVar
 				for _, env := range service.Env {
-					envSplit := strings.Split(strings.TrimSpace(env), "=")
+					trimSpaceEnv := strings.TrimSpace(env)
+					index := strings.Index(trimSpaceEnv, "=")
 					envVars = append(envVars, corev1.EnvVar{
-						Name:  envSplit[0],
-						Value: envSplit[1],
+						Name:  trimSpaceEnv[:index],
+						Value: trimSpaceEnv[index+1:],
 					})
 				}
 				containerNew.Env = envVars
