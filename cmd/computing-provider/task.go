@@ -66,11 +66,6 @@ var taskList = &cli.Command{
 			return fmt.Errorf("get jobs failed, error: %+v", err)
 		}
 		for i, job := range list {
-			var fullSpaceUuid string
-			if len(job.K8sDeployName) > 0 {
-				fullSpaceUuid = job.K8sDeployName[7:]
-			}
-
 			expireTime := time.Unix(job.ExpireTime, 0).Format("2006-01-02 15:04:05")
 
 			var reward = "0.00"
@@ -80,7 +75,7 @@ var taskList = &cli.Command{
 
 			if fullFlag {
 				taskData = append(taskData,
-					[]string{job.TaskUuid, job.ResourceType, job.WalletAddress, fullSpaceUuid, job.Name, models.GetJobStatus(job.Status), reward, expireTime})
+					[]string{job.TaskUuid, job.ResourceType, job.WalletAddress, job.SpaceUuid, job.Name, models.GetJobStatus(job.Status), reward, expireTime})
 			} else {
 				var walletAddress string
 				if len(job.WalletAddress) > 0 {
