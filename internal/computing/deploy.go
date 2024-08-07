@@ -526,10 +526,9 @@ func (d *Deploy) DeploySshTaskToK8s(nodePort int32) error {
 	if err != nil {
 		return fmt.Errorf("failed to create deployment, error: %v", err)
 	}
-	logs.GetLogger().Infof("jobUuid: %s, status: DEPLOY_PULL_IMAGE", d.jobUuid)
 	updateJobStatus(d.jobUuid, models.DEPLOY_PULL_IMAGE)
 	d.DeployName = createDeployment.GetName()
-	podName, err := k8sService.WaitForPodRunningByTcp(d.k8sNameSpace, d.taskUuid)
+	podName, err := k8sService.WaitForPodRunningByTcp(d.k8sNameSpace, d.spaceUuid)
 	if err != nil {
 		return fmt.Errorf("failed to get pod, error: %v", err)
 	}
@@ -545,7 +544,6 @@ func (d *Deploy) DeploySshTaskToK8s(nodePort int32) error {
 	}
 	logs.GetLogger().Infof("Created service successfully: %s", createService.GetObjectMeta().GetName())
 	updateJobStatus(d.jobUuid, models.DEPLOY_TO_K8S)
-	logs.GetLogger().Infof("jobUuid: %s, status: DEPLOY_TO_K8S", d.jobUuid)
 	d.watchContainerRunningTime()
 	return nil
 }
