@@ -129,6 +129,7 @@ func BuildImagesByDockerfile(jobUuid, spaceUuid, spaceName, imagePath string) (s
 }
 
 func downloadFile(filepath string, url string) error {
+	os.Remove(filepath)
 	out, err := os.Create(filepath)
 	if err != nil {
 		return err
