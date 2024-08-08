@@ -14,8 +14,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"math/rand"
-	"net"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -718,24 +716,4 @@ func getHardwareDetailForPrivate(cpu, memory, storage int, gpuModel string, gpuN
 	}
 
 	return taskType, hardwareResource
-}
-
-func GetRandomAvailablePort() (int, error) {
-	rand.Seed(time.Now().UnixNano())
-	for i := 0; i < 100; i++ {
-		port := rand.Intn(32767-30000+1) + 30000
-		if IsPortAvailable(port) {
-			return port, nil
-		}
-	}
-	return 0, fmt.Errorf("no available port found")
-}
-
-func IsPortAvailable(port int) bool {
-	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
-	if err != nil {
-		return false
-	}
-	ln.Close()
-	return true
 }
