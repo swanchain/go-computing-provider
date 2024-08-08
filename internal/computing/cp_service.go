@@ -166,22 +166,20 @@ func ReceiveJob(c *gin.Context) {
 				}
 			}
 
-			if hostPort != 0 {
-				if !IsPortAvailable(int(hostPort)) {
-					logs.GetLogger().Error("failed to check port, error: %v", err)
-					c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.PortNoAvailableError))
-					return
-				}
-				nodePort = int(hostPort)
-			} else {
-				nodePort, err = GetRandomAvailablePort()
-				if err != nil {
-					logs.GetLogger().Error("failed to found available port, error: %v", err)
-					c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.PortNoAvailableError))
-					return
-				}
+			allocateFlag, serviceNodePort, err := NewK8sService().CheckServiceNodePort(hostPort)
+			if err != nil {
+				logs.GetLogger().Error("failed to check port, error: %v", err)
+				c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.PortNoAvailableError))
+				return
 			}
-			realUrl := fmt.Sprintf("ssh root@%s -p%d", multiAddressSplit[2], nodePort)
+
+			if !allocateFlag {
+				logs.GetLogger().Error("failed to found available port, error: %v", err)
+				c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.PortNoAvailableError, err.Error()))
+				return
+			}
+
+			realUrl := fmt.Sprintf("ssh root@%s -p%d", multiAddressSplit[2], serviceNodePort)
 			jobData.JobRealUri = realUrl
 			jobData.ContainerLog = jobData.ContainerLog + "&order=private"
 			logs.GetLogger().Infof("space_uuid: %s, real url: %s", spaceUuid, realUrl)

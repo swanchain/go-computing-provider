@@ -332,6 +332,38 @@ func (s *K8sService) ListNamespace(ctx context.Context) ([]string, error) {
 	return namespaces, nil
 }
 
+func (s *K8sService) CheckServiceNodePort(targetNodePort int32) (bool, int32, error) {
+	services, err := s.k8sClient.CoreV1().Services("").List(context.TODO(), metaV1.ListOptions{})
+	if err != nil {
+		return false, 0, err
+	}
+
+	var usedPorts = make(map[int32]struct{})
+	for _, service := range services.Items {
+		for _, port := range service.Spec.Ports {
+			usedPorts[port.NodePort] = struct{}{}
+		}
+	}
+
+	var resultPort int32
+	var flag bool
+	if targetNodePort == 0 {
+		for i := 30000; i < 32768; i++ {
+			if _, ok := usedPorts[int32(i)]; !ok {
+				resultPort = int32(i)
+				flag = true
+				break
+			}
+		}
+	} else {
+		if _, ok := usedPorts[targetNodePort]; ok {
+			flag = false
+			err = fmt.Errorf("invalid value: %d: provided port is already allocated", targetNodePort)
+		}
+	}
+	return flag, resultPort, err
+}
+
 func (s *K8sService) StatisticalSources(ctx context.Context) ([]*models.NodeResource, error) {
 	activePods, err := s.GetAllActivePod(ctx)
 	if err != nil {
