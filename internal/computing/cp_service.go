@@ -174,7 +174,7 @@ func ReceiveJob(c *gin.Context) {
 			}
 
 			if !allocateFlag {
-				logs.GetLogger().Error("failed to found available port, error: %v", err)
+				logs.GetLogger().Error("failed to check port, error: %v", err)
 				c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.PortNoAvailableError, err.Error()))
 				return
 			}
