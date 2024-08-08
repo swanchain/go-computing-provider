@@ -151,7 +151,7 @@ func ReceiveJob(c *gin.Context) {
 	if deployParam.ContainsYaml {
 		containerResources, err := yaml.HandlerYaml(deployParam.YamlFilePath)
 		if err != nil {
-			logs.GetLogger().Error("failed to parse yaml, error: %v", err)
+			logs.GetLogger().Errorf("failed to parse yaml, error: %v", err)
 			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.DownloadResourceError))
 			return
 		}
@@ -168,13 +168,13 @@ func ReceiveJob(c *gin.Context) {
 
 			allocateFlag, serviceNodePort, err := NewK8sService().CheckServiceNodePort(hostPort)
 			if err != nil {
-				logs.GetLogger().Error("failed to check port, error: %v", err)
+				logs.GetLogger().Errorf("failed to check port, error: %v", err)
 				c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.PortNoAvailableError))
 				return
 			}
 
 			if !allocateFlag {
-				logs.GetLogger().Error("failed to check port, error: %v", err)
+				logs.GetLogger().Errorf("failed to check port, error: %v", err)
 				c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.PortNoAvailableError, err.Error()))
 				return
 			}
