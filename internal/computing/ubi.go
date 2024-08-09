@@ -1074,9 +1074,9 @@ func reportClusterResourceForDocker() {
 
 func CronTaskForEcp() {
 	go func() {
-		ticker := time.NewTicker(24 * time.Hour)
+		ticker := time.NewTicker(3 * time.Hour)
 		for range ticker.C {
-			NewDockerService().CleanResource()
+			NewDockerService().CleanResourceForDocker()
 		}
 	}()
 
@@ -1117,7 +1117,7 @@ func CronTaskForEcp() {
 				logs.GetLogger().Errorf("GetUbiTaskReward, error: %+v", err)
 			}
 		}()
-		ticker := time.NewTicker(5 * time.Minute)
+		ticker := time.NewTicker(10 * time.Minute)
 		for range ticker.C {
 			if err := syncTaskStatusForSequencerService(); err != nil {
 				logs.GetLogger().Errorf("failed to sync task from sequencer, error: %v", err)
@@ -1133,6 +1133,7 @@ func syncTaskStatusForSequencerService() error {
 	}
 
 	taskGroups := handleTasksToGroup(taskList)
+	var taskIdAndStatus = make(map[int64]string)
 	for _, group := range taskGroups {
 		taskList, err := NewSequencer().QueryTask(group.Type, group.Ids...)
 		if err != nil {
@@ -1189,11 +1190,17 @@ func syncTaskStatusForSequencerService() error {
 						status = models.TASK_UNKNOWN_STATUS
 					}
 				}
+
+				if item.Status == status {
+					continue
+				}
+				taskIdAndStatus[item.Id] = models.TaskStatusStr(status)
 				item.Status = status
 				NewTaskService().UpdateTaskEntityByTaskId(item)
 			}
 		}
 	}
+	logs.GetLogger().Infof("successfully updated the task status: %v", taskIdAndStatus)
 	return nil
 }
 

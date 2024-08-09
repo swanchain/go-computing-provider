@@ -117,13 +117,13 @@ func (task *CronTask) watchNameSpaceForDeleted() {
 
 func (task *CronTask) cleanImageResource() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("@every 24h", func() {
+	c.AddFunc("* 0/30 * * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("cleanImageResource catch panic error: %+v", err)
 			}
 		}()
-		NewDockerService().CleanResource()
+		NewDockerService().CleanResourceForK8s()
 	})
 	c.Start()
 }
@@ -351,7 +351,7 @@ func (task *CronTask) checkJobReward() {
 
 func (task *CronTask) getUbiTaskReward() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("* 0/10 * * ?", func() {
+	c.AddFunc("* 0/10 * * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("task job: [GetUbiTaskReward], error: %+v", err)
