@@ -147,7 +147,8 @@ func ReceiveJob(c *gin.Context) {
 		return
 	}
 
-	var nodePort int
+	var serviceNodePort int32
+	var allocateFlag bool
 	if deployParam.ContainsYaml {
 		containerResources, err := yaml.HandlerYaml(deployParam.YamlFilePath)
 		if err != nil {
@@ -166,7 +167,7 @@ func ReceiveJob(c *gin.Context) {
 				}
 			}
 
-			allocateFlag, serviceNodePort, err := NewK8sService().CheckServiceNodePort(hostPort)
+			allocateFlag, serviceNodePort, err = NewK8sService().CheckServiceNodePort(hostPort)
 			if err != nil {
 				logs.GetLogger().Errorf("failed to check port, error: %v", err)
 				c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.PortNoAvailableError))
@@ -234,7 +235,7 @@ func ReceiveJob(c *gin.Context) {
 			logs.GetLogger().Infof("successfully uploaded to MCS, jobuuid: %s", jobData.UUID)
 		}()
 
-		DeploySpaceTask(jobData, deployParam, hostName, gpuProductName, nodePort)
+		DeploySpaceTask(jobData, deployParam, hostName, gpuProductName, serviceNodePort)
 	}()
 
 	c.JSON(http.StatusOK, util.CreateSuccessResponse(jobData))
@@ -775,7 +776,7 @@ func handleConnection(conn *websocket.Conn, jobDetail models.JobEntity, logType 
 	}
 }
 
-func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName string, gpuProductName string, nodePort int) {
+func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName string, gpuProductName string, nodePort int32) {
 	updateJobStatus(jobData.UUID, models.DEPLOY_UPLOAD_RESULT)
 
 	var success bool
@@ -839,7 +840,7 @@ func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName s
 	}
 
 	if deployParam.ContainsYaml {
-		deploy.WithYamlInfo(deployParam.YamlFilePath).YamlToK8s(int32(nodePort))
+		deploy.WithYamlInfo(deployParam.YamlFilePath).YamlToK8s(nodePort)
 	} else {
 		imageName, dockerfilePath := BuildImagesByDockerfile(jobData.UUID, spaceUuid, spaceName, deployParam.BuildImagePath)
 		deploy.WithDockerfile(imageName, dockerfilePath).DockerfileToK8s()
