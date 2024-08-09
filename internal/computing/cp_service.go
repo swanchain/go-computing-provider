@@ -166,18 +166,18 @@ func ReceiveJob(c *gin.Context) {
 				}
 			}
 
-			_, serviceNodePort, err := NewK8sService().CheckServiceNodePort(hostPort)
+			allocateFlag, serviceNodePort, err := NewK8sService().CheckServiceNodePort(hostPort)
 			if err != nil {
 				logs.GetLogger().Errorf("failed to check port, error: %v", err)
 				c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.PortNoAvailableError))
 				return
 			}
 
-			//if !allocateFlag {
-			//	logs.GetLogger().Errorf("failed to check port, error: %v", err)
-			//	c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.PortNoAvailableError, err.Error()))
-			//	return
-			//}
+			if !allocateFlag {
+				logs.GetLogger().Errorf("failed to check port, error: %v", err)
+				c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.PortNoAvailableError, err.Error()))
+				return
+			}
 
 			realUrl := fmt.Sprintf("ssh root@%s -p%d", multiAddressSplit[2], serviceNodePort)
 			jobData.JobRealUri = realUrl

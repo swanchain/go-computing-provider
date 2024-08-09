@@ -359,7 +359,11 @@ func (s *K8sService) CheckServiceNodePort(targetNodePort int32) (bool, int32, er
 		if _, ok := usedPorts[targetNodePort]; ok {
 			flag = false
 			err = fmt.Errorf("invalid value: %d, provided port is already allocated", targetNodePort)
+		} else {
+			flag = true
+			resultPort = targetNodePort
 		}
+
 	}
 	return flag, resultPort, err
 }
