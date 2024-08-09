@@ -345,6 +345,8 @@ func (s *K8sService) CheckServiceNodePort(targetNodePort int32) (bool, int32, er
 		}
 	}
 
+	logs.GetLogger().Infof("targetNodePort：%d, usedPorts: %+v", targetNodePort, usedPorts)
+
 	var resultPort int32
 	var flag bool
 	if targetNodePort == 0 {
