@@ -12,6 +12,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/registry"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/swanchain/go-computing-provider/build"
@@ -310,13 +311,14 @@ func (ds *DockerService) CheckRunningContainer(containerName string) (bool, erro
 	return false, nil
 }
 
-func (ds *DockerService) ContainerCreateAndStart(config *container.Config, hostConfig *container.HostConfig, containerName string) error {
+func (ds *DockerService) ContainerCreateAndStart(config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, containerName string) (string, error) {
 	ctx := context.Background()
-	resp, err := ds.c.ContainerCreate(ctx, config, hostConfig, nil, nil, containerName)
+	resp, err := ds.c.ContainerCreate(ctx, config, hostConfig, networkingConfig, nil, containerName)
 	if err != nil {
-		return err
+		return "", err
 	}
-	return ds.c.ContainerStart(ctx, resp.ID, container.StartOptions{})
+
+	return resp.ID, ds.c.ContainerStart(ctx, resp.ID, container.StartOptions{})
 }
 
 func (ds *DockerService) ContainerLogs(containerName string) (string, error) {
@@ -387,4 +389,60 @@ func (ds *DockerService) IsExistContainer(containerName string) bool {
 	} else {
 		return false
 	}
+}
+
+func (ds *DockerService) CheckExistNetwork(networkName string) (bool, error) {
+	networks, err := ds.c.NetworkList(context.Background(), types.NetworkListOptions{})
+	if err != nil {
+		return false, err
+	}
+	networkExists := false
+	for _, net := range networks {
+		if net.Name == networkName {
+			networkExists = true
+			break
+		}
+	}
+	return networkExists, err
+}
+
+func (ds *DockerService) CreatNetwork(networkName string) error {
+	networkResponse, err := ds.c.NetworkCreate(context.Background(), networkName, types.NetworkCreate{
+		Driver: "macvlan",
+		IPAM: &network.IPAM{
+			Config: []network.IPAMConfig{
+				{
+					Subnet:  "192.168.56.0/24",
+					Gateway: "192.168.56.254",
+				},
+			},
+		},
+		Options: map[string]string{
+			"macvlan_mode": "private",
+			"parent":       "ens33",
+		},
+	})
+	if err != nil {
+		return err
+	}
+	fmt.Printf("successfully to create network, networkiD: %s", networkResponse.ID)
+	return nil
+}
+
+func (ds *DockerService) ExecCmdInDocker(containerId string, execConfig types.ExecConfig) error {
+	execID, err := ds.c.ContainerExecCreate(context.Background(), containerId, execConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create exec instance, error: %v", err)
+	}
+
+	response, err := ds.c.ContainerExecAttach(context.Background(), execID.ID, types.ExecStartCheck{})
+	if err != nil {
+		return fmt.Errorf("failed to exec cmd, error: %v", err)
+	}
+	defer response.Close()
+
+	if _, err := os.Stdout.ReadFrom(response.Reader); err != nil {
+		return fmt.Errorf("failed to read response of cmd, error: %v", err)
+	}
+	return nil
 }

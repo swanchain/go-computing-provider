@@ -698,7 +698,7 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		logs.GetLogger().Warnf("task_id: %d, starting container, container name: %s", ubiTask.ID, containerName)
 
 		dockerService := NewDockerService()
-		if err = dockerService.ContainerCreateAndStart(containerConfig, hostConfig, containerName); err != nil {
+		if _, err = dockerService.ContainerCreateAndStart(containerConfig, hostConfig, nil, containerName); err != nil {
 			logs.GetLogger().Errorf("failed to create ubi task container, task_id: %d, error: %v", ubiTask.ID, err)
 			return
 		}
@@ -1236,14 +1236,14 @@ func RestartResourceExporter() error {
 		return fmt.Errorf("pull %s image failed, error: %v", build.UBIResourceExporterDockerImage, err)
 	}
 
-	err = dockerService.ContainerCreateAndStart(&container.Config{
+	_, err = dockerService.ContainerCreateAndStart(&container.Config{
 		Image:        build.UBIResourceExporterDockerImage,
 		AttachStdout: true,
 		AttachStderr: true,
 		Tty:          true,
 	}, &container.HostConfig{
 		Privileged: true,
-	}, resourceExporterContainerName)
+	}, nil, resourceExporterContainerName)
 	if err != nil {
 		return fmt.Errorf("create resource-exporter container failed, error: %v", err)
 	}

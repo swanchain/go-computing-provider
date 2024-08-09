@@ -4,6 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
+	"github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/api/types/strslice"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/swanchain/go-computing-provider/constants"
 	"github.com/swanchain/go-computing-provider/internal/models"
@@ -544,6 +549,118 @@ func (d *Deploy) DeploySshTaskToK8s(nodePort int32) error {
 	updateJobStatus(d.jobUuid, models.DEPLOY_TO_K8S)
 	d.watchContainerRunningTime()
 	return nil
+}
+
+func (d *Deploy) deployContainerByDocker() (string, error) {
+	var networkName = "net_lan"
+	dockerService := NewDockerService()
+	existNetwork, err := dockerService.CheckExistNetwork(networkName)
+	if err != nil {
+		logs.GetLogger().Errorf("failed to check network name, networkName: %s, error: %+v", networkName, err)
+		return "", err
+	}
+
+	if !existNetwork {
+		if err = dockerService.CreatNetwork(networkName); err != nil {
+			return "", fmt.Errorf("failed to create network name, networkName: %s, error: %+v", networkName, err)
+		}
+	}
+
+	containerConfig := &container.Config{
+		Image:        d.image,
+		AttachStdout: true,
+		AttachStderr: true,
+		Tty:          true,
+	}
+
+	hostConfig := &container.HostConfig{
+		Resources: container.Resources{
+			Memory:     d.hardwareResource.Memory.Quantity * 1024 * 1024 * 1024,
+			CpusetCpus: "1",
+		},
+		StorageOpt: map[string]string{
+			"size": "5G",
+		},
+		Mounts: []mount.Mount{
+			{
+				Source:   "/var/lib/lxcfs/proc/cpuinfo",
+				Target:   "/proc/cpuinfo",
+				Type:     mount.TypeBind,
+				ReadOnly: false,
+			},
+			{
+				Source:   "/var/lib/lxcfs/proc/diskstats",
+				Target:   "/proc/diskstats",
+				Type:     mount.TypeBind,
+				ReadOnly: false,
+			},
+			{
+				Source:   "/var/lib/lxcfs/proc/meminfo",
+				Target:   "/proc/meminfo",
+				Type:     mount.TypeBind,
+				ReadOnly: false,
+			},
+			{
+				Source:   "/var/lib/lxcfs/proc/stat",
+				Target:   "/proc/stat",
+				Type:     mount.TypeBind,
+				ReadOnly: false,
+			},
+			{
+				Source:   "/var/lib/lxcfs/proc/swaps",
+				Target:   "/proc/swaps",
+				Type:     mount.TypeBind,
+				ReadOnly: false,
+			},
+			{
+				Source:   "/var/lib/lxcfs/proc/uptime",
+				Target:   "/proc/uptime",
+				Type:     mount.TypeBind,
+				ReadOnly: false,
+			},
+		},
+	}
+
+	networkConfig := &network.NetworkingConfig{
+		EndpointsConfig: map[string]*network.EndpointSettings{
+			networkName: {},
+		},
+	}
+
+	containerName := "" + generateString(5)
+	containerID, err := dockerService.ContainerCreateAndStart(containerConfig, hostConfig, networkConfig, containerName)
+	if err != nil {
+		logs.GetLogger().Errorf("failed to check network name, networkName: %s, error: %+v", networkName, err)
+		return "", err
+	}
+
+	containerInfo, err := dockerService.c.ContainerInspect(context.Background(), containerID)
+	if err != nil {
+		logs.GetLogger().Errorf("failed to check network name, networkName: %s, error: %+v", networkName, err)
+		return "", err
+	}
+
+	var containerIp string
+	if containerInfo.NetworkSettings != nil {
+		for _, net := range containerInfo.NetworkSettings.Networks {
+			containerIp = net.IPAddress
+			break
+		}
+
+		execConfig := types.ExecConfig{
+			Cmd:          strslice.StrSlice([]string{"sh", "-c", fmt.Sprintf("echo '%s' > /root/.ssh/authorized_keys", d.sshKey)}),
+			AttachStdout: true,
+			AttachStderr: true,
+		}
+
+		if err = dockerService.ExecCmdInDocker(containerID, execConfig); err != nil {
+			logs.GetLogger().Errorf("failed to add sshkey, error: %v", err)
+			return "", err
+		}
+	} else {
+		return "", fmt.Errorf("not found network setting")
+	}
+	return containerIp, nil
 }
 
 func (d *Deploy) deployNamespace() error {
