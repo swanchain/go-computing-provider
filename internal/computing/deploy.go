@@ -241,6 +241,17 @@ func (d *Deploy) YamlToK8s() {
 			return
 		}
 		fmt.Printf("container ip: %s", ip)
+		go func() {
+			var jobData = new(models.JobData)
+			jobData.JobRealUri = ip
+			jobData.UUID = d.jobUuid
+			if err = submitJob(jobData); err != nil {
+				logs.GetLogger().Errorf("failed to upload job data to MCS, jobUuid: %s, spaceUuid: %s, error: %v", jobData.UUID, d.spaceUuid, err)
+				return
+			}
+			logs.GetLogger().Infof("successfully uploaded to MCS, jobuuid: %s", jobData.UUID)
+		}()
+
 		return
 	}
 
