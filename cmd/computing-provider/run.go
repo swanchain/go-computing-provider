@@ -236,7 +236,7 @@ var infoCmd = &cli.Command{
 				})
 		}
 		header := []string{"CP Account Info:"}
-		NewVisualTable(header, taskData, rowColorList).Generate(false)
+		NewVisualTable(header, taskData, rowColorList).SetAutoWrapText(false).Generate(false)
 		if err != nil {
 			return err
 		}
