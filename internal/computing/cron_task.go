@@ -31,8 +31,8 @@ func NewCronTask(nodeId string) *CronTask {
 }
 
 func (task *CronTask) RunTask() {
-	addNodeLabel()
 	checkJobStatus()
+	task.addLabelToNode()
 	task.checkCollateralBalance()
 	task.cleanAbnormalDeployment()
 	task.setFailedUbiTaskStatus()
@@ -62,6 +62,19 @@ func checkJobStatus() {
 			}
 		}
 	}()
+}
+
+func (task *CronTask) addLabelToNode() {
+	c := cron.New(cron.WithSeconds())
+	c.AddFunc("* 0/10 * * * ?", func() {
+		defer func() {
+			if err := recover(); err != nil {
+				logs.GetLogger().Errorf("Failed add lable to k8s node, error: %+v", err)
+			}
+		}()
+		addNodeLabel()
+	})
+	c.Start()
 }
 
 func (task *CronTask) reportClusterResource() {

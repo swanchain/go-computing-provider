@@ -151,7 +151,7 @@ var infoCmd = &cli.Command{
 			}
 
 			for _, taskType := range cpAccount.TaskTypes {
-				taskTypes += models.TaskTypeStr(int(taskType)) + ", "
+				taskTypes += models.TaskTypeStr(int(taskType)) + ",\u200B\u200B"
 			}
 			if taskTypes != "" {
 				taskTypes = taskTypes[:len(taskTypes)-2]
