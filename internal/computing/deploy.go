@@ -586,7 +586,7 @@ func (d *Deploy) deployContainerByDocker() (string, error) {
 	dockerService := NewDockerService()
 	existNetwork, err := dockerService.CheckExistNetwork(networkName)
 	if err != nil {
-		logs.GetLogger().Errorf("failed to check network name, networkName: %s, error: %+v", networkName, err)
+		logs.GetLogger().Errorf("failed to check network exist, networkName: %s, error: %+v", networkName, err)
 		return "", err
 	}
 
@@ -662,16 +662,21 @@ func (d *Deploy) deployContainerByDocker() (string, error) {
 		},
 	}
 
+	if err := dockerService.PullImage(d.image); err != nil {
+		logs.GetLogger().Errorf("failed to pull %s image, error: %v", d.image, err)
+		return "", err
+	}
+
 	containerName := "" + generateString(5)
 	containerID, err := dockerService.ContainerCreateAndStart(containerConfig, hostConfig, networkConfig, containerName)
 	if err != nil {
-		logs.GetLogger().Errorf("failed to check network name, networkName: %s, error: %+v", networkName, err)
+		logs.GetLogger().Errorf("failed to create container, jobUuid: %s,, error: %+v", d.jobUuid, err)
 		return "", err
 	}
 
 	containerInfo, err := dockerService.c.ContainerInspect(context.Background(), containerID)
 	if err != nil {
-		logs.GetLogger().Errorf("failed to check network name, networkName: %s, error: %+v", networkName, err)
+		logs.GetLogger().Errorf("failed to get container info, jobUuid: %s, error: %+v", d.jobUuid, err)
 		return "", err
 	}
 
