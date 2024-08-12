@@ -478,6 +478,7 @@ func ReceiveUbiProof(c *gin.Context) {
 		}()
 		err = submitUBIProof(c2Proof, ubiTask)
 		if err != nil {
+			logs.GetLogger().Errorf("failed to submitUBIProof, taskId: %d, error: %v", taskId, err)
 			return
 		}
 	}()
@@ -863,13 +864,13 @@ func submitUBIProof(c2Proof models.UbiC2Proof, task *models.TaskEntity) error {
 
 	localWallet, err := wallet.SetupWallet(wallet.WalletRepo)
 	if err != nil {
-		logs.GetLogger().Errorf("setup wallet failed, taskId: %s,error: %v", c2Proof.TaskId, err)
+		logs.GetLogger().Errorf("failed to setup wallet, taskId: %s,error: %v", c2Proof.TaskId, err)
 		return err
 	}
 
 	_, workerAddress, err := GetOwnerAddressAndWorkerAddress()
 	if err != nil {
-		logs.GetLogger().Errorf("get worker address failed, taskId: %s,error: %v", c2Proof.TaskId, err)
+		logs.GetLogger().Errorf("failed get worker address, taskId: %s,error: %v", c2Proof.TaskId, err)
 		return err
 	}
 
@@ -944,6 +945,7 @@ loopTask:
 
 	if conf.GetConfig().UBI.EnableSequencer && conf.GetConfig().UBI.AutoChainProof {
 		if sequencerBalance <= 0 {
+			logs.GetLogger().Infof("taskId: %s, sequencerBalance<=0, use chain to submit proof", c2Proof.TaskId)
 			taskContractAddress, err := taskStub.CreateTaskContract(c2Proof.Proof, task, remainingTime)
 			if taskContractAddress != "" {
 				task.Status = models.TASK_SUBMITTED_STATUS
@@ -956,6 +958,7 @@ loopTask:
 				logs.GetLogger().Errorf("taskId: %s, failed to create task contract, error: %v", c2Proof.TaskId, err)
 			}
 		} else {
+			logs.GetLogger().Infof("taskId: %d, AutoChainProof=true and sequencerBalance>0, use sequencer to submit proof", task.Id)
 			if err = submitTaskToSequencer(c2Proof.Proof, task, remainingTime, true); err != nil {
 				logs.GetLogger().Errorf("failed to submitted to the sequencer, taskId: %d, error: %v", task.Id, err)
 				task.Status = models.TASK_FAILED_STATUS
@@ -965,6 +968,7 @@ loopTask:
 		}
 	} else if conf.GetConfig().UBI.EnableSequencer && !conf.GetConfig().UBI.AutoChainProof {
 		if sequencerBalance > 0 {
+			logs.GetLogger().Infof("taskId: %d, AutoChainProof=false and sequencerBalance>0, use sequencer to submit proof", task.Id)
 			if err = submitTaskToSequencer(c2Proof.Proof, task, remainingTime, false); err != nil {
 				logs.GetLogger().Errorf("failed to submitted to the sequencer, taskId: %d, error: %v", task.Id, err)
 				task.Status = models.TASK_FAILED_STATUS
@@ -976,6 +980,7 @@ loopTask:
 			logs.GetLogger().Warnf("taskId: %d, sequencer insufficient balance, sequencerBalance: %f", task.Id, sequencerBalance)
 		}
 	} else {
+		logs.GetLogger().Infof("taskId: %s, use chain to submit proof", c2Proof.TaskId)
 		taskContractAddress, err := taskStub.CreateTaskContract(c2Proof.Proof, task, remainingTime)
 		if taskContractAddress != "" {
 			task.Status = models.TASK_SUBMITTED_STATUS
@@ -1309,6 +1314,7 @@ func submitTaskToSequencer(proof string, task *models.TaskEntity, timeOut int64,
 		}
 		remainingTime := timeOut - int64(time.Now().Sub(start).Seconds())
 		if !flag && remainingTime > 0 {
+			logs.GetLogger().Infof("taskId: %d, use chain to submit proof", task.Id)
 			chainUrl, err := conf.GetRpcByNetWorkName()
 			if err != nil {
 				return fmt.Errorf("failed to get rpc url, taskId: %d, error: %v", task.Id, err)
@@ -1339,7 +1345,6 @@ func submitTaskToSequencer(proof string, task *models.TaskEntity, timeOut int64,
 			if err != nil {
 				return fmt.Errorf("failed to create ubi task client, taskId: %s, contract: %s, error: %v", task.Id, task.Contract, err)
 			}
-
 			taskContractAddress, err := taskStub.CreateTaskContract(task.Proof, task, remainingTime)
 			if taskContractAddress != "" {
 				task.Status = models.TASK_SUBMITTED_STATUS
@@ -1352,6 +1357,10 @@ func submitTaskToSequencer(proof string, task *models.TaskEntity, timeOut int64,
 				task.Error = fmt.Sprintf("%s", err.Error())
 				return fmt.Errorf("taskId: %d, failed to create task contract , error: %v", task.Id, err)
 			}
+		}
+
+		if remainingTime <= 0 {
+			return fmt.Errorf("proof submission deadline has passed, remainingTime: %d", remainingTime)
 		}
 	} else {
 	outerLoop:
