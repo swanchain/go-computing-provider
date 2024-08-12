@@ -613,9 +613,9 @@ func (d *Deploy) deployContainerByDocker() (string, error) {
 			Memory:     d.hardwareResource.Memory.Quantity * 1024 * 1024 * 1024,
 			CpusetCpus: "1",
 		},
-		StorageOpt: map[string]string{
-			"size": "5G",
-		},
+		//StorageOpt: map[string]string{
+		//	"size": "5G",
+		//},
 		Mounts: []mount.Mount{
 			{
 				Source:   "/var/lib/lxcfs/proc/cpuinfo",
