@@ -21,3 +21,8 @@ func NewCpInfoService() CpInfoService {
 	wire.Build(cpInfoSet)
 	return CpInfoService{}
 }
+
+func NewIpPoolService() IpPoolService {
+	wire.Build(ipPoolSet)
+	return IpPoolService{}
+}

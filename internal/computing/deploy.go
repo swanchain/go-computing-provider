@@ -195,7 +195,7 @@ func (d *Deploy) DockerfileToK8s() {
 	return
 }
 
-func (d *Deploy) YamlToK8s(nodePort int32) {
+func (d *Deploy) YamlToK8s() {
 	containerResources, err := yaml.HandlerYaml(d.yamlPath)
 	if err != nil {
 		logs.GetLogger().Error(err)
@@ -209,6 +209,22 @@ func (d *Deploy) YamlToK8s(nodePort int32) {
 		return
 	}
 
+	//if len(containerResources) == 1 && containerResources[0].ServiceType == yaml.ServiceTypeNodePort {
+	//	service := containerResources[0]
+	//	for _, envVar := range service.Env {
+	//		if envVar.Name == "sshkey" {
+	//			d.sshKey = envVar.Value
+	//			d.image = service.ImageName
+	//			break
+	//		}
+	//	}
+	//
+	//	if err := d.DeploySshTaskToK8s(nodePort); err != nil {
+	//		logs.GetLogger().Error(err)
+	//	}
+	//	return
+	//}
+
 	if len(containerResources) == 1 && containerResources[0].ServiceType == yaml.ServiceTypeNodePort {
 		service := containerResources[0]
 		for _, envVar := range service.Env {
@@ -219,9 +235,12 @@ func (d *Deploy) YamlToK8s(nodePort int32) {
 			}
 		}
 
-		if err := d.DeploySshTaskToK8s(nodePort); err != nil {
+		ip, err := d.deployContainerByDocker()
+		if err != nil {
 			logs.GetLogger().Error(err)
+			return
 		}
+		fmt.Printf("container ip: %s", ip)
 		return
 	}
 
@@ -561,7 +580,12 @@ func (d *Deploy) deployContainerByDocker() (string, error) {
 	}
 
 	if !existNetwork {
-		if err = dockerService.CreatNetwork(networkName); err != nil {
+		ipPoolEntity, err := NewIpPoolService().GetIpPoolEntity()
+		if err != nil {
+			logs.GetLogger().Errorf("failed to get ipPool, error: %+v", err)
+			return "", err
+		}
+		if err = dockerService.CreatNetwork(networkName, ipPoolEntity); err != nil {
 			return "", fmt.Errorf("failed to create network name, networkName: %s, error: %+v", networkName, err)
 		}
 	}

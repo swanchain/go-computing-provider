@@ -162,6 +162,17 @@ func (cpServ CpInfoService) UpdateCpInfoByNodeId(cp *models.CpInfoEntity) (err e
 	return cpServ.Model(&models.CpInfoEntity{}).Where("node_id =?", cp.NodeId).Updates(cp).Error
 }
 
+type IpPoolService struct {
+	*gorm.DB
+}
+
+func (ipServ IpPoolService) GetIpPoolEntity() (*models.IpPoolEntity, error) {
+	var ip models.IpPoolEntity
+	err := ipServ.Model(&models.IpPoolEntity{}).Find(&ip).Error
+	return &ip, err
+}
+
 var taskSet = wire.NewSet(db.NewDbService, wire.Struct(new(TaskService), "*"))
 var jobSet = wire.NewSet(db.NewDbService, wire.Struct(new(JobService), "*"))
 var cpInfoSet = wire.NewSet(db.NewDbService, wire.Struct(new(CpInfoService), "*"))
+var ipPoolSet = wire.NewSet(db.NewDbService, wire.Struct(new(IpPoolService), "*"))

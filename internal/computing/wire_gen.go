@@ -39,3 +39,11 @@ func NewCpInfoService() CpInfoService {
 	}
 	return cpInfoService
 }
+
+func NewIpPoolService() IpPoolService {
+	gormDB := db.NewDbService()
+	ipPoolService := IpPoolService{
+		DB: gormDB,
+	}
+	return ipPoolService
+}

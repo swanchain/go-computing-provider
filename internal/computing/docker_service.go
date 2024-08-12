@@ -16,6 +16,7 @@ import (
 	"github.com/docker/docker/api/types/registry"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/swanchain/go-computing-provider/build"
+	"github.com/swanchain/go-computing-provider/internal/models"
 	"io"
 	"os"
 	"path/filepath"
@@ -406,20 +407,20 @@ func (ds *DockerService) CheckExistNetwork(networkName string) (bool, error) {
 	return networkExists, err
 }
 
-func (ds *DockerService) CreatNetwork(networkName string) error {
+func (ds *DockerService) CreatNetwork(networkName string, ipPool *models.IpPoolEntity) error {
 	networkResponse, err := ds.c.NetworkCreate(context.Background(), networkName, types.NetworkCreate{
 		Driver: "macvlan",
 		IPAM: &network.IPAM{
 			Config: []network.IPAMConfig{
 				{
-					Subnet:  "192.168.56.0/24",
-					Gateway: "192.168.56.254",
+					Subnet:  ipPool.SubNet,
+					Gateway: ipPool.Gateway,
 				},
 			},
 		},
 		Options: map[string]string{
 			"macvlan_mode": "private",
-			"parent":       "ens33",
+			"parent":       ipPool.NetworkDriver,
 		},
 	})
 	if err != nil {

@@ -296,3 +296,13 @@ func (c *CpInfoEntity) AfterFind(tx *gorm.DB) (err error) {
 	}
 	return nil
 }
+
+type IpPoolEntity struct {
+	SubNet        string `json:"sub_net" gorm:"sub_net"`
+	Gateway       string `json:"gateway" gorm:"gateway"`
+	NetworkDriver string `json:"network_driver" gorm:"network_driver"`
+}
+
+func (*IpPoolEntity) TableName() string {
+	return "t_ip_pool"
+}
