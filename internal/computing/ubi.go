@@ -1205,7 +1205,9 @@ func syncTaskStatusForSequencerService() error {
 			}
 		}
 	}
-	logs.GetLogger().Infof("successfully updated the task status: %v", taskIdAndStatus)
+	if len(taskIdAndStatus) > 0 {
+		logs.GetLogger().Infof("successfully updated the task status: %v", taskIdAndStatus)
+	}
 	return nil
 }
 
