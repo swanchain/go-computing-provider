@@ -155,13 +155,13 @@ func (s *K8sService) CreateServiceByNodePort(ctx context.Context, nameSpace, tas
 	var servicePort []coreV1.ServicePort
 
 	servicePort = append(servicePort, coreV1.ServicePort{
-		Name:     "tcp",
+		Name:     fmt.Sprintf("tcp-%d", containerPort),
 		Port:     containerPort,
 		NodePort: nodePort,
 	})
 	for _, port := range exclude22Port {
 		servicePort = append(servicePort, coreV1.ServicePort{
-			Name: "tcp",
+			Name: fmt.Sprintf("tcp-%d", port),
 			Port: port,
 		})
 	}
