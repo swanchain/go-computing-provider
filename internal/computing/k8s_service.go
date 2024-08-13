@@ -151,7 +151,21 @@ func (s *K8sService) CreateService(ctx context.Context, nameSpace, spaceUuid str
 	return s.k8sClient.CoreV1().Services(nameSpace).Create(ctx, service, metaV1.CreateOptions{})
 }
 
-func (s *K8sService) CreateServiceByNodePort(ctx context.Context, nameSpace, taskUuid string, containerPort int32, nodePort int32) (result *coreV1.Service, err error) {
+func (s *K8sService) CreateServiceByNodePort(ctx context.Context, nameSpace, taskUuid string, containerPort int32, nodePort int32, exclude22Port []int32) (result *coreV1.Service, err error) {
+	var servicePort []coreV1.ServicePort
+
+	servicePort = append(servicePort, coreV1.ServicePort{
+		Name:     "tcp",
+		Port:     containerPort,
+		NodePort: nodePort,
+	})
+	for _, port := range exclude22Port {
+		servicePort = append(servicePort, coreV1.ServicePort{
+			Name: "tcp",
+			Port: port,
+		})
+	}
+
 	service := &coreV1.Service{
 		TypeMeta: metaV1.TypeMeta{
 			Kind:       "Service",
@@ -162,14 +176,8 @@ func (s *K8sService) CreateServiceByNodePort(ctx context.Context, nameSpace, tas
 			Namespace: nameSpace,
 		},
 		Spec: coreV1.ServiceSpec{
-			Type: coreV1.ServiceTypeNodePort,
-			Ports: []coreV1.ServicePort{
-				{
-					Name:     "tcp",
-					Port:     containerPort,
-					NodePort: nodePort,
-				},
-			},
+			Type:  coreV1.ServiceTypeNodePort,
+			Ports: servicePort,
 			Selector: map[string]string{
 				"hub-private": taskUuid,
 			},
@@ -700,4 +708,98 @@ type collectGpuInfo struct {
 	index     int
 	count     int
 	remainNum int
+}
+
+func generateVolume() ([]coreV1.VolumeMount, []coreV1.Volume) {
+	fileType := coreV1.HostPathFile
+	return []coreV1.VolumeMount{
+			{
+				Name:      "cpuinfo",
+				MountPath: "/proc/cpuinfo",
+			},
+			{
+				Name:      "meminfo",
+				MountPath: "/proc/meminfo",
+			},
+			{
+				Name:      "diskstats",
+				MountPath: "/proc/diskstats",
+			},
+			{
+				Name:      "stat",
+				MountPath: "/proc/stat",
+			},
+			{
+				Name:      "swaps",
+				MountPath: "/proc/swaps",
+			},
+			{
+				Name:      "uptime",
+				MountPath: "/proc/uptime",
+			},
+		}, []coreV1.Volume{
+			{
+				Name: "cpuinfo",
+				VolumeSource: coreV1.VolumeSource{
+					HostPath: &coreV1.HostPathVolumeSource{
+						Type: &fileType,
+						Path: "/var/lib/lxcfs/proc/cpuinfo",
+					},
+				},
+			},
+			{
+				Name: "meminfo",
+				VolumeSource: coreV1.VolumeSource{
+					HostPath: &coreV1.HostPathVolumeSource{
+						Type: &fileType,
+						Path: "/var/lib/lxcfs/proc/meminfo",
+					},
+				},
+			},
+			{
+				Name: "diskstats",
+				VolumeSource: coreV1.VolumeSource{
+					HostPath: &coreV1.HostPathVolumeSource{
+						Type: &fileType,
+						Path: "/var/lib/lxcfs/proc/diskstats",
+					},
+				},
+			},
+			{
+				Name: "stat",
+				VolumeSource: coreV1.VolumeSource{
+					HostPath: &coreV1.HostPathVolumeSource{
+						Type: &fileType,
+						Path: "/var/lib/lxcfs/proc/stat",
+					},
+				},
+			},
+			{
+				Name: "swaps",
+				VolumeSource: coreV1.VolumeSource{
+					HostPath: &coreV1.HostPathVolumeSource{
+						Type: &fileType,
+						Path: "/var/lib/lxcfs/proc/swaps",
+					},
+				},
+			},
+			{
+				Name: "uptime",
+				VolumeSource: coreV1.VolumeSource{
+					HostPath: &coreV1.HostPathVolumeSource{
+						Type: &fileType,
+						Path: "/var/lib/lxcfs/proc/uptime",
+					},
+				},
+			},
+			{
+				Name: "cpuinfo",
+				VolumeSource: coreV1.VolumeSource{
+					HostPath: &coreV1.HostPathVolumeSource{
+						Type: &fileType,
+						Path: "/var/lib/lxcfs/proc/cpuinfo",
+					},
+				},
+			},
+		}
 }

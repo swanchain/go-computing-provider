@@ -214,7 +214,7 @@ func (d *Deploy) YamlToK8s(nodePort int32) {
 			}
 		}
 
-		if err := d.DeploySshTaskToK8s(nodePort); err != nil {
+		if err := d.DeploySshTaskToK8s(service, nodePort); err != nil {
 			logs.GetLogger().Error(err)
 		}
 		return
@@ -483,8 +483,17 @@ func (d *Deploy) ModelInferenceToK8s() error {
 	return nil
 }
 
-func (d *Deploy) DeploySshTaskToK8s(nodePort int32) error {
+func (d *Deploy) DeploySshTaskToK8s(containerResource yaml.ContainerResource, nodePort int32) error {
 	k8sService := NewK8sService()
+	volumeMounts, volumes := generateVolume()
+
+	var exclude22Port []int32
+	for _, port := range containerResource.Ports {
+		if port.ContainerPort != 22 {
+			exclude22Port = append(exclude22Port, port.ContainerPort)
+		}
+	}
+
 	deployment := &appV1.Deployment{
 		TypeMeta: metaV1.TypeMeta{
 			Kind:       "Deployment",
@@ -493,6 +502,9 @@ func (d *Deploy) DeploySshTaskToK8s(nodePort int32) error {
 		ObjectMeta: metaV1.ObjectMeta{
 			Name:      constants.K8S_DEPLOY_NAME_PREFIX + d.spaceUuid,
 			Namespace: d.k8sNameSpace,
+			Annotations: map[string]string{
+				"initializer.kubernetes.io/lxcfs": "true",
+			},
 		},
 		Spec: appV1.DeploymentSpec{
 			Selector: &metaV1.LabelSelector{
@@ -507,16 +519,17 @@ func (d *Deploy) DeploySshTaskToK8s(nodePort int32) error {
 
 				Spec: coreV1.PodSpec{
 					NodeSelector: generateLabel(d.gpuProductName),
-					Containers: []coreV1.Container{{
-						Name:            constants.K8S_PRIVATE_CONTAINER_PREFIX + d.spaceUuid,
-						Image:           d.image,
-						ImagePullPolicy: coreV1.PullIfNotPresent,
-						Ports: []coreV1.ContainerPort{{
-							ContainerPort: int32(22),
-						}},
-						Resources: d.createResources(),
+					Containers: []coreV1.Container{
+						{
+							Name:            constants.K8S_PRIVATE_CONTAINER_PREFIX + d.spaceUuid,
+							Image:           d.image,
+							ImagePullPolicy: coreV1.PullIfNotPresent,
+							Ports:           containerResource.Ports,
+							Resources:       d.createResources(),
+							VolumeMounts:    volumeMounts,
+						},
 					},
-					},
+					Volumes: volumes,
 				},
 			},
 		}}
@@ -536,10 +549,17 @@ func (d *Deploy) DeploySshTaskToK8s(nodePort int32) error {
 		return fmt.Errorf("failed to add sshkey, error: %v", err)
 	}
 
-	createService, err := k8sService.CreateServiceByNodePort(context.TODO(), d.k8sNameSpace, d.spaceUuid, 22, nodePort)
+	createService, err := k8sService.CreateServiceByNodePort(context.TODO(), d.k8sNameSpace, d.spaceUuid, 22, nodePort, exclude22Port)
 	if err != nil {
 		return fmt.Errorf("failed to create service, error: %w", err)
 	}
+
+	var portMap string
+	for _, port := range createService.Spec.Ports {
+		portMap += fmt.Sprintf("%s > %d", port.TargetPort.String(), port.NodePort)
+	}
+	logs.GetLogger().Infof("space_uuid: %s, port map: %s", d.spaceUuid, portMap)
+
 	logs.GetLogger().Infof("Created service successfully: %s", createService.GetObjectMeta().GetName())
 	updateJobStatus(d.jobUuid, models.DEPLOY_TO_K8S)
 	d.watchContainerRunningTime()
