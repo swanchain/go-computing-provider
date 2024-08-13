@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/swanchain/go-computing-provider/internal/yaml"
 	"io"
 	"math/rand"
 	"net/http"
@@ -148,18 +149,26 @@ func ReceiveJob(c *gin.Context) {
 
 	var serviceNodePort int32
 	if deployParam.ContainsYaml {
-		_, serviceNodePort, err = NewK8sService().CheckServiceNodePort(0)
+		containerResources, err := yaml.HandlerYaml(deployParam.YamlFilePath)
 		if err != nil {
-			logs.GetLogger().Errorf("failed to check port, error: %v", err)
-			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.PortNoAvailableError))
+			logs.GetLogger().Errorf("failed to parse yaml, error: %v", err)
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.DownloadResourceError))
 			return
 		}
 
-		realUrl := fmt.Sprintf("ssh root@%s -p%d", multiAddressSplit[2], serviceNodePort)
-		jobData.JobRealUri = realUrl
-		jobData.ContainerLog = jobData.ContainerLog + "&order=private"
-		logs.GetLogger().Infof("space_uuid: %s, real url: %s", spaceUuid, realUrl)
+		if len(containerResources) == 1 && containerResources[0].ServiceType == yaml.ServiceTypeNodePort {
+			_, serviceNodePort, err = NewK8sService().CheckServiceNodePort(0)
+			if err != nil {
+				logs.GetLogger().Errorf("failed to check port, error: %v", err)
+				c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.PortNoAvailableError))
+				return
+			}
 
+			realUrl := fmt.Sprintf("ssh root@%s -p%d", multiAddressSplit[2], serviceNodePort)
+			jobData.JobRealUri = realUrl
+			jobData.ContainerLog = jobData.ContainerLog + "&order=private"
+			logs.GetLogger().Infof("space_uuid: %s, real url: %s", spaceUuid, realUrl)
+		}
 	}
 
 	go func() {
