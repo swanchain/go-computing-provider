@@ -792,14 +792,5 @@ func generateVolume() ([]coreV1.VolumeMount, []coreV1.Volume) {
 					},
 				},
 			},
-			{
-				Name: "cpuinfo",
-				VolumeSource: coreV1.VolumeSource{
-					HostPath: &coreV1.HostPathVolumeSource{
-						Type: &fileType,
-						Path: "/var/lib/lxcfs/proc/cpuinfo",
-					},
-				},
-			},
 		}
 }
