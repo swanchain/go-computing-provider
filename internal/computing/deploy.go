@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
+	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/constants"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"github.com/swanchain/go-computing-provider/internal/yaml"
@@ -553,15 +554,15 @@ func (d *Deploy) DeploySshTaskToK8s(containerResource yaml.ContainerResource, no
 	if err != nil {
 		return fmt.Errorf("failed to create service, error: %w", err)
 	}
+	logs.GetLogger().Infof("Created service successfully: %s", createService.GetObjectMeta().GetName())
 
 	var portMap string
 	for _, port := range createService.Spec.Ports {
-		portMap += fmt.Sprintf("%s > %d; ", port.TargetPort.String(), port.NodePort)
+		portMap += fmt.Sprintf("%s:%d, ", port.TargetPort.String(), port.NodePort)
 	}
-	logs.GetLogger().Infof("space_uuid: %s, port map: %s", d.spaceUuid, portMap)
+	resultUrl := fmt.Sprintf("ssh root@%s -p%d; %s", strings.Split(conf.GetConfig().API.MultiAddress, "/")[2], nodePort, portMap)
 
-	logs.GetLogger().Infof("Created service successfully: %s", createService.GetObjectMeta().GetName())
-	updateJobStatus(d.jobUuid, models.DEPLOY_TO_K8S)
+	updateJobStatus(d.jobUuid, models.DEPLOY_TO_K8S, resultUrl)
 	d.watchContainerRunningTime()
 	return nil
 }
