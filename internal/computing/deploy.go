@@ -556,7 +556,7 @@ func (d *Deploy) DeploySshTaskToK8s(containerResource yaml.ContainerResource, no
 
 	var portMap string
 	for _, port := range createService.Spec.Ports {
-		portMap += fmt.Sprintf("%s > %d", port.TargetPort.String(), port.NodePort)
+		portMap += fmt.Sprintf("%s > %d; ", port.TargetPort.String(), port.NodePort)
 	}
 	logs.GetLogger().Infof("space_uuid: %s, port map: %s", d.spaceUuid, portMap)
 
