@@ -562,7 +562,6 @@ func (d *Deploy) DeploySshTaskToK8s(containerResource yaml.ContainerResource, no
 		portMap += fmt.Sprintf("%s:%d, ", port.TargetPort.String(), port.NodePort)
 	}
 	d.nodePortUrl = fmt.Sprintf("ssh root@%s -p%d; %s", strings.Split(conf.GetConfig().API.MultiAddress, "/")[2], nodePort, portMap)
-	updateJobStatus(d.jobUuid, models.DEPLOY_TO_K8S)
 	d.watchContainerRunningTime()
 	return nil
 }

@@ -819,12 +819,11 @@ func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName s
 
 		if deploy.nodePortUrl != "" {
 			jobData.JobRealUri = deploy.nodePortUrl
-			go func() {
-				if err = submitJob(&jobData); err != nil {
-					logs.GetLogger().Errorf("failed to upload job result to MCS, jobUuid: %s, spaceUuid: %s, error: %v", jobData.UUID, spaceUuid, err)
-					return
-				}
-			}()
+			if err = submitJob(&jobData); err != nil {
+				logs.GetLogger().Errorf("failed to upload job result to MCS, jobUuid: %s, spaceUuid: %s, error: %v", jobData.UUID, spaceUuid, err)
+				return
+			}
+			updateJobStatus(deploy.jobUuid, models.DEPLOY_TO_K8S)
 		}
 	} else {
 		imageName, dockerfilePath := BuildImagesByDockerfile(jobData.UUID, spaceUuid, spaceName, deployParam.BuildImagePath)
