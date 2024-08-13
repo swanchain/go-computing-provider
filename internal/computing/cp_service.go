@@ -818,7 +818,7 @@ func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName s
 		deploy.WithYamlInfo(deployParam.YamlFilePath).YamlToK8s(nodePort)
 
 		if deploy.nodePortUrl != "" {
-			jobData.JobRealUri = deploy.nodePortUrl
+			jobData.JobRealUri = deploy.nodePortUrl[:len(deploy.nodePortUrl)-2]
 			if err = submitJob(&jobData); err != nil {
 				logs.GetLogger().Errorf("failed to upload job result to MCS, jobUuid: %s, spaceUuid: %s, error: %v", jobData.UUID, spaceUuid, err)
 				return
