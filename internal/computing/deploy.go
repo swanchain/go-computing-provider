@@ -43,8 +43,9 @@ type Deploy struct {
 	taskUuid          string
 	gpuProductName    string
 
-	spaceType string
-	sshKey    string
+	spaceType   string
+	sshKey      string
+	nodePortUrl string
 }
 
 func NewDeploy(jobUuid, hostName, walletAddress, hardwareDesc string, duration int64, taskUuid string, spaceType string) *Deploy {
@@ -560,9 +561,8 @@ func (d *Deploy) DeploySshTaskToK8s(containerResource yaml.ContainerResource, no
 	for _, port := range createService.Spec.Ports {
 		portMap += fmt.Sprintf("%s:%d, ", port.TargetPort.String(), port.NodePort)
 	}
-	resultUrl := fmt.Sprintf("ssh root@%s -p%d; %s", strings.Split(conf.GetConfig().API.MultiAddress, "/")[2], nodePort, portMap)
-
-	updateJobStatus(d.jobUuid, models.DEPLOY_TO_K8S, resultUrl)
+	d.nodePortUrl = fmt.Sprintf("ssh root@%s -p%d; %s", strings.Split(conf.GetConfig().API.MultiAddress, "/")[2], nodePort, portMap)
+	updateJobStatus(d.jobUuid, models.DEPLOY_TO_K8S)
 	d.watchContainerRunningTime()
 	return nil
 }
