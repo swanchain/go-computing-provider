@@ -558,16 +558,16 @@ func (d *Deploy) DeploySshTaskToK8s(containerResource yaml.ContainerResource, no
 		return fmt.Errorf("failed to add sshkey, space_uuid: %s error: %v", d.spaceUuid, err)
 	}
 
-	userDir := fmt.Sprintf("/home/%s", d.userName)
-	userDirCmd := []string{"sh", "-c", fmt.Sprintf("mkdir -p %s && chown %s:%s %s && chmod 755 %s", userDir, d.userName, d.userName, userDir, userDir)}
-	if err = k8sService.PodDoCommand(d.k8sNameSpace, podName, "", userDirCmd); err != nil {
-		return fmt.Errorf("failed to create user directory, space_uuid: %s error: %v", d.spaceUuid, err)
-	}
-
 	randomPassword := generateRandomPassword(8)
 	usernameAndPwdCmd := []string{"sh", "-c", fmt.Sprintf("useradd %s && echo \"%s:%s\" | chpasswd", d.userName, d.userName, randomPassword)}
 	if err = k8sService.PodDoCommand(d.k8sNameSpace, podName, "", usernameAndPwdCmd); err != nil {
 		return fmt.Errorf("failed to add user, space_uuid: %s error: %v", d.spaceUuid, err)
+	}
+
+	userDir := fmt.Sprintf("/home/%s", d.userName)
+	userDirCmd := []string{"sh", "-c", fmt.Sprintf("mkdir -p %s && chown %s:%s %s && chmod 755 %s", userDir, d.userName, d.userName, userDir, userDir)}
+	if err = k8sService.PodDoCommand(d.k8sNameSpace, podName, "", userDirCmd); err != nil {
+		return fmt.Errorf("failed to create user directory, space_uuid: %s error: %v", d.spaceUuid, err)
 	}
 
 	createService, err := k8sService.CreateServiceByNodePort(context.TODO(), d.k8sNameSpace, d.spaceUuid, 22, nodePort, exclude22Port)
