@@ -152,7 +152,12 @@ func (task *CronTask) watchExpiredTask() {
 		var deployOnK8s = make(map[string]string)
 		for _, deploy := range deployments.Items {
 			if strings.HasPrefix(deploy.Namespace, constants.K8S_NAMESPACE_NAME_PREFIX) {
-				deployOnK8s[deploy.Name] = deploy.Namespace
+				creationTimestamp := deploy.ObjectMeta.CreationTimestamp.Time
+				currentTime := time.Now()
+				age := currentTime.Sub(creationTimestamp)
+				if age.Hours() >= 1 {
+					deployOnK8s[deploy.Name] = deploy.Namespace
+				}
 			}
 		}
 

@@ -537,25 +537,25 @@ func (d *Deploy) DeploySshTaskToK8s(containerResource yaml.ContainerResource, no
 		}}
 	createDeployment, err := k8sService.CreateDeployment(context.TODO(), d.k8sNameSpace, deployment)
 	if err != nil {
-		return fmt.Errorf("failed to create deployment, error: %v", err)
+		return fmt.Errorf("failed to create deployment, space_uuid: %s error: %v", d.spaceUuid, err)
 	}
 	updateJobStatus(d.jobUuid, models.DEPLOY_PULL_IMAGE)
 	d.DeployName = createDeployment.GetName()
 	podName, err := k8sService.WaitForPodRunningByTcp(d.k8sNameSpace, d.spaceUuid)
 	if err != nil {
-		return fmt.Errorf("failed to get pod, error: %v", err)
+		return fmt.Errorf("space_uuid: %s, %v", d.spaceUuid, err)
 	}
 
 	podCmd := []string{"sh", "-c", fmt.Sprintf("echo '%s' > /root/.ssh/authorized_keys", d.sshKey)}
 	if err = k8sService.PodDoCommand(d.k8sNameSpace, podName, "", podCmd); err != nil {
-		return fmt.Errorf("failed to add sshkey, error: %v", err)
+		return fmt.Errorf("failed to add sshkey, space_uuid: %s error: %v", d.spaceUuid, err)
 	}
 
 	createService, err := k8sService.CreateServiceByNodePort(context.TODO(), d.k8sNameSpace, d.spaceUuid, 22, nodePort, exclude22Port)
 	if err != nil {
-		return fmt.Errorf("failed to create service, error: %w", err)
+		return fmt.Errorf("failed to create service, space_uuid: %s error: %v", d.spaceUuid, err)
 	}
-	logs.GetLogger().Infof("Created service successfully: %s", createService.GetObjectMeta().GetName())
+	logs.GetLogger().Infof("successfully to created service, space_uuid: %s", d.spaceUuid)
 
 	var portMap string
 	for _, port := range createService.Spec.Ports {
@@ -690,14 +690,14 @@ func getHardwareDetail(description string) (string, models.Resource) {
 		hardwareResource.Gpu.Quantity = 0
 		hardwareResource.Gpu.Unit = ""
 		taskType = "CPU"
-		hardwareResource.Storage.Quantity = 5
+		hardwareResource.Storage.Quantity = 40
 	} else {
 		taskType = "GPU"
 		hardwareResource.Gpu.Quantity = 1
 		oldName := strings.TrimSpace(confSplits[0])
 		hardwareResource.Gpu.Unit = strings.ReplaceAll(oldName, "Nvidia", "NVIDIA")
 
-		hardwareResource.Storage.Quantity = 30
+		hardwareResource.Storage.Quantity = 50
 	}
 	hardwareResource.Storage.Unit = "Gi"
 
