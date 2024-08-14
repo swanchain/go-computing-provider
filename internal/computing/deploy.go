@@ -555,7 +555,6 @@ func (d *Deploy) DeploySshTaskToK8s(containerResource yaml.ContainerResource, no
 	if err != nil {
 		return fmt.Errorf("failed to create service, space_uuid: %s error: %v", d.spaceUuid, err)
 	}
-	logs.GetLogger().Infof("successfully to created service, space_uuid: %s", d.spaceUuid)
 
 	var portMap string
 	for _, port := range createService.Spec.Ports {
