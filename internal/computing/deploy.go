@@ -526,6 +526,7 @@ func (d *Deploy) DeploySshTaskToK8s(containerResource yaml.ContainerResource, no
 				},
 
 				Spec: coreV1.PodSpec{
+					Hostname:     d.spaceName + "-" + generateString(4),
 					NodeSelector: generateLabel(d.gpuProductName),
 					Containers: []coreV1.Container{
 						{
