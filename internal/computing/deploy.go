@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -43,9 +44,11 @@ type Deploy struct {
 	taskUuid          string
 	gpuProductName    string
 
+	// ===
 	spaceType   string
 	sshKey      string
 	nodePortUrl string
+	userName    string
 }
 
 func NewDeploy(jobUuid, hostName, walletAddress, hardwareDesc string, duration int64, taskUuid string, spaceType string) *Deploy {
@@ -212,7 +215,10 @@ func (d *Deploy) YamlToK8s(nodePort int32) {
 			if envVar.Name == "sshkey" {
 				d.sshKey = envVar.Value
 				d.image = service.ImageName
-				break
+			}
+
+			if envVar.Name == "username" {
+				d.userName = envVar.Value
 			}
 		}
 
@@ -546,9 +552,15 @@ func (d *Deploy) DeploySshTaskToK8s(containerResource yaml.ContainerResource, no
 		return fmt.Errorf("space_uuid: %s, %v", d.spaceUuid, err)
 	}
 
-	podCmd := []string{"sh", "-c", fmt.Sprintf("echo '%s' > /root/.ssh/authorized_keys", d.sshKey)}
-	if err = k8sService.PodDoCommand(d.k8sNameSpace, podName, "", podCmd); err != nil {
+	sshkeyCmd := []string{"sh", "-c", fmt.Sprintf("echo '%s' > /root/.ssh/authorized_keys", d.sshKey)}
+	if err = k8sService.PodDoCommand(d.k8sNameSpace, podName, "", sshkeyCmd); err != nil {
 		return fmt.Errorf("failed to add sshkey, space_uuid: %s error: %v", d.spaceUuid, err)
+	}
+
+	randomPassword := generateRandomPassword(8)
+	usernameAndPwdCmd := []string{"sh", "-c", fmt.Sprintf("useradd %s && echo \"%s:%s\" | chpasswd", d.userName, d.userName, randomPassword)}
+	if err = k8sService.PodDoCommand(d.k8sNameSpace, podName, "", usernameAndPwdCmd); err != nil {
+		return fmt.Errorf("failed to add user, space_uuid: %s error: %v", d.spaceUuid, err)
 	}
 
 	createService, err := k8sService.CreateServiceByNodePort(context.TODO(), d.k8sNameSpace, d.spaceUuid, 22, nodePort, exclude22Port)
@@ -560,7 +572,8 @@ func (d *Deploy) DeploySshTaskToK8s(containerResource yaml.ContainerResource, no
 	for _, port := range createService.Spec.Ports {
 		portMap += fmt.Sprintf("%s:%d, ", port.TargetPort.String(), port.NodePort)
 	}
-	d.nodePortUrl = fmt.Sprintf("ssh root@%s -p%d; %s", strings.Split(conf.GetConfig().API.MultiAddress, "/")[2], nodePort, portMap)
+	d.nodePortUrl = fmt.Sprintf("ssh root@%s -p%d、username: %s,password: %s; %s",
+		strings.Split(conf.GetConfig().API.MultiAddress, "/")[2], nodePort, d.userName, randomPassword, portMap)
 	d.watchContainerRunningTime()
 	return nil
 }
@@ -679,6 +692,16 @@ func (d *Deploy) watchContainerRunningTime() {
 		return
 	}
 	logs.GetLogger().Infof("space service deployed, jobuuid: %s, spaceUuid: %s, spaceName: %s", d.jobUuid, d.spaceUuid, d.spaceName)
+}
+
+func generateRandomPassword(length int) string {
+	charset := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	seededRand := rand.New(rand.NewSource(time.Now().UnixNano()))
+	password := make([]byte, length)
+	for i := range password {
+		password[i] = charset[seededRand.Intn(len(charset))]
+	}
+	return string(password)
 }
 
 func getHardwareDetail(description string) (string, models.Resource) {
