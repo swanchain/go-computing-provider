@@ -84,6 +84,7 @@ func cpManager(router *gin.RouterGroup) {
 	router.GET("/lagrange/cp/whitelist", computing.WhiteList)
 	router.GET("/lagrange/cp/blacklist", computing.BlackList)
 	router.GET("/lagrange/job/:job_uuid", computing.GetJobStatus)
+	router.GET("/lagrange/cp/public_key", computing.GetPublicKey)
 
 	router.POST("/cp/ubi", computing.DoUbiTaskForK8s)
 	router.POST("/cp/receive/ubi", computing.ReceiveUbiProof)

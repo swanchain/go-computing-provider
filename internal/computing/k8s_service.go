@@ -6,8 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	calicov3 "github.com/projectcalico/api/pkg/apis/projectcalico/v3"
+	calicoclientset "github.com/projectcalico/api/pkg/client/clientset_generated/clientset"
+	"github.com/projectcalico/api/pkg/lib/numorstring"
 	"github.com/swanchain/go-computing-provider/constants"
 	"github.com/swanchain/go-computing-provider/internal/models"
+	"github.com/swanchain/go-computing-provider/internal/yaml"
 	"io"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -678,6 +682,175 @@ func (s *K8sService) GetDeploymentActiveCount() (int, error) {
 		}
 	}
 	return total, nil
+}
+
+func (s *K8sService) GenerateGlobalNetworkSet() error {
+	calicoCs, err := calicoclientset.NewForConfig(config)
+
+	netSegment, err := yaml.GetNetSegment()
+	if err != nil {
+		return err
+	}
+
+	gnsName := generateStringNoNum(8)
+	gns := &calicov3.GlobalNetworkSet{
+		TypeMeta: metaV1.TypeMeta{
+			APIVersion: "projectcalico.org/v3",
+			Kind:       "GlobalNetworkSet",
+		},
+		ObjectMeta: metaV1.ObjectMeta{
+			Name: gnsName,
+			Labels: map[string]string{
+				"net": gnsName,
+			},
+		},
+		Spec: calicov3.GlobalNetworkSetSpec{
+			Nets: netSegment,
+		},
+	}
+	_, err = calicoCs.ProjectcalicoV3().GlobalNetworkSets().Create(context.Background(), gns, metaV1.CreateOptions{})
+	if err != nil {
+		logs.GetLogger().Errorf("failed to create GlobalNetworkSet, name: %s, error: %v", gnsName, err)
+		return err
+	}
+
+	order201 := float64(201)
+	icmp := numorstring.ProtocolFromString(numorstring.ProtocolICMP)
+	tcp := numorstring.ProtocolFromString(numorstring.ProtocolTCP)
+	udp := numorstring.ProtocolFromString(numorstring.ProtocolUDP)
+	subGnpName := generateStringNoNum(8)
+	subGnp := &calicov3.GlobalNetworkPolicy{
+		TypeMeta: metaV1.TypeMeta{
+			APIVersion: "projectcalico.org/v3",
+			Kind:       "GlobalNetworkPolicy",
+		},
+		ObjectMeta: metaV1.ObjectMeta{
+			Name: subGnpName,
+		},
+		Spec: calicov3.GlobalNetworkPolicySpec{
+			Order:             &order201,
+			NamespaceSelector: "has(projectcalico.org/name) && projectcalico.org/name not in {\"kube-system\", \"calico-system\", \"calico-apiserver\",\"ingress-nginx\"}",
+			Types:             []calicov3.PolicyType{calicov3.PolicyTypeEgress},
+			Egress: []calicov3.Rule{
+				{
+					Action:   calicov3.Deny,
+					Protocol: &icmp,
+					Destination: calicov3.EntityRule{
+						Selector: fmt.Sprintf("net == '%s'", gnsName),
+					},
+				},
+				{
+					Action:   calicov3.Deny,
+					Protocol: &tcp,
+					Destination: calicov3.EntityRule{
+						Ports: []numorstring.Port{
+							{
+								MinPort: 1,
+								MaxPort: 65535,
+							},
+						},
+						Selector: fmt.Sprintf("net == '%s'", gnsName),
+					},
+				},
+				{
+					Action:   calicov3.Deny,
+					Protocol: &udp,
+					Destination: calicov3.EntityRule{
+						Ports: []numorstring.Port{
+							{
+								MinPort: 1,
+								MaxPort: 65535,
+							},
+						},
+						Selector: fmt.Sprintf("net == '%s'", gnsName),
+					},
+				},
+			},
+		},
+	}
+	_, err = calicoCs.ProjectcalicoV3().GlobalNetworkPolicies().Create(context.Background(), subGnp, metaV1.CreateOptions{})
+	if err != nil {
+		logs.GetLogger().Errorf("failed to create subnet GlobalNetworkPolicy, name: %s, error: %v", subGnpName, err)
+		return err
+	}
+
+	order210 := float64(210)
+	outAccessGnpName := generateStringNoNum(8)
+	outAccessGnp := &calicov3.GlobalNetworkPolicy{
+		TypeMeta: metaV1.TypeMeta{
+			APIVersion: "projectcalico.org/v3",
+			Kind:       "GlobalNetworkPolicy",
+		},
+		ObjectMeta: metaV1.ObjectMeta{
+			Name: outAccessGnpName,
+		},
+		Spec: calicov3.GlobalNetworkPolicySpec{
+			Order:             &order210,
+			NamespaceSelector: "has(projectcalico.org/name) && projectcalico.org/name not in {\"kube-system\", \"calico-system\", \"calico-apiserver\"}",
+			Types:             []calicov3.PolicyType{calicov3.PolicyTypeIngress},
+			Ingress: []calicov3.Rule{
+				{
+					Action:   calicov3.Allow,
+					Protocol: &tcp,
+					Source: calicov3.EntityRule{
+						Nets: []string{
+							"0.0.0.0/0",
+						},
+					},
+					Destination: calicov3.EntityRule{
+						Ports: []numorstring.Port{
+							{
+								MinPort: 1,
+								MaxPort: 65535,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, err = calicoCs.ProjectcalicoV3().GlobalNetworkPolicies().Create(context.Background(), outAccessGnp, metaV1.CreateOptions{})
+	if err != nil {
+		logs.GetLogger().Errorf("failed to create out access GlobalNetworkPolicy, name: %s, error: %v", outAccessGnpName, err)
+		return err
+	}
+
+	order220 := float64(220)
+	outGnpName := generateStringNoNum(8)
+	outGnp := &calicov3.GlobalNetworkPolicy{
+		TypeMeta: metaV1.TypeMeta{
+			APIVersion: "projectcalico.org/v3",
+			Kind:       "GlobalNetworkPolicy",
+		},
+		ObjectMeta: metaV1.ObjectMeta{
+			Name: "allow-out-access",
+		},
+		Spec: calicov3.GlobalNetworkPolicySpec{
+			Order:             &order220,
+			NamespaceSelector: "has(projectcalico.org/name) && projectcalico.org/name not in {\"kube-system\", \"calico-system\", \"calico-apiserver\"}",
+			Types:             []calicov3.PolicyType{calicov3.PolicyTypeEgress},
+			Egress: []calicov3.Rule{
+				{
+					Action:   calicov3.Allow,
+					Protocol: &icmp,
+				},
+				{
+					Action:   calicov3.Allow,
+					Protocol: &tcp,
+				},
+				{
+					Action:   calicov3.Allow,
+					Protocol: &udp,
+				},
+			},
+		},
+	}
+	_, err = calicoCs.ProjectcalicoV3().GlobalNetworkPolicies().Create(context.Background(), outGnp, metaV1.CreateOptions{})
+	if err != nil {
+		logs.GetLogger().Errorf("failed to create out GlobalNetworkPolicy, name: %s, error: %v", outGnpName, err)
+		return err
+	}
+	return nil
 }
 
 func readLog(req *rest.Request) (*strings.Builder, error) {

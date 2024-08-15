@@ -57,6 +57,9 @@ const (
 	RejectZkTaskError          = 4014
 	DownloadResourceError      = 4015
 	PortNoAvailableError       = 4016
+	GenerateRsaError           = 4017
+	SaveRsaKeyError            = 4018
+	ReadRsaKeyError            = 4019
 
 	ProofParamError   = 7001
 	ProofReadLogError = 7002
@@ -89,6 +92,9 @@ var codeMsg = map[int]string{
 	FoundBlackListError:        "An error occurred while get blacklist",
 	DownloadResourceError:      "An error occurred while download space resource",
 	PortNoAvailableError:       "Port number unavailable",
+	GenerateRsaError:           "An error occurred while generate rsa key pair",
+	SaveRsaKeyError:            "An error occurred while save rsa key pair",
+	ReadRsaKeyError:            "An error occurred while read rsa key pair",
 
 	ProofReadLogError: "An error occurred while read the log of proof",
 	ProofError:        "An error occurred while executing the calculation task",

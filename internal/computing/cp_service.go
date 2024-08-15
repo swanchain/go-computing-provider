@@ -3,6 +3,7 @@ package computing
 import (
 	"bufio"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"github.com/swanchain/go-computing-provider/internal/yaml"
@@ -492,6 +493,45 @@ func GetJobStatus(c *gin.Context) {
 	jobResult.JobResultUrl = jobEntity.ResultUrl
 
 	c.JSON(http.StatusOK, util.CreateSuccessResponse(jobResult))
+}
+
+func GetPublicKey(c *gin.Context) {
+	cpRepoPath, _ := os.LookupEnv("CP_PATH")
+	publicKeyPath := filepath.Join(cpRepoPath, "dcc", "public_key.pem")
+	privateKeyPath := filepath.Join(cpRepoPath, "dcc", "private_key.pem")
+
+	var publicKeyData []byte
+	_, err := os.Stat(publicKeyPath)
+	if err != nil {
+		privateKey, publicKey, err := util.GenerateRSAKeyPair(2048)
+		if err != nil {
+			logs.GetLogger().Errorf("failed to generate rsa keyPair, error: %v", err)
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.GenerateRsaError))
+			return
+		}
+		if err = util.SavePrivateEMKey(privateKeyPath, privateKey); err != nil {
+			logs.GetLogger().Errorf("failed to save rsa private key, error: %v", err)
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SaveRsaKeyError))
+			return
+		}
+		if err = util.SavePublicPEMKey(publicKeyPath, publicKey); err != nil {
+			logs.GetLogger().Errorf("failed to save rsa public key, error: %v", err)
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SaveRsaKeyError))
+			return
+		}
+	}
+
+	publicKeyData, err = util.ReadPublicKey(publicKeyPath)
+	if err != nil {
+		logs.GetLogger().Errorf("failed to read rsa public key, error: %v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ReadRsaKeyError))
+		return
+	}
+
+	encodedData := base64.StdEncoding.EncodeToString(publicKeyData)
+	c.JSON(http.StatusOK, util.CreateSuccessResponse(map[string]any{
+		"public_key": encodedData,
+	}))
 }
 
 func StatisticalSources(c *gin.Context) {
@@ -1108,6 +1148,17 @@ func generateString(length int) string {
 	characters := "abcdefghijklmnopqrstuvwxyz"
 	numbers := "0123456789"
 	source := characters + numbers
+	result := make([]byte, length)
+	rand.Seed(time.Now().UnixNano())
+	for i := 0; i < length; i++ {
+		result[i] = source[rand.Intn(len(source))]
+	}
+	return string(result)
+}
+
+func generateStringNoNum(length int) string {
+	characters := "abcdefghijklmnopqrstuvwxyz"
+	source := characters
 	result := make([]byte, length)
 	rand.Seed(time.Now().UnixNano())
 	for i := 0; i < length; i++ {
