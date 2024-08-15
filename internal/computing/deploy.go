@@ -270,6 +270,14 @@ func (d *Deploy) YamlToK8s(nodePort int32) error {
 
 		var containers []coreV1.Container
 		for _, depend := range cr.Depends {
+			var ports []coreV1.ContainerPort
+			for _, port := range depend.Ports {
+				ports = append(ports, coreV1.ContainerPort{
+					ContainerPort: port.ContainerPort,
+					Protocol:      port.Protocol,
+				})
+			}
+
 			var handler = new(coreV1.ExecAction)
 			handler.Command = depend.ReadyCmd
 			containers = append(containers, coreV1.Container{
@@ -278,7 +286,7 @@ func (d *Deploy) YamlToK8s(nodePort int32) error {
 				Command:         depend.Command,
 				Args:            depend.Args,
 				Env:             depend.Env,
-				Ports:           depend.Ports,
+				Ports:           ports,
 				ImagePullPolicy: coreV1.PullIfNotPresent,
 				Resources:       coreV1.ResourceRequirements{},
 				ReadinessProbe: &coreV1.Probe{
@@ -310,13 +318,21 @@ func (d *Deploy) YamlToK8s(nodePort int32) error {
 			},
 		}...)
 
+		var ports []coreV1.ContainerPort
+		for _, port := range cr.Ports {
+			ports = append(ports, coreV1.ContainerPort{
+				ContainerPort: port.ContainerPort,
+				Protocol:      port.Protocol,
+			})
+		}
+
 		containers = append(containers, coreV1.Container{
 			Name:            d.spaceUuid + "-" + cr.Name,
 			Image:           cr.ImageName,
 			Command:         cr.Command,
 			Args:            cr.Args,
 			Env:             cr.Env,
-			Ports:           cr.Ports,
+			Ports:           ports,
 			ImagePullPolicy: coreV1.PullIfNotPresent,
 			Resources:       d.createResources(),
 			VolumeMounts:    volumeMount,
