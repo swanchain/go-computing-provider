@@ -195,18 +195,18 @@ func (d *Deploy) DockerfileToK8s() {
 	return
 }
 
-func (d *Deploy) YamlToK8s(nodePort int32) {
+func (d *Deploy) YamlToK8s(nodePort int32) error {
 	containerResources, err := yaml.HandlerYaml(d.yamlPath)
 	if err != nil {
 		logs.GetLogger().Error(err)
-		return
+		return err
 	}
 
 	deleteJob(d.k8sNameSpace, d.spaceUuid, "start deploying new space service and delete previous service")
 
 	if err := d.deployNamespace(); err != nil {
 		logs.GetLogger().Error(err)
-		return
+		return err
 	}
 
 	if len(containerResources) == 1 && containerResources[0].ServiceType == yaml.ServiceTypeNodePort {
@@ -224,8 +224,9 @@ func (d *Deploy) YamlToK8s(nodePort int32) {
 
 		if err := d.DeploySshTaskToK8s(service, nodePort); err != nil {
 			logs.GetLogger().Error(err)
+			return err
 		}
-		return
+		return nil
 	}
 
 	k8sService := NewK8sService()
@@ -244,7 +245,7 @@ func (d *Deploy) YamlToK8s(nodePort int32) {
 			configMap, err := k8sService.CreateConfigMap(context.TODO(), d.k8sNameSpace, d.spaceUuid, filepath.Dir(d.yamlPath), cr.VolumeMounts.Name)
 			if err != nil {
 				logs.GetLogger().Error(err)
-				return
+				return err
 			}
 			configName := configMap.GetName()
 			volumes = []coreV1.Volume{
@@ -351,7 +352,7 @@ func (d *Deploy) YamlToK8s(nodePort int32) {
 		createDeployment, err := k8sService.CreateDeployment(context.TODO(), d.k8sNameSpace, deployment)
 		if err != nil {
 			logs.GetLogger().Error(err)
-			return
+			return err
 		}
 		d.DeployName = createDeployment.GetName()
 		updateJobStatus(d.jobUuid, models.DEPLOY_PULL_IMAGE)
@@ -359,7 +360,7 @@ func (d *Deploy) YamlToK8s(nodePort int32) {
 		serviceHost, err := d.deployK8sResource(cr.Ports[0].ContainerPort)
 		if err != nil {
 			logs.GetLogger().Error(err)
-			return
+			return err
 		}
 
 		updateJobStatus(d.jobUuid, models.DEPLOY_TO_K8S, "https://"+d.hostName)
@@ -373,6 +374,7 @@ func (d *Deploy) YamlToK8s(nodePort int32) {
 		}
 		d.watchContainerRunningTime()
 	}
+	return nil
 }
 
 func (d *Deploy) ModelInferenceToK8s() error {

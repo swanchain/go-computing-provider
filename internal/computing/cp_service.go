@@ -824,8 +824,11 @@ func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName s
 	}
 
 	if deployParam.ContainsYaml {
-		deploy.WithYamlInfo(deployParam.YamlFilePath).YamlToK8s(nodePort)
-
+		err := deploy.WithYamlInfo(deployParam.YamlFilePath).YamlToK8s(nodePort)
+		if err != nil {
+			logs.GetLogger().Error(err)
+			return
+		}
 		if deploy.nodePortUrl != "" {
 			jobData.JobRealUri = deploy.nodePortUrl[:len(deploy.nodePortUrl)-2]
 			if err = submitJob(&jobData); err != nil {
