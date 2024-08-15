@@ -503,7 +503,7 @@ func GetPublicKey(c *gin.Context) {
 	var publicKeyData []byte
 	_, err := os.Stat(publicKeyPath)
 	if err != nil {
-		os.Create(filepath.Join(cpRepoPath, "dcc"))
+		os.Mkdir(filepath.Join(cpRepoPath, "dcc"), 0755)
 		privateKey, publicKey, err := util.GenerateRSAKeyPair(2048)
 		if err != nil {
 			logs.GetLogger().Errorf("failed to generate rsa keyPair, error: %v", err)
