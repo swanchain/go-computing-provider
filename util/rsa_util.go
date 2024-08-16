@@ -1,6 +1,8 @@
 package util
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -9,6 +11,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+)
+
+const (
+	RSA_DIR_NAME    = "dcc"
+	RSA_PUBLIC_KEY  = "public_key.pem"
+	RSA_PRIVATE_KEY = "private_key.pem"
 )
 
 func GenerateRSAKeyPair(bits int) (*rsa.PrivateKey, *rsa.PublicKey, error) {
@@ -103,4 +111,16 @@ func DecryptData(filename string, ciphertext []byte) ([]byte, error) {
 		return nil, err
 	}
 	return rsa.DecryptOAEP(sha256.New(), rand.Reader, privateKey, ciphertext, nil)
+}
+
+func DecryptAES256CFB(encryptedData, key []byte, iv []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	stream := cipher.NewCFBDecrypter(block, iv)
+	plaintext := make([]byte, len(encryptedData))
+	stream.XORKeyStream(plaintext, encryptedData)
+
+	return plaintext, nil
 }

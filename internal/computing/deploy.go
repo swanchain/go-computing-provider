@@ -620,11 +620,11 @@ func (d *Deploy) deployNamespace() error {
 				return fmt.Errorf("failed create namespace, error: %w", err)
 			}
 
-			//networkPolicy, err := k8sService.CreateNetworkPolicy(context.TODO(), k8sNameSpace)
-			//if err != nil {
-			//	return fmt.Errorf("failed create networkPolicy, error: %w", err)
-			//}
-			//logs.GetLogger().Infof("create networkPolicy successfully, networkPolicyName: %s", networkPolicy.Name)
+			networkPolicy, err := k8sService.CreateNetworkPolicy(context.TODO(), d.k8sNameSpace)
+			if err != nil {
+				return fmt.Errorf("failed create networkPolicy, error: %w", err)
+			}
+			logs.GetLogger().Infof("create networkPolicy successfully, networkPolicyName: %s", networkPolicy.Name)
 		} else {
 			return err
 		}

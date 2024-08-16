@@ -284,14 +284,27 @@ func (s *K8sService) CreateNetworkPolicy(ctx context.Context, namespace string) 
 			Namespace: namespace,
 		},
 		Spec: networkingv1.NetworkPolicySpec{
-			PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress},
+			PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress, networkingv1.PolicyTypeEgress},
 			Ingress: []networkingv1.NetworkPolicyIngressRule{
 				{
 					From: []networkingv1.NetworkPolicyPeer{
 						{
 							NamespaceSelector: &metaV1.LabelSelector{
 								MatchLabels: map[string]string{
-									"kubernetes.io/metadata.name": "ingress-nginx",
+									"name": fmt.Sprintf("kubernetes.io/metadata.name:%s", namespace),
+								},
+							},
+						},
+					},
+				},
+			},
+			Egress: []networkingv1.NetworkPolicyEgressRule{
+				{
+					To: []networkingv1.NetworkPolicyPeer{
+						{
+							NamespaceSelector: &metaV1.LabelSelector{
+								MatchLabels: map[string]string{
+									"name": fmt.Sprintf("kubernetes.io/metadata.name:%s", namespace),
 								},
 							},
 						},

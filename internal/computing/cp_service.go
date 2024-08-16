@@ -497,13 +497,13 @@ func GetJobStatus(c *gin.Context) {
 
 func GetPublicKey(c *gin.Context) {
 	cpRepoPath, _ := os.LookupEnv("CP_PATH")
-	publicKeyPath := filepath.Join(cpRepoPath, "dcc", "public_key.pem")
-	privateKeyPath := filepath.Join(cpRepoPath, "dcc", "private_key.pem")
+	publicKeyPath := filepath.Join(cpRepoPath, util.RSA_DIR_NAME, util.RSA_PUBLIC_KEY)
+	privateKeyPath := filepath.Join(cpRepoPath, util.RSA_DIR_NAME, util.RSA_PRIVATE_KEY)
 
 	var publicKeyData []byte
 	_, err := os.Stat(publicKeyPath)
 	if err != nil {
-		os.Mkdir(filepath.Join(cpRepoPath, "dcc"), 0755)
+		os.Mkdir(filepath.Join(cpRepoPath, util.RSA_DIR_NAME), 0755)
 		privateKey, publicKey, err := util.GenerateRSAKeyPair(2048)
 		if err != nil {
 			logs.GetLogger().Errorf("failed to generate rsa keyPair, error: %v", err)

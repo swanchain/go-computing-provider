@@ -44,8 +44,10 @@ type SpaceJSON struct {
 }
 
 type SpaceFile struct {
-	Name string `json:"name"`
-	URL  string `json:"url"`
+	Name         string `json:"name"`
+	URL          string `json:"url"`
+	SymmetricKey string `json:"symmetric_key"`
+	Iv           string `json:"iv"`
 }
 
 type SpaceHardware struct {
