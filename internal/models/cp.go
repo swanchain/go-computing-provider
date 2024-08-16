@@ -25,22 +25,24 @@ type Job struct {
 	Url    string
 }
 
+type SpaceJsonWithNoData struct {
+	Files []SpaceFile `json:"files"`
+	Owner struct {
+		PublicAddress string `json:"public_address"`
+	} `json:"owner"`
+	Space struct {
+		Uuid        string `json:"uuid"`
+		Name        string `json:"name"`
+		ActiveOrder struct {
+			Config SpaceHardware `json:"config"`
+		} `json:"activeOrder"`
+	} `json:"space"`
+}
+
 type SpaceJSON struct {
-	Data struct {
-		Files []SpaceFile `json:"files"`
-		Owner struct {
-			PublicAddress string `json:"public_address"`
-		} `json:"owner"`
-		Space struct {
-			Uuid        string `json:"uuid"`
-			Name        string `json:"name"`
-			ActiveOrder struct {
-				Config SpaceHardware `json:"config"`
-			} `json:"activeOrder"`
-		} `json:"space"`
-	} `json:"data"`
-	Message string `json:"message"`
-	Status  string `json:"status"`
+	Data    SpaceJsonWithNoData `json:"data"`
+	Message string              `json:"message"`
+	Status  string              `json:"status"`
 }
 
 type SpaceFile struct {

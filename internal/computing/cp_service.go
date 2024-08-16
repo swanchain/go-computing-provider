@@ -1009,6 +1009,15 @@ func getSpaceDetail(jobSourceURI string) (models.SpaceJSON, error) {
 	if err := json.NewDecoder(resp.Body).Decode(&spaceJson); err != nil {
 		return models.SpaceJSON{}, fmt.Errorf("error decoding Space API response JSON: %v", err)
 	}
+
+	if spaceJson.Data.Files == nil {
+		var spaceJsonWithNoData models.SpaceJsonWithNoData
+		if err := json.NewDecoder(resp.Body).Decode(&spaceJsonWithNoData); err != nil {
+			return models.SpaceJSON{}, fmt.Errorf("error decoding Space API response JSON: %v", err)
+		}
+		spaceJson.Data = spaceJsonWithNoData
+	}
+
 	return spaceJson, nil
 }
 
