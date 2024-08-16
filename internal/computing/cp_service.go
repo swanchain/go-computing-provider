@@ -1005,14 +1005,19 @@ func getSpaceDetail(jobSourceURI string) (models.SpaceJSON, error) {
 		return models.SpaceJSON{}, fmt.Errorf("space API response not OK. Status Code: %d", resp.StatusCode)
 	}
 
+	readAll, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return models.SpaceJSON{}, fmt.Errorf("failed to read job_source_url body, error: %v", err)
+	}
+
 	var spaceJson models.SpaceJSON
-	if err := json.NewDecoder(resp.Body).Decode(&spaceJson); err != nil {
+	if err := json.Unmarshal(readAll, &spaceJson); err != nil {
 		return models.SpaceJSON{}, fmt.Errorf("error decoding Space API response JSON: %v", err)
 	}
 
 	if spaceJson.Data.Files == nil {
 		var spaceJsonWithNoData models.SpaceJsonWithNoData
-		if err := json.NewDecoder(resp.Body).Decode(&spaceJsonWithNoData); err != nil {
+		if err := json.Unmarshal(readAll, &spaceJsonWithNoData); err != nil {
 			return models.SpaceJSON{}, fmt.Errorf("error decoding Space API response JSON: %v", err)
 		}
 		spaceJson.Data = spaceJsonWithNoData
