@@ -2,10 +2,12 @@ package computing
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/contract/account"
@@ -15,7 +17,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"time"
 )
 
 type Sequencer struct {
@@ -60,20 +61,34 @@ func (s *Sequencer) GetToken() error {
 	if err != nil {
 		return err
 	}
-	var timestamp = time.Now().Unix()
-	signMsg, err := signMessage(fmt.Sprintf("%s%d", accountInfo.Contract, timestamp), accountInfo.OwnerAddress)
+
+	chainUrl, err := conf.GetRpcByNetWorkName()
+	if err != nil {
+		return fmt.Errorf("failed to get rpc url, error: %v", err)
+	}
+	client, err := ethclient.Dial(chainUrl)
+	if err != nil {
+		return fmt.Errorf("failed to dial rpc connect, error: %v", err)
+	}
+	client.Close()
+
+	blockNumber, err := client.BlockNumber(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to get block_number, error: %v", err)
+	}
+	signMsg, err := signMessage(fmt.Sprintf("%s%d", accountInfo.Contract, blockNumber), accountInfo.WorkerAddress)
 	if err != nil {
 		return err
 	}
 
 	var data struct {
-		CpAddr    string `json:"cp_addr"`
-		Timestamp int64  `json:"timestamp"`
-		Sign      string `json:"sign"`
+		CpAddr      string `json:"cp_addr"`
+		BlockNumber uint64 `json:"block_number"`
+		Sign        string `json:"sign"`
 	}
 
 	data.CpAddr = accountInfo.Contract
-	data.Timestamp = timestamp
+	data.BlockNumber = blockNumber
 	data.Sign = signMsg
 
 	var header = make(http.Header)
