@@ -2,7 +2,6 @@ package computing
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"strings"
 	"sync"
@@ -65,16 +64,24 @@ func checkJobStatus() {
 }
 
 func (task *CronTask) addLabelToNode() {
-	c := cron.New(cron.WithSeconds())
-	c.AddFunc("* 0/10 * * * ?", func() {
-		defer func() {
-			if err := recover(); err != nil {
-				logs.GetLogger().Errorf("Failed add lable to k8s node, error: %+v", err)
+	ticker := time.NewTicker(10 * time.Minute)
+	defer ticker.Stop()
+
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				func() {
+					defer func() {
+						if err := recover(); err != nil {
+							logs.GetLogger().Errorf("failed to add label for cluster node, error: %+v", err)
+						}
+					}()
+					addNodeLabel()
+				}()
 			}
-		}()
-		addNodeLabel()
-	})
-	c.Start()
+		}
+	}()
 }
 
 func (task *CronTask) reportClusterResource() {
@@ -143,7 +150,7 @@ func (task *CronTask) cleanImageResource() {
 
 func (task *CronTask) watchExpiredTask() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("* 0/5 * * * ?", func() {
+	c.AddFunc("* 0/10 * * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("watchExpiredTask catch panic error: %+v", err)
@@ -158,7 +165,7 @@ func (task *CronTask) watchExpiredTask() {
 
 		deployments, err := NewK8sService().k8sClient.AppsV1().Deployments(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
-			fmt.Println("Error listing deployments:", err)
+			logs.GetLogger().Errorf("failed to listing deployments, error: %v", err)
 			return
 		}
 
@@ -199,8 +206,8 @@ func (task *CronTask) watchExpiredTask() {
 
 				checkFcpJobInfoInChain(job)
 
+				logs.GetLogger().Infof("task_uuid: %s, current status is %s", job.TaskUuid, models.GetJobStatus(job.Status))
 				if job.Status == models.JOB_TERMINATED_STATUS || job.Status == models.JOB_COMPLETED_STATUS {
-					logs.GetLogger().Infof("task_uuid: %s, current status is %s, starting to delete it.", job.TaskUuid, models.GetJobStatus(job.Status))
 					if err = deleteJob(job.NameSpace, job.SpaceUuid, "cron task, abnormal state"); err == nil {
 						deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
 						continue
