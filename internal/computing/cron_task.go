@@ -143,7 +143,7 @@ func (task *CronTask) cleanImageResource() {
 
 func (task *CronTask) watchExpiredTask() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("* 0/10 * * * ?", func() {
+	c.AddFunc("* 0/5 * * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("watchExpiredTask catch panic error: %+v", err)
@@ -171,8 +171,12 @@ func (task *CronTask) watchExpiredTask() {
 
 		if len(deployOnK8s) == 0 && len(jobList) > 0 {
 			for _, job := range jobList {
-				if err = NewJobService().DeleteJobEntityBySpaceUuId(job.SpaceUuid, models.JOB_COMPLETED_STATUS); err != nil {
-					logs.GetLogger().Infof("failed to delete job from db, space_uuid: %s, error: %v", job.SpaceUuid, err)
+				if job.CreateTime > 0 {
+					if time.Now().Sub(time.Unix(job.CreateTime, 0)) > time.Hour {
+						if err = NewJobService().DeleteJobEntityBySpaceUuId(job.SpaceUuid, models.JOB_COMPLETED_STATUS); err != nil {
+							logs.GetLogger().Infof("failed to delete job from db, space_uuid: %s, error: %v", job.SpaceUuid, err)
+						}
+					}
 				}
 			}
 		} else if len(deployOnK8s) > 0 && len(jobList) == 0 {
@@ -472,6 +476,7 @@ func checkFcpJobInfoInChain(job *models.JobEntity) {
 		return
 	}
 
+	logs.GetLogger().Infof("task_uuid: %s, space_uuid: %s, chain statu: %s, local status: %s", job.TaskUuid, job.SpaceUuid, models.JobOnChainStatus(taskInfo.TaskStatus), models.GetJobStatus(job.Status))
 	if taskInfo.TaskStatus == models.COMPLETED {
 		job.Status = models.JOB_COMPLETED_STATUS
 	} else if taskInfo.TaskStatus == models.TERMINATED {

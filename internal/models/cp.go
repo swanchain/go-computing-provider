@@ -167,8 +167,18 @@ const (
 	TERMINATED
 )
 
-const (
-	LOCKED = iota
-	UNLOCKED
-	SLASHED
-)
+func JobOnChainStatus(status int) string {
+	var str string
+	switch status {
+	case NOT_ASSIGNED:
+		str = "not_assigned"
+	case IN_PROGRESS:
+		str = "in_progress"
+	case COMPLETED:
+		str = "completed"
+	case TERMINATED:
+		str = "terminated"
+	}
+
+	return str
+}

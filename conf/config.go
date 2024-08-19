@@ -125,7 +125,7 @@ func InitConfig(cpRepoPath string, standalone bool) error {
 		}
 
 		if !isValidDomain(domain) {
-			log.Fatalf("domain %s is invalid\n", domain)
+			log.Fatalf("domain \"%s\" is invalid\n", domain)
 		}
 	}
 
