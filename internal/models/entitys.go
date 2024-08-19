@@ -296,3 +296,10 @@ func (c *CpInfoEntity) AfterFind(tx *gorm.DB) (err error) {
 	}
 	return nil
 }
+
+const (
+	NetworkNetset          = "cp-network-netset"
+	NetworkGlobalSubnet    = "cp-global-subnet"
+	NetworkGlobalOutAccess = "cp-global-out-to-in"
+	NetworkGlobalInAccess  = "cp-global-in-to-out"
+)

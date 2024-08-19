@@ -31,6 +31,7 @@ func NewCronTask(nodeId string) *CronTask {
 }
 
 func (task *CronTask) RunTask() {
+	checkClusterNetworkPolicy()
 	addNodeLabel()
 	checkJobStatus()
 	task.checkCollateralBalance()
@@ -42,6 +43,88 @@ func (task *CronTask) RunTask() {
 	task.getUbiTaskReward()
 	task.checkJobReward()
 	task.cleanImageResource()
+}
+
+func checkClusterNetworkPolicy() {
+	netset, err := NewK8sService().GetGlobalNetworkSet(models.NetworkNetset)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			generateNewNetworkPolicy()
+		} else {
+			logs.GetLogger().Error(err)
+		}
+		return
+	}
+
+	if netset != nil {
+		_, err = NewK8sService().GetGlobalNetworkPolicy(models.NetworkGlobalSubnet)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				err = NewK8sService().GenerateGlobalNetworkPoliciesForSubnet()
+				if err != nil {
+					logs.GetLogger().Error(err)
+					return
+				}
+			}
+		}
+
+		_, err = NewK8sService().GetGlobalNetworkPolicy(models.NetworkGlobalOutAccess)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				err = NewK8sService().GenerateGlobalNetworkPoliciesForSubnet()
+				if err != nil {
+					logs.GetLogger().Error(err)
+					return
+				}
+			}
+		}
+
+		_, err = NewK8sService().GetGlobalNetworkPolicy(models.NetworkGlobalInAccess)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				err = NewK8sService().GenerateGlobalNetworkPoliciesForSubnet()
+				if err != nil {
+					logs.GetLogger().Error(err)
+					return
+				}
+			}
+		}
+	}
+}
+
+func generateNewNetworkPolicy() {
+	var err error
+	defer func() {
+		if err != nil {
+			NewK8sService().DeleteGlobalNetworkSet(models.NetworkNetset)
+			NewK8sService().DeleteGlobalNetworkPolicy(models.NetworkGlobalSubnet)
+			NewK8sService().DeleteGlobalNetworkPolicy(models.NetworkGlobalOutAccess)
+			NewK8sService().DeleteGlobalNetworkPolicy(models.NetworkGlobalInAccess)
+		}
+	}()
+
+	if err = NewK8sService().GenerateGlobalNetworkSet(); err != nil {
+		logs.GetLogger().Error(err)
+		return
+	}
+
+	err = NewK8sService().GenerateGlobalNetworkPoliciesForSubnet()
+	if err != nil {
+		logs.GetLogger().Error(err)
+		return
+	}
+
+	err = NewK8sService().GenerateGlobalNetworkPoliciesForOutAccess()
+	if err != nil {
+		logs.GetLogger().Error(err)
+		return
+	}
+
+	err = NewK8sService().GenerateGlobalNetworkForInAccess()
+	if err != nil {
+		logs.GetLogger().Error(err)
+		return
+	}
 }
 
 func checkJobStatus() {

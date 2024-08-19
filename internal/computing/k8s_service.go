@@ -699,22 +699,24 @@ func (s *K8sService) GetDeploymentActiveCount() (int, error) {
 
 func (s *K8sService) GenerateGlobalNetworkSet() error {
 	calicoCs, err := calicoclientset.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("failed to create calico client, error: %v", err)
+	}
 
 	netSegment, err := yaml.GetNetSegment()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get host subnet mask, error: %v", err)
 	}
 
-	gnsName := generateStringNoNum(8)
 	gns := &calicov3.GlobalNetworkSet{
 		TypeMeta: metaV1.TypeMeta{
 			APIVersion: "projectcalico.org/v3",
 			Kind:       "GlobalNetworkSet",
 		},
 		ObjectMeta: metaV1.ObjectMeta{
-			Name: gnsName,
+			Name: models.NetworkNetset,
 			Labels: map[string]string{
-				"net": gnsName,
+				"net": models.NetworkNetset,
 			},
 		},
 		Spec: calicov3.GlobalNetworkSetSpec{
@@ -723,22 +725,86 @@ func (s *K8sService) GenerateGlobalNetworkSet() error {
 	}
 	_, err = calicoCs.ProjectcalicoV3().GlobalNetworkSets().Create(context.Background(), gns, metaV1.CreateOptions{})
 	if err != nil {
-		logs.GetLogger().Errorf("failed to create GlobalNetworkSet, name: %s, error: %v", gnsName, err)
+		logs.GetLogger().Errorf("failed to create GlobalNetworkSet, name: %s, error: %v", models.NetworkNetset, err)
 		return err
+	}
+	return nil
+}
+
+func (s *K8sService) GetGlobalNetworkSet(gnsName string) (*calicov3.GlobalNetworkSet, error) {
+	calicoCs, err := calicoclientset.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create calico client, error: %v", err)
+	}
+
+	gns, err := calicoCs.ProjectcalicoV3().GlobalNetworkSets().Get(context.Background(), gnsName, metaV1.GetOptions{})
+	if err != nil {
+		logs.GetLogger().Errorf("failed to get GlobalNetworkSet, name: %s, error: %v", gnsName, err)
+		return nil, err
+	}
+	return gns, nil
+}
+
+func (s *K8sService) DeleteGlobalNetworkSet(gnsName string) error {
+	calicoCs, err := calicoclientset.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("failed to create calico client, error: %v", err)
+	}
+
+	err = calicoCs.ProjectcalicoV3().GlobalNetworkSets().Delete(context.Background(), gnsName, metaV1.DeleteOptions{})
+	if err != nil {
+		logs.GetLogger().Errorf("failed to delete GlobalNetworkSet, name: %s, error: %v", gnsName, err)
+		return err
+	}
+	return nil
+}
+
+func (s *K8sService) GetGlobalNetworkPolicy(gnpName string) (*calicov3.GlobalNetworkPolicy, error) {
+	calicoCs, err := calicoclientset.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create calico client, error: %v", err)
+	}
+
+	gnp, err := calicoCs.ProjectcalicoV3().GlobalNetworkPolicies().Get(context.Background(), gnpName, metaV1.GetOptions{})
+	if err != nil {
+		logs.GetLogger().Errorf("failed to get GlobalNetworkPolicy, name: %s, error: %v", gnpName, err)
+		return nil, err
+	}
+	return gnp, nil
+}
+
+func (s *K8sService) DeleteGlobalNetworkPolicy(gnpName string) error {
+	calicoCs, err := calicoclientset.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("failed to create calico client, error: %v", err)
+	}
+
+	err = calicoCs.ProjectcalicoV3().GlobalNetworkPolicies().Delete(context.Background(), gnpName, metaV1.DeleteOptions{})
+	if err != nil {
+		logs.GetLogger().Errorf("failed to delete GlobalNetworkPolicy, name: %s, error: %v", gnpName, err)
+		return err
+	}
+	return nil
+}
+
+func (s *K8sService) GenerateGlobalNetworkPoliciesForSubnet() error {
+	calicoCs, err := calicoclientset.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("failed to create calico client, error: %v", err)
 	}
 
 	order201 := float64(201)
 	icmp := numorstring.ProtocolFromString(numorstring.ProtocolICMP)
 	tcp := numorstring.ProtocolFromString(numorstring.ProtocolTCP)
 	udp := numorstring.ProtocolFromString(numorstring.ProtocolUDP)
-	subGnpName := generateStringNoNum(8)
+
 	subGnp := &calicov3.GlobalNetworkPolicy{
 		TypeMeta: metaV1.TypeMeta{
 			APIVersion: "projectcalico.org/v3",
 			Kind:       "GlobalNetworkPolicy",
 		},
 		ObjectMeta: metaV1.ObjectMeta{
-			Name: subGnpName,
+			Name: models.NetworkGlobalSubnet,
 		},
 		Spec: calicov3.GlobalNetworkPolicySpec{
 			Order:             &order201,
@@ -749,7 +815,7 @@ func (s *K8sService) GenerateGlobalNetworkSet() error {
 					Action:   calicov3.Deny,
 					Protocol: &icmp,
 					Destination: calicov3.EntityRule{
-						Selector: fmt.Sprintf("net == '%s'", gnsName),
+						Selector: fmt.Sprintf("net == '%s'", models.NetworkNetset),
 					},
 				},
 				{
@@ -762,7 +828,7 @@ func (s *K8sService) GenerateGlobalNetworkSet() error {
 								MaxPort: 65535,
 							},
 						},
-						Selector: fmt.Sprintf("net == '%s'", gnsName),
+						Selector: fmt.Sprintf("net == '%s'", models.NetworkNetset),
 					},
 				},
 				{
@@ -775,7 +841,7 @@ func (s *K8sService) GenerateGlobalNetworkSet() error {
 								MaxPort: 65535,
 							},
 						},
-						Selector: fmt.Sprintf("net == '%s'", gnsName),
+						Selector: fmt.Sprintf("net == '%s'", models.NetworkNetset),
 					},
 				},
 			},
@@ -783,19 +849,29 @@ func (s *K8sService) GenerateGlobalNetworkSet() error {
 	}
 	_, err = calicoCs.ProjectcalicoV3().GlobalNetworkPolicies().Create(context.Background(), subGnp, metaV1.CreateOptions{})
 	if err != nil {
-		logs.GetLogger().Errorf("failed to create subnet GlobalNetworkPolicy, name: %s, error: %v", subGnpName, err)
+		logs.GetLogger().Errorf("failed to create subnet GlobalNetworkPolicy, name: %s, error: %v", models.NetworkGlobalSubnet, err)
 		return err
 	}
 
+	return nil
+}
+
+func (s *K8sService) GenerateGlobalNetworkPoliciesForOutAccess() error {
+	calicoCs, err := calicoclientset.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("failed to create calico client, error: %v", err)
+	}
+
+	tcp := numorstring.ProtocolFromString(numorstring.ProtocolTCP)
 	order210 := float64(210)
-	outAccessGnpName := generateStringNoNum(8)
+
 	outAccessGnp := &calicov3.GlobalNetworkPolicy{
 		TypeMeta: metaV1.TypeMeta{
 			APIVersion: "projectcalico.org/v3",
 			Kind:       "GlobalNetworkPolicy",
 		},
 		ObjectMeta: metaV1.ObjectMeta{
-			Name: outAccessGnpName,
+			Name: models.NetworkGlobalOutAccess,
 		},
 		Spec: calicov3.GlobalNetworkPolicySpec{
 			Order:             &order210,
@@ -824,19 +900,30 @@ func (s *K8sService) GenerateGlobalNetworkSet() error {
 	}
 	_, err = calicoCs.ProjectcalicoV3().GlobalNetworkPolicies().Create(context.Background(), outAccessGnp, metaV1.CreateOptions{})
 	if err != nil {
-		logs.GetLogger().Errorf("failed to create out access GlobalNetworkPolicy, name: %s, error: %v", outAccessGnpName, err)
+		logs.GetLogger().Errorf("failed to create out to in access GlobalNetworkPolicy, name: %s, error: %v", models.NetworkGlobalOutAccess, err)
 		return err
 	}
+	return nil
+}
 
+func (s *K8sService) GenerateGlobalNetworkForInAccess() error {
+	calicoCs, err := calicoclientset.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("failed to create calico client, error: %v", err)
+	}
+
+	icmp := numorstring.ProtocolFromString(numorstring.ProtocolICMP)
+	tcp := numorstring.ProtocolFromString(numorstring.ProtocolTCP)
+	udp := numorstring.ProtocolFromString(numorstring.ProtocolUDP)
 	order220 := float64(220)
-	outGnpName := generateStringNoNum(8)
+
 	outGnp := &calicov3.GlobalNetworkPolicy{
 		TypeMeta: metaV1.TypeMeta{
 			APIVersion: "projectcalico.org/v3",
 			Kind:       "GlobalNetworkPolicy",
 		},
 		ObjectMeta: metaV1.ObjectMeta{
-			Name: "allow-out-access",
+			Name: models.NetworkGlobalInAccess,
 		},
 		Spec: calicov3.GlobalNetworkPolicySpec{
 			Order:             &order220,
@@ -860,7 +947,7 @@ func (s *K8sService) GenerateGlobalNetworkSet() error {
 	}
 	_, err = calicoCs.ProjectcalicoV3().GlobalNetworkPolicies().Create(context.Background(), outGnp, metaV1.CreateOptions{})
 	if err != nil {
-		logs.GetLogger().Errorf("failed to create out GlobalNetworkPolicy, name: %s, error: %v", outGnpName, err)
+		logs.GetLogger().Errorf("failed to create in to out GlobalNetworkPolicy, name: %s, error: %v", models.NetworkGlobalInAccess, err)
 		return err
 	}
 	return nil
