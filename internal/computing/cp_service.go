@@ -127,7 +127,7 @@ func ReceiveJob(c *gin.Context) {
 
 	multiAddressSplit := strings.Split(conf.GetConfig().API.MultiAddress, "/")
 	jobSourceUri := jobData.JobSourceURI
-	spaceUuid := jobSourceUri[strings.LastIndex(jobSourceUri, "/")+1:]
+	spaceUuid := spaceDetail.Data.Space.Uuid
 	wsUrl := fmt.Sprintf("wss://%s:%s/api/v1/computing/lagrange/spaces/log?space_id=%s", logHost, multiAddressSplit[4], spaceUuid)
 	jobData.BuildLog = wsUrl + "&type=build"
 	jobData.ContainerLog = wsUrl + "&type=container"
