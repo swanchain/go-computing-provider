@@ -158,8 +158,12 @@ func (task *CronTask) watchExpiredTask() {
 
 		if len(deployOnK8s) == 0 && len(jobList) > 0 {
 			for _, job := range jobList {
-				if err = NewJobService().DeleteJobEntityBySpaceUuId(job.SpaceUuid, models.JOB_COMPLETED_STATUS); err != nil {
-					logs.GetLogger().Infof("failed to delete job from db, space_uuid: %s, error: %v", job.SpaceUuid, err)
+				if job.CreateTime > 0 {
+					if time.Now().Sub(time.Unix(job.CreateTime, 0)) > time.Hour {
+						if err = NewJobService().DeleteJobEntityBySpaceUuId(job.SpaceUuid, models.JOB_COMPLETED_STATUS); err != nil {
+							logs.GetLogger().Infof("failed to delete job from db, space_uuid: %s, error: %v", job.SpaceUuid, err)
+						}
+					}
 				}
 			}
 		} else if len(deployOnK8s) > 0 && len(jobList) == 0 {
@@ -171,8 +175,10 @@ func (task *CronTask) watchExpiredTask() {
 		} else if len(deployOnK8s) > 0 && len(jobList) > 0 {
 			var deleteSpaceIds []string
 			for _, job := range jobList {
-				if _, ok := deployOnK8s[job.K8sDeployName]; ok {
-					delete(deployOnK8s, job.K8sDeployName)
+				if job.K8sDeployName != "" {
+					if _, ok := deployOnK8s[job.K8sDeployName]; ok {
+						delete(deployOnK8s, job.K8sDeployName)
+					}
 				}
 
 				checkFcpJobInfoInChain(job)
