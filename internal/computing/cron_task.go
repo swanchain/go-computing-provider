@@ -130,7 +130,7 @@ func (task *CronTask) cleanImageResource() {
 
 func (task *CronTask) watchExpiredTask() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("* 0/2 * * * ?", func() {
+	c.AddFunc("* 0/5 * * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("watchExpiredTask catch panic error: %+v", err)
@@ -157,7 +157,6 @@ func (task *CronTask) watchExpiredTask() {
 		}
 
 		logs.GetLogger().Infof("debug::deployOnK8s: %+v", deployOnK8s)
-		logs.GetLogger().Infof("debug::jobList: %+v", jobList)
 
 		if len(deployOnK8s) == 0 && len(jobList) > 0 {
 			for _, job := range jobList {
@@ -174,6 +173,7 @@ func (task *CronTask) watchExpiredTask() {
 		} else if len(deployOnK8s) > 0 && len(jobList) > 0 {
 			var deleteSpaceIds []string
 			for _, job := range jobList {
+				logs.GetLogger().Infof("debug::jobList: %+v", job)
 				if v, ok := deployOnK8s[job.K8sDeployName]; ok {
 					logs.GetLogger().Infof("debug::delete on k8s: %s, %s", v, job.K8sDeployName)
 					delete(deployOnK8s, job.K8sDeployName)
