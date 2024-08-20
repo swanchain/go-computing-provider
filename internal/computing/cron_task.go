@@ -175,10 +175,8 @@ func (task *CronTask) watchExpiredTask() {
 		} else if len(deployOnK8s) > 0 && len(jobList) > 0 {
 			var deleteSpaceIds []string
 			for _, job := range jobList {
-				if job.K8sDeployName != "" {
-					if _, ok := deployOnK8s[job.K8sDeployName]; ok {
-						delete(deployOnK8s, job.K8sDeployName)
-					}
+				if _, ok := deployOnK8s[job.K8sDeployName]; ok {
+					delete(deployOnK8s, job.K8sDeployName)
 				}
 
 				checkFcpJobInfoInChain(job)
