@@ -1029,7 +1029,7 @@ func (s *K8sService) GenerateGlobalNetworkPoliciesForDNS() error {
 	}
 	_, err = calicoCs.ProjectcalicoV3().GlobalNetworkPolicies().Create(context.Background(), dnsGnp, metaV1.CreateOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to create dns GlobalNetworkPolicy, name: %s, error: %v", models.NetworkGlobalDns, err))
+		return fmt.Errorf("failed to create dns GlobalNetworkPolicy, name: %s, error: %v", models.NetworkGlobalDns, err)
 	}
 	return nil
 }
