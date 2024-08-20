@@ -84,16 +84,20 @@ func (taskManager *TaskManagerContract) Scan(job *models.JobEntity) {
 			//logs.GetLogger().Errorf("task manager contract scan task_uuid %s from %d to %d, failed: %v", job.TaskUuid, filterOps.Start, *filterOps.End, ecp.ParseError(err))
 			return
 		} else {
-			if filterRewardReleased.Event != nil {
-				amount := contract.BalanceToStr(filterRewardReleased.Event.RewardAmount)
-				NewJobService().UpdateJobReward(job.TaskUuid, amount)
+			defer filterRewardReleased.Close()
+			for filterRewardReleased.Next() {
+				event := filterRewardReleased.Event
+
+				if event != nil {
+					amount := contract.BalanceToStr(event.RewardAmount)
+					NewJobService().UpdateJobReward(job.TaskUuid, amount)
+				}
+				time.Sleep(time.Second)
 			}
 			if err := NewJobService().UpdateJobScannedBlock(job.TaskUuid, end); err != nil {
 				logs.GetLogger().Errorf("save job %s scanned block %d err: %v", job.TaskUuid, end, err)
 			}
-			time.Sleep(time.Second)
 		}
-
 	}
 }
 

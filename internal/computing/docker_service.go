@@ -47,7 +47,7 @@ func NewDockerService() *DockerService {
 func ExtractExposedPort(dockerfilePath string) (string, error) {
 	file, err := os.Open(dockerfilePath)
 	if err != nil {
-		return "", fmt.Errorf("unable to open Dockerfile: %v", err)
+		return "", fmt.Errorf("failed to open Dockerfile, path: %s, error: %v", dockerfilePath, err)
 	}
 	defer file.Close()
 
