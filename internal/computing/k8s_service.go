@@ -280,7 +280,7 @@ func (s *K8sService) GetPods(namespace, spaceUuid string) (bool, error) {
 func (s *K8sService) CreateNetworkPolicy(ctx context.Context, namespace string) (*networkingv1.NetworkPolicy, error) {
 	networkPolicy := &networkingv1.NetworkPolicy{
 		ObjectMeta: metaV1.ObjectMeta{
-			Name:      namespace + "-" + generateString(4),
+			Name:      namespace + "-" + generateString(10),
 			Namespace: namespace,
 		},
 		Spec: networkingv1.NetworkPolicySpec{
@@ -291,7 +291,7 @@ func (s *K8sService) CreateNetworkPolicy(ctx context.Context, namespace string) 
 						{
 							NamespaceSelector: &metaV1.LabelSelector{
 								MatchLabels: map[string]string{
-									"name": fmt.Sprintf("kubernetes.io/metadata.name:%s", namespace),
+									"kubernetes.io/metadata.name": namespace,
 								},
 							},
 						},
@@ -304,7 +304,7 @@ func (s *K8sService) CreateNetworkPolicy(ctx context.Context, namespace string) 
 						{
 							NamespaceSelector: &metaV1.LabelSelector{
 								MatchLabels: map[string]string{
-									"name": fmt.Sprintf("kubernetes.io/metadata.name:%s", namespace),
+									"kubernetes.io/metadata.name": namespace,
 								},
 							},
 						},
@@ -948,6 +948,105 @@ func (s *K8sService) GenerateGlobalNetworkForInAccess() error {
 	_, err = calicoCs.ProjectcalicoV3().GlobalNetworkPolicies().Create(context.Background(), outGnp, metaV1.CreateOptions{})
 	if err != nil {
 		logs.GetLogger().Errorf("failed to create in to out GlobalNetworkPolicy, name: %s, error: %v", models.NetworkGlobalInAccess, err)
+		return err
+	}
+	return nil
+}
+
+func (s *K8sService) GenerateGlobalNetworkPoliciesForNamespace() error {
+	calicoCs, err := calicoclientset.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("failed to create calico client, error: %v", err)
+	}
+
+	order150 := float64(150)
+	nsGnp := &calicov3.GlobalNetworkPolicy{
+		TypeMeta: metaV1.TypeMeta{
+			APIVersion: "projectcalico.org/v3",
+			Kind:       "GlobalNetworkPolicy",
+		},
+		ObjectMeta: metaV1.ObjectMeta{
+			Name: models.NetworkGlobalNamespace,
+		},
+		Spec: calicov3.GlobalNetworkPolicySpec{
+			Order:             &order150,
+			NamespaceSelector: "has(projectcalico.org/name) && projectcalico.org/name not in {\"kube-system\", \"calico-system\", \"calico-apiserver\", \"ingress-nginx\"}",
+			Types:             []calicov3.PolicyType{calicov3.PolicyTypeEgress},
+			Egress: []calicov3.Rule{
+				{
+					Action: calicov3.Deny,
+					Destination: calicov3.EntityRule{
+						NamespaceSelector: "projectcalico.org/name in {\"kube-system\", \"calico-system\", \"calico-apiserver\", \"ingress-nginx\"}",
+					},
+				},
+			},
+		},
+	}
+	_, err = calicoCs.ProjectcalicoV3().GlobalNetworkPolicies().Create(context.Background(), nsGnp, metaV1.CreateOptions{})
+	if err != nil {
+		logs.GetLogger().Errorf("failed to create deny for ns GlobalNetworkPolicy, name: %s, error: %v", models.NetworkGlobalNamespace, err)
+		return err
+	}
+	return nil
+}
+
+func (s *K8sService) GenerateGlobalNetworkPoliciesForDNS() error {
+	calicoCs, err := calicoclientset.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("failed to create calico client, error: %v", err)
+	}
+
+	udp := numorstring.ProtocolFromString(numorstring.ProtocolUDP)
+	tcp := numorstring.ProtocolFromString(numorstring.ProtocolTCP)
+	order140 := float64(140)
+
+	dnsGnp := &calicov3.GlobalNetworkPolicy{
+		TypeMeta: metaV1.TypeMeta{
+			APIVersion: "projectcalico.org/v3",
+			Kind:       "GlobalNetworkPolicy",
+		},
+		ObjectMeta: metaV1.ObjectMeta{
+			Name: models.NetworkGlobalDns,
+		},
+		Spec: calicov3.GlobalNetworkPolicySpec{
+			Order:             &order140,
+			NamespaceSelector: "has(projectcalico.org/name) && projectcalico.org/name not in {\"kube-system\", \"calico-system\", \"calico-apiserver\", \"ingress-nginx\"}",
+			Types:             []calicov3.PolicyType{calicov3.PolicyTypeEgress},
+			Egress: []calicov3.Rule{
+				{
+					Action:   calicov3.Allow,
+					Protocol: &udp,
+					Destination: calicov3.EntityRule{
+						NamespaceSelector: "projectcalico.org/name == \"kube-system\"",
+						Selector:          "k8s-app == \"kube-dns\"",
+						Ports: []numorstring.Port{
+							{
+								MinPort: 53,
+								MaxPort: 53,
+							},
+						},
+					},
+				},
+				{
+					Action:   calicov3.Allow,
+					Protocol: &tcp,
+					Destination: calicov3.EntityRule{
+						NamespaceSelector: "projectcalico.org/name == \"kube-system\"",
+						Selector:          "k8s-app == \"kube-dns\"",
+						Ports: []numorstring.Port{
+							{
+								MinPort: 53,
+								MaxPort: 53,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, err = calicoCs.ProjectcalicoV3().GlobalNetworkPolicies().Create(context.Background(), dnsGnp, metaV1.CreateOptions{})
+	if err != nil {
+		logs.GetLogger().Errorf("failed to create dns GlobalNetworkPolicy, name: %s, error: %v", models.NetworkGlobalDns, err)
 		return err
 	}
 	return nil

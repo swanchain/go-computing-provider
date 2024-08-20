@@ -302,4 +302,6 @@ const (
 	NetworkGlobalSubnet    = "cp-global-subnet"
 	NetworkGlobalOutAccess = "cp-global-out-to-in"
 	NetworkGlobalInAccess  = "cp-global-in-to-out"
+	NetworkGlobalNamespace = "cp-global-deny-to-ns"
+	NetworkGlobalDns       = "cp-global-permit-to-dns"
 )

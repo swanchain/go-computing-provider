@@ -19,6 +19,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+var NetworkPolicyFlag bool
+
 var deployingChan = make(chan models.Job)
 var TaskMap sync.Map
 
@@ -89,7 +91,31 @@ func checkClusterNetworkPolicy() {
 				}
 			}
 		}
+
+		_, err = NewK8sService().GetGlobalNetworkPolicy(models.NetworkGlobalNamespace)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				err = NewK8sService().GenerateGlobalNetworkPoliciesForNamespace()
+				if err != nil {
+					logs.GetLogger().Error(err)
+					return
+				}
+			}
+		}
+
+		_, err = NewK8sService().GetGlobalNetworkPolicy(models.NetworkGlobalDns)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				err = NewK8sService().GenerateGlobalNetworkPoliciesForDNS()
+				if err != nil {
+					logs.GetLogger().Error(err)
+					return
+				}
+			}
+		}
 	}
+
+	NetworkPolicyFlag = true
 }
 
 func generateNewNetworkPolicy() {
@@ -100,6 +126,8 @@ func generateNewNetworkPolicy() {
 			NewK8sService().DeleteGlobalNetworkPolicy(models.NetworkGlobalSubnet)
 			NewK8sService().DeleteGlobalNetworkPolicy(models.NetworkGlobalOutAccess)
 			NewK8sService().DeleteGlobalNetworkPolicy(models.NetworkGlobalInAccess)
+			NewK8sService().DeleteGlobalNetworkPolicy(models.NetworkGlobalNamespace)
+			NewK8sService().DeleteGlobalNetworkPolicy(models.NetworkGlobalDns)
 		}
 	}()
 
@@ -125,6 +153,18 @@ func generateNewNetworkPolicy() {
 		logs.GetLogger().Error(err)
 		return
 	}
+
+	err = NewK8sService().GenerateGlobalNetworkPoliciesForNamespace()
+	if err != nil {
+		logs.GetLogger().Error(err)
+		return
+	}
+	err = NewK8sService().GenerateGlobalNetworkPoliciesForDNS()
+	if err != nil {
+		logs.GetLogger().Error(err)
+		return
+	}
+
 }
 
 func checkJobStatus() {
