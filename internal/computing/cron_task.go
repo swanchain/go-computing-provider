@@ -164,7 +164,6 @@ func generateNewNetworkPolicy() {
 		logs.GetLogger().Error(err)
 		return
 	}
-
 }
 
 func checkJobStatus() {

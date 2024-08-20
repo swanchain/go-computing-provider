@@ -837,10 +837,8 @@ func (s *K8sService) GenerateGlobalNetworkPoliciesForSubnet() error {
 	}
 	_, err = calicoCs.ProjectcalicoV3().GlobalNetworkPolicies().Create(context.Background(), subGnp, metaV1.CreateOptions{})
 	if err != nil {
-		logs.GetLogger().Errorf("failed to create subnet GlobalNetworkPolicy, name: %s, error: %v", models.NetworkGlobalSubnet, err)
-		return err
+		return fmt.Errorf("failed to create subnet GlobalNetworkPolicy, name: %s, error: %v", models.NetworkGlobalSubnet, err)
 	}
-
 	return nil
 }
 
@@ -888,8 +886,7 @@ func (s *K8sService) GenerateGlobalNetworkPoliciesForOutAccess() error {
 	}
 	_, err = calicoCs.ProjectcalicoV3().GlobalNetworkPolicies().Create(context.Background(), outAccessGnp, metaV1.CreateOptions{})
 	if err != nil {
-		logs.GetLogger().Errorf("failed to create out to in access GlobalNetworkPolicy, name: %s, error: %v", models.NetworkGlobalOutAccess, err)
-		return err
+		return fmt.Errorf("failed to create out to in access GlobalNetworkPolicy, name: %s, error: %v", models.NetworkGlobalOutAccess, err)
 	}
 	return nil
 }
@@ -935,8 +932,7 @@ func (s *K8sService) GenerateGlobalNetworkForInAccess() error {
 	}
 	_, err = calicoCs.ProjectcalicoV3().GlobalNetworkPolicies().Create(context.Background(), outGnp, metaV1.CreateOptions{})
 	if err != nil {
-		logs.GetLogger().Errorf("failed to create in to out GlobalNetworkPolicy, name: %s, error: %v", models.NetworkGlobalInAccess, err)
-		return err
+		return fmt.Errorf("failed to create in to out GlobalNetworkPolicy, name: %s, error: %v", models.NetworkGlobalInAccess, err)
 	}
 	return nil
 }
@@ -972,8 +968,7 @@ func (s *K8sService) GenerateGlobalNetworkPoliciesForNamespace() error {
 	}
 	_, err = calicoCs.ProjectcalicoV3().GlobalNetworkPolicies().Create(context.Background(), nsGnp, metaV1.CreateOptions{})
 	if err != nil {
-		logs.GetLogger().Errorf("failed to create deny for ns GlobalNetworkPolicy, name: %s, error: %v", models.NetworkGlobalNamespace, err)
-		return err
+		return fmt.Errorf("failed to create deny for ns GlobalNetworkPolicy, name: %s, error: %v", models.NetworkGlobalNamespace, err)
 	}
 	return nil
 }
@@ -1034,8 +1029,7 @@ func (s *K8sService) GenerateGlobalNetworkPoliciesForDNS() error {
 	}
 	_, err = calicoCs.ProjectcalicoV3().GlobalNetworkPolicies().Create(context.Background(), dnsGnp, metaV1.CreateOptions{})
 	if err != nil {
-		logs.GetLogger().Errorf("failed to create dns GlobalNetworkPolicy, name: %s, error: %v", models.NetworkGlobalDns, err)
-		return err
+		return fmt.Errorf("failed to create dns GlobalNetworkPolicy, name: %s, error: %v", models.NetworkGlobalDns, err))
 	}
 	return nil
 }
