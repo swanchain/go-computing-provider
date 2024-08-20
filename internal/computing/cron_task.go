@@ -156,6 +156,9 @@ func (task *CronTask) watchExpiredTask() {
 			}
 		}
 
+		logs.GetLogger().Infof("debug::deployOnK8s: %+v", deployOnK8s)
+		logs.GetLogger().Infof("debug::jobList: %+v", jobList)
+
 		if len(deployOnK8s) == 0 && len(jobList) > 0 {
 			for _, job := range jobList {
 				if err = NewJobService().DeleteJobEntityBySpaceUuId(job.SpaceUuid, models.JOB_COMPLETED_STATUS); err != nil {
