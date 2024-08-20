@@ -174,11 +174,13 @@ func (task *CronTask) watchExpiredTask() {
 		} else if len(deployOnK8s) > 0 && len(jobList) > 0 {
 			var deleteSpaceIds []string
 			for _, job := range jobList {
-				if _, ok := deployOnK8s[job.K8sDeployName]; ok {
+				if v, ok := deployOnK8s[job.K8sDeployName]; ok {
+					logs.GetLogger().Infof("debug::delete on k8s: %s, %s", v, job.K8sDeployName)
 					delete(deployOnK8s, job.K8sDeployName)
 				}
 
-				if time.Now().Sub(time.Unix(job.CreateTime, 0)).Hours() > 2 {
+				if time.Now().Sub(time.Unix(job.CreateTime, 0)).Minutes() > 4 {
+					logs.GetLogger().Infof("debug:::4Minutes: %s", job.K8sDeployName)
 					deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
 					continue
 				}
@@ -201,15 +203,16 @@ func (task *CronTask) watchExpiredTask() {
 				}
 			}
 
+			logs.GetLogger().Infof("debug::deployOnK8s:2222: %+v", deployOnK8s)
 			for deploymentName, nameSpace := range deployOnK8s {
 				if nameSpace != "" && deploymentName != "" {
-					spaceUuid := strings.TrimPrefix(deploymentName, constants.K8S_DEPLOY_NAME_PREFIX)
-					deleteJob(nameSpace, spaceUuid, "cron-task the obsolete task left in the k8s")
+					//spaceUuid := strings.TrimPrefix(deploymentName, constants.K8S_DEPLOY_NAME_PREFIX)
+					//deleteJob(nameSpace, spaceUuid, "cron-task the obsolete task left in the k8s")
 				}
 			}
-			for _, spaceUuid := range deleteSpaceIds {
-				NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid, models.JOB_COMPLETED_STATUS)
-			}
+			//for _, spaceUuid := range deleteSpaceIds {
+			//	NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid, models.JOB_COMPLETED_STATUS)
+			//}
 		}
 	})
 	c.Start()
