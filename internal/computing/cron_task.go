@@ -2,6 +2,7 @@ package computing
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"sync"
@@ -150,7 +151,7 @@ func (task *CronTask) cleanImageResource() {
 
 func (task *CronTask) watchExpiredTask() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("* 0/10 * * * ?", func() {
+	c.AddFunc("* 0/20 * * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("watchExpiredTask catch panic error: %+v", err)
@@ -165,7 +166,7 @@ func (task *CronTask) watchExpiredTask() {
 
 		deployments, err := NewK8sService().k8sClient.AppsV1().Deployments(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
-			logs.GetLogger().Errorf("failed to listing deployments, error: %v", err)
+			fmt.Println("Error listing deployments:", err)
 			return
 		}
 
@@ -199,15 +200,10 @@ func (task *CronTask) watchExpiredTask() {
 					delete(deployOnK8s, job.K8sDeployName)
 				}
 
-				if time.Now().Sub(time.Unix(job.CreateTime, 0)).Hours() > 2 {
-					deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
-					continue
-				}
-
 				checkFcpJobInfoInChain(job)
 
-				logs.GetLogger().Infof("task_uuid: %s, current status is %s", job.TaskUuid, models.GetJobStatus(job.Status))
 				if job.Status == models.JOB_TERMINATED_STATUS || job.Status == models.JOB_COMPLETED_STATUS {
+					logs.GetLogger().Infof("task_uuid: %s, current status is %s, starting to delete it.", job.TaskUuid, models.GetJobStatus(job.Status))
 					if err = deleteJob(job.NameSpace, job.SpaceUuid, "cron task, abnormal state"); err == nil {
 						deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
 						continue

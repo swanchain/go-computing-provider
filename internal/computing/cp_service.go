@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -35,6 +36,8 @@ import (
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
+
+var gpuResourceCache sync.Map
 
 func GetServiceProviderInfo(c *gin.Context) {
 	info := new(models.HostInfo)
@@ -107,6 +110,8 @@ func ReceiveJob(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
 		return
 	}
+
+	saveGpuCache(gpuProductName)
 
 	if !available {
 		logs.GetLogger().Warnf(" task id: %s, name: %s, not found a resources available", jobData.TaskUUID, jobData.Name)
@@ -834,6 +839,7 @@ func DeploySpaceTask(jobSourceURI, hostName string, duration int, jobUuid string
 	var spaceUuid string
 	var walletAddress string
 	defer func() {
+		deleteGpuCache(gpuProductName)
 		if !success {
 			k8sNameSpace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(walletAddress)
 			deleteJob(k8sNameSpace, spaceUuid, "failed to deploy space")
@@ -1455,4 +1461,24 @@ func getJobOnChain(taskUuid string) (models.TaskInfoOnChain, error) {
 		return models.TaskInfoOnChain{}, err
 	}
 	return taskManagerStub.GetTaskInfo(taskUuid)
+}
+
+func saveGpuCache(gpuProductName string) {
+	value, ok := gpuResourceCache.Load(gpuProductName)
+	if ok {
+		value = value.(int) + 1
+	} else {
+		value = 1
+	}
+	gpuResourceCache.Store(gpuProductName, value)
+
+}
+
+func deleteGpuCache(gpuProductName string) {
+	value, ok := gpuResourceCache.Load(gpuProductName)
+	if ok {
+		value = value.(int) - 1
+	}
+	gpuResourceCache.Store(gpuProductName, value)
+
 }
