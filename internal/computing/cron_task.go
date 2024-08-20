@@ -130,7 +130,7 @@ func (task *CronTask) cleanImageResource() {
 
 func (task *CronTask) watchExpiredTask() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("* 0/5 * * * ?", func() {
+	c.AddFunc("* 0/10 * * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("watchExpiredTask catch panic error: %+v", err)
@@ -156,8 +156,6 @@ func (task *CronTask) watchExpiredTask() {
 			}
 		}
 
-		logs.GetLogger().Infof("debug::deployOnK8s: %+v", deployOnK8s)
-
 		if len(deployOnK8s) == 0 && len(jobList) > 0 {
 			for _, job := range jobList {
 				if err = NewJobService().DeleteJobEntityBySpaceUuId(job.SpaceUuid, models.JOB_COMPLETED_STATUS); err != nil {
@@ -173,16 +171,8 @@ func (task *CronTask) watchExpiredTask() {
 		} else if len(deployOnK8s) > 0 && len(jobList) > 0 {
 			var deleteSpaceIds []string
 			for _, job := range jobList {
-				logs.GetLogger().Infof("debug::jobList: %+v", job)
-				if v, ok := deployOnK8s[job.K8sDeployName]; ok {
-					logs.GetLogger().Infof("debug::delete on k8s: %s, %s", v, job.K8sDeployName)
+				if _, ok := deployOnK8s[job.K8sDeployName]; ok {
 					delete(deployOnK8s, job.K8sDeployName)
-				}
-
-				if time.Now().Sub(time.Unix(job.CreateTime, 0)).Minutes() > 4 {
-					logs.GetLogger().Infof("debug:::4Minutes: %s", job.K8sDeployName)
-					deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
-					continue
 				}
 
 				checkFcpJobInfoInChain(job)
@@ -203,16 +193,15 @@ func (task *CronTask) watchExpiredTask() {
 				}
 			}
 
-			logs.GetLogger().Infof("debug::deployOnK8s:2222: %+v", deployOnK8s)
 			for deploymentName, nameSpace := range deployOnK8s {
 				if nameSpace != "" && deploymentName != "" {
-					//spaceUuid := strings.TrimPrefix(deploymentName, constants.K8S_DEPLOY_NAME_PREFIX)
-					//deleteJob(nameSpace, spaceUuid, "cron-task the obsolete task left in the k8s")
+					spaceUuid := strings.TrimPrefix(deploymentName, constants.K8S_DEPLOY_NAME_PREFIX)
+					deleteJob(nameSpace, spaceUuid, "cron-task the obsolete task left in the k8s")
 				}
 			}
-			//for _, spaceUuid := range deleteSpaceIds {
-			//	NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid, models.JOB_COMPLETED_STATUS)
-			//}
+			for _, spaceUuid := range deleteSpaceIds {
+				NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid, models.JOB_COMPLETED_STATUS)
+			}
 		}
 	})
 	c.Start()
