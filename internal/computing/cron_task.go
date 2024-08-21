@@ -479,7 +479,6 @@ func checkFcpJobInfoInChain(job *models.JobEntity) {
 		return
 	}
 
-	logs.GetLogger().Infof("task_uuid: %s, space_uuid: %s, chain statu: %s, local status: %s", job.TaskUuid, job.SpaceUuid, models.JobOnChainStatus(taskInfo.TaskStatus), models.GetJobStatus(job.Status))
 	if taskInfo.TaskStatus == models.COMPLETED {
 		job.Status = models.JOB_COMPLETED_STATUS
 	} else if taskInfo.TaskStatus == models.TERMINATED {
