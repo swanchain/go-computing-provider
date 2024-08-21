@@ -1429,14 +1429,14 @@ func checkBalance(cpAccountAddress string) (bool, error) {
 		return false, fmt.Errorf("failed to convert numbers for cp sequencer balance, cpAccount: %s, sequencerBalance: %s, error: %v", cpAccountAddress, sequencerBalanceStr, err)
 	}
 
-	logs.GetLogger().Infof("cpAccount: %s, sequencer balance: %s, worker address balance: %s", cpAccountAddress, fmt.Sprintf("%.6f", sequencerBalance),
+	logs.GetLogger().Infof("cpAccount: %s, sequencer balance: %s ETH, worker address balance: %s ETH", cpAccountAddress, fmt.Sprintf("%.6f", sequencerBalance),
 		fmt.Sprintf("%.6f", workerBalance))
 
 	if conf.GetConfig().UBI.EnableSequencer && !conf.GetConfig().UBI.AutoChainProof {
 		if sequencerBalance > 0.000001 {
 			return true, nil
 		} else {
-			return false, fmt.Errorf("sequencer insufficient balance")
+			return false, fmt.Errorf("No sufficient balance in the sequencer account, current balance: %s ETH", fmt.Sprintf("%.6f", sequencerBalance))
 		}
 	}
 
@@ -1444,7 +1444,8 @@ func checkBalance(cpAccountAddress string) (bool, error) {
 		if sequencerBalance > 0.000001 || workerBalance > 0.00001 {
 			return true, nil
 		} else {
-			return false, fmt.Errorf("insufficient balance")
+			return false, fmt.Errorf("Not enough funds in the sequencer account and worker address, sequencer balance: %s ETH, worker address: %s ETH", fmt.Sprintf("%.6f", sequencerBalance),
+				fmt.Sprintf("%.6f", workerBalance))
 		}
 	}
 
@@ -1452,7 +1453,7 @@ func checkBalance(cpAccountAddress string) (bool, error) {
 		if workerBalance > 0.00001 {
 			return true, nil
 		} else {
-			return false, fmt.Errorf("worker address insufficient balance")
+			return false, fmt.Errorf("No sufficient balance in the worker address, current balance: %s ETH", fmt.Sprintf("%.6f", workerBalance))
 		}
 	}
 
