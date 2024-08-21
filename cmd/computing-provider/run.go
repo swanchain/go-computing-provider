@@ -77,7 +77,6 @@ func cpManager(router *gin.RouterGroup) {
 	router.GET("/cp", computing.StatisticalSources)
 	router.GET("/host/info", computing.GetServiceProviderInfo)
 	router.POST("/lagrange/jobs", computing.ReceiveJob)
-	router.POST("/lagrange/jobs/redeploy", computing.RedeployJob)
 	router.DELETE("/lagrange/jobs", computing.CancelJob)
 	router.POST("/lagrange/jobs/renew", computing.ReNewJob)
 	router.GET("/lagrange/spaces/log", computing.GetSpaceLog)
@@ -85,6 +84,7 @@ func cpManager(router *gin.RouterGroup) {
 	router.GET("/lagrange/cp/whitelist", computing.WhiteList)
 	router.GET("/lagrange/cp/blacklist", computing.BlackList)
 	router.GET("/lagrange/job/:job_uuid", computing.GetJobStatus)
+	router.GET("/lagrange/cp/public_key", computing.GetPublicKey)
 
 	router.POST("/cp/ubi", computing.DoUbiTaskForK8s)
 	router.POST("/cp/receive/ubi", computing.ReceiveUbiProof)

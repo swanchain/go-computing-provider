@@ -1,11 +1,13 @@
 package computing
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/models"
+	"github.com/swanchain/go-computing-provider/util"
 	"io"
 	"log"
 	"net/http"
@@ -23,7 +25,9 @@ const (
 	modelSetName   = "model-setting.json"
 )
 
-func BuildSpaceTaskImage(spaceUuid string, files []models.SpaceFile) (bool, string, string, string, string, error) {
+func BuildSpaceTaskImage(spaceUuid string, files []models.SpaceFile) (DeployParam, error) {
+	var deployParam DeployParam
+
 	var err error
 	cpRepoPath, _ := os.LookupEnv("CP_PATH")
 	buildFolder := filepath.Join(cpRepoPath, "build")
@@ -37,10 +41,10 @@ func BuildSpaceTaskImage(spaceUuid string, files []models.SpaceFile) (bool, stri
 			fileNames = append(fileNames, file.Name)
 			dirPath := filepath.Dir(file.Name)
 			if err = os.MkdirAll(filepath.Join(buildFolder, dirPath), os.ModePerm); err != nil {
-				return false, "", "", "", "", err
+				return deployParam, err
 			}
-			if err = downloadFile(filepath.Join(buildFolder, file.Name), file.URL); err != nil {
-				return false, "", "", "", "", fmt.Errorf("error downloading file: %w", err)
+			if err = downloadFile(filepath.Join(buildFolder, file.Name), file.URL, file.Iv, file.SymmetricKey); err != nil {
+				return deployParam, fmt.Errorf("error downloading file: %w", err)
 			}
 
 			if strings.HasSuffix(strings.ToLower(file.Name), yamlDeployName) ||
@@ -64,11 +68,16 @@ func BuildSpaceTaskImage(spaceUuid string, files []models.SpaceFile) (bool, stri
 			yamlPath = filepath.Join(buildFolder, yamlName)
 		}
 
-		return containsYaml, yamlPath, imagePath, modelsSettingFilePath, "", nil
+		deployParam.ContainsYaml = containsYaml
+		deployParam.YamlFilePath = yamlPath
+		deployParam.BuildImagePath = imagePath
+		deployParam.ModelsSettingFilePath = modelsSettingFilePath
+
+		return deployParam, nil
 	} else {
 		logs.GetLogger().Warnf("Space %s is not found.", spaceUuid)
 	}
-	return false, "", "", "", "", NotFoundError
+	return deployParam, NotFoundError
 }
 
 func commonPrefix(strs []string) string {
@@ -124,7 +133,8 @@ func BuildImagesByDockerfile(jobUuid, spaceUuid, spaceName, imagePath string) (s
 	return imageName, dockerfilePath
 }
 
-func downloadFile(filepath string, url string) error {
+func downloadFile(filepath, url, iv, symmetricKey string) error {
+	os.Remove(filepath)
 	out, err := os.Create(filepath)
 	if err != nil {
 		return err
@@ -140,21 +150,55 @@ func downloadFile(filepath string, url string) error {
 	if err != nil {
 		return err
 	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-
-		}
-	}(resp.Body)
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("url: %s, unexpected status code: %d", url, resp.StatusCode)
 	}
 
-	_, err = io.Copy(out, resp.Body)
+	var reader io.Reader
+	if iv != "" && symmetricKey != "" {
+		data, err := decryptData(resp.Body, iv, symmetricKey)
+		if err != nil {
+			return err
+		}
+		reader = strings.NewReader(string(data))
+	} else {
+		reader = resp.Body
+	}
+	_, err = io.Copy(out, reader)
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func decryptData(body io.ReadCloser, ivData, symmetricKeyData string) ([]byte, error) {
+	encodedData, err := io.ReadAll(body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response, error: %v", err)
+	}
+
+	iv, err := base64.StdEncoding.DecodeString(ivData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode iv using base64, error: %v", err)
+	}
+	symmetricKey, err := base64.StdEncoding.DecodeString(symmetricKeyData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode symmetricKey using base64, error: %v", err)
+	}
+
+	cpRepoPath, _ := os.LookupEnv("CP_PATH")
+	privateKeyPath := filepath.Join(cpRepoPath, util.RSA_DIR_NAME, util.RSA_PRIVATE_KEY)
+	plainSymmetricKey, err := util.DecryptData(privateKeyPath, symmetricKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt symmetricKey using rsa, error: %v", err)
+	}
+
+	plainData, err := util.DecryptAES256CFB(encodedData, plainSymmetricKey, iv)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt symmetricKey using aes-256, error: %v", err)
+	}
+	return plainData, nil
 }
