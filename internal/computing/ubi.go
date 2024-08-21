@@ -478,6 +478,7 @@ func ReceiveUbiProof(c *gin.Context) {
 		}()
 		err = submitUBIProof(c2Proof, ubiTask)
 		if err != nil {
+			logs.GetLogger().Errorf("failed to submitUBIProof, taskId: %d, error: %v", taskId, err)
 			return
 		}
 	}()
@@ -863,13 +864,13 @@ func submitUBIProof(c2Proof models.UbiC2Proof, task *models.TaskEntity) error {
 
 	localWallet, err := wallet.SetupWallet(wallet.WalletRepo)
 	if err != nil {
-		logs.GetLogger().Errorf("setup wallet failed, taskId: %s,error: %v", c2Proof.TaskId, err)
+		logs.GetLogger().Errorf("failed to setup wallet, taskId: %s,error: %v", c2Proof.TaskId, err)
 		return err
 	}
 
 	_, workerAddress, err := GetOwnerAddressAndWorkerAddress()
 	if err != nil {
-		logs.GetLogger().Errorf("get worker address failed, taskId: %s,error: %v", c2Proof.TaskId, err)
+		logs.GetLogger().Errorf("failed get worker address, taskId: %s,error: %v", c2Proof.TaskId, err)
 		return err
 	}
 
@@ -1074,7 +1075,7 @@ func reportClusterResourceForDocker() {
 
 func CronTaskForEcp() {
 	go func() {
-		ticker := time.NewTicker(24 * time.Hour)
+		ticker := time.NewTicker(2 * time.Hour)
 		for range ticker.C {
 			NewDockerService().CleanResource()
 		}
@@ -1117,7 +1118,7 @@ func CronTaskForEcp() {
 				logs.GetLogger().Errorf("GetUbiTaskReward, error: %+v", err)
 			}
 		}()
-		ticker := time.NewTicker(5 * time.Minute)
+		ticker := time.NewTicker(10 * time.Minute)
 		for range ticker.C {
 			if err := syncTaskStatusForSequencerService(); err != nil {
 				logs.GetLogger().Errorf("failed to sync task from sequencer, error: %v", err)
@@ -1133,6 +1134,7 @@ func syncTaskStatusForSequencerService() error {
 	}
 
 	taskGroups := handleTasksToGroup(taskList)
+	var taskIdAndStatus = make(map[int64]string)
 	for _, group := range taskGroups {
 		taskList, err := NewSequencer().QueryTask(group.Type, group.Ids...)
 		if err != nil {
@@ -1189,10 +1191,18 @@ func syncTaskStatusForSequencerService() error {
 						status = models.TASK_UNKNOWN_STATUS
 					}
 				}
+
+				if item.Status == status {
+					continue
+				}
+				taskIdAndStatus[item.Id] = models.TaskStatusStr(status)
 				item.Status = status
 				NewTaskService().UpdateTaskEntityByTaskId(item)
 			}
 		}
+	}
+	if len(taskIdAndStatus) > 0 {
+		logs.GetLogger().Infof("successfully updated the task status: %v", taskIdAndStatus)
 	}
 	return nil
 }
@@ -1242,6 +1252,10 @@ func RestartResourceExporter() error {
 		AttachStderr: true,
 		Tty:          true,
 	}, &container.HostConfig{
+		RestartPolicy: container.RestartPolicy{
+			Name:              container.RestartPolicyAlways,
+			MaximumRetryCount: 3,
+		},
 		Privileged: true,
 	}, resourceExporterContainerName)
 	if err != nil {
@@ -1346,6 +1360,10 @@ func submitTaskToSequencer(proof string, task *models.TaskEntity, timeOut int64,
 				return fmt.Errorf("taskId: %d, failed to create task contract , error: %v", task.Id, err)
 			}
 		}
+
+		if remainingTime <= 0 {
+			return fmt.Errorf("proof submission deadline has passed, remainingTime: %d", remainingTime)
+		}
 	} else {
 	outerLoop:
 		for {
@@ -1407,30 +1425,31 @@ func checkBalance(cpAccountAddress string) (bool, error) {
 		return false, fmt.Errorf("failed to convert numbers for cp sequencer balance, cpAccount: %s, sequencerBalance: %s, error: %v", cpAccountAddress, sequencerBalanceStr, err)
 	}
 
-	logs.GetLogger().Infof("cpAccount: %s, sequencer balance: %s, worker address balance: %s", cpAccountAddress, fmt.Sprintf("%.4f", sequencerBalance),
-		fmt.Sprintf("%.4f", workerBalance))
+	logs.GetLogger().Infof("cpAccount: %s, sequencer balance: %s ETH, worker address balance: %s ETH", cpAccountAddress, fmt.Sprintf("%.6f", sequencerBalance),
+		fmt.Sprintf("%.6f", workerBalance))
 
 	if conf.GetConfig().UBI.EnableSequencer && !conf.GetConfig().UBI.AutoChainProof {
-		if sequencerBalance > 0 {
+		if sequencerBalance > 0.000001 {
 			return true, nil
 		} else {
-			return false, fmt.Errorf("sequencer insufficient balance")
+			return false, fmt.Errorf("No sufficient balance in the sequencer account, current balance: %s ETH", fmt.Sprintf("%.6f", sequencerBalance))
 		}
 	}
 
 	if conf.GetConfig().UBI.EnableSequencer && conf.GetConfig().UBI.AutoChainProof {
-		if sequencerBalance > 0 || workerBalance > 0 {
+		if sequencerBalance > 0.000001 || workerBalance > 0.00001 {
 			return true, nil
 		} else {
-			return false, fmt.Errorf("insufficient balance")
+			return false, fmt.Errorf("Not enough funds in the sequencer account and worker address, sequencer balance: %s ETH, worker address: %s ETH", fmt.Sprintf("%.6f", sequencerBalance),
+				fmt.Sprintf("%.6f", workerBalance))
 		}
 	}
 
 	if !conf.GetConfig().UBI.EnableSequencer && conf.GetConfig().UBI.AutoChainProof {
-		if workerBalance > 0 {
+		if workerBalance > 0.00001 {
 			return true, nil
 		} else {
-			return false, fmt.Errorf("worker address insufficient balance")
+			return false, fmt.Errorf("No sufficient balance in the worker address, current balance: %s ETH", fmt.Sprintf("%.6f", workerBalance))
 		}
 	}
 
