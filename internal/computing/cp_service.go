@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -35,6 +36,8 @@ import (
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
+
+var gpuResourceCache sync.Map
 
 func GetServiceProviderInfo(c *gin.Context) {
 	info := new(models.HostInfo)
@@ -108,6 +111,8 @@ func ReceiveJob(c *gin.Context) {
 		return
 	}
 
+	saveGpuCache(gpuProductName)
+
 	if !available {
 		logs.GetLogger().Warnf(" task id: %s, name: %s, not found a resources available", jobData.TaskUUID, jobData.Name)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError))
@@ -127,7 +132,7 @@ func ReceiveJob(c *gin.Context) {
 
 	multiAddressSplit := strings.Split(conf.GetConfig().API.MultiAddress, "/")
 	jobSourceUri := jobData.JobSourceURI
-	spaceUuid := jobSourceUri[strings.LastIndex(jobSourceUri, "/")+1:]
+	spaceUuid := spaceDetail.Data.Space.Uuid
 	wsUrl := fmt.Sprintf("wss://%s:%s/api/v1/computing/lagrange/spaces/log?space_id=%s", logHost, multiAddressSplit[4], spaceUuid)
 	jobData.BuildLog = wsUrl + "&type=build"
 	jobData.ContainerLog = wsUrl + "&type=container"
@@ -834,6 +839,7 @@ func DeploySpaceTask(jobSourceURI, hostName string, duration int, jobUuid string
 	var spaceUuid string
 	var walletAddress string
 	defer func() {
+		deleteGpuCache(gpuProductName)
 		if !success {
 			k8sNameSpace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(walletAddress)
 			deleteJob(k8sNameSpace, spaceUuid, "failed to deploy space")
@@ -1455,4 +1461,24 @@ func getJobOnChain(taskUuid string) (models.TaskInfoOnChain, error) {
 		return models.TaskInfoOnChain{}, err
 	}
 	return taskManagerStub.GetTaskInfo(taskUuid)
+}
+
+func saveGpuCache(gpuProductName string) {
+	value, ok := gpuResourceCache.Load(gpuProductName)
+	if ok {
+		value = value.(int) + 1
+	} else {
+		value = 1
+	}
+	gpuResourceCache.Store(gpuProductName, value)
+
+}
+
+func deleteGpuCache(gpuProductName string) {
+	value, ok := gpuResourceCache.Load(gpuProductName)
+	if ok {
+		value = value.(int) - 1
+	}
+	gpuResourceCache.Store(gpuProductName, value)
+
 }

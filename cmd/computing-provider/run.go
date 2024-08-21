@@ -210,9 +210,9 @@ var infoCmd = &cli.Command{
 		taskData = append(taskData, []string{"   Task Types:", taskTypes})
 		taskData = append(taskData, []string{"   Applications:", strconv.Itoa(count)})
 		taskData = append(taskData, []string{""})
-		taskData = append(taskData, []string{"Owner Balance(sETH):", ownerBalance})
-		taskData = append(taskData, []string{"Worker Balance(sETH):", workerBalance})
-		taskData = append(taskData, []string{"Sequencer Balance(sETH):", sequencerBalance})
+		taskData = append(taskData, []string{"Owner Balance(ETH):", ownerBalance})
+		taskData = append(taskData, []string{"Worker Balance(ETH):", workerBalance})
+		taskData = append(taskData, []string{"Sequencer Balance(ETH):", sequencerBalance})
 		taskData = append(taskData, []string{""})
 		taskData = append(taskData, []string{"ECP Balance(SWANC):"})
 		taskData = append(taskData, []string{"   Collateral:", ecpCollateralBalance})
@@ -236,7 +236,7 @@ var infoCmd = &cli.Command{
 				})
 		}
 		header := []string{"CP Account Info:"}
-		NewVisualTable(header, taskData, rowColorList).Generate(false)
+		NewVisualTable(header, taskData, rowColorList).SetAutoWrapText(false).Generate(false)
 		if err != nil {
 			return err
 		}
@@ -354,9 +354,9 @@ var stateInfoCmd = &cli.Command{
 		taskData = append(taskData, []string{"Beneficiary Address:", beneficiaryAddress})
 		taskData = append(taskData, []string{"Task Types:", taskTypes})
 		taskData = append(taskData, []string{""})
-		taskData = append(taskData, []string{"Owner Balance(sETH):", ownerBalance})
-		taskData = append(taskData, []string{"Worker Balance(sETH):", workerBalance})
-		taskData = append(taskData, []string{"Sequencer Balance(sETH):", sequencerBalance})
+		taskData = append(taskData, []string{"Owner Balance(ETH):", ownerBalance})
+		taskData = append(taskData, []string{"Worker Balance(ETH):", workerBalance})
+		taskData = append(taskData, []string{"Sequencer Balance(ETH):", sequencerBalance})
 		taskData = append(taskData, []string{""})
 		taskData = append(taskData, []string{"ECP Balance(SWANC):"})
 		taskData = append(taskData, []string{"   Collateral:", ecpCollateralBalance})
