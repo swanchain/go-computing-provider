@@ -180,7 +180,7 @@ func (task *CronTask) watchExpiredTask() {
 		if len(deployOnK8s) == 0 && len(jobList) > 0 {
 			for _, job := range jobList {
 				if job.CreateTime > 0 {
-					if time.Now().Sub(time.Unix(job.CreateTime, 0)) > time.Hour {
+					if time.Now().Sub(time.Unix(job.CreateTime, 0)) > 2*time.Hour && job.K8sDeployName == "" {
 						if err = NewJobService().DeleteJobEntityBySpaceUuId(job.SpaceUuid, models.JOB_COMPLETED_STATUS); err != nil {
 							logs.GetLogger().Infof("failed to delete job from db, space_uuid: %s, error: %v", job.SpaceUuid, err)
 						}
