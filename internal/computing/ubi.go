@@ -1441,7 +1441,7 @@ func checkBalance(cpAccountAddress string) (bool, error) {
 	}
 
 	if conf.GetConfig().UBI.EnableSequencer && conf.GetConfig().UBI.AutoChainProof {
-		if sequencerBalance > 0.000001 || workerBalance > 0.000001 {
+		if sequencerBalance > 0.000001 || workerBalance > 0.00001 {
 			return true, nil
 		} else {
 			return false, fmt.Errorf("insufficient balance")
@@ -1449,7 +1449,7 @@ func checkBalance(cpAccountAddress string) (bool, error) {
 	}
 
 	if !conf.GetConfig().UBI.EnableSequencer && conf.GetConfig().UBI.AutoChainProof {
-		if workerBalance > 0.000001 {
+		if workerBalance > 0.00001 {
 			return true, nil
 		} else {
 			return false, fmt.Errorf("worker address insufficient balance")
