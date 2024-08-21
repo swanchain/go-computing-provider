@@ -10,11 +10,11 @@ import (
 	"github.com/swanchain/go-computing-provider/internal/contract"
 	"github.com/swanchain/go-computing-provider/internal/contract/fcp"
 	"github.com/swanchain/go-computing-provider/internal/models"
-	"time"
 )
 
 type TaskManagerContract struct {
-	cpAccount string
+	cpAccount         string
+	taskManagerClient *fcp.FcpTaskManager
 }
 
 func NewTaskManagerContract() *TaskManagerContract {
@@ -55,7 +55,7 @@ func (taskManager *TaskManagerContract) Scan(job *models.JobEntity) {
 	}
 	defer client.Close()
 
-	taskManagerClient, err := fcp.NewFcpTaskManager(common.HexToAddress(conf.GetConfig().CONTRACT.JobManager), client)
+	taskManager.taskManagerClient, err = fcp.NewFcpTaskManager(common.HexToAddress(conf.GetConfig().CONTRACT.JobManager), client)
 	if err != nil {
 		logs.GetLogger().Errorf("failed to create job manager contract client, error: %+v", err)
 		return
@@ -78,23 +78,31 @@ func (taskManager *TaskManagerContract) Scan(job *models.JobEntity) {
 			End:   &end,
 		}
 
-		filterRewardReleased, err := taskManagerClient.FilterRewardReleased(filterOps, []string{job.TaskUuid},
-			[]common.Address{common.HexToAddress(taskManager.cpAccount)})
-		if err != nil {
-			//logs.GetLogger().Errorf("task manager contract scan task_uuid %s from %d to %d, failed: %v", job.TaskUuid, filterOps.Start, *filterOps.End, ecp.ParseError(err))
+		if err := taskManager.scanTaskRewards(job, filterOps); err != nil {
+			logs.GetLogger().Error(err)
 			return
-		} else {
-			if filterRewardReleased.Event != nil {
-				amount := contract.BalanceToStr(filterRewardReleased.Event.RewardAmount)
-				NewJobService().UpdateJobReward(job.TaskUuid, amount)
-			}
-			if err := NewJobService().UpdateJobScannedBlock(job.TaskUuid, end); err != nil {
-				logs.GetLogger().Errorf("save job %s scanned block %d err: %v", job.TaskUuid, end, err)
-			}
-			time.Sleep(time.Second)
 		}
-
+		if err := NewJobService().UpdateJobScannedBlock(job.TaskUuid, end); err != nil {
+			logs.GetLogger().Errorf("save job %s scanned block %d err: %v", job.TaskUuid, end, err)
+		}
 	}
+}
+
+func (taskManager *TaskManagerContract) scanTaskRewards(job *models.JobEntity, opts *bind.FilterOpts) (err error) {
+	iterator, err := taskManager.taskManagerClient.FilterRewardReleased(opts, []string{job.TaskUuid},
+		[]common.Address{common.HexToAddress(taskManager.cpAccount)})
+	if err != nil {
+		return err
+	}
+	defer iterator.Close()
+	for iterator.Next() {
+		event := iterator.Event
+		if event != nil {
+			amount := contract.BalanceToStr(event.RewardAmount)
+			NewJobService().UpdateJobReward(job.TaskUuid, amount)
+		}
+	}
+	return nil
 }
 
 func (taskManager *TaskManagerContract) ScannedBlock(job *models.JobEntity) uint64 {
