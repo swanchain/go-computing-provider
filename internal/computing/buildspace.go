@@ -76,18 +76,21 @@ func commonPrefix(strs []string) string {
 		return ""
 	}
 
-	prefix := strs[0]
-
-	for _, str := range strs {
-		for !strings.HasPrefix(str, prefix) {
-			if len(prefix) == 0 {
-				return ""
+	if len(strs) == 1 {
+		str := strs[0]
+		return str[:strings.LastIndex(str, "/")]
+	} else {
+		prefix := strs[0]
+		for _, str := range strs {
+			for !strings.HasPrefix(str, prefix) {
+				if len(prefix) == 0 {
+					return ""
+				}
+				prefix = prefix[:len(prefix)-1]
 			}
-			prefix = prefix[:len(prefix)-1]
 		}
+		return prefix
 	}
-
-	return prefix
 }
 
 func BuildImagesByDockerfile(jobUuid, spaceUuid, spaceName, imagePath string) (string, string) {
