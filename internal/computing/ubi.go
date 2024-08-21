@@ -945,7 +945,6 @@ loopTask:
 
 	if conf.GetConfig().UBI.EnableSequencer && conf.GetConfig().UBI.AutoChainProof {
 		if sequencerBalance <= 0 {
-			logs.GetLogger().Infof("taskId: %s, sequencerBalance<=0, use chain to submit proof", c2Proof.TaskId)
 			taskContractAddress, err := taskStub.CreateTaskContract(c2Proof.Proof, task, remainingTime)
 			if taskContractAddress != "" {
 				task.Status = models.TASK_SUBMITTED_STATUS
@@ -958,7 +957,6 @@ loopTask:
 				logs.GetLogger().Errorf("taskId: %s, failed to create task contract, error: %v", c2Proof.TaskId, err)
 			}
 		} else {
-			logs.GetLogger().Infof("taskId: %d, AutoChainProof=true and sequencerBalance>0, use sequencer to submit proof", task.Id)
 			if err = submitTaskToSequencer(c2Proof.Proof, task, remainingTime, true); err != nil {
 				logs.GetLogger().Errorf("failed to submitted to the sequencer, taskId: %d, error: %v", task.Id, err)
 				task.Status = models.TASK_FAILED_STATUS
@@ -968,7 +966,6 @@ loopTask:
 		}
 	} else if conf.GetConfig().UBI.EnableSequencer && !conf.GetConfig().UBI.AutoChainProof {
 		if sequencerBalance > 0 {
-			logs.GetLogger().Infof("taskId: %d, AutoChainProof=false and sequencerBalance>0, use sequencer to submit proof", task.Id)
 			if err = submitTaskToSequencer(c2Proof.Proof, task, remainingTime, false); err != nil {
 				logs.GetLogger().Errorf("failed to submitted to the sequencer, taskId: %d, error: %v", task.Id, err)
 				task.Status = models.TASK_FAILED_STATUS
@@ -980,7 +977,6 @@ loopTask:
 			logs.GetLogger().Warnf("taskId: %d, sequencer insufficient balance, sequencerBalance: %f", task.Id, sequencerBalance)
 		}
 	} else {
-		logs.GetLogger().Infof("taskId: %s, use chain to submit proof", c2Proof.TaskId)
 		taskContractAddress, err := taskStub.CreateTaskContract(c2Proof.Proof, task, remainingTime)
 		if taskContractAddress != "" {
 			task.Status = models.TASK_SUBMITTED_STATUS
