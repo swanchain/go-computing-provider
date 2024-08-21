@@ -593,7 +593,7 @@ func getHardwareDetail(description string) (string, models.Resource) {
 		oldName := strings.TrimSpace(confSplits[0])
 		hardwareResource.Gpu.Unit = strings.ReplaceAll(oldName, "Nvidia", "NVIDIA")
 
-		hardwareResource.Storage.Quantity = 30
+		hardwareResource.Storage.Quantity = 50
 	}
 	hardwareResource.Storage.Unit = "Gi"
 
