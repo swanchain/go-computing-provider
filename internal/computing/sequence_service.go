@@ -98,7 +98,7 @@ func (s *Sequencer) GetToken() error {
 	var tokenResp TokenResp
 	err = NewHttpClient(s.url, header).PostJSON(token, data, &tokenResp)
 	if err != nil {
-		return fmt.Errorf("failed to get token, error: %v", err)
+		return fmt.Errorf("failed to get token, blockNumber: %d, error: %v", blockNumber, err)
 	}
 
 	if tokenResp.Code == 0 {

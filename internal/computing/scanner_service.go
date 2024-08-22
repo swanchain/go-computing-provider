@@ -63,7 +63,6 @@ func (taskManager *TaskManagerContract) Scan(job *models.JobEntity) {
 
 	endBlockNumber, err = client.BlockNumber(context.Background())
 	if err != nil {
-		logs.GetLogger().Error(err)
 		return
 	}
 
