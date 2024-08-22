@@ -1358,7 +1358,7 @@ func submitTaskToSequencer(proof string, task *models.TaskEntity, timeOut int64,
 				return fmt.Errorf("failed to create ubi task client, taskId: %s, contract: %s, error: %v", task.Id, task.Contract, err)
 			}
 
-			logs.GetLogger().Infof("taskId: %d starting to create task contract", task.Id)
+			logs.GetLogger().Infof("taskId: %d, failed to submit proof using sequencer, starting to create task contract", task.Id)
 			taskContractAddress, err := taskStub.CreateTaskContract(task.Proof, task, remainingTime)
 			if taskContractAddress != "" {
 				task.Status = models.TASK_SUBMITTED_STATUS
