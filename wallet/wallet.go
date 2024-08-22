@@ -45,15 +45,16 @@ func SetupWallet(dir string) (*LocalWallet, error) {
 		return nil, fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
 	}
 
+	var walletRepo = filepath.Join(cpPath, dir)
 	var resultErr error
 	timeOutCh := time.After(10 * time.Second)
 loop:
 	for {
 		select {
 		case <-timeOutCh:
-			return nil, fmt.Errorf("open wallet timeout, retry again")
+			return nil, fmt.Errorf("open %s wallet repo timeout, retry again", walletRepo)
 		default:
-			kstore, err := OpenOrInitKeystore(filepath.Join(cpPath, dir))
+			kstore, err := OpenOrInitKeystore(walletRepo)
 			if err != nil {
 				if strings.Contains(err.Error(), "permission denied") {
 					resultErr = err

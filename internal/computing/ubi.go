@@ -461,12 +461,14 @@ func ReceiveUbiProof(c *gin.Context) {
 
 	taskId, err := strconv.Atoi(c2Proof.TaskId)
 	if err != nil {
+		logs.GetLogger().Errorf("failed to parse task id, task_id: %s, error: %v", c2Proof.TaskId, err)
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
 		return
 	}
 
 	ubiTask, err := NewTaskService().GetTaskEntity(int64(taskId))
 	if err != nil {
+		logs.GetLogger().Errorf("failed to get task info, task_id: %s, error: %v", c2Proof.TaskId, err)
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
 		return
 	}
@@ -476,11 +478,7 @@ func ReceiveUbiProof(c *gin.Context) {
 				logs.GetLogger().Errorf("taskId: %d, submit zk-task proof catch painc error: %v", taskId, err)
 			}
 		}()
-		err = submitUBIProof(c2Proof, ubiTask)
-		if err != nil {
-			logs.GetLogger().Errorf("failed to submitUBIProof, taskId: %d, error: %v", taskId, err)
-			return
-		}
+		submitUBIProof(c2Proof, ubiTask)
 	}()
 
 	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
@@ -840,23 +838,24 @@ func GetCpResource(c *gin.Context) {
 	})
 }
 
-func submitUBIProof(c2Proof models.UbiC2Proof, task *models.TaskEntity) error {
+func submitUBIProof(c2Proof models.UbiC2Proof, task *models.TaskEntity) {
 	chainUrl, err := conf.GetRpcByNetWorkName()
 	if err != nil {
-		logs.GetLogger().Errorf("get rpc url failed, taskId: %s, error: %v", c2Proof.TaskId, err)
-		return err
+		logs.GetLogger().Errorf("failed to get rpc url, taskId: %s, error: %v", c2Proof.TaskId, err)
+		return
 	}
 	client, err := ethclient.Dial(chainUrl)
 	if err != nil {
-		logs.GetLogger().Errorf("dial rpc connect failed, taskId: %s, error: %v", c2Proof.TaskId, err)
-		return err
+		logs.GetLogger().Errorf("failed to dial rpc, taskId: %s, error: %v", c2Proof.TaskId, err)
+		return
 	}
-	client.Close()
+	defer client.Close()
 
 	var timeUnit int64 = 2
 	chainId, err := client.ChainID(context.Background())
 	if err != nil {
-		return err
+		logs.GetLogger().Errorf("dial rpc connect failed, taskId: %s, error: %v", c2Proof.TaskId, err)
+		return
 	}
 	if chainId.Int64() == 254 {
 		timeUnit = 5
@@ -865,19 +864,19 @@ func submitUBIProof(c2Proof models.UbiC2Proof, task *models.TaskEntity) error {
 	localWallet, err := wallet.SetupWallet(wallet.WalletRepo)
 	if err != nil {
 		logs.GetLogger().Errorf("failed to setup wallet, taskId: %s,error: %v", c2Proof.TaskId, err)
-		return err
+		return
 	}
 
 	_, workerAddress, err := GetOwnerAddressAndWorkerAddress()
 	if err != nil {
 		logs.GetLogger().Errorf("failed get worker address, taskId: %s,error: %v", c2Proof.TaskId, err)
-		return err
+		return
 	}
 
 	ki, err := localWallet.FindKey(workerAddress)
 	if err != nil || ki == nil {
 		logs.GetLogger().Errorf("taskId: %s,the address: %s, private key %v", c2Proof.TaskId, workerAddress, wallet.ErrKeyInfoNotFound)
-		return err
+		return
 	}
 	var workerPrivateKey = ki.PrivateKey
 	ki = nil
@@ -885,7 +884,7 @@ func submitUBIProof(c2Proof models.UbiC2Proof, task *models.TaskEntity) error {
 	taskStub, err := ecp.NewTaskStub(client, ecp.WithTaskContractAddress(task.Contract), ecp.WithTaskPrivateKey(workerPrivateKey))
 	if err != nil {
 		logs.GetLogger().Errorf("create ubi task client failed, taskId: %s, contract: %s, error: %v", c2Proof.TaskId, task.Contract, err)
-		return err
+		return
 	}
 
 	var sequencerBalance float64
@@ -893,24 +892,24 @@ func submitUBIProof(c2Proof models.UbiC2Proof, task *models.TaskEntity) error {
 		cpAccountAddress, err := contract.GetCpAccountAddress()
 		if err != nil {
 			logs.GetLogger().Errorf("failed to get cp account contract address, error: %v", err)
-			return err
+			return
 		}
 
 		sequencerStub, err := ecp.NewSequencerStub(client, ecp.WithSequencerCpAccountAddress(cpAccountAddress))
 		if err != nil {
 			logs.GetLogger().Errorf("failed to get cp sequencer contract, error: %v", err)
-			return err
+			return
 		}
 		sequencerBalanceStr, err := sequencerStub.GetCPBalance()
 		if err != nil {
 			logs.GetLogger().Errorf("failed to get cp sequencer contract, error: %v", err)
-			return err
+			return
 		}
 
 		sequencerBalance, err = strconv.ParseFloat(sequencerBalanceStr, 64)
 		if err != nil {
 			logs.GetLogger().Errorf("failed to convert numbers for cp sequencer balance, sequencerBalance: %s, error: %v", sequencerBalanceStr, err)
-			return err
+			return
 		}
 	}
 
@@ -940,11 +939,15 @@ loopTask:
 		logs.GetLogger().Warnf("taskId: %s proof submission deadline has passed, current: %d, deadline: %d, deadlineTime: %d", c2Proof.TaskId, blockNumber, task.Deadline, remainingTime)
 		task.Status = models.TASK_FAILED_STATUS
 		task.Error = fmt.Sprintf("create contract deadline has passed")
-		return NewTaskService().SaveTaskEntity(task)
+		if err = NewTaskService().SaveTaskEntity(task); err != nil {
+			logs.GetLogger().Errorf("failed to save task info, taskId: %s, error: %v", c2Proof.TaskId, err)
+		}
+		return
 	}
 
 	if conf.GetConfig().UBI.EnableSequencer && conf.GetConfig().UBI.AutoChainProof {
 		if sequencerBalance <= 0 {
+			logs.GetLogger().Infof("taskId: %s starting to create task contract", c2Proof.TaskId)
 			taskContractAddress, err := taskStub.CreateTaskContract(c2Proof.Proof, task, remainingTime)
 			if taskContractAddress != "" {
 				task.Status = models.TASK_SUBMITTED_STATUS
@@ -957,6 +960,7 @@ loopTask:
 				logs.GetLogger().Errorf("taskId: %s, failed to create task contract, error: %v", c2Proof.TaskId, err)
 			}
 		} else {
+			logs.GetLogger().Infof("taskId: %s starting to use sequencer to submit proof", c2Proof.TaskId)
 			if err = submitTaskToSequencer(c2Proof.Proof, task, remainingTime, true); err != nil {
 				logs.GetLogger().Errorf("failed to submitted to the sequencer, taskId: %d, error: %v", task.Id, err)
 				task.Status = models.TASK_FAILED_STATUS
@@ -966,6 +970,7 @@ loopTask:
 		}
 	} else if conf.GetConfig().UBI.EnableSequencer && !conf.GetConfig().UBI.AutoChainProof {
 		if sequencerBalance > 0 {
+			logs.GetLogger().Infof("taskId: %s starting to use sequencer to submit proof", c2Proof.TaskId)
 			if err = submitTaskToSequencer(c2Proof.Proof, task, remainingTime, false); err != nil {
 				logs.GetLogger().Errorf("failed to submitted to the sequencer, taskId: %d, error: %v", task.Id, err)
 				task.Status = models.TASK_FAILED_STATUS
@@ -974,9 +979,10 @@ loopTask:
 			}
 		} else {
 			task.Status = models.TASK_FAILED_STATUS
-			logs.GetLogger().Warnf("taskId: %d, sequencer insufficient balance, sequencerBalance: %f", task.Id, sequencerBalance)
+			logs.GetLogger().Warnf("taskId: %d, sequencer insufficient balance, sequencerBalance: %.6f", task.Id, sequencerBalance)
 		}
 	} else {
+		logs.GetLogger().Infof("taskId: %s starting to create task contract", c2Proof.TaskId)
 		taskContractAddress, err := taskStub.CreateTaskContract(c2Proof.Proof, task, remainingTime)
 		if taskContractAddress != "" {
 			task.Status = models.TASK_SUBMITTED_STATUS
@@ -989,7 +995,11 @@ loopTask:
 			logs.GetLogger().Errorf("taskId: %s, failed to create task contract, error: %v", c2Proof.TaskId, err)
 		}
 	}
-	return NewTaskService().SaveTaskEntity(task)
+
+	if err = NewTaskService().SaveTaskEntity(task); err != nil {
+		logs.GetLogger().Errorf("failed to save task info, taskId: %s, error: %v", c2Proof.TaskId, err)
+	}
+	return
 }
 
 func GetTaskInfoOnChain(taskContract string) (models.EcpTaskInfo, error) {
@@ -1316,7 +1326,6 @@ func submitTaskToSequencer(proof string, task *models.TaskEntity, timeOut int64,
 		}
 		remainingTime := timeOut - int64(time.Now().Sub(start).Seconds())
 		if !flag && remainingTime > 0 {
-			logs.GetLogger().Infof("taskId: %d, use chain to submit proof", task.Id)
 			chainUrl, err := conf.GetRpcByNetWorkName()
 			if err != nil {
 				return fmt.Errorf("failed to get rpc url, taskId: %d, error: %v", task.Id, err)
@@ -1347,6 +1356,8 @@ func submitTaskToSequencer(proof string, task *models.TaskEntity, timeOut int64,
 			if err != nil {
 				return fmt.Errorf("failed to create ubi task client, taskId: %s, contract: %s, error: %v", task.Id, task.Contract, err)
 			}
+
+			logs.GetLogger().Infof("taskId: %d starting to create task contract", task.Id)
 			taskContractAddress, err := taskStub.CreateTaskContract(task.Proof, task, remainingTime)
 			if taskContractAddress != "" {
 				task.Status = models.TASK_SUBMITTED_STATUS
@@ -1357,12 +1368,12 @@ func submitTaskToSequencer(proof string, task *models.TaskEntity, timeOut int64,
 			} else {
 				task.Status = models.TASK_FAILED_STATUS
 				task.Error = fmt.Sprintf("%s", err.Error())
-				return fmt.Errorf("taskId: %d, failed to create task contract , error: %v", task.Id, err)
+				return fmt.Errorf("taskId: %d, failed to create task contract, error: %v", task.Id, err)
 			}
 		}
 
 		if remainingTime <= 0 {
-			return fmt.Errorf("proof submission deadline has passed, remainingTime: %d", remainingTime)
+			return fmt.Errorf("taskId: %d, proof submission deadline has passed, remainingTime: %d", task.Id, remainingTime)
 		}
 	} else {
 	outerLoop:
