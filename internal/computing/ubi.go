@@ -330,7 +330,6 @@ func DoUbiTaskForK8s(c *gin.Context) {
 			Spec: batchv1.JobSpec{
 				Template: v1.PodTemplateSpec{
 					Spec: v1.PodSpec{
-						HostNetwork:  true,
 						NodeName:     nodeName,
 						NodeSelector: generateLabel(strings.ReplaceAll(c2GpuName, " ", "-")),
 						Containers: []v1.Container{
