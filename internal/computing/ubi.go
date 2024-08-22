@@ -280,7 +280,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 			}
 		}
 
-		receiveUrl := fmt.Sprintf("https://127.0.0.1:%d/api/v1/computing/cp/receive/ubi", conf.GetConfig().API.Port)
+		receiveUrl := fmt.Sprintf("%s:%d/api/v1/computing/cp/receive/ubi", k8sService.GetAPIServerEndpoint(), conf.GetConfig().API.Port)
 		execCommand := []string{"ubi-bench", "c2"}
 		JobName := strings.ToLower(models.UbiTaskTypeStr(ubiTask.Type)) + "-" + strconv.Itoa(ubiTask.ID)
 		filC2Param := envVars["FIL_PROOFS_PARAMETER_CACHE"]
