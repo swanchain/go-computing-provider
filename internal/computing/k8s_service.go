@@ -403,6 +403,26 @@ func (s *K8sService) StatisticalSources(ctx context.Context) ([]*models.NodeReso
 
 		nodeList = append(nodeList, nodeResource)
 	}
+
+	gpuResourceCache.Range(func(applyGpu, num any) bool {
+		needNum := num.(int)
+	loop:
+		for i, node := range nodeList {
+			for j, gpu := range node.Gpu.Details {
+				if needNum == 0 {
+					break loop
+				}
+				if applyGpu == gpu.ProductName && needNum > 0 {
+					if gpu.Status == models.Available {
+						nodeList[i].Gpu.Details[j].Status = models.Occupied
+						needNum--
+					}
+				}
+			}
+		}
+		return true
+	})
+
 	return nodeList, nil
 }
 

@@ -35,6 +35,7 @@ func (v *VisualTable) SetAutoWrapText(wrapText bool) *VisualTable {
 
 func (v *VisualTable) Generate(formatHeaders bool) {
 	table := tablewriter.NewWriter(os.Stdout)
+	table.SetAutoWrapText(v.WrapText)
 
 	for index, datum := range v.Data {
 		var rowColors []tablewriter.Colors
@@ -58,7 +59,6 @@ func (v *VisualTable) Generate(formatHeaders bool) {
 	}
 
 	table.SetHeader(v.Header)
-	table.SetAutoWrapText(v.WrapText)
 	table.SetAutoFormatHeaders(formatHeaders)
 	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
 	table.SetHeaderLine(false)

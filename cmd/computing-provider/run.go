@@ -77,7 +77,6 @@ func cpManager(router *gin.RouterGroup) {
 	router.GET("/cp", computing.StatisticalSources)
 	router.GET("/host/info", computing.GetServiceProviderInfo)
 	router.POST("/lagrange/jobs", computing.ReceiveJob)
-	router.POST("/lagrange/jobs/redeploy", computing.RedeployJob)
 	router.DELETE("/lagrange/jobs", computing.CancelJob)
 	router.POST("/lagrange/jobs/renew", computing.ReNewJob)
 	router.GET("/lagrange/spaces/log", computing.GetSpaceLog)
@@ -85,6 +84,7 @@ func cpManager(router *gin.RouterGroup) {
 	router.GET("/lagrange/cp/whitelist", computing.WhiteList)
 	router.GET("/lagrange/cp/blacklist", computing.BlackList)
 	router.GET("/lagrange/job/:job_uuid", computing.GetJobStatus)
+	router.GET("/lagrange/cp/public_key", computing.GetPublicKey)
 
 	router.POST("/cp/ubi", computing.DoUbiTaskForK8s)
 	router.POST("/cp/receive/ubi", computing.ReceiveUbiProof)
@@ -210,9 +210,9 @@ var infoCmd = &cli.Command{
 		taskData = append(taskData, []string{"   Task Types:", taskTypes})
 		taskData = append(taskData, []string{"   Applications:", strconv.Itoa(count)})
 		taskData = append(taskData, []string{""})
-		taskData = append(taskData, []string{"Owner Balance(sETH):", ownerBalance})
-		taskData = append(taskData, []string{"Worker Balance(sETH):", workerBalance})
-		taskData = append(taskData, []string{"Sequencer Balance(sETH):", sequencerBalance})
+		taskData = append(taskData, []string{"Owner Balance(ETH):", ownerBalance})
+		taskData = append(taskData, []string{"Worker Balance(ETH):", workerBalance})
+		taskData = append(taskData, []string{"Sequencer Balance(ETH):", sequencerBalance})
 		taskData = append(taskData, []string{""})
 		taskData = append(taskData, []string{"ECP Balance(SWANC):"})
 		taskData = append(taskData, []string{"   Collateral:", ecpCollateralBalance})
@@ -236,7 +236,7 @@ var infoCmd = &cli.Command{
 				})
 		}
 		header := []string{"CP Account Info:"}
-		NewVisualTable(header, taskData, rowColorList).Generate(false)
+		NewVisualTable(header, taskData, rowColorList).SetAutoWrapText(false).Generate(false)
 		if err != nil {
 			return err
 		}
@@ -354,9 +354,9 @@ var stateInfoCmd = &cli.Command{
 		taskData = append(taskData, []string{"Beneficiary Address:", beneficiaryAddress})
 		taskData = append(taskData, []string{"Task Types:", taskTypes})
 		taskData = append(taskData, []string{""})
-		taskData = append(taskData, []string{"Owner Balance(sETH):", ownerBalance})
-		taskData = append(taskData, []string{"Worker Balance(sETH):", workerBalance})
-		taskData = append(taskData, []string{"Sequencer Balance(sETH):", sequencerBalance})
+		taskData = append(taskData, []string{"Owner Balance(ETH):", ownerBalance})
+		taskData = append(taskData, []string{"Worker Balance(ETH):", workerBalance})
+		taskData = append(taskData, []string{"Sequencer Balance(ETH):", sequencerBalance})
 		taskData = append(taskData, []string{""})
 		taskData = append(taskData, []string{"ECP Balance(SWANC):"})
 		taskData = append(taskData, []string{"   Collateral:", ecpCollateralBalance})

@@ -184,18 +184,18 @@ func (d *Deploy) DockerfileToK8s() {
 	return
 }
 
-func (d *Deploy) YamlToK8s() {
+func (d *Deploy) YamlToK8s() error {
 	containerResources, err := yaml.HandlerYaml(d.yamlPath)
 	if err != nil {
 		logs.GetLogger().Error(err)
-		return
+		return err
 	}
 
 	deleteJob(d.k8sNameSpace, d.spaceUuid, "start deploying new space service and delete previous service")
 
 	if err := d.deployNamespace(); err != nil {
 		logs.GetLogger().Error(err)
-		return
+		return err
 	}
 
 	k8sService := NewK8sService()
@@ -214,7 +214,7 @@ func (d *Deploy) YamlToK8s() {
 			configMap, err := k8sService.CreateConfigMap(context.TODO(), d.k8sNameSpace, d.spaceUuid, filepath.Dir(d.yamlPath), cr.VolumeMounts.Name)
 			if err != nil {
 				logs.GetLogger().Error(err)
-				return
+				return err
 			}
 			configName := configMap.GetName()
 			volumes = []coreV1.Volume{
@@ -321,7 +321,7 @@ func (d *Deploy) YamlToK8s() {
 		createDeployment, err := k8sService.CreateDeployment(context.TODO(), d.k8sNameSpace, deployment)
 		if err != nil {
 			logs.GetLogger().Error(err)
-			return
+			return err
 		}
 		d.DeployName = createDeployment.GetName()
 		updateJobStatus(d.jobUuid, models.DEPLOY_PULL_IMAGE)
@@ -329,7 +329,7 @@ func (d *Deploy) YamlToK8s() {
 		serviceHost, err := d.deployK8sResource(cr.Ports[0].ContainerPort)
 		if err != nil {
 			logs.GetLogger().Error(err)
-			return
+			return err
 		}
 
 		updateJobStatus(d.jobUuid, models.DEPLOY_TO_K8S, "https://"+d.hostName)
@@ -343,6 +343,7 @@ func (d *Deploy) YamlToK8s() {
 		}
 		d.watchContainerRunningTime()
 	}
+	return nil
 }
 
 func (d *Deploy) ModelInferenceToK8s() error {
@@ -592,7 +593,7 @@ func getHardwareDetail(description string) (string, models.Resource) {
 		oldName := strings.TrimSpace(confSplits[0])
 		hardwareResource.Gpu.Unit = strings.ReplaceAll(oldName, "Nvidia", "NVIDIA")
 
-		hardwareResource.Storage.Quantity = 30
+		hardwareResource.Storage.Quantity = 50
 	}
 	hardwareResource.Storage.Unit = "Gi"
 

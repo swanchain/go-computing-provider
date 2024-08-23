@@ -286,7 +286,7 @@ spec:
     spec:
       containers:
       - name: resource-exporter
-        image: filswan/resource-exporter:v11.2.8
+        image: filswan/resource-exporter:v11.2.9
         imagePullPolicy: IfNotPresent
         securityContext:
           privileged: true

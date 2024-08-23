@@ -3,7 +3,6 @@ package computing
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"strconv"
 	"strings"
 	"sync"
@@ -32,8 +31,8 @@ func NewCronTask(nodeId string) *CronTask {
 }
 
 func (task *CronTask) RunTask() {
-	addNodeLabel()
 	checkJobStatus()
+	task.addLabelToNode()
 	task.checkCollateralBalance()
 	task.cleanAbnormalDeployment()
 	task.setFailedUbiTaskStatus()
@@ -42,6 +41,7 @@ func (task *CronTask) RunTask() {
 	task.watchExpiredTask()
 	task.getUbiTaskReward()
 	task.checkJobReward()
+	task.cleanImageResource()
 }
 
 func checkJobStatus() {
@@ -59,6 +59,27 @@ func checkJobStatus() {
 					}
 					return true
 				})
+			}
+		}
+	}()
+}
+
+func (task *CronTask) addLabelToNode() {
+	ticker := time.NewTicker(10 * time.Minute)
+	defer ticker.Stop()
+
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				func() {
+					defer func() {
+						if err := recover(); err != nil {
+							logs.GetLogger().Errorf("failed to add label for cluster node, error: %+v", err)
+						}
+					}()
+					addNodeLabel()
+				}()
 			}
 		}
 	}()
@@ -111,14 +132,26 @@ func (task *CronTask) watchNameSpaceForDeleted() {
 				}
 			}
 		}
-		NewDockerService().CleanResource()
+	})
+	c.Start()
+}
+
+func (task *CronTask) cleanImageResource() {
+	c := cron.New(cron.WithSeconds())
+	c.AddFunc("* 0/30 * * * ?", func() {
+		defer func() {
+			if err := recover(); err != nil {
+				logs.GetLogger().Errorf("cleanImageResource catch panic error: %+v", err)
+			}
+		}()
+		NewDockerService().CleanResourceForK8s()
 	})
 	c.Start()
 }
 
 func (task *CronTask) watchExpiredTask() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("* 0/10 * * * ?", func() {
+	c.AddFunc("* 0/20 * * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("watchExpiredTask catch panic error: %+v", err)
@@ -146,8 +179,12 @@ func (task *CronTask) watchExpiredTask() {
 
 		if len(deployOnK8s) == 0 && len(jobList) > 0 {
 			for _, job := range jobList {
-				if err = NewJobService().DeleteJobEntityBySpaceUuId(job.SpaceUuid, models.JOB_COMPLETED_STATUS); err != nil {
-					logs.GetLogger().Infof("failed to delete job from db, space_uuid: %s, error: %v", job.SpaceUuid, err)
+				if job.CreateTime > 0 {
+					if time.Now().Sub(time.Unix(job.CreateTime, 0)) > 2*time.Hour && job.K8sDeployName == "" {
+						if err = NewJobService().DeleteJobEntityBySpaceUuId(job.SpaceUuid, models.JOB_COMPLETED_STATUS); err != nil {
+							logs.GetLogger().Infof("failed to delete job from db, space_uuid: %s, error: %v", job.SpaceUuid, err)
+						}
+					}
 				}
 			}
 		} else if len(deployOnK8s) > 0 && len(jobList) == 0 {
@@ -161,11 +198,6 @@ func (task *CronTask) watchExpiredTask() {
 			for _, job := range jobList {
 				if _, ok := deployOnK8s[job.K8sDeployName]; ok {
 					delete(deployOnK8s, job.K8sDeployName)
-				}
-
-				if time.Now().Sub(time.Unix(job.CreateTime, 0)).Hours() > 2 {
-					deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
-					continue
 				}
 
 				checkFcpJobInfoInChain(job)
@@ -338,18 +370,26 @@ func (task *CronTask) checkJobReward() {
 }
 
 func (task *CronTask) getUbiTaskReward() {
-	c := cron.New(cron.WithSeconds())
-	c.AddFunc("* * 0/1 * ?", func() {
-		defer func() {
-			if err := recover(); err != nil {
-				logs.GetLogger().Errorf("task job: [GetUbiTaskReward], error: %+v", err)
+	ticker := time.NewTicker(10 * time.Minute)
+	defer ticker.Stop()
+
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				func() {
+					defer func() {
+						if err := recover(); err != nil {
+							logs.GetLogger().Errorf("failed to get zk task reward, catch painc: %+v", err)
+						}
+					}()
+					if err := syncTaskStatusForSequencerService(); err != nil {
+						logs.GetLogger().Errorf("failed to sync task from sequencer, error: %v", err)
+					}
+				}()
 			}
-		}()
-		if err := syncTaskStatusForSequencerService(); err != nil {
-			logs.GetLogger().Errorf("failed to sync task from sequencer, error: %v", err)
 		}
-	})
-	c.Start()
+	}()
 }
 
 func addNodeLabel() {
@@ -461,15 +501,6 @@ func checkFcpJobInfoInChain(job *models.JobEntity) {
 		}
 	}
 
-}
-
-func checkHealth(url string) bool {
-	response, err := http.Get(url)
-	if err != nil {
-		return false
-	}
-	defer response.Body.Close()
-	return response.StatusCode == 200
 }
 
 type TaskGroup struct {
