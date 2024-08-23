@@ -363,7 +363,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 			logs.GetLogger().Errorf("Failed creating ubi task job: %v", err)
 			return
 		}
-		time.Sleep(30 * time.Second)
+		time.Sleep(20 * time.Second)
 
 		logs.GetLogger().Infof("create pod, podName: %s", podName)
 
