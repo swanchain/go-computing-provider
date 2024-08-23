@@ -22,7 +22,6 @@ import (
 	"github.com/swanchain/go-computing-provider/util"
 	"github.com/swanchain/go-computing-provider/wallet"
 	"io"
-	batchv1 "k8s.io/api/batch/v1"
 	coreV1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -282,7 +281,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 
 		receiveUrl := fmt.Sprintf("%s:%d/api/v1/computing/cp/receive/ubi", k8sService.GetAPIServerEndpoint(), conf.GetConfig().API.Port)
 		execCommand := []string{"ubi-bench", "c2"}
-		JobName := strings.ToLower(models.UbiTaskTypeStr(ubiTask.Type)) + "-" + strconv.Itoa(ubiTask.ID)
+		podName := strings.ToLower(models.UbiTaskTypeStr(ubiTask.Type)) + "-" + strconv.Itoa(ubiTask.ID)
 		filC2Param := envVars["FIL_PROOFS_PARAMETER_CACHE"]
 
 		if len(strings.TrimSpace(filC2Param)) == 0 {
@@ -322,78 +321,68 @@ func DoUbiTaskForK8s(c *gin.Context) {
 			},
 		)
 
-		job := &batchv1.Job{
+		pod := coreV1.Pod{
 			ObjectMeta: metaV1.ObjectMeta{
-				Name:      JobName,
+				Name:      podName,
 				Namespace: namespace,
 			},
-			Spec: batchv1.JobSpec{
-				Template: v1.PodTemplateSpec{
-					Spec: v1.PodSpec{
-						NodeName:     nodeName,
-						NodeSelector: generateLabel(strings.ReplaceAll(c2GpuName, " ", "-")),
-						Containers: []v1.Container{
+			Spec: v1.PodSpec{
+				HostNetwork:  true,
+				NodeName:     nodeName,
+				NodeSelector: generateLabel(strings.ReplaceAll(c2GpuName, " ", "-")),
+				Containers: []v1.Container{
+					{
+						Name:  podName + generateString(5),
+						Image: ubiTaskImage,
+						Env:   useEnvVars,
+						VolumeMounts: []v1.VolumeMount{
 							{
-								Name:  JobName + generateString(5),
-								Image: ubiTaskImage,
-								Env:   useEnvVars,
-								VolumeMounts: []v1.VolumeMount{
-									{
-										Name:      "proof-params",
-										MountPath: "/var/tmp/filecoin-proof-parameters",
-									},
-								},
-								Command:         execCommand,
-								Resources:       resourceRequirements,
-								ImagePullPolicy: coreV1.PullIfNotPresent,
+								Name:      "proof-params",
+								MountPath: "/var/tmp/filecoin-proof-parameters",
 							},
 						},
-						Volumes: []v1.Volume{
-							{
-								Name: "proof-params",
-								VolumeSource: v1.VolumeSource{
-									HostPath: &v1.HostPathVolumeSource{
-										Path: filC2Param,
-									},
-								},
-							},
-						},
-						RestartPolicy: v1.RestartPolicyNever,
+						Command:         execCommand,
+						Resources:       resourceRequirements,
+						ImagePullPolicy: coreV1.PullIfNotPresent,
 					},
 				},
-				BackoffLimit:            new(int32),
-				TTLSecondsAfterFinished: new(int32),
+				Volumes: []v1.Volume{
+					{
+						Name: "proof-params",
+						VolumeSource: v1.VolumeSource{
+							HostPath: &v1.HostPathVolumeSource{
+								Path: filC2Param,
+							},
+						},
+					},
+				},
+				RestartPolicy: v1.RestartPolicyNever,
 			},
 		}
 
-		*job.Spec.BackoffLimit = 1
-		*job.Spec.TTLSecondsAfterFinished = 300
-
-		if _, err = k8sService.k8sClient.BatchV1().Jobs(namespace).Create(context.TODO(), job, metaV1.CreateOptions{}); err != nil {
+		if _, err = k8sService.k8sClient.CoreV1().Pods(namespace).Create(context.TODO(), &pod, metaV1.CreateOptions{}); err != nil {
 			logs.GetLogger().Errorf("Failed creating ubi task job: %v", err)
 			return
 		}
 
+		logs.GetLogger().Infof("create pod, podName: %s", podName)
+
 		err = wait.PollImmediate(2*time.Second, 60*time.Second, func() (bool, error) {
-			pods, err := k8sService.k8sClient.CoreV1().Pods(namespace).List(context.TODO(), metaV1.ListOptions{
-				LabelSelector: fmt.Sprintf("job-name=%s", JobName),
-			})
+			createPod, err := k8sService.k8sClient.CoreV1().Pods(namespace).Get(context.TODO(), podName, metaV1.GetOptions{})
 			if err != nil {
 				logs.GetLogger().Errorf("failed get pod, taskId: %d, error: %v，retrying", ubiTask.ID, err)
 				return false, err
 			}
 
-			if len(pods.Items) == 0 {
+			if createPod == nil {
 				return false, nil
 			}
-
-			for _, p := range pods.Items {
-				for _, condition := range p.Status.Conditions {
-					if condition.Type != coreV1.PodReady && condition.Status != coreV1.ConditionTrue {
-						return false, nil
-					}
+			for _, condition := range createPod.Status.Conditions {
+				if condition.Type != coreV1.PodReady && condition.Status != coreV1.ConditionTrue {
+					return false, nil
 				}
 			}
+			podName = createPod.Name
 			return true, nil
 		})
 		if err != nil {
@@ -401,19 +390,6 @@ func DoUbiTaskForK8s(c *gin.Context) {
 			return
 		}
 
-		pods, err := k8sService.k8sClient.CoreV1().Pods(namespace).List(context.TODO(), metaV1.ListOptions{
-			LabelSelector: fmt.Sprintf("job-name=%s", JobName),
-		})
-		if err != nil {
-			logs.GetLogger().Errorf("Failed list ubi pods: %v", err)
-			return
-		}
-
-		var podName string
-		for _, pod := range pods.Items {
-			podName = pod.Name
-			break
-		}
 		if podName == "" {
 			logs.GetLogger().Errorf("failed get pod name, taskId: %d", ubiTask.ID)
 			return
