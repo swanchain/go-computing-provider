@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -364,31 +363,32 @@ func DoUbiTaskForK8s(c *gin.Context) {
 			logs.GetLogger().Errorf("Failed creating ubi task job: %v", err)
 			return
 		}
+		time.Sleep(30 * time.Second)
 
 		logs.GetLogger().Infof("create pod, podName: %s", podName)
 
-		err = wait.PollImmediate(2*time.Second, 60*time.Second, func() (bool, error) {
-			createPod, err := k8sService.k8sClient.CoreV1().Pods(namespace).Get(context.TODO(), podName, metaV1.GetOptions{})
-			if err != nil {
-				logs.GetLogger().Errorf("failed get pod, taskId: %d, error: %v，retrying", ubiTask.ID, err)
-				return false, err
-			}
-
-			if createPod == nil {
-				return false, nil
-			}
-			for _, condition := range createPod.Status.Conditions {
-				if condition.Type != coreV1.PodReady && condition.Status != coreV1.ConditionTrue {
-					return false, nil
-				}
-			}
-			podName = createPod.Name
-			return true, nil
-		})
-		if err != nil {
-			logs.GetLogger().Errorf("Failed waiting pods create: %v", err)
-			return
-		}
+		//err = wait.PollImmediate(2*time.Second, 60*time.Second, func() (bool, error) {
+		//	createPod, err := k8sService.k8sClient.CoreV1().Pods(namespace).Get(context.TODO(), podName, metaV1.GetOptions{})
+		//	if err != nil {
+		//		logs.GetLogger().Errorf("failed get pod, taskId: %d, error: %v，retrying", ubiTask.ID, err)
+		//		return false, err
+		//	}
+		//
+		//	if createPod == nil {
+		//		return false, nil
+		//	}
+		//	for _, condition := range createPod.Status.Conditions {
+		//		if condition.Type != coreV1.PodReady && condition.Status != coreV1.ConditionTrue {
+		//			return false, nil
+		//		}
+		//	}
+		//	podName = createPod.Name
+		//	return true, nil
+		//})
+		//if err != nil {
+		//	logs.GetLogger().Errorf("Failed waiting pods create: %v", err)
+		//	return
+		//}
 
 		if podName == "" {
 			logs.GetLogger().Errorf("failed get pod name, taskId: %d", ubiTask.ID)
