@@ -1034,6 +1034,23 @@ func (s *K8sService) GenerateGlobalNetworkPoliciesForDNS() error {
 	return nil
 }
 
+func (s *K8sService) GetUsedNodePorts() (map[int32]struct{}, error) {
+	services, err := s.k8sClient.CoreV1().Services(metaV1.NamespaceAll).List(context.TODO(), metaV1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	nodePorts := make(map[int32]struct{})
+	for _, svc := range services.Items {
+		for _, port := range svc.Spec.Ports {
+			if port.NodePort != 0 {
+				nodePorts[port.NodePort] = struct{}{}
+			}
+		}
+	}
+	return nodePorts, nil
+}
+
 func readLog(req *rest.Request) (*strings.Builder, error) {
 	podLogs, err := req.Stream(context.TODO())
 	if err != nil {

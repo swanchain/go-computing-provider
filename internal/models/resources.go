@@ -6,6 +6,7 @@ type ClusterResource struct {
 	Region           string          `json:"region,omitempty"`
 	ClusterInfo      []*NodeResource `json:"cluster_info"`
 	NodeName         string          `json:"node_name,omitempty"`
+	EnableNodePort   bool            `json:"enable_node_port"`
 }
 
 type NodeResource struct {

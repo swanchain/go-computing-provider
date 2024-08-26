@@ -22,6 +22,7 @@ BalanceThreshold= 10                                                      # The 
 OrchestratorPk = "0x4B98086A20f3C19530AF32D21F85Bc6399358e20"             # Orchestrator's public key, CP only accept the task from this Orchestrator
 VerifySign = true                                                         # Verify that the task signature is from Orchestrator
 BidMode = 1                                                               # 0: all, 1: auto, 2: private, 3: none
+EnableNodePortService = true
 
 [MCS]
 ApiKey = ""                                                               # Acquired from "https://www.multichain.storage" -> setting -> Create API Key

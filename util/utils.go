@@ -1,11 +1,17 @@
 package util
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/valyala/gozstd"
 	"io"
 	"net/http"
 	"os"
+	"sync"
+	"sync/atomic"
+	"time"
 )
 
 func SaveMcsFileByUrlToFile(fileName, mcsUrl string) error {
@@ -30,4 +36,54 @@ func SaveMcsFileByUrlToFile(fileName, mcsUrl string) error {
 		return err
 	}
 	return os.WriteFile(fileName, out, 0655)
+}
+
+func CheckPortAvailability(usedPort map[int32]struct{}) bool {
+	startPort := 30000
+	endPort := 32767
+
+	var wg sync.WaitGroup
+	var num int64
+	var portCounter atomic.Int64
+	for port := startPort; port <= endPort; port++ {
+		if _, ok := usedPort[int32(port)]; ok {
+			continue
+		}
+		wg.Add(1)
+		go startServer(&wg, &portCounter, port)
+		num++
+	}
+	wg.Wait()
+
+	if num == portCounter.Load() {
+		return true
+	}
+	return false
+}
+
+func startServer(wg *sync.WaitGroup, portCounter *atomic.Int64, port int) {
+	defer wg.Done()
+	srv := &http.Server{
+		Addr: fmt.Sprintf(":%d", port),
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		}),
+	}
+	defer srv.Shutdown(context.TODO())
+
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logs.GetLogger().Errorf("Port %d is closed: %v", port, err)
+		}
+	}()
+	time.Sleep(2 * time.Second)
+
+	resp, err := http.Get(fmt.Sprintf("http://localhost:%d", port))
+	if err != nil {
+		logs.GetLogger().Errorf("Port %d is not accessible: %v", port, err)
+		return
+	}
+	defer resp.Body.Close()
+	portCounter.Add(1)
+	return
+
 }

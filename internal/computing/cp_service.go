@@ -535,6 +535,54 @@ func GetPublicKey(c *gin.Context) {
 	}))
 }
 
+func CheckNodeportServiceEnv(c *gin.Context) {
+	k8sService := NewK8sService()
+	usedPorts, err := k8sService.GetUsedNodePorts()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckNodePortError))
+		return
+	}
+	var msg []string
+	var numPass int
+	availability := util.CheckPortAvailability(usedPorts)
+	if availability {
+		msg = append(msg, "port check passed")
+		numPass++
+	} else {
+		msg = append(msg, "port check failed")
+	}
+
+	daemonSet, err := k8sService.k8sClient.AppsV1().DaemonSets("kube-system").Get(context.TODO(), "resource-limit", metaV1.GetOptions{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourceLimitError))
+		return
+	}
+
+	if daemonSet != nil {
+		msg = append(msg, "resource-limit check passed")
+		numPass++
+	} else {
+		msg = append(msg, "resource-limit check failed")
+	}
+
+	if NetworkPolicyFlag {
+		msg = append(msg, "network policy check passed")
+		numPass++
+	} else {
+		msg = append(msg, "network policy check failed")
+	}
+
+	var result = make(map[string]interface{})
+	if numPass == 3 {
+		result["code"] = 2000
+	} else {
+		result["code"] = 4000
+	}
+	result["msg"] = msg
+
+	c.JSON(http.StatusOK, util.CreateSuccessResponse(result))
+}
+
 func StatisticalSources(c *gin.Context) {
 	location, err := getLocation()
 	if err != nil {
@@ -562,6 +610,7 @@ func StatisticalSources(c *gin.Context) {
 		NodeName:         conf.GetConfig().API.NodeName,
 		NodeId:           GetNodeId(cpRepo),
 		CpAccountAddress: cpAccountAddress,
+		EnableNodePort:   conf.GetConfig().HUB.EnableNodePortService,
 	})
 }
 

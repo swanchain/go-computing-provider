@@ -50,11 +50,12 @@ type LOG struct {
 }
 
 type HUB struct {
-	AccessToken      string
-	BalanceThreshold float64
-	OrchestratorPk   string
-	VerifySign       bool
-	BidMode          int
+	AccessToken           string
+	BalanceThreshold      float64
+	OrchestratorPk        string
+	VerifySign            bool
+	BidMode               int
+	EnableNodePortService bool
 }
 
 type MCS struct {
