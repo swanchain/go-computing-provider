@@ -158,6 +158,11 @@ func ReceiveJob(c *gin.Context) {
 		}
 
 		if len(containerResources) == 1 && containerResources[0].ServiceType == yaml.ServiceTypeNodePort {
+			if !conf.GetConfig().HUB.EnableNodePortService {
+				c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NotAcceptNodePortError))
+				return
+			}
+
 			_, serviceNodePort, err = NewK8sService().CheckServiceNodePort(0)
 			if err != nil {
 				logs.GetLogger().Errorf("failed to check port, error: %v", err)
