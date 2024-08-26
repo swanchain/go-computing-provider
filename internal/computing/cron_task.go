@@ -48,6 +48,18 @@ func (task *CronTask) RunTask() {
 }
 
 func checkClusterNetworkPolicy() {
+	var err error
+	defer func() {
+		if err != nil {
+			NewK8sService().DeleteGlobalNetworkSet(models.NetworkNetset)
+			NewK8sService().DeleteGlobalNetworkPolicy(models.NetworkGlobalSubnet)
+			NewK8sService().DeleteGlobalNetworkPolicy(models.NetworkGlobalOutAccess)
+			NewK8sService().DeleteGlobalNetworkPolicy(models.NetworkGlobalInAccess)
+			NewK8sService().DeleteGlobalNetworkPolicy(models.NetworkGlobalNamespace)
+			NewK8sService().DeleteGlobalNetworkPolicy(models.NetworkGlobalDns)
+		}
+	}()
+
 	netset, err := NewK8sService().GetGlobalNetworkSet(models.NetworkNetset)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -73,7 +85,7 @@ func checkClusterNetworkPolicy() {
 		_, err = NewK8sService().GetGlobalNetworkPolicy(models.NetworkGlobalOutAccess)
 		if err != nil {
 			if errors.IsNotFound(err) {
-				err = NewK8sService().GenerateGlobalNetworkPoliciesForSubnet()
+				err = NewK8sService().GenerateGlobalNetworkPoliciesForOutAccess()
 				if err != nil {
 					logs.GetLogger().Error(err)
 					return
@@ -84,7 +96,7 @@ func checkClusterNetworkPolicy() {
 		_, err = NewK8sService().GetGlobalNetworkPolicy(models.NetworkGlobalInAccess)
 		if err != nil {
 			if errors.IsNotFound(err) {
-				err = NewK8sService().GenerateGlobalNetworkPoliciesForSubnet()
+				err = NewK8sService().GenerateGlobalNetworkForInAccess()
 				if err != nil {
 					logs.GetLogger().Error(err)
 					return
