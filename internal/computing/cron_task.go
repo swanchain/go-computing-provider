@@ -3,6 +3,7 @@ package computing
 import (
 	"context"
 	"fmt"
+	corev1 "k8s.io/api/core/v1"
 	"strconv"
 	"strings"
 	"sync"
@@ -145,6 +146,30 @@ func (task *CronTask) cleanImageResource() {
 			}
 		}()
 		NewDockerService().CleanResourceForK8s()
+
+		k8sClient := NewK8sService().k8sClient
+		namespaces, err := k8sClient.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			return
+		}
+
+		for _, ns := range namespaces.Items {
+			if strings.HasPrefix(ns.Name, "ubi-task") {
+				pods, err := k8sClient.CoreV1().Pods(ns.Name).List(context.TODO(), metav1.ListOptions{})
+				if err != nil {
+					fmt.Printf("Error fetching pods in namespace %s: %v\n", ns.Name, err)
+					continue
+				}
+				for _, pod := range pods.Items {
+					if pod.Status.Phase == corev1.PodSucceeded {
+						err := k8sClient.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
+						if err != nil {
+							logs.GetLogger().Errorf("Error deleting pod %s: %v\n", pod.Name, err)
+						}
+					}
+				}
+			}
+		}
 	})
 	c.Start()
 }

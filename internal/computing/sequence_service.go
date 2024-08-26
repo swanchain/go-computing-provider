@@ -141,8 +141,10 @@ func (s *Sequencer) SendTaskProof(data []byte) (SendProofResp, error) {
 
 	var spr SendProofResp
 	if resp.StatusCode != http.StatusOK {
-		logs.GetLogger().Infof("SendTaskProof: code: %d, result: %s", resp.StatusCode, string(body))
-		return spr, fmt.Errorf("response status: %d", resp.StatusCode)
+		if err := s.GetToken(); err != nil {
+			return SendProofResp{}, fmt.Errorf("failed to get token, error: %v", err)
+		}
+		return spr, fmt.Errorf("response status: %d, %s", resp.StatusCode, string(body))
 	}
 
 	err = json.Unmarshal(body, &spr)
