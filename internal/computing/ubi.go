@@ -1252,10 +1252,6 @@ func RestartResourceExporter() error {
 		AttachStderr: true,
 		Tty:          true,
 	}, &container.HostConfig{
-		RestartPolicy: container.RestartPolicy{
-			Name:              container.RestartPolicyAlways,
-			MaximumRetryCount: 3,
-		},
 		Privileged: true,
 	}, resourceExporterContainerName)
 	if err != nil {
