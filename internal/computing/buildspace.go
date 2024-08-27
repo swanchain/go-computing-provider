@@ -111,9 +111,14 @@ func BuildImagesByDockerfile(jobUuid, spaceUuid, spaceName, imagePath string) (s
 			strings.TrimSpace(conf.GetConfig().Registry.ServerAddress), spaceFlag, time.Now().Unix())
 	}
 	imageName = strings.ToLower(imageName)
+
 	dockerfilePath := filepath.Join(imagePath, "Dockerfile")
-	if dockerfilePath == "" {
+	if _, err := os.Stat(dockerfilePath); err != nil {
 		dockerfilePath = filepath.Join(imagePath, "dockerfile")
+		if _, err := os.Stat(dockerfilePath); err != nil {
+			logs.GetLogger().Errorf("not found Dockerfile, path: %s", dockerfilePath)
+			return "", ""
+		}
 	}
 	log.Printf("Image path: %s", imagePath)
 
