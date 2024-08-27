@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/contract/account"
 	"github.com/swanchain/go-computing-provider/wallet"
@@ -141,8 +140,10 @@ func (s *Sequencer) SendTaskProof(data []byte) (SendProofResp, error) {
 
 	var spr SendProofResp
 	if resp.StatusCode != http.StatusOK {
-		logs.GetLogger().Infof("SendTaskProof: code: %d, result: %s", resp.StatusCode, string(body))
-		return spr, fmt.Errorf("response status: %d", resp.StatusCode)
+		if err := s.GetToken(); err != nil {
+			return SendProofResp{}, fmt.Errorf("failed to get token, error: %v", err)
+		}
+		return spr, fmt.Errorf("response status: %d, %s", resp.StatusCode, string(body))
 	}
 
 	err = json.Unmarshal(body, &spr)
@@ -194,8 +195,10 @@ func (s *Sequencer) QueryTask(taskType int, taskIds ...int64) (TaskListResp, err
 
 	var taskListResp TaskListResp
 	if resp.StatusCode != http.StatusOK {
-		logs.GetLogger().Infof("QueryTask: code: %d, result: %s", resp.StatusCode, string(body))
-		return taskListResp, fmt.Errorf("response status: %d", resp.StatusCode)
+		if err := s.GetToken(); err != nil {
+			return taskListResp, fmt.Errorf("failed to get token, error: %v", err)
+		}
+		return taskListResp, fmt.Errorf("response status: %d, %s", resp.StatusCode, string(body))
 	}
 
 	err = json.Unmarshal(body, &taskListResp)

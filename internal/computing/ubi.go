@@ -1263,7 +1263,7 @@ func RestartResourceExporter() error {
 		Tty:          true,
 	}, &container.HostConfig{
 		RestartPolicy: container.RestartPolicy{
-			Name:              container.RestartPolicyAlways,
+			Name:              container.RestartPolicyOnFailure,
 			MaximumRetryCount: 3,
 		},
 		Privileged: true,
