@@ -111,6 +111,8 @@ var taskList = &cli.Command{
 				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
 			case models.JOB_COMPLETED_STATUS:
 				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiMagentaColor}}
+			default:
+				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiCyanColor}}
 			}
 
 			rowColorList = append(rowColorList, RowColor{
@@ -173,6 +175,8 @@ var taskDetail = &cli.Command{
 			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
 		case models.JOB_COMPLETED_STATUS:
 			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiMagentaColor}}
+		default:
+			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiCyanColor}}
 		}
 
 		header := []string{"TASK UUID:", job.TaskUuid}
