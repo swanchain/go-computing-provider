@@ -59,6 +59,8 @@ func CheckPortAvailability(usedPort map[int32]struct{}) bool {
 	}
 	wg.Wait()
 
+	println("num:", num-1)
+	println("portCounter:", portCounter.Load())
 	if num-1 == portCounter.Load() {
 		return true
 	}
