@@ -282,7 +282,7 @@ func (task *CronTask) watchExpiredTask() {
 			currentTime := time.Now()
 			createdTime := time.Unix(job.CreateTime, 0)
 			createDuration := currentTime.Sub(createdTime)
-			if createDuration.Hours() <= 5 {
+			if createDuration.Hours() <= 2 {
 				continue
 			}
 
