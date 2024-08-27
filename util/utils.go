@@ -69,6 +69,7 @@ func CheckPortAvailability(usedPort map[int32]struct{}) bool {
 
 func startServer(wg *sync.WaitGroup, port int) bool {
 	defer wg.Done()
+
 	srv := &http.Server{
 		Addr: fmt.Sprintf(":%d", port),
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -76,12 +77,17 @@ func startServer(wg *sync.WaitGroup, port int) bool {
 	}
 	defer srv.Shutdown(context.TODO())
 
+	var isListen bool
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logs.GetLogger().Errorf("Port %d is closed: %v", port, err)
+			isListen = true
 		}
 	}()
 	time.Sleep(2 * time.Second)
+	if isListen {
+		return false
+	}
 
 	resp, err := http.Get(fmt.Sprintf("http://localhost:%d", port))
 	if err != nil {
