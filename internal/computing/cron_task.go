@@ -287,7 +287,7 @@ func (task *CronTask) watchExpiredTask() {
 			}
 
 			if job.NameSpace != "" && job.K8sDeployName != "" {
-				deployment, err := NewK8sService().k8sClient.AppsV1().Deployments(job.NameSpace).Get(context.TODO(), job.K8sDeployName, metav1.GetOptions{})
+				_, err = NewK8sService().k8sClient.AppsV1().Deployments(job.NameSpace).Get(context.TODO(), job.K8sDeployName, metav1.GetOptions{})
 				if err != nil {
 					if errors.IsNotFound(err) {
 						// delete job
@@ -296,13 +296,6 @@ func (task *CronTask) watchExpiredTask() {
 						continue
 					}
 					logs.GetLogger().Errorf("failed to get deployment: %s, error: %v", job.K8sDeployName, err)
-					continue
-				}
-
-				if deployment != nil && deployment.Status.AvailableReplicas == 0 {
-					// delete job
-					logs.GetLogger().Warnf("unable to create deployment on the cluster, space_uuid: %s, deployment: %s", job.SpaceUuid, job.K8sDeployName)
-					deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
 					continue
 				}
 			}
