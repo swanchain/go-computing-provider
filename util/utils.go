@@ -59,9 +59,10 @@ func CheckPortAvailability(usedPort map[int32]struct{}) bool {
 	}
 	wg.Wait()
 
-	println("num:", num-1)
-	println("portCounter:", portCounter.Load())
-	if num-1 == portCounter.Load() {
+	if len(usedPort) > 0 {
+		num = num - 1
+	}
+	if num == portCounter.Load() {
 		return true
 	}
 	return false
@@ -69,7 +70,6 @@ func CheckPortAvailability(usedPort map[int32]struct{}) bool {
 
 func startServer(wg *sync.WaitGroup, port int) bool {
 	defer wg.Done()
-
 	srv := &http.Server{
 		Addr: fmt.Sprintf(":%d", port),
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
