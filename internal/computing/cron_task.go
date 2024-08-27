@@ -314,11 +314,6 @@ func (task *CronTask) watchExpiredTask() {
 					delete(deployOnK8s, job.K8sDeployName)
 				}
 
-				if time.Now().Sub(time.Unix(job.CreateTime, 0)).Hours() > 2 {
-					deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
-					continue
-				}
-
 				checkFcpJobInfoInChain(job)
 
 				if job.Status == models.JOB_TERMINATED_STATUS || job.Status == models.JOB_COMPLETED_STATUS {
