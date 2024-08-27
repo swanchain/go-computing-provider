@@ -291,6 +291,7 @@ func (task *CronTask) watchExpiredTask() {
 				if err != nil {
 					if errors.IsNotFound(err) {
 						// delete job
+						logs.GetLogger().Warnf("not found deployment on the cluster, space_uuid: %s, deployment: %s", job.SpaceUuid, job.K8sDeployName)
 						deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
 						continue
 					}
@@ -300,6 +301,7 @@ func (task *CronTask) watchExpiredTask() {
 
 				if deployment != nil && deployment.Status.AvailableReplicas == 0 {
 					// delete job
+					logs.GetLogger().Warnf("unable to create deployment on the cluster, space_uuid: %s, deployment: %s", job.SpaceUuid, job.K8sDeployName)
 					deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
 					continue
 				}
