@@ -50,18 +50,22 @@ func CheckPortAvailability(usedPort map[int32]struct{}) bool {
 			continue
 		}
 		wg.Add(1)
-		go startServer(&wg, &portCounter, port)
+		go func() {
+			if startServer(&wg, port) {
+				portCounter.Add(1)
+			}
+		}()
 		num++
 	}
 	wg.Wait()
 
-	if num == portCounter.Load() {
+	if num-1 == portCounter.Load() {
 		return true
 	}
 	return false
 }
 
-func startServer(wg *sync.WaitGroup, portCounter *atomic.Int64, port int) {
+func startServer(wg *sync.WaitGroup, port int) bool {
 	defer wg.Done()
 	srv := &http.Server{
 		Addr: fmt.Sprintf(":%d", port),
@@ -80,10 +84,9 @@ func startServer(wg *sync.WaitGroup, portCounter *atomic.Int64, port int) {
 	resp, err := http.Get(fmt.Sprintf("http://localhost:%d", port))
 	if err != nil {
 		logs.GetLogger().Errorf("Port %d is not accessible: %v", port, err)
-		return
+		return false
 	}
 	defer resp.Body.Close()
-	portCounter.Add(1)
-	return
+	return true
 
 }
