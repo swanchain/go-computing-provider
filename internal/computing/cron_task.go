@@ -270,7 +270,7 @@ func (task *CronTask) watchExpiredTask() {
 			}
 		}()
 
-		jobList, err := NewJobService().GetJobList(models.UN_DELETEED_FLAG)
+		jobList, err := NewJobService().GetJobList(models.All_FLAG)
 		if err != nil {
 			logs.GetLogger().Errorf("failed to get job data, error: %+v", err)
 			return
@@ -279,6 +279,10 @@ func (task *CronTask) watchExpiredTask() {
 		var deleteSpaceIds []string
 
 		for _, job := range jobList {
+			if job.DeleteAt == models.DELETED_FLAG {
+				continue
+			}
+
 			currentTime := time.Now()
 			createdTime := time.Unix(job.CreateTime, 0)
 			createDuration := currentTime.Sub(createdTime)

@@ -149,6 +149,8 @@ func GetJobStatus(status int) string {
 		statusStr = "terminated"
 	case JOB_COMPLETED_STATUS:
 		statusStr = "completed"
+	default:
+		statusStr = "unknown"
 	}
 	return statusStr
 }
