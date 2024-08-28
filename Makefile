@@ -6,12 +6,22 @@ unexport GOFLAGS
 
 GOCC?=go
 
-BUILD_DATE := $(shell date +%Y-%m-%d_%H:%M)
-ldflags=-X=github.com/swanchain/go-computing-provider/build.CurrentCommit=+git.$(subst -,.,$(shell git describe --always --match=NeVeRmAtCh --dirty 2>/dev/null || git rev-parse --short HEAD 2>/dev/null))+$(BUILD_DATE)
+commitflag=
+
+ldflags=-X=github.com/swanchain/go-computing-provider/build.CurrentCommit=+git.$(subst -,.,$(shell git describe --always --match=NeVeRmAtCh --dirty 2>/dev/null || git rev-parse --short HEAD 2>/dev/null))+ $(commitflag)
+
 
 all: mainnet
 .PHONY: all
 
+check_git_status:
+	@if ! git diff --quiet; then \
+		commitflag=dirty; \
+	fi
+	$(eval commitflag=$(commitflag))
+
+
+computing-provider: check_git_status
 computing-provider:
 	rm -rf computing-provider
 	$(GOCC) build $(GOFLAGS) -o computing-provider ./cmd/computing-provider
