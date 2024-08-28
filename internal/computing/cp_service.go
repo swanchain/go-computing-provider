@@ -140,7 +140,7 @@ func ReceiveJob(c *gin.Context) {
 	jobData.JobRealUri = fmt.Sprintf("https://%s", hostName)
 	jobData.NodeIdJobSourceUriSignature = ""
 
-	deployParam, err := DownloadSpaceResources(spaceDetail.Data.Files)
+	deployParam, err := DownloadSpaceResources(jobData.UUID, spaceDetail.Data.Files)
 	if err != nil {
 		logs.GetLogger().Errorf("failed to download space resource, job_uuid: %s, error: %v", jobData.UUID, err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.DownloadResourceError))
@@ -188,7 +188,6 @@ func ReceiveJob(c *gin.Context) {
 				return
 			}
 			logs.GetLogger().Infof("successfully uploaded to MCS, jobuuid: %s", jobData.UUID)
-			updateJobStatus(jobData.UUID, models.DEPLOY_UPLOAD_RESULT)
 		}()
 
 		DeploySpaceTask(jobData, deployParam, hostName, gpuProductName)
@@ -775,8 +774,7 @@ func handleConnection(conn *websocket.Conn, jobDetail models.JobEntity, logType 
 }
 
 func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName string, gpuProductName string) {
-	updateJobStatus(jobData.UUID, models.DEPLOY_DOWNLOAD_SOURCE)
-
+	updateJobStatus(jobData.UUID, models.DEPLOY_UPLOAD_RESULT)
 	var success bool
 	var jobUuid string
 	var walletAddress string

@@ -193,6 +193,8 @@ func (task *CronTask) watchExpiredTask() {
 				}
 			}
 
+			checkFcpJobInfoInChain(job)
+
 			if job.Status == models.JOB_TERMINATED_STATUS || job.Status == models.JOB_COMPLETED_STATUS {
 				logs.GetLogger().Infof("task_uuid: %s, current status is %s, starting to delete it.", job.TaskUuid, models.GetJobStatus(job.Status))
 				if err = DeleteJob(job.NameSpace, job.JobUuid, "cron-task abnormal state"); err == nil {

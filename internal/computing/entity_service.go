@@ -71,10 +71,6 @@ func (jobServ JobService) SaveJobEntity(job *models.JobEntity) (err error) {
 	return jobServ.Save(job).Error
 }
 
-func (jobServ JobService) UpdateJobEntityBySpaceUuid(job *models.JobEntity) (err error) {
-	return jobServ.Model(&models.JobEntity{}).Where("space_uuid=? and delete_at=?", job.SpaceUuid, models.UN_DELETEED_FLAG).Updates(job).Error
-}
-
 func (jobServ JobService) UpdateJobEntityByJobUuid(job *models.JobEntity) (err error) {
 	return jobServ.Where("job_uuid=? and delete_at=?", job.JobUuid, models.UN_DELETEED_FLAG).Updates(job).Error
 }

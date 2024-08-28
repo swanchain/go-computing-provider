@@ -23,7 +23,8 @@ const (
 	modelSetName   = "model-setting.json"
 )
 
-func DownloadSpaceResources(files []models.SpaceFile) (DeployParam, error) {
+func DownloadSpaceResources(jobUuid string, files []models.SpaceFile) (DeployParam, error) {
+	updateJobStatus(jobUuid, models.DEPLOY_DOWNLOAD_SOURCE)
 	var deployParam DeployParam
 
 	var err error

@@ -63,10 +63,6 @@ var taskList = &cli.Command{
 			return fmt.Errorf("get jobs failed, error: %+v", err)
 		}
 		for i, job := range list {
-			var fullSpaceUuid string
-			if len(job.K8sDeployName) > 0 {
-				fullSpaceUuid = job.K8sDeployName[7:]
-			}
 
 			expireTime := time.Unix(job.ExpireTime, 0).Format("2006-01-02 15:04:05")
 
@@ -77,16 +73,16 @@ var taskList = &cli.Command{
 
 			if fullFlag {
 				taskData = append(taskData,
-					[]string{job.TaskUuid, job.ResourceType, job.WalletAddress, fullSpaceUuid, job.Name, models.GetJobStatus(job.Status), reward, expireTime})
+					[]string{job.JobUuid, job.ResourceType, job.WalletAddress, job.SpaceUuid, job.Name, models.GetJobStatus(job.Status), reward, expireTime})
 			} else {
 				var walletAddress string
 				if len(job.WalletAddress) > 0 {
 					walletAddress = job.WalletAddress[:5] + "..." + job.WalletAddress[37:]
 				}
 
-				var taskUuid string
+				var jobUuid string
 				if len(job.TaskUuid) > 0 {
-					taskUuid = "..." + job.TaskUuid[26:]
+					jobUuid = "..." + job.TaskUuid[26:]
 				}
 
 				var spaceUuid string
@@ -95,7 +91,7 @@ var taskList = &cli.Command{
 				}
 
 				taskData = append(taskData,
-					[]string{taskUuid, job.ResourceType, walletAddress, spaceUuid, job.Name, models.GetJobStatus(job.Status), expireTime})
+					[]string{jobUuid, job.ResourceType, walletAddress, spaceUuid, job.Name, models.GetJobStatus(job.Status), expireTime})
 			}
 
 			var rowColor []tablewriter.Colors
@@ -120,10 +116,10 @@ var taskList = &cli.Command{
 		}
 
 		if fullFlag {
-			header := []string{"TASK UUID", "TASK TYPE", "WALLET ADDRESS", "SPACE UUID", "SPACE NAME", "STATUS", "REWARD", "EXPIRE TIME"}
+			header := []string{"JOB UUID", "TASK TYPE", "WALLET ADDRESS", "SPACE UUID", "SPACE NAME", "STATUS", "REWARD", "EXPIRE TIME"}
 			NewVisualTable(header, taskData, rowColorList).Generate(true)
 		} else {
-			header := []string{"TASK UUID", "TASK TYPE", "WALLET ADDRESS", "SPACE UUID", "SPACE NAME", "STATUS", "EXPIRE TIME"}
+			header := []string{"JOB UUID", "TASK TYPE", "WALLET ADDRESS", "SPACE UUID", "SPACE NAME", "STATUS", "EXPIRE TIME"}
 			NewVisualTable(header, taskData, rowColorList).Generate(true)
 		}
 
@@ -134,7 +130,7 @@ var taskList = &cli.Command{
 var taskDetail = &cli.Command{
 	Name:      "get",
 	Usage:     "Get task detail info",
-	ArgsUsage: "[task_uuid]",
+	ArgsUsage: "[job_uuid]",
 	Action: func(cctx *cli.Context) error {
 		if cctx.NArg() != 1 {
 			return fmt.Errorf("incorrect number of arguments, got %d, missing args: task_uuid", cctx.NArg())
@@ -148,13 +144,14 @@ var taskDetail = &cli.Command{
 			return fmt.Errorf("load config file failed, error: %+v", err)
 		}
 
-		taskUuid := cctx.Args().First()
-		job, err := computing.NewJobService().GetJobEntityByTaskUuid(taskUuid)
+		jobUuid := cctx.Args().First()
+		job, err := computing.NewJobService().GetJobEntityByJobUuid(jobUuid)
 		if err != nil {
-			return fmt.Errorf("task_uuid: %s, get job detail failed, error: %+v", taskUuid, err)
+			return fmt.Errorf("job_uuid: %s, get job detail failed, error: %+v", jobUuid, err)
 		}
 
 		var taskData [][]string
+		taskData = append(taskData, []string{"TASK UUID:", job.TaskUuid})
 		taskData = append(taskData, []string{"TASK TYPE:", job.ResourceType})
 		taskData = append(taskData, []string{"WALLET ADDRESS:", job.WalletAddress})
 		taskData = append(taskData, []string{"SPACE NAME:", job.Name})
@@ -176,11 +173,11 @@ var taskDetail = &cli.Command{
 			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiCyanColor}}
 		}
 
-		header := []string{"TASK UUID:", job.TaskUuid}
+		header := []string{"JOB UUID:", job.JobUuid}
 
 		var rowColorList []RowColor
 		rowColorList = append(rowColorList, RowColor{
-			row:    6,
+			row:    7,
 			column: []int{1},
 			color:  rowColor,
 		})
@@ -192,7 +189,7 @@ var taskDetail = &cli.Command{
 var taskDelete = &cli.Command{
 	Name:      "delete",
 	Usage:     "Delete an task from the k8s",
-	ArgsUsage: "[task_uuid]",
+	ArgsUsage: "[job_uuid]",
 	Action: func(cctx *cli.Context) error {
 		if cctx.NArg() != 1 {
 			return fmt.Errorf("incorrect number of arguments, got %d, missing args: task_uuid", cctx.NArg())
@@ -206,10 +203,10 @@ var taskDelete = &cli.Command{
 			return fmt.Errorf("failed to load config file, error: %+v", err)
 		}
 
-		taskUuid := strings.ToLower(cctx.Args().First())
-		job, err := computing.NewJobService().GetJobEntityByTaskUuid(taskUuid)
+		jobUuid := strings.ToLower(cctx.Args().First())
+		job, err := computing.NewJobService().GetJobEntityByJobUuid(jobUuid)
 		if err != nil {
-			return fmt.Errorf("failed to get job detail: %s, error: %+v", taskUuid, err)
+			return fmt.Errorf("failed to get job detail: %s, error: %+v", jobUuid, err)
 		}
 
 		err = computing.DeleteJob(job.NameSpace, job.K8sDeployName, "terminated job form cp")
