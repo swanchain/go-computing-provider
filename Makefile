@@ -6,8 +6,9 @@ unexport GOFLAGS
 
 GOCC?=go
 
+BUILD_DATE := $(shell date +%Y-%m-%d)
 
-ldflags=-X=github.com/swanchain/go-computing-provider/build.CurrentCommit=+git.$(subst -,.,$(shell git describe --always --match=NeVeRmAtCh --dirty 2>/dev/null || git rev-parse --short HEAD 2>/dev/null))
+ldflags=-X=github.com/swanchain/go-computing-provider/build.CurrentCommit=+git.$(subst -,.,$(shell git describe --always --match=NeVeRmAtCh --dirty 2>/dev/null || git rev-parse --short HEAD 2>/dev/null))+$(shell date +%Y-%m-%d)
 
 all: mainnet
 .PHONY: all
