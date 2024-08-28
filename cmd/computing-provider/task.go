@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -9,11 +8,9 @@ import (
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/swanchain/go-computing-provider/conf"
-	"github.com/swanchain/go-computing-provider/constants"
 	"github.com/swanchain/go-computing-provider/internal/computing"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"github.com/urfave/cli/v2"
-	"k8s.io/apimachinery/pkg/api/errors"
 )
 
 var taskCmd = &cli.Command{
@@ -206,28 +203,22 @@ var taskDelete = &cli.Command{
 			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
 		}
 		if err := conf.InitConfig(cpRepoPath, true); err != nil {
-			return fmt.Errorf("load config file failed, error: %+v", err)
+			return fmt.Errorf("failed to load config file, error: %+v", err)
 		}
 
 		taskUuid := strings.ToLower(cctx.Args().First())
 		job, err := computing.NewJobService().GetJobEntityByTaskUuid(taskUuid)
 		if err != nil {
-			return fmt.Errorf("failed get job detail: %s, error: %+v", taskUuid, err)
+			return fmt.Errorf("failed to get job detail: %s, error: %+v", taskUuid, err)
 		}
 
-		deployName := constants.K8S_DEPLOY_NAME_PREFIX + job.SpaceUuid
-		namespace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(job.WalletAddress)
-		k8sService := computing.NewK8sService()
-		if err := k8sService.DeleteDeployment(context.TODO(), namespace, deployName); err != nil && !errors.IsNotFound(err) {
-			return err
+		err = computing.DeleteJob(job.NameSpace, job.K8sDeployName, "terminated job form cp")
+		if err != nil {
+			return fmt.Errorf("failed to delete space from k8s, error: %v", err)
 		}
-		time.Sleep(3 * time.Second)
 
-		if err := k8sService.DeleteDeployRs(context.TODO(), namespace, job.SpaceUuid); err != nil && !errors.IsNotFound(err) {
-			return err
-		}
-		computing.NewJobService().DeleteJobEntityBySpaceUuId(job.SpaceUuid, models.JOB_TERMINATED_STATUS)
-		fmt.Printf("space_uuid: %s space serivce successfully deleted \n", job.SpaceUuid)
+		computing.NewJobService().DeleteJobEntityByJobUuId(job.JobUuid, models.JOB_TERMINATED_STATUS)
+		fmt.Printf("job_uuid: %s space serivce successfully deleted \n", job.JobUuid)
 		return nil
 	},
 }

@@ -26,7 +26,6 @@ type Deploy struct {
 	jobUuid           string
 	hostName          string
 	walletAddress     string
-	spaceUuid         string
 	spaceName         string
 	image             string
 	dockerfilePath    string
@@ -45,7 +44,7 @@ type Deploy struct {
 	spaceType string
 }
 
-func NewDeploy(jobUuid, hostName, walletAddress, hardwareDesc string, duration int64, taskUuid string, spaceType string) *Deploy {
+func NewDeploy(jobUuid, hostName, walletAddress, hardwareDesc string, duration int64, spaceType string) *Deploy {
 
 	var taskType string
 	var hardwareDetail models.Resource
@@ -61,7 +60,6 @@ func NewDeploy(jobUuid, hostName, walletAddress, hardwareDesc string, duration i
 		TaskType:         taskType,
 		k8sNameSpace:     constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(walletAddress),
 		hardwareDesc:     hardwareDesc,
-		taskUuid:         taskUuid,
 		spaceType:        spaceType,
 	}
 }
@@ -78,8 +76,7 @@ func (d *Deploy) WithImage(images string) *Deploy {
 	return d
 }
 
-func (d *Deploy) WithSpaceInfo(spaceUuid, spaceName string) *Deploy {
-	d.spaceUuid = spaceUuid
+func (d *Deploy) WithSpaceName(spaceName string) *Deploy {
 	d.spaceName = spaceName
 	return d
 }
@@ -122,8 +119,6 @@ func (d *Deploy) DockerfileToK8s() {
 		return
 	}
 
-	deleteJob(d.k8sNameSpace, d.spaceUuid, "start deploying new space service and delete previous service")
-
 	if err := d.deployNamespace(); err != nil {
 		logs.GetLogger().Error(err)
 		return
@@ -136,24 +131,24 @@ func (d *Deploy) DockerfileToK8s() {
 			APIVersion: "apps/v1",
 		},
 		ObjectMeta: metaV1.ObjectMeta{
-			Name:      constants.K8S_DEPLOY_NAME_PREFIX + d.spaceUuid,
+			Name:      constants.K8S_DEPLOY_NAME_PREFIX + d.jobUuid,
 			Namespace: d.k8sNameSpace,
 		},
 		Spec: appV1.DeploymentSpec{
 			Selector: &metaV1.LabelSelector{
-				MatchLabels: map[string]string{"lad_app": d.spaceUuid},
+				MatchLabels: map[string]string{"lad_app": d.jobUuid},
 			},
 
 			Template: coreV1.PodTemplateSpec{
 				ObjectMeta: metaV1.ObjectMeta{
-					Labels:    map[string]string{"lad_app": d.spaceUuid},
+					Labels:    map[string]string{"lad_app": d.jobUuid},
 					Namespace: d.k8sNameSpace,
 				},
 
 				Spec: coreV1.PodSpec{
 					NodeSelector: generateLabel(d.gpuProductName),
 					Containers: []coreV1.Container{{
-						Name:            constants.K8S_CONTAINER_NAME_PREFIX + d.spaceUuid,
+						Name:            constants.K8S_CONTAINER_NAME_PREFIX + d.jobUuid,
 						Image:           d.image,
 						ImagePullPolicy: coreV1.PullIfNotPresent,
 						Ports: []coreV1.ContainerPort{{
@@ -191,8 +186,6 @@ func (d *Deploy) YamlToK8s() error {
 		return err
 	}
 
-	deleteJob(d.k8sNameSpace, d.spaceUuid, "start deploying new space service and delete previous service")
-
 	if err := d.deployNamespace(); err != nil {
 		logs.GetLogger().Error(err)
 		return err
@@ -211,7 +204,7 @@ func (d *Deploy) YamlToK8s() error {
 		var volumes []coreV1.Volume
 		if cr.VolumeMounts.Path != "" {
 			fileNameWithoutExt := filepath.Base(cr.VolumeMounts.Name[:len(cr.VolumeMounts.Name)-len(filepath.Ext(cr.VolumeMounts.Name))])
-			configMap, err := k8sService.CreateConfigMap(context.TODO(), d.k8sNameSpace, d.spaceUuid, filepath.Dir(d.yamlPath), cr.VolumeMounts.Name)
+			configMap, err := k8sService.CreateConfigMap(context.TODO(), d.k8sNameSpace, d.jobUuid, filepath.Dir(d.yamlPath), cr.VolumeMounts.Name)
 			if err != nil {
 				logs.GetLogger().Error(err)
 				return err
@@ -219,7 +212,7 @@ func (d *Deploy) YamlToK8s() error {
 			configName := configMap.GetName()
 			volumes = []coreV1.Volume{
 				{
-					Name: d.spaceUuid + "-" + fileNameWithoutExt,
+					Name: d.jobUuid + "-" + fileNameWithoutExt,
 					VolumeSource: coreV1.VolumeSource{
 						ConfigMap: &coreV1.ConfigMapVolumeSource{
 							LocalObjectReference: coreV1.LocalObjectReference{
@@ -231,7 +224,7 @@ func (d *Deploy) YamlToK8s() error {
 			}
 			volumeMount = []coreV1.VolumeMount{
 				{
-					Name:      d.spaceUuid + "-" + fileNameWithoutExt,
+					Name:      d.jobUuid + "-" + fileNameWithoutExt,
 					MountPath: cr.VolumeMounts.Path,
 				},
 			}
@@ -242,7 +235,7 @@ func (d *Deploy) YamlToK8s() error {
 			var handler = new(coreV1.ExecAction)
 			handler.Command = depend.ReadyCmd
 			containers = append(containers, coreV1.Container{
-				Name:            d.spaceUuid + "-" + depend.Name,
+				Name:            d.jobUuid + "-" + depend.Name,
 				Image:           depend.ImageName,
 				Command:         depend.Command,
 				Args:            depend.Args,
@@ -266,10 +259,6 @@ func (d *Deploy) YamlToK8s() error {
 				Value: d.walletAddress,
 			},
 			{
-				Name:  "space_uuid",
-				Value: d.spaceUuid,
-			},
-			{
 				Name:  "result_url",
 				Value: d.hostName,
 			},
@@ -280,7 +269,7 @@ func (d *Deploy) YamlToK8s() error {
 		}...)
 
 		containers = append(containers, coreV1.Container{
-			Name:            d.spaceUuid + "-" + cr.Name,
+			Name:            d.jobUuid + "-" + cr.Name,
 			Image:           cr.ImageName,
 			Command:         cr.Command,
 			Args:            cr.Args,
@@ -297,17 +286,17 @@ func (d *Deploy) YamlToK8s() error {
 				APIVersion: "apps/v1",
 			},
 			ObjectMeta: metaV1.ObjectMeta{
-				Name:      constants.K8S_DEPLOY_NAME_PREFIX + d.spaceUuid,
+				Name:      constants.K8S_DEPLOY_NAME_PREFIX + d.jobUuid,
 				Namespace: d.k8sNameSpace,
 			},
 
 			Spec: appV1.DeploymentSpec{
 				Selector: &metaV1.LabelSelector{
-					MatchLabels: map[string]string{"lad_app": d.spaceUuid},
+					MatchLabels: map[string]string{"lad_app": d.jobUuid},
 				},
 				Template: coreV1.PodTemplateSpec{
 					ObjectMeta: metaV1.ObjectMeta{
-						Labels:    map[string]string{"lad_app": d.spaceUuid},
+						Labels:    map[string]string{"lad_app": d.jobUuid},
 						Namespace: d.k8sNameSpace,
 					},
 					Spec: coreV1.PodSpec{
@@ -337,7 +326,7 @@ func (d *Deploy) YamlToK8s() error {
 		if len(cr.Models) > 0 {
 			for _, res := range cr.Models {
 				go func(res yaml.ModelResource) {
-					downloadModelUrl(d.k8sNameSpace, d.spaceUuid, serviceHost, []string{"wget", res.Url, "-O", filepath.Join(res.Dir, res.Name)})
+					downloadModelUrl(d.k8sNameSpace, d.jobUuid, serviceHost, []string{"wget", res.Url, "-O", filepath.Join(res.Dir, res.Name)})
 				}(res)
 			}
 		}
@@ -377,7 +366,6 @@ func (d *Deploy) ModelInferenceToK8s() error {
 		return err
 	}
 
-	deleteJob(d.k8sNameSpace, d.spaceUuid, "start deploying new space service and delete previous service")
 	imageName := "lagrange/" + modelInfo.Framework + ":v1.0"
 
 	logFile := filepath.Join(d.SpacePath, BuildFileName)
@@ -415,24 +403,24 @@ func (d *Deploy) ModelInferenceToK8s() error {
 			APIVersion: "apps/v1",
 		},
 		ObjectMeta: metaV1.ObjectMeta{
-			Name:      constants.K8S_DEPLOY_NAME_PREFIX + d.spaceUuid,
+			Name:      constants.K8S_DEPLOY_NAME_PREFIX + d.jobUuid,
 			Namespace: d.k8sNameSpace,
 		},
 		Spec: appV1.DeploymentSpec{
 			Selector: &metaV1.LabelSelector{
-				MatchLabels: map[string]string{"lad_app": d.spaceUuid},
+				MatchLabels: map[string]string{"lad_app": d.jobUuid},
 			},
 
 			Template: coreV1.PodTemplateSpec{
 				ObjectMeta: metaV1.ObjectMeta{
-					Labels:    map[string]string{"lad_app": d.spaceUuid},
+					Labels:    map[string]string{"lad_app": d.jobUuid},
 					Namespace: d.k8sNameSpace,
 				},
 
 				Spec: coreV1.PodSpec{
 					NodeSelector: generateLabel(d.gpuProductName),
 					Containers: []coreV1.Container{{
-						Name:            constants.K8S_CONTAINER_NAME_PREFIX + d.spaceUuid,
+						Name:            constants.K8S_CONTAINER_NAME_PREFIX + d.jobUuid,
 						Image:           d.image,
 						ImagePullPolicy: coreV1.PullIfNotPresent,
 						Ports: []coreV1.ContainerPort{{
@@ -451,7 +439,6 @@ func (d *Deploy) ModelInferenceToK8s() error {
 	}
 	d.DeployName = createDeployment.GetName()
 	updateJobStatus(d.jobUuid, models.DEPLOY_PULL_IMAGE)
-	logs.GetLogger().Infof("Created deployment: %s", createDeployment.GetObjectMeta().GetName())
 
 	if _, err := d.deployK8sResource(int32(80)); err != nil {
 		logs.GetLogger().Error(err)
@@ -493,10 +480,6 @@ func (d *Deploy) deployNamespace() error {
 
 func (d *Deploy) createEnv(envs ...coreV1.EnvVar) []coreV1.EnvVar {
 	defaultEnv := []coreV1.EnvVar{
-		{
-			Name:  "space_uuid",
-			Value: d.spaceUuid,
-		},
 		{
 			Name:  "space_name",
 			Value: d.spaceName,
@@ -548,34 +531,33 @@ func (d *Deploy) createResources() coreV1.ResourceRequirements {
 func (d *Deploy) deployK8sResource(containerPort int32) (string, error) {
 	k8sService := NewK8sService()
 
-	createService, err := k8sService.CreateService(context.TODO(), d.k8sNameSpace, d.spaceUuid, containerPort)
+	createService, err := k8sService.CreateService(context.TODO(), d.k8sNameSpace, d.jobUuid, containerPort)
 	if err != nil {
-		return "", fmt.Errorf("failed creata service, error: %w", err)
+		return "", fmt.Errorf("failed to create service, error: %w", err)
 	}
-
 	serviceHost := fmt.Sprintf("http://%s:%d", createService.Spec.ClusterIP, createService.Spec.Ports[0].Port)
 
-	_, err = k8sService.CreateIngress(context.TODO(), d.k8sNameSpace, d.spaceUuid, d.hostName, containerPort)
+	_, err = k8sService.CreateIngress(context.TODO(), d.k8sNameSpace, d.jobUuid, d.hostName, containerPort)
 	if err != nil {
-		return "", fmt.Errorf("failed creata ingress, error: %w", err)
+		return "", fmt.Errorf("failed create ingress, error: %w", err)
 	}
 	return serviceHost, nil
 }
 
 func (d *Deploy) watchContainerRunningTime() {
 	var job = new(models.JobEntity)
-	job.SpaceUuid = d.spaceUuid
+	job.JobUuid = d.jobUuid
 	job.ExpireTime = time.Now().Unix() + d.duration
 	job.K8sDeployName = d.DeployName
 	job.NameSpace = d.k8sNameSpace
 	job.ImageName = d.image
 	job.K8sResourceType = "deployment"
 	job.ResourceType = d.TaskType
-	if err := NewJobService().UpdateJobEntityBySpaceUuid(job); err != nil {
-		logs.GetLogger().Errorf("update job info failed, error: %v", err)
+	if err := NewJobService().UpdateJobEntityByJobUuid(job); err != nil {
+		logs.GetLogger().Errorf("failed to update job info, error: %v", err)
 		return
 	}
-	logs.GetLogger().Infof("space service deployed, jobuuid: %s, spaceUuid: %s, spaceName: %s", d.jobUuid, d.spaceUuid, d.spaceName)
+	logs.GetLogger().Infof("space service deployed, job_uuid: %s, spaceName: %s", d.jobUuid, d.spaceName)
 }
 
 func getHardwareDetail(description string) (string, models.Resource) {

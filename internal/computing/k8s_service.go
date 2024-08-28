@@ -87,9 +87,9 @@ func (s *K8sService) DeletePod(ctx context.Context, namespace, spaceUuid string)
 	})
 }
 
-func (s *K8sService) DeleteDeployRs(ctx context.Context, namespace, spaceUuid string) error {
+func (s *K8sService) DeleteDeployRs(ctx context.Context, namespace, jobUuid string) error {
 	return s.k8sClient.AppsV1().ReplicaSets(namespace).DeleteCollection(ctx, *metaV1.NewDeleteOptions(0), metaV1.ListOptions{
-		LabelSelector: fmt.Sprintf("lad_app=%s", spaceUuid),
+		LabelSelector: fmt.Sprintf("lad_app=%s", jobUuid),
 	})
 }
 
@@ -225,7 +225,7 @@ func (s *K8sService) DeleteIngress(ctx context.Context, nameSpace, ingressName s
 	return s.k8sClient.NetworkingV1().Ingresses(nameSpace).Delete(ctx, ingressName, metaV1.DeleteOptions{})
 }
 
-func (s *K8sService) CreateConfigMap(ctx context.Context, k8sNameSpace, spaceUuid, basePath, configName string) (*coreV1.ConfigMap, error) {
+func (s *K8sService) CreateConfigMap(ctx context.Context, k8sNameSpace, jobUuid, basePath, configName string) (*coreV1.ConfigMap, error) {
 	configFilePath := filepath.Join(basePath, configName)
 
 	fileNameWithoutExt := filepath.Base(configName[:len(configName)-len(filepath.Ext(configName))])
@@ -237,7 +237,7 @@ func (s *K8sService) CreateConfigMap(ctx context.Context, k8sNameSpace, spaceUui
 
 	configMap := &coreV1.ConfigMap{
 		ObjectMeta: metaV1.ObjectMeta{
-			Name: spaceUuid + "-" + fileNameWithoutExt,
+			Name: jobUuid + "-" + fileNameWithoutExt,
 		},
 		Data: map[string]string{
 			configName: string(iniData),
@@ -246,11 +246,11 @@ func (s *K8sService) CreateConfigMap(ctx context.Context, k8sNameSpace, spaceUui
 	return s.k8sClient.CoreV1().ConfigMaps(k8sNameSpace).Create(ctx, configMap, metaV1.CreateOptions{})
 }
 
-func (s *K8sService) GetPods(namespace, spaceUuid string) (bool, error) {
+func (s *K8sService) GetPods(namespace, jobUuid string) (bool, error) {
 	listOption := metaV1.ListOptions{}
-	if spaceUuid != "" {
+	if jobUuid != "" {
 		listOption = metaV1.ListOptions{
-			LabelSelector: fmt.Sprintf("lad_app=%s", spaceUuid),
+			LabelSelector: fmt.Sprintf("lad_app=%s", jobUuid),
 		}
 	}
 	podList, err := s.k8sClient.CoreV1().Pods(namespace).List(context.TODO(), listOption)
@@ -492,7 +492,7 @@ func (s *K8sService) AddNodeLabel(nodeName, key string) error {
 	return nil
 }
 
-func (s *K8sService) WaitForPodRunningByHttp(namespace, spaceUuid, serviceIp string) (string, error) {
+func (s *K8sService) WaitForPodRunningByHttp(namespace, jobUuid, serviceIp string) (string, error) {
 	var podName string
 	var podErr = errors.New("get pod status failed")
 
@@ -506,7 +506,7 @@ func (s *K8sService) WaitForPodRunningByHttp(namespace, spaceUuid, serviceIp str
 			return podErr
 		}
 		podList, err := s.k8sClient.CoreV1().Pods(namespace).List(context.TODO(), metaV1.ListOptions{
-			LabelSelector: fmt.Sprintf("lad_app==%s", spaceUuid),
+			LabelSelector: fmt.Sprintf("lad_app==%s", jobUuid),
 		})
 		if err != nil {
 			logs.GetLogger().Error(err)
