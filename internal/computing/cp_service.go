@@ -744,7 +744,7 @@ func handleConnection(conn *websocket.Conn, jobDetail models.JobEntity, logType 
 
 		k8sService := NewK8sService()
 		pods, err := k8sService.k8sClient.CoreV1().Pods(k8sNameSpace).List(context.TODO(), metaV1.ListOptions{
-			LabelSelector: fmt.Sprintf("lad_app=%s", jobDetail.SpaceUuid),
+			LabelSelector: fmt.Sprintf("lad_app=%s", jobDetail.JobUuid),
 		})
 		if err != nil {
 			logs.GetLogger().Errorf("Error listing Pods: %v", err)
