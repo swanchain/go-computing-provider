@@ -1,6 +1,7 @@
 package computing
 
 import (
+	"crypto/tls"
 	"encoding/base64"
 	"fmt"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
@@ -147,6 +148,7 @@ func downloadFile(filepath, url, iv, symmetricKey string) error {
 		}
 	}(out)
 
+	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	resp, err := http.Get(url)
 	if err != nil {
 		return err
