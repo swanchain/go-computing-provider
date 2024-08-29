@@ -546,12 +546,8 @@ func CheckNodeportServiceEnv(c *gin.Context) {
 		return
 	}
 	var msg string
-	var numPass int
 	availability := util.CheckPortAvailability(usedPorts)
-	if availability {
-		msg = "node port check passed"
-		numPass++
-	} else {
+	if !availability {
 		msg = "failed to check node port"
 	}
 
@@ -562,22 +558,16 @@ func CheckNodeportServiceEnv(c *gin.Context) {
 		return
 	}
 
-	if daemonSet != nil {
-		msg = "resource-limit check passed"
-		numPass++
-	} else {
+	if daemonSet == nil {
 		msg = "failed to check resource-limit"
 	}
 
-	if NetworkPolicyFlag {
-		msg = "network policy check passed"
-		numPass++
-	} else {
+	if !NetworkPolicyFlag {
 		msg = "failed to check network policy"
 	}
 
-	if numPass == 3 {
-		c.JSON(http.StatusOK, util.CreateSuccessResponse(msg))
+	if msg == "" {
+		c.JSON(http.StatusOK, util.CreateSuccessResponse("All checks have passed"))
 	} else {
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(http.StatusInternalServerError, msg))
 	}
