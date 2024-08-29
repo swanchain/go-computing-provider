@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"github.com/swanchain/go-computing-provider/constants"
 	"os"
 	"strings"
 	"time"
@@ -206,13 +208,18 @@ var taskDelete = &cli.Command{
 		jobUuid := strings.ToLower(cctx.Args().First())
 		job, err := computing.NewJobService().GetJobEntityByJobUuid(jobUuid)
 		if err != nil {
-			return fmt.Errorf("failed to get job detail: %s, error: %+v", jobUuid, err)
+			return fmt.Errorf("failed to get job detail, job_uuid: %s, error: %+v", jobUuid, err)
 		}
 
-		err = computing.DeleteJob(job.NameSpace, job.K8sDeployName, "terminated job form cp")
-		if err != nil {
-			return fmt.Errorf("failed to delete space from k8s, error: %v", err)
-		}
+		serviceName := constants.K8S_SERVICE_NAME_PREFIX + jobUuid
+		ingressName := constants.K8S_INGRESS_NAME_PREFIX + jobUuid
+
+		k8sService := computing.NewK8sService()
+		k8sService.DeleteIngress(context.TODO(), job.NameSpace, ingressName)
+		k8sService.DeleteService(context.TODO(), job.NameSpace, serviceName)
+		k8sService.DeleteDeployment(context.TODO(), job.NameSpace, job.K8sDeployName)
+		time.Sleep(3 * time.Second)
+		k8sService.DeleteDeployRs(context.TODO(), job.NameSpace, job.JobUuid)
 
 		computing.NewJobService().DeleteJobEntityByJobUuId(job.JobUuid, models.JOB_TERMINATED_STATUS)
 		fmt.Printf("job_uuid: %s space serivce successfully deleted \n", job.JobUuid)
