@@ -336,7 +336,7 @@ func (task *CronTask) watchExpiredTask() {
 		}
 
 		for _, jobUuid := range deleteJobIds {
-			logs.GetLogger().Errorf("corn-task starting delete job, job_uuid: %s", jobUuid)
+			logs.GetLogger().Infof("corn-task starting delete job, job_uuid: %s", jobUuid)
 			NewJobService().DeleteJobEntityByJobUuId(jobUuid, models.JOB_COMPLETED_STATUS)
 		}
 	})
