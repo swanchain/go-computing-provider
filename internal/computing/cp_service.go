@@ -544,6 +544,7 @@ func CheckNodeportServiceEnv(c *gin.Context) {
 	k8sService := NewK8sService()
 	usedPorts, err := k8sService.GetUsedNodePorts()
 	if err != nil {
+		logs.GetLogger().Errorf("failed to get used node-port, error: %v", err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckNodePortError))
 		return
 	}
@@ -554,11 +555,12 @@ func CheckNodeportServiceEnv(c *gin.Context) {
 		msg = append(msg, "port check passed")
 		numPass++
 	} else {
-		msg = append(msg, "port check failed")
+		msg = append(msg, "failed to check node port")
 	}
 
 	daemonSet, err := k8sService.k8sClient.AppsV1().DaemonSets("kube-system").Get(context.TODO(), "resource-limit", metaV1.GetOptions{})
 	if err != nil {
+		logs.GetLogger().Errorf("failed to get resource-limit daemonSet, error: %v", err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourceLimitError))
 		return
 	}
@@ -567,14 +569,14 @@ func CheckNodeportServiceEnv(c *gin.Context) {
 		msg = append(msg, "resource-limit check passed")
 		numPass++
 	} else {
-		msg = append(msg, "resource-limit check failed")
+		msg = append(msg, "failed to check resource-limit")
 	}
 
 	if NetworkPolicyFlag {
 		msg = append(msg, "network policy check passed")
 		numPass++
 	} else {
-		msg = append(msg, "network policy check failed")
+		msg = append(msg, "failed to check network policy")
 	}
 
 	var result = make(map[string]interface{})
