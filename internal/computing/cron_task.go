@@ -297,7 +297,7 @@ func (task *CronTask) watchExpiredTask() {
 					if errors.IsNotFound(err) {
 						// delete job
 						logs.GetLogger().Warnf("not found deployment on the cluster, space_uuid: %s, deployment: %s", job.SpaceUuid, job.K8sDeployName)
-						deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
+						deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid+"_"+job.JobUuid)
 						deleteJobIds = append(deleteJobIds, job.JobUuid)
 						continue
 					}
@@ -311,7 +311,7 @@ func (task *CronTask) watchExpiredTask() {
 			if job.Status == models.JOB_TERMINATED_STATUS || job.Status == models.JOB_COMPLETED_STATUS {
 				logs.GetLogger().Infof("task_uuid: %s, current status is %s, starting to delete it.", job.TaskUuid, models.GetJobStatus(job.Status))
 				if err = DeleteJob(job.NameSpace, job.JobUuid, "cron-task abnormal state"); err == nil {
-					deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
+					deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid+"_"+job.JobUuid)
 					continue
 				}
 			}
@@ -329,8 +329,10 @@ func (task *CronTask) watchExpiredTask() {
 		}
 
 		for _, spaceUuid := range deleteSpaceIds {
-			logs.GetLogger().Errorf("corn-task starting delete job, space_uuid: %s", spaceUuid)
-			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid, models.JOB_COMPLETED_STATUS)
+			split := strings.Split(spaceUuid, "_")
+			if len(split) == 2 {
+				NewJobService().DeleteJobEntityBySpaceUuId(split[0], split[1], models.JOB_COMPLETED_STATUS)
+			}
 		}
 
 		for _, jobUuid := range deleteJobIds {
