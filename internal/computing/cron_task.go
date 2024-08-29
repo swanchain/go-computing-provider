@@ -277,6 +277,7 @@ func (task *CronTask) watchExpiredTask() {
 		}
 
 		var deleteSpaceIds []string
+		var deleteJobIds []string
 
 		for _, job := range jobList {
 			if job.DeleteAt == models.DELETED_FLAG {
@@ -297,6 +298,7 @@ func (task *CronTask) watchExpiredTask() {
 						// delete job
 						logs.GetLogger().Warnf("not found deployment on the cluster, space_uuid: %s, deployment: %s", job.SpaceUuid, job.K8sDeployName)
 						deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
+						deleteJobIds = append(deleteJobIds, job.JobUuid)
 						continue
 					}
 					logs.GetLogger().Errorf("failed to get deployment: %s, error: %v", job.K8sDeployName, err)
@@ -304,17 +306,22 @@ func (task *CronTask) watchExpiredTask() {
 				}
 			}
 
+			checkFcpJobInfoInChain(job)
+
 			if job.Status == models.JOB_TERMINATED_STATUS || job.Status == models.JOB_COMPLETED_STATUS {
 				logs.GetLogger().Infof("task_uuid: %s, current status is %s, starting to delete it.", job.TaskUuid, models.GetJobStatus(job.Status))
-				if err = deleteJob(job.NameSpace, job.SpaceUuid, "cron-task abnormal state"); err == nil {
+				if err = DeleteJob(job.NameSpace, job.JobUuid, "cron-task abnormal state"); err == nil {
 					deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
 					continue
 				}
 			}
 
 			if time.Now().Unix() > job.ExpireTime {
-				if err = deleteJob(job.NameSpace, job.SpaceUuid, "cron-task the task execution time has expired"); err == nil {
+				// Compatible with old versions
+				DeleteJob(job.NameSpace, job.SpaceUuid, "compatible with old versions, cron-task the task execution time has expired")
+				if err = DeleteJob(job.NameSpace, job.JobUuid, "cron-task the task execution time has expired"); err == nil {
 					deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
+					deleteJobIds = append(deleteJobIds, job.JobUuid)
 					continue
 				}
 			}
@@ -324,6 +331,11 @@ func (task *CronTask) watchExpiredTask() {
 		for _, spaceUuid := range deleteSpaceIds {
 			logs.GetLogger().Errorf("corn-task starting delete job, space_uuid: %s", spaceUuid)
 			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid, models.JOB_COMPLETED_STATUS)
+		}
+
+		for _, jobUuid := range deleteJobIds {
+			logs.GetLogger().Errorf("corn-task starting delete job, job_uuid: %s", jobUuid)
+			NewJobService().DeleteJobEntityByJobUuId(jobUuid, models.JOB_COMPLETED_STATUS)
 		}
 	})
 	c.Start()
