@@ -545,14 +545,14 @@ func CheckNodeportServiceEnv(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckNodePortError))
 		return
 	}
-	var msg []string
+	var msg string
 	var numPass int
 	availability := util.CheckPortAvailability(usedPorts)
 	if availability {
-		msg = append(msg, "port check passed")
+		msg = "node port check passed"
 		numPass++
 	} else {
-		msg = append(msg, "failed to check node port")
+		msg = "failed to check node port"
 	}
 
 	daemonSet, err := k8sService.k8sClient.AppsV1().DaemonSets("kube-system").Get(context.TODO(), "resource-limit", metaV1.GetOptions{})
@@ -563,28 +563,24 @@ func CheckNodeportServiceEnv(c *gin.Context) {
 	}
 
 	if daemonSet != nil {
-		msg = append(msg, "resource-limit check passed")
+		msg = "resource-limit check passed"
 		numPass++
 	} else {
-		msg = append(msg, "failed to check resource-limit")
+		msg = "failed to check resource-limit"
 	}
 
 	if NetworkPolicyFlag {
-		msg = append(msg, "network policy check passed")
+		msg = "network policy check passed"
 		numPass++
 	} else {
-		msg = append(msg, "failed to check network policy")
+		msg = "failed to check network policy"
 	}
 
-	var result = make(map[string]interface{})
 	if numPass == 3 {
-		result["code"] = 2000
+		c.JSON(http.StatusOK, util.CreateSuccessResponse(msg))
 	} else {
-		result["code"] = 4000
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(http.StatusInternalServerError, msg))
 	}
-	result["msg"] = msg
-
-	c.JSON(http.StatusOK, util.CreateSuccessResponse(result))
 }
 
 func StatisticalSources(c *gin.Context) {
