@@ -455,7 +455,6 @@ func (ds *DockerService) SaveDockerImage(imageName string) (string, error) {
 	return tarFile, nil
 }
 
-// ImportImageToContainerd  Containerd import images
 func ImportImageToContainerd(tarFile string) error {
 	defer os.Remove(tarFile)
 	client, err := containerd.New("/run/containerd/containerd.sock")
@@ -464,14 +463,13 @@ func ImportImageToContainerd(tarFile string) error {
 	}
 	defer client.Close()
 
-	ctx := namespaces.WithNamespace(context.Background(), "k8s.io")
-
 	file, err := os.Open(tarFile)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
+	ctx := namespaces.WithNamespace(context.Background(), "docker.io")
 	img, err := client.Import(ctx, file)
 	if err != nil {
 		return err
