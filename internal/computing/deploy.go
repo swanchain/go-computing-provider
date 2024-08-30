@@ -182,12 +182,10 @@ func (d *Deploy) DockerfileToK8s() {
 func (d *Deploy) YamlToK8s() error {
 	containerResources, err := yaml.HandlerYaml(d.yamlPath)
 	if err != nil {
-		logs.GetLogger().Error(err)
 		return err
 	}
 
-	if err := d.deployNamespace(); err != nil {
-		logs.GetLogger().Error(err)
+	if err = d.deployNamespace(); err != nil {
 		return err
 	}
 
@@ -206,7 +204,6 @@ func (d *Deploy) YamlToK8s() error {
 			fileNameWithoutExt := filepath.Base(cr.VolumeMounts.Name[:len(cr.VolumeMounts.Name)-len(filepath.Ext(cr.VolumeMounts.Name))])
 			configMap, err := k8sService.CreateConfigMap(context.TODO(), d.k8sNameSpace, d.jobUuid, filepath.Dir(d.yamlPath), cr.VolumeMounts.Name)
 			if err != nil {
-				logs.GetLogger().Error(err)
 				return err
 			}
 			configName := configMap.GetName()
@@ -309,7 +306,6 @@ func (d *Deploy) YamlToK8s() error {
 
 		createDeployment, err := k8sService.CreateDeployment(context.TODO(), d.k8sNameSpace, deployment)
 		if err != nil {
-			logs.GetLogger().Error(err)
 			return err
 		}
 		d.DeployName = createDeployment.GetName()
@@ -317,7 +313,6 @@ func (d *Deploy) YamlToK8s() error {
 
 		serviceHost, err := d.deployK8sResource(cr.Ports[0].ContainerPort)
 		if err != nil {
-			logs.GetLogger().Error(err)
 			return err
 		}
 

@@ -655,6 +655,20 @@ func (s *K8sService) GetDeploymentActiveCount() (int, error) {
 	return total, nil
 }
 
+func (s *K8sService) GetClusterRuntime() (string, error) {
+	nodes, err := s.k8sClient.CoreV1().Nodes().List(context.TODO(), metaV1.ListOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to get node list, error: %v", err)
+	}
+
+	var runtime string
+	for _, node := range nodes.Items {
+		runtime = node.Status.NodeInfo.ContainerRuntimeVersion
+		break
+	}
+	return runtime, nil
+}
+
 func readLog(req *rest.Request) (*strings.Builder, error) {
 	podLogs, err := req.Stream(context.TODO())
 	if err != nil {

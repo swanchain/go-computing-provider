@@ -521,6 +521,12 @@ func StatisticalSources(c *gin.Context) {
 		return
 	}
 
+	clusterRuntime, err := k8sService.GetClusterRuntime()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.GeResourceError))
+		return
+	}
+
 	cpAccountAddress, err := contract.GetCpAccountAddress()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.GetCpAccountError))
@@ -534,6 +540,7 @@ func StatisticalSources(c *gin.Context) {
 		NodeName:         conf.GetConfig().API.NodeName,
 		NodeId:           GetNodeId(cpRepo),
 		CpAccountAddress: cpAccountAddress,
+		Runtime:          clusterRuntime,
 	})
 }
 
@@ -826,14 +833,33 @@ func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName s
 	if deployParam.ContainsYaml {
 		err := deploy.WithYamlInfo(deployParam.YamlFilePath).YamlToK8s()
 		if err != nil {
-			logs.GetLogger().Error(err)
+			logs.GetLogger().Errorf("failed to use yaml to deploy job, error: %v", err)
 			return
 		}
+		success = true
 	} else {
 		imageName, dockerfilePath := BuildImagesByDockerfile(jobData.UUID, jobUuid, spaceName, deployParam.BuildImagePath)
-		deploy.WithDockerfile(imageName, dockerfilePath).DockerfileToK8s()
+
+		clusterRuntime, err := NewK8sService().GetClusterRuntime()
+		if err != nil {
+			logs.GetLogger().Errorf("failed to get cluster runtime, error: %v", err)
+		} else {
+			logs.GetLogger().Infof("cluster runtime: %s", clusterRuntime)
+			if strings.EqualFold(clusterRuntime, "containerd") {
+				imageTar, err := NewDockerService().SaveDockerImage(imageName)
+				if err != nil {
+					logs.GetLogger().Errorf("failed to save image, imageName: %s error: %v", imageName, err)
+					return
+				}
+				if err = ImportImageToContainerd(imageTar); err != nil {
+					logs.GetLogger().Errorf("failed to load image into containerd, imageName: %s error: %v", imageName, err)
+					return
+				}
+			}
+			deploy.WithDockerfile(imageName, dockerfilePath).DockerfileToK8s()
+			success = true
+		}
 	}
-	success = true
 	return
 }
 
