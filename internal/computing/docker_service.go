@@ -469,7 +469,7 @@ func ImportImageToContainerd(tarFile string) error {
 	}
 	defer file.Close()
 
-	ctx := namespaces.WithNamespace(context.Background(), "docker.io")
+	ctx := namespaces.WithNamespace(context.Background(), "k8s.io")
 	img, err := client.Import(ctx, file)
 	if err != nil {
 		return err
