@@ -439,9 +439,9 @@ func (ds *DockerService) SaveDockerImage(imageName string) (string, error) {
 
 	cpRepoPath, _ := os.LookupEnv("CP_PATH")
 	imageFolder := filepath.Join(cpRepoPath, "images_cache")
-	os.MkdirAll(imageFolder, os.ModePerm)
-
 	tarFile := filepath.Join(imageFolder, imageName+".tar")
+
+	os.MkdirAll(filepath.Dir(tarFile), os.ModePerm)
 	file, err := os.Create(tarFile)
 	if err != nil {
 		return "", err
@@ -457,6 +457,7 @@ func (ds *DockerService) SaveDockerImage(imageName string) (string, error) {
 
 // ImportImageToContainerd  Containerd import images
 func ImportImageToContainerd(tarFile string) error {
+	defer os.Remove(tarFile)
 	client, err := containerd.New("/run/containerd/containerd.sock")
 	if err != nil {
 		return err
