@@ -845,7 +845,7 @@ func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName s
 			logs.GetLogger().Errorf("failed to get cluster runtime, error: %v", err)
 		} else {
 			logs.GetLogger().Infof("cluster runtime: %s", clusterRuntime)
-			if strings.EqualFold(clusterRuntime, "containerd") {
+			if strings.Contains(strings.ToLower(clusterRuntime), "containerd") {
 				imageTar, err := NewDockerService().SaveDockerImage(imageName)
 				if err != nil {
 					logs.GetLogger().Errorf("failed to save image, imageName: %s error: %v", imageName, err)
