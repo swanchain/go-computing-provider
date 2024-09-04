@@ -315,6 +315,13 @@ func (task *CronTask) watchExpiredTask() {
 					continue
 				}
 			}
+			if job.Status == models.JOB_TERMINATED_STATUS || job.Status == models.JOB_COMPLETED_STATUS {
+				logs.GetLogger().Infof("compatible with old versions, task_uuid: %s, current status is %s, starting to delete it.", job.TaskUuid, models.GetJobStatus(job.Status))
+				if err = DeleteJob(job.NameSpace, job.SpaceUuid, "cron-task abnormal state"); err == nil {
+					deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid+"_"+job.JobUuid)
+					continue
+				}
+			}
 
 			if time.Now().Unix() > job.ExpireTime {
 				// Compatible with old versions
