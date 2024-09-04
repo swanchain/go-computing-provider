@@ -306,7 +306,7 @@ func (task *CronTask) watchExpiredTask() {
 				if _, ok = deployOnK8s[spaceUuidDeployName]; ok {
 					if job.Status == models.JOB_TERMINATED_STATUS || job.Status == models.JOB_COMPLETED_STATUS {
 						if err = DeleteJob(job.NameSpace, job.SpaceUuid, "cron-task abnormal state"); err != nil {
-							logs.GetLogger().Errorf("failed to use spaceUuid: %s delete job, error: %v", job.JobUuid, err)
+							logs.GetLogger().Errorf("failed to use spaceUuid: %s delete job, error: %v", job.SpaceUuid, err)
 						}
 						continue
 					}
