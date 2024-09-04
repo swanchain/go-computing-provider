@@ -207,6 +207,9 @@ func ReceiveJob(c *gin.Context) {
 		jobEntity.Name = spaceDetail.Data.Space.Name
 		jobEntity.Hardware = spaceDetail.Data.Space.ActiveOrder.Config.Description
 		jobEntity.SpaceType = 0
+		jobEntity.K8sDeployName = constants.K8S_DEPLOY_NAME_PREFIX + strings.ToLower(jobData.UUID)
+		jobEntity.NameSpace = constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(jobEntity.WalletAddress)
+		jobEntity.K8sResourceType = "deployment"
 		err = NewJobService().SaveJobEntity(jobEntity)
 		if err != nil {
 			logs.GetLogger().Errorf("failed to save job to db, job_uuid: %s, error: %+v", jobData.UUID, err)

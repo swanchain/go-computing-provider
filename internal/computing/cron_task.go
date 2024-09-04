@@ -280,7 +280,7 @@ func (task *CronTask) watchExpiredTask() {
 		var deleteJobIds []string
 
 		for _, job := range jobList {
-			if job.DeleteAt == models.DELETED_FLAG && job.PodStatus == models.POD_DELETE_STATUS {
+			if job.DeleteAt == models.DELETED_FLAG && job.DeployStatus == models.DEPLOY_TO_K8S {
 				continue
 			}
 
