@@ -308,24 +308,16 @@ func (task *CronTask) watchExpiredTask() {
 
 			checkFcpJobInfoInChain(job)
 
-			if job.Status == models.JOB_TERMINATED_STATUS || job.Status == models.JOB_COMPLETED_STATUS {
-				logs.GetLogger().Infof("task_uuid: %s, current status is %s, starting to delete it.", job.TaskUuid, models.GetJobStatus(job.Status))
+			if job.Status == models.JOB_TERMINATED_STATUS || job.Status == models.JOB_COMPLETED_STATUS || time.Now().Unix() > job.ExpireTime {
+				expireTime := time.Unix(job.ExpireTime, 0).Format("2006-01-02 15:04:05")
+				logs.GetLogger().Infof("task_uuid: %s, current status is %s, expire time: %s, starting to delete it.", job.TaskUuid, models.GetJobStatus(job.Status), expireTime)
 				if err = DeleteJob(job.NameSpace, job.JobUuid, "cron-task abnormal state"); err == nil {
 					deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid+"_"+job.JobUuid)
-					continue
 				}
-			}
-
-			if time.Now().Unix() > job.ExpireTime {
-				// Compatible with old versions
-				DeleteJob(job.NameSpace, job.SpaceUuid, "compatible with old versions, cron-task the task execution time has expired")
-				if err = DeleteJob(job.NameSpace, job.JobUuid, "cron-task the task execution time has expired"); err == nil {
-					deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
+				if err = DeleteJob(job.NameSpace, job.SpaceUuid, "compatible with old versions, cron-task abnormal state"); err == nil {
 					deleteJobIds = append(deleteJobIds, job.JobUuid)
-					continue
 				}
 			}
-
 		}
 
 		for _, spaceUuid := range deleteSpaceIds {
@@ -336,7 +328,6 @@ func (task *CronTask) watchExpiredTask() {
 		}
 
 		for _, jobUuid := range deleteJobIds {
-			logs.GetLogger().Infof("corn-task starting delete job, job_uuid: %s", jobUuid)
 			NewJobService().DeleteJobEntityByJobUuId(jobUuid, models.JOB_COMPLETED_STATUS)
 		}
 	})
