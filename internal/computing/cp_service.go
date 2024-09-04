@@ -929,11 +929,13 @@ func DeleteJob(namespace, jobUuid string, msg string) error {
 			logs.GetLogger().Errorf("Failed delete ingress, ingressName: %s, error: %+v", ingressName, err)
 			return err
 		}
+		logs.GetLogger().Infof(" deleted ingress, jobUuid: %s, ingressName: %s", jobUuid, ingressName)
 
 		if err := k8sService.DeleteService(context.TODO(), namespace, serviceName); err != nil && !errors.IsNotFound(err) {
 			logs.GetLogger().Errorf("Failed delete service, serviceName: %s, error: %+v", serviceName, err)
 			return err
 		}
+		logs.GetLogger().Infof(" deleted service, jobUuid: %s, serviceName: %s", jobUuid, serviceName)
 
 		dockerService := NewDockerService()
 		deployImageIds, err := k8sService.GetDeploymentImages(context.TODO(), namespace, deployName)
@@ -943,23 +945,27 @@ func DeleteJob(namespace, jobUuid string, msg string) error {
 		}
 		for _, imageId := range deployImageIds {
 			dockerService.RemoveImage(imageId)
+			logs.GetLogger().Infof(" deleted images, jobUuid: %s, image: %s", jobUuid, imageId)
 		}
 
 		if err := k8sService.DeleteDeployment(context.TODO(), namespace, deployName); err != nil && !errors.IsNotFound(err) {
 			logs.GetLogger().Errorf("Failed delete deployment, deployName: %s, error: %+v", deployName, err)
 			return err
 		}
+		logs.GetLogger().Infof(" deleted deployment, jobUuid: %s, deployName: %s", jobUuid, deployName)
 		time.Sleep(6 * time.Second)
 
 		if err := k8sService.DeleteDeployRs(context.TODO(), namespace, jobUuid); err != nil && !errors.IsNotFound(err) {
-			logs.GetLogger().Errorf("Failed delete ReplicaSetsController, spaceUuid: %s, error: %+v", jobUuid, err)
+			logs.GetLogger().Errorf("Failed delete ReplicaSetsController, jobUuid: %s, error: %+v", jobUuid, err)
 			return err
 		}
+		logs.GetLogger().Infof(" deleted ReplicaSetsController, jobUuid: %s", jobUuid)
 
 		if err := k8sService.DeletePod(context.TODO(), namespace, jobUuid); err != nil && !errors.IsNotFound(err) {
 			logs.GetLogger().Errorf("Failed delete pods, spaceUuid: %s, error: %+v", jobUuid, err)
 			return err
 		}
+		logs.GetLogger().Infof(" deleted pod, jobUuid: %s", jobUuid)
 	}
 
 	ticker := time.NewTicker(3 * time.Second)
@@ -984,7 +990,7 @@ func DeleteJob(namespace, jobUuid string, msg string) error {
 	if msg != "" {
 		logs.GetLogger().Infof("%s, job_uuid: %s", msg, jobUuid)
 	} else {
-		logs.GetLogger().Infof("delete space service finished, job_uuid: %s", jobUuid)
+		logs.GetLogger().Infof("delete job service finished, job_uuid: %s", jobUuid)
 	}
 
 	return nil
