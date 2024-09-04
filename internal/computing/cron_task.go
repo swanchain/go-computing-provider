@@ -263,7 +263,7 @@ func (task *CronTask) cleanImageResource() {
 
 func (task *CronTask) watchExpiredTask() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("* 0/20 * * * ?", func() {
+	c.AddFunc("* 0/10 * * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("watchExpiredTask catch panic error: %+v", err)
@@ -280,7 +280,7 @@ func (task *CronTask) watchExpiredTask() {
 		var deleteJobIds []string
 
 		for _, job := range jobList {
-			if job.DeleteAt == models.DELETED_FLAG {
+			if job.DeleteAt == models.DELETED_FLAG && job.PodStatus == models.POD_DELETE_STATUS {
 				continue
 			}
 
