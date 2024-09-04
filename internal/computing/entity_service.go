@@ -107,9 +107,10 @@ func (jobServ JobService) DeleteJobEntityByJobUuId(jobUuid string, jobStatus int
 
 func (jobServ JobService) DeleteJobEntityBySpaceUuId(spaceUuid, jobUuid string, jobStatus int) error {
 	return jobServ.Model(&models.JobEntity{}).Where("job_uuid=? and space_uuid=? and delete_at=?", jobUuid, spaceUuid, models.UN_DELETEED_FLAG).Updates(map[string]interface{}{
-		"delete_at":  models.DELETED_FLAG,
-		"status":     jobStatus,
-		"pod_status": models.POD_DELETE_STATUS,
+		"delete_at":     models.DELETED_FLAG,
+		"status":        jobStatus,
+		"pod_status":    models.POD_DELETE_STATUS,
+		"deploy_status": models.DEPLOY_TO_K8S,
 	}).Error
 }
 

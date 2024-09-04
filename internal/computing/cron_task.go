@@ -310,10 +310,12 @@ func (task *CronTask) watchExpiredTask() {
 				logs.GetLogger().Infof("task_uuid: %s, current status is %s, expire time: %s, starting to delete it.", job.TaskUuid, models.GetJobStatus(job.Status), expireTime)
 				if err = DeleteJob(job.NameSpace, job.JobUuid, "cron-task abnormal state"); err != nil {
 					logs.GetLogger().Errorf("failed to use jobUuid: %s delete job, error: %v", job.JobUuid, err)
+					continue
 				}
 
 				if err = DeleteJob(job.NameSpace, job.SpaceUuid, "compatible with old versions, cron-task abnormal state"); err != nil {
 					logs.GetLogger().Errorf("failed to use spaceUuid: %s delete job, error: %v", job.SpaceUuid, err)
+					continue
 				}
 				deleteSpaceIdAndJobUuid[job.JobUuid] = job.SpaceUuid + "_" + job.JobUuid
 			}
