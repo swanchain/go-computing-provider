@@ -2,6 +2,7 @@ package computing
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"sync"
@@ -276,9 +277,43 @@ func (task *CronTask) watchExpiredTask() {
 			return
 		}
 
+		deployments, err := NewK8sService().k8sClient.AppsV1().Deployments(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			fmt.Println("Error listing deployments:", err)
+			return
+		}
+
+		var deployOnK8s = make(map[string]string)
+		for _, deploy := range deployments.Items {
+			if strings.HasPrefix(deploy.Namespace, constants.K8S_NAMESPACE_NAME_PREFIX) {
+				deployOnK8s[deploy.Name] = deploy.Namespace
+			}
+		}
+
 		var deleteSpaceIdAndJobUuid = make(map[string]string)
 		for _, job := range jobList {
-			if job.DeleteAt == models.DELETED_FLAG && job.DeployStatus == models.DEPLOY_TO_K8S {
+			jobUuidDeployName := constants.K8S_DEPLOY_NAME_PREFIX + strings.ToLower(job.JobUuid)
+			if _, ok := deployOnK8s[jobUuidDeployName]; ok {
+				if job.Status == models.JOB_TERMINATED_STATUS || job.Status == models.JOB_COMPLETED_STATUS {
+					if err = DeleteJob(job.NameSpace, job.JobUuid, "cron-task abnormal state"); err != nil {
+						logs.GetLogger().Errorf("failed to use jobUuid: %s delete job, error: %v", job.JobUuid, err)
+					}
+					continue
+				}
+			} else {
+				// compatible with space_uuid
+				spaceUuidDeployName := constants.K8S_DEPLOY_NAME_PREFIX + strings.ToLower(job.SpaceUuid)
+				if _, ok = deployOnK8s[spaceUuidDeployName]; ok {
+					if job.Status == models.JOB_TERMINATED_STATUS || job.Status == models.JOB_COMPLETED_STATUS {
+						if err = DeleteJob(job.NameSpace, job.SpaceUuid, "cron-task abnormal state"); err != nil {
+							logs.GetLogger().Errorf("failed to use spaceUuid: %s delete job, error: %v", job.JobUuid, err)
+						}
+						continue
+					}
+				}
+			}
+
+			if job.DeleteAt == models.DELETED_FLAG {
 				continue
 			}
 
@@ -294,7 +329,7 @@ func (task *CronTask) watchExpiredTask() {
 				if err != nil {
 					if errors.IsNotFound(err) {
 						// delete job
-						logs.GetLogger().Warnf("not found deployment on the cluster, space_uuid: %s, deployment: %s", job.SpaceUuid, job.K8sDeployName)
+						logs.GetLogger().Warnf("not found deployment on the cluster, job_uuid: %s, deployment: %s", job.JobUuid, job.K8sDeployName)
 						deleteSpaceIdAndJobUuid[job.JobUuid] = job.SpaceUuid + "_" + job.JobUuid
 						continue
 					}
@@ -307,7 +342,7 @@ func (task *CronTask) watchExpiredTask() {
 
 			if job.Status == models.JOB_TERMINATED_STATUS || job.Status == models.JOB_COMPLETED_STATUS || time.Now().Unix() > job.ExpireTime {
 				expireTime := time.Unix(job.ExpireTime, 0).Format("2006-01-02 15:04:05")
-				logs.GetLogger().Infof("task_uuid: %s, current status is %s, expire time: %s, starting to delete it.", job.TaskUuid, models.GetJobStatus(job.Status), expireTime)
+				logs.GetLogger().Infof("job_uuid: %s, current status is %s, expire time: %s, starting to delete it.", job.JobUuid, models.GetJobStatus(job.Status), expireTime)
 				if err = DeleteJob(job.NameSpace, job.JobUuid, "cron-task abnormal state"); err != nil {
 					logs.GetLogger().Errorf("failed to use jobUuid: %s delete job, error: %v", job.JobUuid, err)
 					continue
