@@ -131,6 +131,7 @@ func checkClusterNetworkPolicy() {
 }
 
 func generateNewNetworkPolicy() {
+	logs.GetLogger().Infof("starting genreate global network policy")
 	var err error
 	defer func() {
 		if err != nil {
@@ -177,6 +178,7 @@ func generateNewNetworkPolicy() {
 		return
 	}
 	NetworkPolicyFlag = true
+	logs.GetLogger().Infof("finished genreate global network policy")
 }
 
 func checkJobStatus() {
