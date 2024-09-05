@@ -61,6 +61,10 @@ func checkClusterNetworkPolicy() {
 	}()
 
 	netset, err := NewK8sService().GetGlobalNetworkSet(models.NetworkNetset)
+
+	logs.GetLogger().Infof("netset: %v, err: %v", err)
+	logs.GetLogger().Infof("netset: %t, err: %t", netset == nil, err == nil)
+
 	if err != nil {
 		logs.GetLogger().Error(err)
 		return
