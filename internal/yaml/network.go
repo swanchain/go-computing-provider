@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type NetplanConfig struct {
@@ -54,6 +55,14 @@ func GetNetSegment() ([]string, error) {
 			ipSegment = append(ipSegment, ipNet.String())
 		}
 	}
+
+	if len(ipSegment) == 0 {
+		netAddress, err := getNetAddress()
+		if err != nil {
+			return nil, err
+		}
+		ipSegment = netAddress
+	}
 	return ipSegment, nil
 }
 
@@ -63,4 +72,35 @@ func parseNetplanFile(filepath string, config *NetplanConfig) error {
 		return fmt.Errorf("failed to read file, name: %s, error: %v", err)
 	}
 	return yaml.Unmarshal(data, config)
+}
+
+func getNetAddress() ([]string, error) {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return nil, err
+	}
+	var addrList []string
+	for _, iface := range interfaces {
+		if strings.HasPrefix(iface.Name, "cali") || strings.HasPrefix(iface.Name, "docker") ||
+			strings.HasPrefix(iface.Name, "kube") || strings.HasPrefix(iface.Name, "lo") ||
+			strings.Contains(iface.Name, "calico") {
+			continue
+		}
+		addrs, err := iface.Addrs()
+		if err != nil {
+			logs.GetLogger().Errorf("failed to get net interface, interfaceName: %s", iface.Name)
+			continue
+		}
+		for _, addr := range addrs {
+			ipNet, ok := addr.(*net.IPNet)
+			if !ok {
+				continue
+			}
+			if ipNet.IP.To4() != nil {
+				ipStr := addr.String()
+				addrList = append(addrList, ipNet.IP.Mask(ipNet.Mask).String()+ipStr[strings.Index(ipStr, "/"):])
+			}
+		}
+	}
+	return addrList, nil
 }
