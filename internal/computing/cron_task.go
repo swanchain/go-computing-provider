@@ -62,11 +62,11 @@ func checkClusterNetworkPolicy() {
 
 	netset, err := NewK8sService().GetGlobalNetworkSet(models.NetworkNetset)
 	if err != nil {
-		if errors.IsNotFound(err) {
-			generateNewNetworkPolicy()
-		} else {
-			logs.GetLogger().Error(err)
-		}
+		logs.GetLogger().Error(err)
+		return
+	}
+	if netset == nil {
+		generateNewNetworkPolicy()
 		return
 	}
 
@@ -176,6 +176,7 @@ func generateNewNetworkPolicy() {
 		logs.GetLogger().Error(err)
 		return
 	}
+	NetworkPolicyFlag = true
 }
 
 func checkJobStatus() {
