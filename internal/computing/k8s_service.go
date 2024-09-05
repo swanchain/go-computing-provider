@@ -782,6 +782,9 @@ func (s *K8sService) GetGlobalNetworkPolicy(gnpName string) (*calicov3.GlobalNet
 		if item.Name == gnpName {
 			gnp = item
 		} else {
+			if models.ExistResource(item.Name) {
+				continue
+			}
 			s.DeleteGlobalNetworkPolicy(item.Name)
 		}
 	}

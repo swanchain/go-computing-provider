@@ -307,3 +307,15 @@ const (
 	NetworkGlobalNamespace = "global-ao9kq72mjc0sl3"
 	NetworkGlobalDns       = "global-s92ms87dl3j6do"
 )
+
+var networkPolicyMap = []string{NetworkGlobalSubnet, NetworkGlobalOutAccess,
+	NetworkGlobalInAccess, NetworkGlobalNamespace, NetworkGlobalDns}
+
+func ExistResource(name string) bool {
+	for _, s := range networkPolicyMap {
+		if s == name {
+			return true
+		}
+	}
+	return false
+}
