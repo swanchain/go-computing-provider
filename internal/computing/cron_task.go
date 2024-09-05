@@ -71,58 +71,63 @@ func checkClusterNetworkPolicy() {
 	}
 
 	if netset != nil {
-		_, err = NewK8sService().GetGlobalNetworkPolicy(models.NetworkGlobalSubnet)
+		subNetGnp, err := NewK8sService().GetGlobalNetworkPolicy(models.NetworkGlobalSubnet)
 		if err != nil {
-			if errors.IsNotFound(err) {
-				err = NewK8sService().GenerateGlobalNetworkPoliciesForSubnet()
-				if err != nil {
-					logs.GetLogger().Error(err)
-					return
-				}
+			logs.GetLogger().Error(err)
+			return
+		}
+		if subNetGnp.Name == "" {
+			if err = NewK8sService().GenerateGlobalNetworkPoliciesForSubnet(); err != nil {
+				logs.GetLogger().Error(err)
+				return
 			}
 		}
 
-		_, err = NewK8sService().GetGlobalNetworkPolicy(models.NetworkGlobalOutAccess)
+		outAccessGnp, err := NewK8sService().GetGlobalNetworkPolicy(models.NetworkGlobalOutAccess)
 		if err != nil {
-			if errors.IsNotFound(err) {
-				err = NewK8sService().GenerateGlobalNetworkPoliciesForOutAccess()
-				if err != nil {
-					logs.GetLogger().Error(err)
-					return
-				}
+			logs.GetLogger().Error(err)
+			return
+		}
+		if outAccessGnp.Name == "" {
+			if err = NewK8sService().GenerateGlobalNetworkPoliciesForOutAccess(); err != nil {
+				logs.GetLogger().Error(err)
+				return
 			}
 		}
 
-		_, err = NewK8sService().GetGlobalNetworkPolicy(models.NetworkGlobalInAccess)
+		inAccessGnp, err := NewK8sService().GetGlobalNetworkPolicy(models.NetworkGlobalInAccess)
 		if err != nil {
-			if errors.IsNotFound(err) {
-				err = NewK8sService().GenerateGlobalNetworkForInAccess()
-				if err != nil {
-					logs.GetLogger().Error(err)
-					return
-				}
+			logs.GetLogger().Error(err)
+			return
+		}
+		if inAccessGnp.Name == "" {
+			if err = NewK8sService().GenerateGlobalNetworkForInAccess(); err != nil {
+				logs.GetLogger().Error(err)
+				return
 			}
 		}
 
-		_, err = NewK8sService().GetGlobalNetworkPolicy(models.NetworkGlobalNamespace)
+		namespaceGnp, err := NewK8sService().GetGlobalNetworkPolicy(models.NetworkGlobalNamespace)
 		if err != nil {
-			if errors.IsNotFound(err) {
-				err = NewK8sService().GenerateGlobalNetworkPoliciesForNamespace()
-				if err != nil {
-					logs.GetLogger().Error(err)
-					return
-				}
+			logs.GetLogger().Error(err)
+			return
+		}
+		if namespaceGnp.Name == "" {
+			if err = NewK8sService().GenerateGlobalNetworkPoliciesForNamespace(); err != nil {
+				logs.GetLogger().Error(err)
+				return
 			}
 		}
 
-		_, err = NewK8sService().GetGlobalNetworkPolicy(models.NetworkGlobalDns)
+		dnsGnp, err := NewK8sService().GetGlobalNetworkPolicy(models.NetworkGlobalDns)
 		if err != nil {
-			if errors.IsNotFound(err) {
-				err = NewK8sService().GenerateGlobalNetworkPoliciesForDNS()
-				if err != nil {
-					logs.GetLogger().Error(err)
-					return
-				}
+			logs.GetLogger().Error(err)
+			return
+		}
+		if dnsGnp.Name == "" {
+			if err = NewK8sService().GenerateGlobalNetworkPoliciesForDNS(); err != nil {
+				logs.GetLogger().Error(err)
+				return
 			}
 		}
 	}
