@@ -73,9 +73,31 @@ var taskList = &cli.Command{
 				reward = job.Reward
 			}
 
+			var rowColor []tablewriter.Colors
+
+			switch job.Status {
+			case models.JOB_DEPLOY_STATUS:
+				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgYellowColor}}
+			case models.JOB_RUNNING_STATUS:
+				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
+			case models.JOB_TERMINATED_STATUS:
+				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
+			case models.JOB_COMPLETED_STATUS:
+				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiMagentaColor}}
+			default:
+				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiCyanColor}}
+			}
+
 			if fullFlag {
 				taskData = append(taskData,
-					[]string{job.JobUuid, job.ResourceType, job.WalletAddress, job.SpaceUuid, job.Name, models.GetJobStatus(job.Status), reward, expireTime})
+					[]string{job.JobUuid, job.TaskUuid, job.ResourceType, job.WalletAddress, job.SpaceUuid, job.Name, models.GetJobStatus(job.Status), reward, expireTime})
+
+				rowColorList = append(rowColorList, RowColor{
+					row:    i,
+					column: []int{6},
+					color:  rowColor,
+				})
+
 			} else {
 				var walletAddress string
 				if len(job.WalletAddress) > 0 {
@@ -94,31 +116,17 @@ var taskList = &cli.Command{
 
 				taskData = append(taskData,
 					[]string{jobUuid, job.ResourceType, walletAddress, spaceUuid, job.Name, models.GetJobStatus(job.Status), expireTime})
-			}
 
-			var rowColor []tablewriter.Colors
-			switch job.Status {
-			case models.JOB_DEPLOY_STATUS:
-				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgYellowColor}}
-			case models.JOB_RUNNING_STATUS:
-				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
-			case models.JOB_TERMINATED_STATUS:
-				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
-			case models.JOB_COMPLETED_STATUS:
-				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiMagentaColor}}
-			default:
-				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiCyanColor}}
+				rowColorList = append(rowColorList, RowColor{
+					row:    i,
+					column: []int{5},
+					color:  rowColor,
+				})
 			}
-
-			rowColorList = append(rowColorList, RowColor{
-				row:    i,
-				column: []int{5},
-				color:  rowColor,
-			})
 		}
 
 		if fullFlag {
-			header := []string{"JOB UUID", "TASK TYPE", "WALLET ADDRESS", "SPACE UUID", "SPACE NAME", "STATUS", "REWARD", "EXPIRE TIME"}
+			header := []string{"JOB UUID", "TASK UUID", "TASK TYPE", "WALLET ADDRESS", "SPACE UUID", "SPACE NAME", "STATUS", "REWARD", "EXPIRE TIME"}
 			NewVisualTable(header, taskData, rowColorList).Generate(true)
 		} else {
 			header := []string{"JOB UUID", "TASK TYPE", "WALLET ADDRESS", "SPACE UUID", "SPACE NAME", "STATUS", "EXPIRE TIME"}
