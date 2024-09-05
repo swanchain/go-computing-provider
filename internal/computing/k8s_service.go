@@ -736,7 +736,20 @@ func (s *K8sService) GetGlobalNetworkSet(gnsName string) (*calicov3.GlobalNetwor
 	if err != nil {
 		return nil, fmt.Errorf("failed to create calico client, error: %v", err)
 	}
-	return calicoCs.ProjectcalicoV3().GlobalNetworkSets().Get(context.Background(), gnsName, metaV1.GetOptions{})
+	networkSetList, err := calicoCs.ProjectcalicoV3().GlobalNetworkSets().List(context.Background(), metaV1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get globalNetworkSets list, error: %v", err)
+	}
+
+	var gns calicov3.GlobalNetworkSet
+	for _, item := range networkSetList.Items {
+		if item.Name == gnsName {
+			gns = item
+		} else {
+			s.DeleteGlobalNetworkSet(item.Name)
+		}
+	}
+	return &gns, nil
 }
 
 func (s *K8sService) DeleteGlobalNetworkSet(gnsName string) error {
@@ -758,7 +771,21 @@ func (s *K8sService) GetGlobalNetworkPolicy(gnpName string) (*calicov3.GlobalNet
 	if err != nil {
 		return nil, fmt.Errorf("failed to create calico client, error: %v", err)
 	}
-	return calicoCs.ProjectcalicoV3().GlobalNetworkPolicies().Get(context.Background(), gnpName, metaV1.GetOptions{})
+
+	networkPolicyList, err := calicoCs.ProjectcalicoV3().GlobalNetworkPolicies().List(context.Background(), metaV1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get globalNetworkSets list, error: %v", err)
+	}
+
+	var gnp calicov3.GlobalNetworkPolicy
+	for _, item := range networkPolicyList.Items {
+		if item.Name == gnpName {
+			gnp = item
+		} else {
+			s.DeleteGlobalNetworkPolicy(item.Name)
+		}
+	}
+	return &gnp, nil
 }
 
 func (s *K8sService) DeleteGlobalNetworkPolicy(gnpName string) error {
