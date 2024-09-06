@@ -2,6 +2,7 @@ package computing
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"sync"
@@ -150,7 +151,7 @@ func (task *CronTask) cleanImageResource() {
 
 func (task *CronTask) watchExpiredTask() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("* 0/20 * * * ?", func() {
+	c.AddFunc("* 0/10 * * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("watchExpiredTask catch panic error: %+v", err)
@@ -163,9 +164,50 @@ func (task *CronTask) watchExpiredTask() {
 			return
 		}
 
-		var deleteSpaceIds []string
+		deployments, err := NewK8sService().k8sClient.AppsV1().Deployments(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			fmt.Println("Error listing deployments:", err)
+			return
+		}
 
+		var deployOnK8s = make(map[string]string)
+		for _, deploy := range deployments.Items {
+			if strings.HasPrefix(deploy.Namespace, constants.K8S_NAMESPACE_NAME_PREFIX) {
+				deployOnK8s[deploy.Name] = deploy.Namespace
+			}
+		}
+
+		var deleteSpaceIdAndJobUuid = make(map[string]string)
 		for _, job := range jobList {
+			jobUuidDeployName := constants.K8S_DEPLOY_NAME_PREFIX + strings.ToLower(job.JobUuid)
+			if _, ok := deployOnK8s[jobUuidDeployName]; ok {
+				var nameSpace string
+				if job.Status == models.JOB_TERMINATED_STATUS || job.Status == models.JOB_COMPLETED_STATUS {
+					if job.NameSpace == "" {
+						nameSpace = constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(job.WalletAddress)
+					}
+					if err = DeleteJob(nameSpace, job.JobUuid, "cron-task abnormal state"); err != nil {
+						logs.GetLogger().Errorf("failed to use jobUuid: %s delete job, error: %v", job.JobUuid, err)
+					}
+					continue
+				}
+			} else {
+				// compatible with space_uuid
+				spaceUuidDeployName := constants.K8S_DEPLOY_NAME_PREFIX + strings.ToLower(job.SpaceUuid)
+				if _, ok = deployOnK8s[spaceUuidDeployName]; ok {
+					var nameSpace string
+					if job.Status == models.JOB_TERMINATED_STATUS || job.Status == models.JOB_COMPLETED_STATUS {
+						if job.NameSpace == "" {
+							nameSpace = constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(job.WalletAddress)
+						}
+						if err = DeleteJob(nameSpace, job.SpaceUuid, "cron-task abnormal state"); err != nil {
+							logs.GetLogger().Errorf("failed to use spaceUuid: %s delete job, error: %v", job.SpaceUuid, err)
+						}
+						continue
+					}
+				}
+			}
+
 			if job.DeleteAt == models.DELETED_FLAG {
 				continue
 			}
@@ -182,8 +224,8 @@ func (task *CronTask) watchExpiredTask() {
 				if err != nil {
 					if errors.IsNotFound(err) {
 						// delete job
-						logs.GetLogger().Warnf("not found deployment on the cluster, space_uuid: %s, deployment: %s", job.SpaceUuid, job.K8sDeployName)
-						deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
+						logs.GetLogger().Warnf("not found deployment on the cluster, job_uuid: %s, deployment: %s", job.JobUuid, job.K8sDeployName)
+						deleteSpaceIdAndJobUuid[job.JobUuid] = job.SpaceUuid + "_" + job.JobUuid
 						continue
 					}
 					logs.GetLogger().Errorf("failed to get deployment: %s, error: %v", job.K8sDeployName, err)
@@ -191,26 +233,29 @@ func (task *CronTask) watchExpiredTask() {
 				}
 			}
 
-			if job.Status == models.JOB_TERMINATED_STATUS || job.Status == models.JOB_COMPLETED_STATUS {
-				logs.GetLogger().Infof("task_uuid: %s, current status is %s, starting to delete it.", job.TaskUuid, models.GetJobStatus(job.Status))
-				if err = deleteJob(job.NameSpace, job.SpaceUuid, "cron-task abnormal state"); err == nil {
-					deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
+			checkFcpJobInfoInChain(job)
+
+			if job.Status == models.JOB_TERMINATED_STATUS || job.Status == models.JOB_COMPLETED_STATUS || time.Now().Unix() > job.ExpireTime {
+				expireTime := time.Unix(job.ExpireTime, 0).Format("2006-01-02 15:04:05")
+				logs.GetLogger().Infof("job_uuid: %s, current status is %s, expire time: %s, starting to delete it.", job.JobUuid, models.GetJobStatus(job.Status), expireTime)
+				if err = DeleteJob(job.NameSpace, job.JobUuid, "cron-task abnormal state"); err != nil {
+					logs.GetLogger().Errorf("failed to use jobUuid: %s delete job, error: %v", job.JobUuid, err)
 					continue
 				}
-			}
 
-			if time.Now().Unix() > job.ExpireTime {
-				if err = deleteJob(job.NameSpace, job.SpaceUuid, "cron-task the task execution time has expired"); err == nil {
-					deleteSpaceIds = append(deleteSpaceIds, job.SpaceUuid)
+				if err = DeleteJob(job.NameSpace, job.SpaceUuid, "compatible with old versions, cron-task abnormal state"); err != nil {
+					logs.GetLogger().Errorf("failed to use spaceUuid: %s delete job, error: %v", job.SpaceUuid, err)
 					continue
 				}
+				deleteSpaceIdAndJobUuid[job.JobUuid] = job.SpaceUuid + "_" + job.JobUuid
 			}
-
 		}
 
-		for _, spaceUuid := range deleteSpaceIds {
-			logs.GetLogger().Errorf("corn-task starting delete job, space_uuid: %s", spaceUuid)
-			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid, models.JOB_COMPLETED_STATUS)
+		for _, spaceUuidAndJobUuid := range deleteSpaceIdAndJobUuid {
+			split := strings.Split(spaceUuidAndJobUuid, "_")
+			if len(split) == 2 {
+				NewJobService().DeleteJobEntityBySpaceUuId(split[0], split[1], models.JOB_COMPLETED_STATUS)
+			}
 		}
 	})
 	c.Start()
@@ -354,26 +399,18 @@ func (task *CronTask) checkJobReward() {
 }
 
 func (task *CronTask) getUbiTaskReward() {
-	ticker := time.NewTicker(10 * time.Minute)
-	defer ticker.Stop()
-
-	go func() {
-		for {
-			select {
-			case <-ticker.C:
-				func() {
-					defer func() {
-						if err := recover(); err != nil {
-							logs.GetLogger().Errorf("failed to get zk task reward, catch painc: %+v", err)
-						}
-					}()
-					if err := syncTaskStatusForSequencerService(); err != nil {
-						logs.GetLogger().Errorf("failed to sync task from sequencer, error: %v", err)
-					}
-				}()
+	c := cron.New(cron.WithSeconds())
+	c.AddFunc("* 0/10 * * * ?", func() {
+		defer func() {
+			if err := recover(); err != nil {
+				logs.GetLogger().Errorf("task job: [GetUbiTaskReward], error: %+v", err)
 			}
+		}()
+		if err := syncTaskStatusForSequencerService(); err != nil {
+			logs.GetLogger().Errorf("failed to sync task from sequencer, error: %v", err)
 		}
-	}()
+	})
+	c.Start()
 }
 
 func addNodeLabel() {

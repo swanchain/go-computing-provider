@@ -1,8 +1,8 @@
 package computing
 
 import (
+	"crypto/tls"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/swanchain/go-computing-provider/conf"
@@ -17,15 +17,14 @@ import (
 	"time"
 )
 
-var NotFoundError = errors.New("not found resource")
-
 const (
 	yamlDeployName = "deploy.yaml"
 	ymlDeployName  = "deploy.yml"
 	modelSetName   = "model-setting.json"
 )
 
-func BuildSpaceTaskImage(spaceUuid string, files []models.SpaceFile) (DeployParam, error) {
+func DownloadSpaceResources(jobUuid string, files []models.SpaceFile) (DeployParam, error) {
+	updateJobStatus(jobUuid, models.DEPLOY_DOWNLOAD_SOURCE)
 	var deployParam DeployParam
 
 	var err error
@@ -44,7 +43,7 @@ func BuildSpaceTaskImage(spaceUuid string, files []models.SpaceFile) (DeployPara
 				return deployParam, err
 			}
 			if err = downloadFile(filepath.Join(buildFolder, file.Name), file.URL, file.Iv, file.SymmetricKey); err != nil {
-				return deployParam, fmt.Errorf("error downloading file: %w", err)
+				return deployParam, fmt.Errorf("failed to downloading file: %w", err)
 			}
 
 			if strings.HasSuffix(strings.ToLower(file.Name), yamlDeployName) ||
@@ -75,9 +74,8 @@ func BuildSpaceTaskImage(spaceUuid string, files []models.SpaceFile) (DeployPara
 
 		return deployParam, nil
 	} else {
-		logs.GetLogger().Warnf("Space %s is not found.", spaceUuid)
+		return deployParam, fmt.Errorf("not found the space")
 	}
-	return deployParam, NotFoundError
 }
 
 func commonPrefix(strs []string) string {
@@ -111,9 +109,14 @@ func BuildImagesByDockerfile(jobUuid, spaceUuid, spaceName, imagePath string) (s
 			strings.TrimSpace(conf.GetConfig().Registry.ServerAddress), spaceFlag, time.Now().Unix())
 	}
 	imageName = strings.ToLower(imageName)
+
 	dockerfilePath := filepath.Join(imagePath, "Dockerfile")
-	if dockerfilePath == "" {
+	if _, err := os.Stat(dockerfilePath); err != nil {
 		dockerfilePath = filepath.Join(imagePath, "dockerfile")
+		if _, err := os.Stat(dockerfilePath); err != nil {
+			logs.GetLogger().Errorf("not found Dockerfile, path: %s", dockerfilePath)
+			return "", ""
+		}
 	}
 	log.Printf("Image path: %s", imagePath)
 
@@ -146,6 +149,7 @@ func downloadFile(filepath, url, iv, symmetricKey string) error {
 		}
 	}(out)
 
+	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	resp, err := http.Get(url)
 	if err != nil {
 		return err

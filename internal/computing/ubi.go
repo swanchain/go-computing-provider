@@ -1414,12 +1414,12 @@ func checkBalance(cpAccountAddress string) (bool, error) {
 
 	_, workerAddress, err := GetOwnerAddressAndWorkerAddress()
 	if err != nil {
-		return false, fmt.Errorf("failed to get worker address, cpAccount: %d,error: %v", cpAccountAddress, err)
+		return false, fmt.Errorf("failed to get worker address, cpAccount: %s,error: %v", cpAccountAddress, err)
 	}
 
 	workerBalance, err := wallet.BalanceNumber(client, workerAddress)
 	if err != nil {
-		return false, fmt.Errorf("failed to get worker banlance, cpAccount: %d,error: %v", cpAccountAddress, err)
+		return false, fmt.Errorf("failed to get worker banlance, cpAccount: %s,error: %v", cpAccountAddress, err)
 	}
 
 	sequencerStub, err := ecp.NewSequencerStub(client, ecp.WithSequencerCpAccountAddress(cpAccountAddress))
