@@ -132,6 +132,7 @@ const (
 )
 
 const (
+	JOB_RECEIVED_STATUS   = 0
 	JOB_DEPLOY_STATUS     = 1
 	JOB_RUNNING_STATUS    = 2
 	JOB_TERMINATED_STATUS = 3
@@ -141,6 +142,8 @@ const (
 func GetJobStatus(status int) string {
 	var statusStr string
 	switch status {
+	case JOB_RECEIVED_STATUS:
+		statusStr = "received"
 	case JOB_DEPLOY_STATUS:
 		statusStr = "deploying"
 	case JOB_RUNNING_STATUS:

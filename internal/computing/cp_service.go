@@ -177,6 +177,7 @@ func ReceiveJob(c *gin.Context) {
 		jobEntity.Name = spaceDetail.Data.Space.Name
 		jobEntity.Hardware = spaceDetail.Data.Space.ActiveOrder.Config.Description
 		jobEntity.SpaceType = 0
+		jobEntity.Status = models.JOB_RECEIVED_STATUS
 		err = NewJobService().SaveJobEntity(jobEntity)
 		if err != nil {
 			logs.GetLogger().Errorf("failed to save job to db, job_uuid: %s, error: %+v", jobData.UUID, err)

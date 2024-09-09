@@ -73,20 +73,7 @@ var taskList = &cli.Command{
 				reward = job.Reward
 			}
 
-			var rowColor []tablewriter.Colors
-
-			switch job.Status {
-			case models.JOB_DEPLOY_STATUS:
-				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgYellowColor}}
-			case models.JOB_RUNNING_STATUS:
-				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
-			case models.JOB_TERMINATED_STATUS:
-				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
-			case models.JOB_COMPLETED_STATUS:
-				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiMagentaColor}}
-			default:
-				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiCyanColor}}
-			}
+			rowColor := getColor(job.Status)
 
 			if fullFlag {
 				taskData = append(taskData,
@@ -139,7 +126,7 @@ var taskList = &cli.Command{
 
 var taskDetail = &cli.Command{
 	Name:      "get",
-	Usage:     "Get task detail info",
+	Usage:     "Get job detail info",
 	ArgsUsage: "[job_uuid]",
 	Action: func(cctx *cli.Context) error {
 		if cctx.NArg() != 1 {
@@ -169,20 +156,7 @@ var taskDetail = &cli.Command{
 		taskData = append(taskData, []string{"HARDWARE:", job.Hardware})
 		taskData = append(taskData, []string{"STATUS:", models.GetJobStatus(job.Status)})
 
-		var rowColor []tablewriter.Colors
-		switch job.Status {
-		case models.JOB_DEPLOY_STATUS:
-			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgYellowColor}}
-		case models.JOB_RUNNING_STATUS:
-			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
-		case models.JOB_TERMINATED_STATUS:
-			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
-		case models.JOB_COMPLETED_STATUS:
-			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiMagentaColor}}
-		default:
-			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiCyanColor}}
-		}
-
+		rowColor := getColor(job.Status)
 		header := []string{"JOB UUID:", job.JobUuid}
 
 		var rowColorList []RowColor
@@ -219,6 +193,10 @@ var taskDelete = &cli.Command{
 			return fmt.Errorf("failed to get job detail, job_uuid: %s, error: %+v", jobUuid, err)
 		}
 
+		if job.JobUuid == "" {
+			return fmt.Errorf("not found the job_uuid='%s' job detail", jobUuid)
+		}
+
 		serviceName := constants.K8S_SERVICE_NAME_PREFIX + jobUuid
 		ingressName := constants.K8S_INGRESS_NAME_PREFIX + jobUuid
 
@@ -233,4 +211,23 @@ var taskDelete = &cli.Command{
 		fmt.Printf("job_uuid: %s space serivce successfully deleted \n", jobUuid)
 		return nil
 	},
+}
+
+func getColor(status int) []tablewriter.Colors {
+	var rowColor []tablewriter.Colors
+	switch status {
+	case models.JOB_DEPLOY_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgYellowColor}}
+	case models.JOB_RUNNING_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
+	case models.JOB_TERMINATED_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
+	case models.JOB_COMPLETED_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiMagentaColor}}
+	case models.JOB_RECEIVED_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiBlueColor}}
+	default:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiCyanColor}}
+	}
+	return rowColor
 }
