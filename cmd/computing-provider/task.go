@@ -230,7 +230,7 @@ var taskDelete = &cli.Command{
 		k8sService.DeleteDeployRs(context.TODO(), job.NameSpace, job.JobUuid)
 
 		computing.NewJobService().DeleteJobEntityByJobUuId(job.JobUuid, models.JOB_TERMINATED_STATUS)
-		fmt.Printf("job_uuid: %s space serivce successfully deleted \n", job.JobUuid)
+		fmt.Printf("job_uuid: %s space serivce successfully deleted \n", jobUuid)
 		return nil
 	},
 }
