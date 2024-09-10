@@ -524,6 +524,7 @@ func GetPrice(c *gin.Context) {
 	}
 
 	var resourcePrice models.ResourcePrice
+	resourcePrice.GpusPrice = make(map[string]string)
 	for key, value := range config.Resources {
 		switch key {
 		case "TARGET_CPU":
