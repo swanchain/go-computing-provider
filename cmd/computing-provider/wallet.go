@@ -206,7 +206,8 @@ var walletSign = &cli.Command{
 			return fmt.Errorf("failed to parse message")
 		}
 
-		sig, err := localWallet.WalletSign(ctx, addr, []byte(msg))
+		originalStr := hexutil.Encode([]byte(msg))
+		sig, err := localWallet.WalletSign(ctx, addr, []byte(originalStr))
 		if err != nil {
 			return err
 		}
@@ -238,12 +239,17 @@ var walletVerify = &cli.Command{
 			return fmt.Errorf("failed to get raw message")
 		}
 
+		originalBytes, err := hexutil.Decode(messageData)
+		if err != nil {
+			return err
+		}
+
 		localWallet, err := wallet.SetupWallet(wallet.WalletRepo)
 		if err != nil {
 			return err
 		}
 
-		pass, err := localWallet.WalletVerify(ctx, addr, sigBytes, messageData)
+		pass, err := localWallet.WalletVerify(ctx, addr, sigBytes, string(originalBytes))
 		if err != nil {
 			return err
 		}
