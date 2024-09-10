@@ -28,8 +28,13 @@ func GeneratePriceConfig() error {
 		return fmt.Errorf("price.conf configuration already exists")
 	}
 
-	os.Create(resourcePriceFile)
-	os.WriteFile(filepath.Join(cpRepoPath, resourceConfigFile), []byte(resourcePrice), 0666)
+	file, err := os.OpenFile(resourcePriceFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	if err != nil {
+		return fmt.Errorf("failed to open file: %s \n", resourcePriceFile)
+	}
+	defer file.Close()
+
+	file.WriteString(resourcePrice)
 
 	statisticalSources, err := NewK8sService().StatisticalSources(context.TODO())
 	if err != nil {
@@ -45,9 +50,9 @@ func GeneratePriceConfig() error {
 
 	for _, gpu := range gpuMap {
 		data := fmt.Sprintf("TARGET_GPU_%s=\"\" # SWAN/%s GPU unit a hour", strings.ReplaceAll(gpu, "NVIDIA ", ""), strings.ReplaceAll(gpu, "NVIDIA ", ""))
-		os.WriteFile(filepath.Join(cpRepoPath, resourceConfigFile), []byte(data), 0666)
+		file.WriteString(data)
 	}
-	fmt.Printf("Successfully generated resource price configuration file at %s", resourcePriceFile)
+	fmt.Printf("Successfully generated resource price configuration file at %s \n", resourcePriceFile)
 	return nil
 }
 
