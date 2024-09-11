@@ -56,22 +56,18 @@ func GeneratePriceConfig() error {
 	return nil
 }
 
-func ReadPriceConfig() error {
+func ReadPriceConfig() (Config, error) {
+	var config Config
 	cpRepoPath, _ := os.LookupEnv("CP_PATH")
 	if _, err := os.Stat(filepath.Join(cpRepoPath, resourceConfigFile)); err != nil {
-		return err
+		return config, err
 	}
-
-	var config Config
 	_, err := toml.DecodeFile(filepath.Join(cpRepoPath, resourceConfigFile), &config.Resources)
 	if err != nil {
-		return err
+		return config, err
 	}
 
-	for key, value := range config.Resources {
-		fmt.Printf("%s = %s\n", key, value)
-	}
-	return nil
+	return config, nil
 }
 
 type Config struct {
