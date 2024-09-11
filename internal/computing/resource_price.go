@@ -73,13 +73,13 @@ func ReadPriceConfig() (HardwarePrice, error) {
 	for key, value := range config.Resources {
 		switch key {
 		case "TARGET_CPU":
-			hardwarePrice.CpuPrice = value
+			hardwarePrice.TARGET_CPU = value
 		case "TARGET_MEMORY":
-			hardwarePrice.MemoryPrice = value
+			hardwarePrice.TARGET_MEMORY = value
 		case "TARGET_HD_EPHEMERAL":
-			hardwarePrice.EphemeralPrice = value
+			hardwarePrice.TARGET_HD_EPHEMERAL = value
 		case "TARGET_GPU_DEFAULT":
-			hardwarePrice.GpuDefaultPrice = value
+			hardwarePrice.TARGET_GPU_DEFAULT = value
 		default:
 			hardwarePrice.GpusPrice[key] = value
 		}
@@ -132,9 +132,9 @@ type Config struct {
 }
 
 type HardwarePrice struct {
-	CpuPrice        string `toml:"TARGET_CPU" tag:"1"`
-	MemoryPrice     string `toml:"TARGET_MEMORY" tag:"2"`
-	EphemeralPrice  string `toml:"TARGET_HD_EPHEMERAL" tag:"3"`
-	GpuDefaultPrice string `toml:"TARGET_GPU_DEFAULT" tag:"4"`
-	GpusPrice       map[string]string
+	TARGET_CPU          string `toml:"TARGET_CPU" tag:"1"`
+	TARGET_MEMORY       string `toml:"TARGET_MEMORY" tag:"2"`
+	TARGET_HD_EPHEMERAL string `toml:"TARGET_HD_EPHEMERAL" tag:"3"`
+	TARGET_GPU_DEFAULT  string `toml:"TARGET_GPU_DEFAULT" tag:"4"`
+	GpusPrice           map[string]string
 }
