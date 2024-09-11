@@ -49,7 +49,8 @@ func GeneratePriceConfig() error {
 	}
 
 	for _, gpu := range gpuMap {
-		data := fmt.Sprintf("TARGET_GPU_%s=\"\" # SWAN/%s GPU unit a hour", strings.ReplaceAll(gpu, "NVIDIA ", ""), strings.ReplaceAll(gpu, "NVIDIA ", ""))
+		gpuStr := strings.ReplaceAll(gpu, "NVIDIA ", "")
+		data := fmt.Sprintf("TARGET_GPU_%s=\"\" # SWAN/%s GPU unit a hour", strings.ReplaceAll(gpuStr, " ", "_"), strings.ReplaceAll(gpuStr, " ", "_"))
 		file.WriteString(data)
 	}
 	fmt.Printf("Successfully generated resource price configuration file at %s \n", resourcePriceFile)
