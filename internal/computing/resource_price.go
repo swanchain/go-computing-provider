@@ -6,6 +6,9 @@ import (
 	"github.com/BurntSushi/toml"
 	"os"
 	"path/filepath"
+	"reflect"
+	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -15,10 +18,7 @@ var resourcePrice = `
 TARGET_CPU=""          # SWAN/thread-hour
 TARGET_MEMORY=""       # SWAN/GB-hour
 TARGET_HD_EPHEMERAL="" # SWAN/GB-hour
-TARGET_HD_PERS_HDD=""  # SWAN/GB-hour
-TARGET_HD_PERS_SSD=""  # SWAN/GB-hour
-TARGET_HD_PERS_NVME="" # SWAN/GB-hour
-TARGET_GPU_DEFAULT=""   # SWAN/Default GPU unit a hour
+TARGET_GPU_DEFAULT=""  # SWAN/Default GPU unit a hour
 `
 
 func GeneratePriceConfig() error {
@@ -56,20 +56,84 @@ func GeneratePriceConfig() error {
 	return nil
 }
 
-func ReadPriceConfig() (Config, error) {
-	var config Config
+func ReadPriceConfig() (HardwarePrice, error) {
+	var hardwarePrice HardwarePrice
 	cpRepoPath, _ := os.LookupEnv("CP_PATH")
 	if _, err := os.Stat(filepath.Join(cpRepoPath, resourceConfigFile)); err != nil {
-		return config, err
-	}
-	_, err := toml.DecodeFile(filepath.Join(cpRepoPath, resourceConfigFile), &config.Resources)
-	if err != nil {
-		return config, err
+		return hardwarePrice, err
 	}
 
-	return config, nil
+	var config Config
+	_, err := toml.DecodeFile(filepath.Join(cpRepoPath, resourceConfigFile), &config.Resources)
+	if err != nil {
+		return hardwarePrice, err
+	}
+
+	for key, value := range config.Resources {
+		switch key {
+		case "TARGET_CPU":
+			hardwarePrice.CpuPrice = value
+		case "TARGET_MEMORY":
+			hardwarePrice.MemoryPrice = value
+		case "TARGET_HD_EPHEMERAL":
+			hardwarePrice.EphemeralPrice = value
+		case "TARGET_GPU_DEFAULT":
+			hardwarePrice.GpuDefaultPrice = value
+		default:
+			hardwarePrice.GpusPrice[key] = value
+		}
+	}
+
+	return hardwarePrice, nil
+}
+
+func GetStructByTag(v interface{}) ([]HardwareField, error) {
+	val := reflect.ValueOf(v)
+	typ := reflect.TypeOf(v)
+
+	if val.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("input param is not a struct")
+	}
+
+	var fields []HardwareField
+	for i := 0; i < val.NumField(); i++ {
+		field := typ.Field(i)
+		tag := field.Tag.Get("tag")
+
+		if tag != "" {
+			tagValue, err := strconv.Atoi(tag)
+			if err != nil {
+				continue
+			}
+			fields = append(fields, HardwareField{
+				TagValue: tagValue,
+				Name:     field.Name,
+				Value:    val.Field(i).String(),
+			})
+		}
+	}
+
+	sort.Slice(fields, func(i, j int) bool {
+		return fields[i].TagValue < fields[j].TagValue
+	})
+
+	return fields, nil
+}
+
+type HardwareField struct {
+	TagValue int
+	Name     string
+	Value    string
 }
 
 type Config struct {
 	Resources map[string]string `toml:"-"`
+}
+
+type HardwarePrice struct {
+	CpuPrice        string `toml:"TARGET_CPU" tag:"1"`
+	MemoryPrice     string `toml:"TARGET_MEMORY" tag:"2"`
+	EphemeralPrice  string `toml:"TARGET_HD_EPHEMERAL" tag:"3"`
+	GpuDefaultPrice string `toml:"TARGET_GPU_DEFAULT" tag:"4"`
+	GpusPrice       map[string]string
 }

@@ -210,6 +210,7 @@ var walletSign = &cli.Command{
 		if err != nil {
 			return err
 		}
+		fmt.Println("Signature:")
 		fmt.Println(sig)
 		return nil
 	},

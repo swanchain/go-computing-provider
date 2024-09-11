@@ -36,13 +36,39 @@ var viewCmd = &cli.Command{
 	Name:  "view",
 	Usage: "View resource price configuration information",
 	Action: func(cctx *cli.Context) error {
-		config, err := computing.ReadPriceConfig()
+		hardwarePrice, err := computing.ReadPriceConfig()
 		if err != nil {
 			return err
 		}
+
+		hardwareFields, err := computing.GetStructByTag(hardwarePrice)
+		if err != nil {
+			return err
+		}
+
+		for k, v := range hardwarePrice.GpusPrice {
+			hardwareFields = append(hardwareFields, computing.HardwareField{
+				Name:  k,
+				Value: v,
+			})
+		}
+
 		var taskData [][]string
-		for key, value := range config.Resources {
-			taskData = append(taskData, []string{fmt.Sprintf("%s:", key), value})
+		for _, field := range hardwareFields {
+			var valStr string
+			switch field.Name {
+			case "TARGET_CPU":
+				valStr = field.Value + " SWAN/thread-hour"
+			case "TARGET_GPU_DEFAULT":
+				valStr = field.Value + " SWAN/Default GPU unit a hour"
+			case "TARGET_MEMORY":
+				fallthrough
+			case "TARGET_HD_EPHEMERAL":
+				valStr = field.Value + " SWAN/GB-hour"
+			default:
+				valStr = field.Value + " SWAN/GPU unit a hour"
+			}
+			taskData = append(taskData, []string{fmt.Sprintf("%s:", field.Name), valStr})
 		}
 		header := []string{"CP Hardware Price Info:"}
 		NewVisualTable(header, taskData, []RowColor{}).SetAutoWrapText(false).Generate(false)

@@ -533,12 +533,6 @@ func GetPrice(c *gin.Context) {
 			resourcePrice.MemoryPrice = value
 		case "TARGET_HD_EPHEMERAL":
 			resourcePrice.HdEphemeralPrice = value
-		case "TARGET_HD_PERS_HDD":
-			resourcePrice.HdPersHddPrice = value
-		case "TARGET_HD_PERS_SSD":
-			resourcePrice.HdPersSsdPrice = value
-		case "TARGET_HD_PERS_NVME":
-			resourcePrice.HdPersNvmePrice = value
 		case "TARGET_GPU_DEFAULT":
 			resourcePrice.GpuDefaultPrice = value
 		default:
