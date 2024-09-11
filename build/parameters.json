@@ -19,7 +19,7 @@
   {
     "network": "testnet",
     "config": {
-      "sequencer_url": "http://sequencer-testnet.swanchain.cn/v1",
+      "sequencer_url": "http://sequencer-testnet.swanchain.io",
       "zk_engine_pk": "0xB5aeb540B4895cd024c1625E146684940A849ED9",
       "orchestrator_pk": "0x29eD49c8E973696D07E7927f748F6E5Eacd5516D",
       "chain_rpc": "https://rpc-proxima.swanchain.io",

@@ -221,7 +221,7 @@ func (task *CronTask) watchExpiredTask() {
 			currentTime := time.Now()
 			createdTime := time.Unix(job.CreateTime, 0)
 			createDuration := currentTime.Sub(createdTime)
-			if createDuration.Hours() <= 2 {
+			if createDuration.Hours() <= 2 && job.Status != models.JOB_RUNNING_STATUS {
 				continue
 			}
 
