@@ -58,6 +58,7 @@ func GeneratePriceConfig() error {
 
 func ReadPriceConfig() (HardwarePrice, error) {
 	var hardwarePrice HardwarePrice
+	hardwarePrice.GpusPrice = make(map[string]string)
 	cpRepoPath, _ := os.LookupEnv("CP_PATH")
 	if _, err := os.Stat(filepath.Join(cpRepoPath, resourceConfigFile)); err != nil {
 		return hardwarePrice, err
