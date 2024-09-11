@@ -165,7 +165,7 @@ var taskDetail = &cli.Command{
 			column: []int{1},
 			color:  rowColor,
 		})
-		NewVisualTable(header, taskData, rowColorList).Generate(false)
+		NewVisualTable(header, taskData, rowColorList).SetAutoWrapText(false).Generate(false)
 		return nil
 	},
 }
