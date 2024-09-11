@@ -59,12 +59,15 @@ var viewCmd = &cli.Command{
 			switch field.Name {
 			case "TARGET_CPU":
 				valStr = field.Value + " SWAN/thread-hour"
+				break
 			case "TARGET_GPU_DEFAULT":
 				valStr = field.Value + " SWAN/Default GPU unit a hour"
+				break
 			case "TARGET_MEMORY":
 				fallthrough
 			case "TARGET_HD_EPHEMERAL":
 				valStr = field.Value + " SWAN/GB-hour"
+				break
 			default:
 				valStr = field.Value + " SWAN/GPU unit a hour"
 			}
