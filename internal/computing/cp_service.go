@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/BurntSushi/toml"
 	"io"
 	"math/rand"
 	"net/http"
@@ -506,6 +507,39 @@ func GetPublicKey(c *gin.Context) {
 	c.JSON(http.StatusOK, util.CreateSuccessResponse(map[string]any{
 		"public_key": encodedData,
 	}))
+}
+
+func GetPrice(c *gin.Context) {
+	cpRepoPath, _ := os.LookupEnv("CP_PATH")
+	if _, err := os.Stat(filepath.Join(cpRepoPath, resourceConfigFile)); err != nil {
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ReadRsaKeyError))
+		return
+	}
+
+	var config Config
+	_, err := toml.DecodeFile(filepath.Join(cpRepoPath, resourceConfigFile), &config.Resources)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ReadRsaKeyError))
+		return
+	}
+
+	var resourcePrice models.ResourcePrice
+	resourcePrice.GpusPrice = make(map[string]string)
+	for key, value := range config.Resources {
+		switch key {
+		case "TARGET_CPU":
+			resourcePrice.CpuPrice = value
+		case "TARGET_MEMORY":
+			resourcePrice.MemoryPrice = value
+		case "TARGET_HD_EPHEMERAL":
+			resourcePrice.HdEphemeralPrice = value
+		case "TARGET_GPU_DEFAULT":
+			resourcePrice.GpuDefaultPrice = value
+		default:
+			resourcePrice.GpusPrice[key] = value
+		}
+	}
+	c.JSON(http.StatusOK, util.CreateSuccessResponse(resourcePrice))
 }
 
 func StatisticalSources(c *gin.Context) {
