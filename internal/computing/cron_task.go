@@ -226,7 +226,7 @@ func (task *CronTask) watchExpiredTask() {
 			}
 
 			if job.NameSpace != "" && job.K8sDeployName != "" {
-				_, err = NewK8sService().k8sClient.AppsV1().Deployments(job.NameSpace).Get(context.TODO(), job.K8sDeployName, metav1.GetOptions{})
+				foundDeployment, err := NewK8sService().k8sClient.AppsV1().Deployments(job.NameSpace).Get(context.TODO(), job.K8sDeployName, metav1.GetOptions{})
 				if err != nil {
 					if errors.IsNotFound(err) {
 						// delete job
@@ -236,6 +236,18 @@ func (task *CronTask) watchExpiredTask() {
 					}
 					logs.GetLogger().Errorf("failed to get deployment: %s, error: %v", job.K8sDeployName, err)
 					continue
+				}
+
+				if foundDeployment.Status.AvailableReplicas == 0 { // need to delete
+					DeleteJob(job.NameSpace, job.JobUuid, "cron-task correction status")
+					deleteSpaceIdAndJobUuid[job.JobUuid] = job.SpaceUuid + "_" + job.JobUuid
+					continue
+				} else {
+					if job.Status != models.JOB_RUNNING_STATUS {
+						job.PodStatus = models.POD_RUNNING_STATUS
+						job.Status = models.JOB_RUNNING_STATUS
+						NewJobService().UpdateJobEntityByJobUuid(job)
+					}
 				}
 			}
 
@@ -518,21 +530,21 @@ func checkFcpJobInfoInChain(job *models.JobEntity) {
 	if err != nil {
 		return
 	}
+	if taskInfo.TaskUuid != "" {
+		if taskInfo.TaskStatus == models.COMPLETED {
+			job.Status = models.JOB_COMPLETED_STATUS
+		} else if taskInfo.TaskStatus == models.TERMINATED {
+			job.Status = models.JOB_TERMINATED_STATUS
+		}
 
-	if taskInfo.TaskStatus == models.COMPLETED {
-		job.Status = models.JOB_COMPLETED_STATUS
-	} else if taskInfo.TaskStatus == models.TERMINATED {
-		job.Status = models.JOB_TERMINATED_STATUS
-	}
-
-	expiredTime := taskInfo.StartTimestamp + taskInfo.Duration
-	if expiredTime > 0 {
-		job.ExpireTime = expiredTime
-		if err := NewJobService().UpdateJobEntityByJobUuid(job); err != nil {
-			logs.GetLogger().Errorf("update job info by jobUuid failed, error: %v", err)
+		expiredTime := taskInfo.StartTimestamp + taskInfo.Duration
+		if expiredTime > 0 {
+			job.ExpireTime = expiredTime
+			if err := NewJobService().UpdateJobEntityByJobUuid(job); err != nil {
+				logs.GetLogger().Errorf("update job info by jobUuid failed, error: %v", err)
+			}
 		}
 	}
-
 }
 
 type TaskGroup struct {

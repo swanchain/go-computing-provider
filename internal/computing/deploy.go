@@ -547,7 +547,6 @@ func (d *Deploy) watchContainerRunningTime() {
 	job.NameSpace = d.k8sNameSpace
 	job.ImageName = d.image
 	job.K8sResourceType = "deployment"
-	job.ResourceType = d.TaskType
 	if err := NewJobService().UpdateJobEntityByJobUuid(job); err != nil {
 		logs.GetLogger().Errorf("failed to update job info, error: %v", err)
 		return
