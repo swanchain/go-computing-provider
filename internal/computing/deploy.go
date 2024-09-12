@@ -602,13 +602,13 @@ func (d *Deploy) deployNamespace() error {
 				return fmt.Errorf("failed create namespace, error: %w", err)
 			}
 
-			if NetworkPolicyFlag {
-				networkPolicy, err := k8sService.CreateNetworkPolicy(context.TODO(), d.k8sNameSpace)
-				if err != nil {
-					return fmt.Errorf("failed to created networkPolicy, error: %w", err)
-				}
-				logs.GetLogger().Infof("successfully to created networkPolicy, networkPolicyName: %s", networkPolicy.Name)
-			}
+			//if NetworkPolicyFlag {
+			//	networkPolicy, err := k8sService.CreateNetworkPolicy(context.TODO(), d.k8sNameSpace)
+			//	if err != nil {
+			//		return fmt.Errorf("failed to created networkPolicy, error: %w", err)
+			//	}
+			//	logs.GetLogger().Infof("successfully to created networkPolicy, networkPolicyName: %s", networkPolicy.Name)
+			//}
 		} else {
 			return err
 		}
