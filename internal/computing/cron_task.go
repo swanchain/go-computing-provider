@@ -301,6 +301,7 @@ func (task *CronTask) watchExpiredTask() {
 		var deleteSpaceIdAndJobUuid = make(map[string]string)
 		for _, jobCopy := range jobList {
 			job := jobCopy
+			logs.GetLogger().Infof("debug:: job_uuid: %s, space_uuid: %s, status: %s", job.JobUuid, job.SpaceUuid, models.GetJobStatus(job.Status))
 			jobUuidDeployName := constants.K8S_DEPLOY_NAME_PREFIX + strings.ToLower(job.JobUuid)
 			if _, ok := deployOnK8s[jobUuidDeployName]; ok {
 				var nameSpace = job.NameSpace
@@ -335,6 +336,8 @@ func (task *CronTask) watchExpiredTask() {
 				}
 			}
 
+			logs.GetLogger().Infof("debug:: job_uuid: %s, 1111111", job.JobUuid)
+
 			if job.DeleteAt == models.DELETED_FLAG {
 				continue
 			}
@@ -342,9 +345,14 @@ func (task *CronTask) watchExpiredTask() {
 			currentTime := time.Now()
 			createdTime := time.Unix(job.CreateTime, 0)
 			createDuration := currentTime.Sub(createdTime)
+
+			logs.GetLogger().Infof("debug:: job_uuid: %s createTime: %f, expiredTime: %t,  222222", job.JobUuid, createDuration.Hours(), time.Now().Unix() > job.ExpireTime)
+
 			if createDuration.Hours() <= 2 && job.Status != models.JOB_RUNNING_STATUS {
 				continue
 			}
+
+			logs.GetLogger().Infof("debug:: job_uuid: %s, 33333333", job.JobUuid)
 
 			if job.NameSpace != "" && job.K8sDeployName != "" {
 				foundDeployment, err := NewK8sService().k8sClient.AppsV1().Deployments(job.NameSpace).Get(context.TODO(), job.K8sDeployName, metav1.GetOptions{})
@@ -374,6 +382,7 @@ func (task *CronTask) watchExpiredTask() {
 
 			checkFcpJobInfoInChain(job)
 
+			logs.GetLogger().Infof("debug:: job_uuid: %s, 44444444", job.JobUuid)
 			if job.Status == models.JOB_TERMINATED_STATUS || job.Status == models.JOB_COMPLETED_STATUS || time.Now().Unix() > job.ExpireTime {
 				expireTime := time.Unix(job.ExpireTime, 0).Format("2006-01-02 15:04:05")
 				logs.GetLogger().Infof("job_uuid: %s, current status is %s, expire time: %s, starting to delete it.", job.JobUuid, models.GetJobStatus(job.Status), expireTime)
