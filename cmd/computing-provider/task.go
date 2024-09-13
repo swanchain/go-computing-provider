@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/olekukonko/tablewriter"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/olekukonko/tablewriter"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/constants"
 	"github.com/swanchain/go-computing-provider/internal/computing"
@@ -96,20 +96,7 @@ var taskList = &cli.Command{
 					[]string{jobUuid, job.ResourceType, walletAddress, spaceUuid, job.Name, models.GetJobStatus(job.Status), expireTime})
 			}
 
-			var rowColor []tablewriter.Colors
-			switch job.Status {
-			case models.JOB_DEPLOY_STATUS:
-				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgYellowColor}}
-			case models.JOB_RUNNING_STATUS:
-				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
-			case models.JOB_TERMINATED_STATUS:
-				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
-			case models.JOB_COMPLETED_STATUS:
-				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiMagentaColor}}
-			default:
-				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiCyanColor}}
-			}
-
+			rowColor := getColor(job.Status)
 			rowColorList = append(rowColorList, RowColor{
 				row:    i,
 				column: []int{5},
@@ -161,22 +148,9 @@ var taskDetail = &cli.Command{
 		taskData = append(taskData, []string{"HARDWARE:", job.Hardware})
 		taskData = append(taskData, []string{"STATUS:", models.GetJobStatus(job.Status)})
 
-		var rowColor []tablewriter.Colors
-		switch job.Status {
-		case models.JOB_DEPLOY_STATUS:
-			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgYellowColor}}
-		case models.JOB_RUNNING_STATUS:
-			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
-		case models.JOB_TERMINATED_STATUS:
-			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
-		case models.JOB_COMPLETED_STATUS:
-			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiMagentaColor}}
-		default:
-			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiCyanColor}}
-		}
-
 		header := []string{"JOB UUID:", job.JobUuid}
 
+		rowColor := getColor(job.Status)
 		var rowColorList []RowColor
 		rowColorList = append(rowColorList, RowColor{
 			row:    7,
@@ -225,4 +199,23 @@ var taskDelete = &cli.Command{
 		fmt.Printf("job_uuid: %s space serivce successfully deleted \n", job.JobUuid)
 		return nil
 	},
+}
+
+func getColor(status int) []tablewriter.Colors {
+	var rowColor []tablewriter.Colors
+	switch status {
+	case models.JOB_DEPLOY_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgYellowColor}}
+	case models.JOB_RUNNING_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
+	case models.JOB_TERMINATED_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
+	case models.JOB_COMPLETED_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiMagentaColor}}
+	case models.JOB_RECEIVED_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiBlueColor}}
+	default:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiCyanColor}}
+	}
+	return rowColor
 }
