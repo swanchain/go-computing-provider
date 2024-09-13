@@ -163,7 +163,7 @@ var taskDetail = &cli.Command{
 
 		var rowColorList []RowColor
 		rowColorList = append(rowColorList, RowColor{
-			row:    7,
+			row:    6,
 			column: []int{1},
 			color:  rowColor,
 		})
