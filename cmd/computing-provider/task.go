@@ -93,7 +93,7 @@ var taskList = &cli.Command{
 
 				var jobUuid string
 				if len(job.JobUuid) > 0 {
-					jobUuid = "..." + job.TaskUuid[26:]
+					jobUuid = "..." + job.JobUuid[26:]
 				}
 
 				var spaceUuid string
