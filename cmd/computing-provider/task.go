@@ -92,7 +92,7 @@ var taskList = &cli.Command{
 				}
 
 				var jobUuid string
-				if len(job.TaskUuid) > 0 {
+				if len(job.JobUuid) > 0 {
 					jobUuid = "..." + job.TaskUuid[26:]
 				}
 
@@ -155,6 +155,8 @@ var taskDetail = &cli.Command{
 		taskData = append(taskData, []string{"SPACE URL:", job.RealUrl})
 		taskData = append(taskData, []string{"HARDWARE:", job.Hardware})
 		taskData = append(taskData, []string{"STATUS:", models.GetJobStatus(job.Status)})
+		taskData = append(taskData, []string{"CREATE TIME:", time.Unix(job.CreateTime, 0).Format("2006-01-02 15:04:05")})
+		taskData = append(taskData, []string{"EXPIRE TIME:", time.Unix(job.ExpireTime, 0).Format("2006-01-02 15:04:05")})
 
 		rowColor := getColor(job.Status)
 		header := []string{"JOB UUID:", job.JobUuid}
