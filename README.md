@@ -570,7 +570,7 @@ computing-provider task list
 ```
 computing-provider task get [job_uuid]
 ```
-* Delete task by `task_uuid`
+* Delete task by `job_uuid`
 ```
 computing-provider task delete [job_uuid]
 ```
