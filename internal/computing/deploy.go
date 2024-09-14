@@ -36,7 +36,6 @@ type Deploy struct {
 	k8sNameSpace      string
 	SpacePath         string
 	TaskType          string
-	DeployName        string
 	hardwareDesc      string
 	taskUuid          string
 	gpuProductName    string
@@ -160,14 +159,12 @@ func (d *Deploy) DockerfileToK8s() {
 				},
 			},
 		}}
-	createDeployment, err := k8sService.CreateDeployment(context.TODO(), d.k8sNameSpace, deployment)
+	_, err = k8sService.CreateDeployment(context.TODO(), d.k8sNameSpace, deployment)
 	if err != nil {
 		logs.GetLogger().Error(err)
 		return
 	}
-	d.DeployName = createDeployment.GetName()
 	updateJobStatus(d.jobUuid, models.DEPLOY_PULL_IMAGE)
-	logs.GetLogger().Infof("Created deployment: %s", createDeployment.GetName())
 
 	if _, err := d.deployK8sResource(int32(containerPort)); err != nil {
 		logs.GetLogger().Error(err)
@@ -304,11 +301,10 @@ func (d *Deploy) YamlToK8s() error {
 				},
 			}}
 
-		createDeployment, err := k8sService.CreateDeployment(context.TODO(), d.k8sNameSpace, deployment)
+		_, err = k8sService.CreateDeployment(context.TODO(), d.k8sNameSpace, deployment)
 		if err != nil {
 			return err
 		}
-		d.DeployName = createDeployment.GetName()
 		updateJobStatus(d.jobUuid, models.DEPLOY_PULL_IMAGE)
 
 		serviceHost, err := d.deployK8sResource(cr.Ports[0].ContainerPort)
@@ -427,12 +423,11 @@ func (d *Deploy) ModelInferenceToK8s() error {
 				},
 			},
 		}}
-	createDeployment, err := k8sService.CreateDeployment(context.TODO(), d.k8sNameSpace, deployment)
+	_, err = k8sService.CreateDeployment(context.TODO(), d.k8sNameSpace, deployment)
 	if err != nil {
 		logs.GetLogger().Error(err)
 		return err
 	}
-	d.DeployName = createDeployment.GetName()
 	updateJobStatus(d.jobUuid, models.DEPLOY_PULL_IMAGE)
 
 	if _, err := d.deployK8sResource(int32(80)); err != nil {
@@ -543,11 +538,8 @@ func (d *Deploy) watchContainerRunningTime() {
 	var job = new(models.JobEntity)
 	job.JobUuid = d.jobUuid
 	job.ExpireTime = time.Now().Unix() + d.duration
-	job.K8sDeployName = d.DeployName
-	job.NameSpace = d.k8sNameSpace
 	job.ImageName = d.image
 	job.K8sResourceType = "deployment"
-	job.ResourceType = d.TaskType
 	if err := NewJobService().UpdateJobEntityByJobUuid(job); err != nil {
 		logs.GetLogger().Errorf("failed to update job info, error: %v", err)
 		return

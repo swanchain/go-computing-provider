@@ -196,7 +196,18 @@ func (task *CronTask) watchExpiredTask() {
 				// compatible with space_uuid
 				spaceUuidDeployName := constants.K8S_DEPLOY_NAME_PREFIX + strings.ToLower(job.SpaceUuid)
 				if _, ok = deployOnK8s[spaceUuidDeployName]; ok {
-					if NewJobService().GetJobEntityBySpaceUuid(job.SpaceUuid) > 0 {
+					if NewJobService().GetJobEntityBySpaceUuid(job.SpaceUuid) > 0 && time.Now().Unix() < job.ExpireTime {
+						if job.Status != models.JOB_RUNNING_STATUS {
+							foundDeployment, err := NewK8sService().k8sClient.AppsV1().Deployments(job.NameSpace).Get(context.TODO(), job.K8sDeployName, metav1.GetOptions{})
+							if err != nil {
+								continue
+							}
+							if foundDeployment.Status.AvailableReplicas > 0 {
+								job.PodStatus = models.POD_RUNNING_STATUS
+								job.Status = models.JOB_RUNNING_STATUS
+								NewJobService().UpdateJobEntityByJobUuid(job)
+							}
+						}
 						continue
 					}
 
@@ -221,13 +232,13 @@ func (task *CronTask) watchExpiredTask() {
 			currentTime := time.Now()
 			createdTime := time.Unix(job.CreateTime, 0)
 			createDuration := currentTime.Sub(createdTime)
-			if createDuration.Hours() <= 2 && job.Status != models.JOB_RUNNING_STATUS {
-				continue
-			}
 
 			if job.NameSpace != "" && job.K8sDeployName != "" {
-				_, err = NewK8sService().k8sClient.AppsV1().Deployments(job.NameSpace).Get(context.TODO(), job.K8sDeployName, metav1.GetOptions{})
+				foundDeployment, err := NewK8sService().k8sClient.AppsV1().Deployments(job.NameSpace).Get(context.TODO(), job.K8sDeployName, metav1.GetOptions{})
 				if err != nil {
+					if createDuration.Hours() <= 2 && job.Status != models.JOB_RUNNING_STATUS {
+						continue
+					}
 					if errors.IsNotFound(err) {
 						// delete job
 						logs.GetLogger().Warnf("not found deployment on the cluster, job_uuid: %s, deployment: %s", job.JobUuid, job.K8sDeployName)
@@ -236,6 +247,18 @@ func (task *CronTask) watchExpiredTask() {
 					}
 					logs.GetLogger().Errorf("failed to get deployment: %s, error: %v", job.K8sDeployName, err)
 					continue
+				}
+
+				if foundDeployment.Status.AvailableReplicas == 0 && createDuration.Hours() > 2 { // need to delete
+					DeleteJob(job.NameSpace, job.JobUuid, "cron-task correction status")
+					deleteSpaceIdAndJobUuid[job.JobUuid] = job.SpaceUuid + "_" + job.JobUuid
+					continue
+				} else {
+					if job.Status != models.JOB_RUNNING_STATUS {
+						job.PodStatus = models.POD_RUNNING_STATUS
+						job.Status = models.JOB_RUNNING_STATUS
+						NewJobService().UpdateJobEntityByJobUuid(job)
+					}
 				}
 			}
 
@@ -518,21 +541,21 @@ func checkFcpJobInfoInChain(job *models.JobEntity) {
 	if err != nil {
 		return
 	}
+	if taskInfo.TaskUuid != "" {
+		if taskInfo.TaskStatus == models.COMPLETED {
+			job.Status = models.JOB_COMPLETED_STATUS
+		} else if taskInfo.TaskStatus == models.TERMINATED {
+			job.Status = models.JOB_TERMINATED_STATUS
+		}
 
-	if taskInfo.TaskStatus == models.COMPLETED {
-		job.Status = models.JOB_COMPLETED_STATUS
-	} else if taskInfo.TaskStatus == models.TERMINATED {
-		job.Status = models.JOB_TERMINATED_STATUS
-	}
-
-	expiredTime := taskInfo.StartTimestamp + taskInfo.Duration
-	if expiredTime > 0 {
-		job.ExpireTime = expiredTime
-		if err := NewJobService().UpdateJobEntityByJobUuid(job); err != nil {
-			logs.GetLogger().Errorf("update job info by jobUuid failed, error: %v", err)
+		expiredTime := taskInfo.StartTimestamp + taskInfo.Duration
+		if expiredTime > 0 {
+			job.ExpireTime = expiredTime
+			if err := NewJobService().UpdateJobEntityByJobUuid(job); err != nil {
+				logs.GetLogger().Errorf("update job info by jobUuid failed, error: %v", err)
+			}
 		}
 	}
-
 }
 
 type TaskGroup struct {

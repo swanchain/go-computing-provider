@@ -450,13 +450,9 @@ func (s *K8sService) GetResourceExporterPodLog(ctx context.Context) (map[string]
 			continue
 		}
 
-		if strings.Contains(podLog, "ERROR::") {
-			continue
-		}
-
 		var nodeInfo models.CollectNodeInfo
 		if err := json.Unmarshal([]byte(podLog), &nodeInfo); err != nil {
-			logs.GetLogger().Error("nodeName: %s, collect gpu error: %+v", pod.Spec.NodeName, err)
+			s.k8sClient.CoreV1().Pods("kube-system").Delete(ctx, pod.Name, metaV1.DeleteOptions{})
 			continue
 		}
 		result[pod.Spec.NodeName] = nodeInfo

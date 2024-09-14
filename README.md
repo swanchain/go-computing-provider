@@ -566,13 +566,13 @@ nohup computing-provider run >> cp.log 2>&1 &
 ```
 computing-provider task list 
 ```
-* Retrieve detailed information for a specific task using `task_uuid`
+* Retrieve detailed information for a specific task using `job_uuid`
 ```
-computing-provider task get [task_uuid]
+computing-provider task get [job_uuid]
 ```
-* Delete task by `task_uuid`
+* Delete task by `job_uuid`
 ```
-computing-provider task delete [task_uuid]
+computing-provider task delete [job_uuid]
 ```
 
 ## Getting Help

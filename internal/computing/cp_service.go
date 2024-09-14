@@ -178,6 +178,9 @@ func ReceiveJob(c *gin.Context) {
 		jobEntity.Name = spaceDetail.Data.Space.Name
 		jobEntity.Hardware = spaceDetail.Data.Space.ActiveOrder.Config.Description
 		jobEntity.SpaceType = 0
+		jobEntity.ResourceType = spaceDetail.Data.Space.ActiveOrder.Config.HardwareType
+		jobEntity.NameSpace = constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(spaceDetail.Data.Owner.PublicAddress)
+		jobEntity.K8sDeployName = constants.K8S_DEPLOY_NAME_PREFIX + strings.ToLower(jobData.UUID)
 		jobEntity.Status = models.JOB_RECEIVED_STATUS
 		err = NewJobService().SaveJobEntity(jobEntity)
 		if err != nil {

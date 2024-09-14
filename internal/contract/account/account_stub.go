@@ -155,7 +155,7 @@ func (s *CpStub) ChangeWorkerAddress(newWorkerAddress common.Address) (string, e
 func (s *CpStub) GetCpAccountInfo() (models.Account, error) {
 	cpAccount, err := s.account.GetAccount(&bind.CallOpts{})
 	if err != nil {
-		return models.Account{}, fmt.Errorf("cpAccount client create GetCpAccountInfo tx error: %+v", err)
+		return models.Account{}, fmt.Errorf("cpAccount client GetCpAccountInfo error: %+v", err)
 	}
 	var account models.Account
 	account.OwnerAddress = cpAccount.Owner.Hex()
