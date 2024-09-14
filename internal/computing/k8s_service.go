@@ -1064,6 +1064,61 @@ func (s *K8sService) GenerateGlobalNetworkPoliciesForDNS() error {
 	return nil
 }
 
+func (s *K8sService) GenerateGlobalNetworkForPodInNamespace() error {
+	calicoCs, err := calicoclientset.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("failed to create calico client, error: %v", err)
+	}
+
+	icmp := numorstring.ProtocolFromString(numorstring.ProtocolICMP)
+	tcp := numorstring.ProtocolFromString(numorstring.ProtocolTCP)
+	udp := numorstring.ProtocolFromString(numorstring.ProtocolUDP)
+	order110 := float64(110)
+
+	outGnp := &calicov3.GlobalNetworkPolicy{
+		TypeMeta: metaV1.TypeMeta{
+			APIVersion: "projectcalico.org/v3",
+			Kind:       "GlobalNetworkPolicy",
+		},
+		ObjectMeta: metaV1.ObjectMeta{
+			Name: models.NetworkGlobalPodInNamespace,
+		},
+		Spec: calicov3.GlobalNetworkPolicySpec{
+			Order:             &order110,
+			NamespaceSelector: "has(projectcalico.org/name) && projectcalico.org/name not in {\"kube-system\", \"calico-system\", \"calico-apiserver\", \"ingress-nginx\"}",
+			Types:             []calicov3.PolicyType{calicov3.PolicyTypeEgress},
+			Egress: []calicov3.Rule{
+				{
+					Action:   calicov3.Deny,
+					Protocol: &tcp,
+					Destination: calicov3.EntityRule{
+						NamespaceSelector: "has(projectcalico.org/name) && projectcalico.org/name not in {\"kube-system\", \"calico-system\", \"calico-apiserver\", \"ingress-nginx\"}",
+					},
+				},
+				{
+					Action:   calicov3.Deny,
+					Protocol: &udp,
+					Destination: calicov3.EntityRule{
+						NamespaceSelector: "has(projectcalico.org/name) && projectcalico.org/name not in {\"kube-system\", \"calico-system\", \"calico-apiserver\", \"ingress-nginx\"}",
+					},
+				},
+				{
+					Action:   calicov3.Deny,
+					Protocol: &icmp,
+					Destination: calicov3.EntityRule{
+						NamespaceSelector: "has(projectcalico.org/name) && projectcalico.org/name not in {\"kube-system\", \"calico-system\", \"calico-apiserver\", \"ingress-nginx\"}",
+					},
+				},
+			},
+		},
+	}
+	_, err = calicoCs.ProjectcalicoV3().GlobalNetworkPolicies().Create(context.Background(), outGnp, metaV1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to create pod in namespace GlobalNetworkPolicy, name: %s, error: %v", models.NetworkGlobalPodInNamespace, err)
+	}
+	return nil
+}
+
 func (s *K8sService) GetUsedNodePorts() (map[int32]struct{}, error) {
 	services, err := s.k8sClient.CoreV1().Services(metaV1.NamespaceAll).List(context.TODO(), metaV1.ListOptions{})
 	if err != nil {

@@ -57,6 +57,7 @@ func checkClusterNetworkPolicy() {
 			NewK8sService().DeleteGlobalNetworkPolicy(models.NetworkGlobalInAccess)
 			NewK8sService().DeleteGlobalNetworkPolicy(models.NetworkGlobalNamespace)
 			NewK8sService().DeleteGlobalNetworkPolicy(models.NetworkGlobalDns)
+			NewK8sService().DeleteGlobalNetworkPolicy(models.NetworkGlobalPodInNamespace)
 		}
 	}()
 
@@ -130,6 +131,18 @@ func checkClusterNetworkPolicy() {
 				return
 			}
 		}
+
+		podInNsGnp, err := NewK8sService().GetGlobalNetworkPolicy(models.NetworkGlobalPodInNamespace)
+		if err != nil {
+			logs.GetLogger().Error(err)
+			return
+		}
+		if podInNsGnp.Name == "" {
+			if err = NewK8sService().GenerateGlobalNetworkForPodInNamespace(); err != nil {
+				logs.GetLogger().Error(err)
+				return
+			}
+		}
 	}
 
 	NetworkPolicyFlag = true
@@ -182,6 +195,12 @@ func generateNewNetworkPolicy() {
 		logs.GetLogger().Error(err)
 		return
 	}
+
+	if err = NewK8sService().GenerateGlobalNetworkForPodInNamespace(); err != nil {
+		logs.GetLogger().Error(err)
+		return
+	}
+
 	NetworkPolicyFlag = true
 	logs.GetLogger().Infof("finished genreate global network policy")
 }
