@@ -285,6 +285,17 @@ var stateInfoCmd = &cli.Command{
 		}
 		defer client.Close()
 
+		cpAccountAddress := cctx.Args().Get(0)
+		cpAccount := common.HexToAddress(cpAccountAddress)
+		bytecode, err := client.CodeAt(context.Background(), cpAccount, nil)
+		if err != nil {
+			return fmt.Errorf("failed to check cp account contract address, error: %v", err)
+		}
+
+		if len(bytecode) <= 0 {
+			return fmt.Errorf("the cp_account_contract_address parameter must be a cpAccount contract address")
+		}
+
 		var sequencerBalance = "0.0000"
 		var fcpCollateralBalance = "0.0000"
 		var fcpEscrowBalance = "0.0000"
@@ -295,7 +306,7 @@ var stateInfoCmd = &cli.Command{
 		var chainMultiAddress string
 		var contractAddress, ownerAddress, workerAddress, beneficiaryAddress, taskTypes, chainNodeId, version string
 
-		cpStub, err := account.NewAccountStub(client, account.WithContractAddress(cctx.Args().Get(0)))
+		cpStub, err := account.NewAccountStub(client, account.WithContractAddress(cpAccountAddress))
 		if err == nil {
 			cpAccount, err := cpStub.GetCpAccountInfo()
 			if err != nil {
@@ -404,6 +415,26 @@ var taskInfoCmd = &cli.Command{
 		taskContract := cctx.Args().Get(0)
 		if strings.TrimSpace(taskContract) == "" {
 			return fmt.Errorf("the task contract address is required")
+		}
+
+		chainRpc, err := conf.GetRpcByNetWorkName()
+		if err != nil {
+			return err
+		}
+		client, err := ethclient.Dial(chainRpc)
+		if err != nil {
+			return err
+		}
+		defer client.Close()
+
+		cpAccount := common.HexToAddress(taskContract)
+		bytecode, err := client.CodeAt(context.Background(), cpAccount, nil)
+		if err != nil {
+			return fmt.Errorf("failed to check the task contract address, error: %v", err)
+		}
+
+		if len(bytecode) <= 0 {
+			return fmt.Errorf("the task_contract_address parameter must be a cpAccount contract address")
 		}
 
 		taskInfo, err := computing.GetTaskInfoOnChain(taskContract)
