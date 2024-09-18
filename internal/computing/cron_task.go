@@ -434,7 +434,7 @@ func (task *CronTask) checkJobReward() {
 
 func (task *CronTask) getUbiTaskReward() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("* 0/10 * * * ?", func() {
+	c.AddFunc("0 */10 * * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("task job: [GetUbiTaskReward], error: %+v", err)
