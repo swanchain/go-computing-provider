@@ -293,7 +293,7 @@ var stateInfoCmd = &cli.Command{
 		}
 
 		if len(bytecode) <= 0 {
-			return fmt.Errorf("the cp_account_contract_address parameter must be a cpAccount contract address")
+			return fmt.Errorf("the %s parameter is not a cpAccount contract address", cpAccountAddress)
 		}
 
 		var sequencerBalance = "0.0000"
@@ -427,14 +427,14 @@ var taskInfoCmd = &cli.Command{
 		}
 		defer client.Close()
 
-		cpAccount := common.HexToAddress(taskContract)
-		bytecode, err := client.CodeAt(context.Background(), cpAccount, nil)
+		taskContractAddress := common.HexToAddress(taskContract)
+		bytecode, err := client.CodeAt(context.Background(), taskContractAddress, nil)
 		if err != nil {
 			return fmt.Errorf("failed to check the task contract address, error: %v", err)
 		}
 
 		if len(bytecode) <= 0 {
-			return fmt.Errorf("the task_contract_address parameter must be a cpAccount contract address")
+			return fmt.Errorf("the %s parameter is not a task contract address", taskContract)
 		}
 
 		taskInfo, err := computing.GetTaskInfoOnChain(taskContract)
