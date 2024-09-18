@@ -204,6 +204,10 @@ var daemonCmd = &cli.Command{
 		router.POST("/cp/ubi", computing.DoUbiTaskForDocker)
 		router.POST("/cp/docker/receive/ubi", computing.ReceiveUbiProof)
 
+		ecpImageService := computing.NewImageJobService()
+		router.POST("/cp/deploy", ecpImageService.DeployJob)
+		router.DELETE("/cp/job/:job_uuid", ecpImageService.DeleteJob)
+
 		shutdownChan := make(chan struct{})
 		httpStopper, err := util.ServeHttp(r, "cp-api", ":"+strconv.Itoa(conf.GetConfig().API.Port), false)
 		if err != nil {

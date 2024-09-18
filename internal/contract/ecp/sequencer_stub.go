@@ -115,7 +115,7 @@ func (s *SequencerStub) GetCPBalance() (string, error) {
 
 	balance, err := s.sequencer.GetCPBalance(&bind.CallOpts{}, common.HexToAddress(s.cpAccountAddress))
 	if err != nil {
-		return "", fmt.Errorf("address: %s, ECP sequencer client withdraw tx error: %+v", s.cpAccountAddress, err)
+		return "", fmt.Errorf("address: %s, ECP sequencer client get balance tx error: %+v", s.cpAccountAddress, err)
 	}
 	return contract.BalanceToStr2(balance), nil
 }
