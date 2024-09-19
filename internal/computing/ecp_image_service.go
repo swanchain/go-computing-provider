@@ -103,14 +103,21 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 }
 
 func (*ImageJobService) GetJobStatus(c *gin.Context) {
-	status, err := NewDockerService().GetContainerStatus()
+	ecpJobs, err := NewEcpJobService().GetEcpJobs()
 	if err != nil {
 		return
 	}
-	for k, v := range status {
-		fmt.Printf("container name: %s, status: %s \n", k, v)
+
+	containerStatus, err := NewDockerService().GetContainerStatus()
+	if err != nil {
+		return
 	}
 
+	for _, entity := range ecpJobs {
+		if status, ok := containerStatus[entity.Name]; ok {
+			fmt.Printf("container name: %s, status: %s \n", entity.Name, status)
+		}
+	}
 }
 
 func (*ImageJobService) DeleteJob(c *gin.Context) {

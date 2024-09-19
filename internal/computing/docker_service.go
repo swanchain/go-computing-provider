@@ -465,7 +465,8 @@ func (ds *DockerService) GetContainerStatus() (map[string]string, error) {
 	var containerStatus = make(map[string]string)
 	for _, c := range containers {
 		for _, name := range c.Names {
-			containerStatus[name] = c.Status
+			name = name[1:]
+			containerStatus[name] = c.State
 		}
 	}
 	return containerStatus, nil
