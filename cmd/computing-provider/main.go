@@ -43,6 +43,7 @@ func main() {
 			sequencerCmd,
 			ubiTaskCmd,
 			contractCmd,
+			priceCmd,
 		},
 		Before: func(c *cli.Context) error {
 			cpRepoPath, err := homedir.Expand(c.String(FlagRepo.Name))

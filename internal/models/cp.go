@@ -164,6 +164,17 @@ type TaskInfoOnChain struct {
 	CollateralStatus   int
 }
 
+type ResourcePrice struct {
+	CpuPrice         string            `json:"cpu_price"`
+	MemoryPrice      string            `json:"memory_price"`
+	HdEphemeralPrice string            `json:"hd_ephemeral_price"`
+	HdPersHddPrice   string            `json:"hd_pers_hdd_price"`
+	HdPersSsdPrice   string            `json:"hd_pers_ssd_price"`
+	HdPersNvmePrice  string            `json:"hd_pers_nvme_price"`
+	GpuDefaultPrice  string            `json:"gpu_default_price"`
+	GpusPrice        map[string]string `json:"gpus_price"`
+}
+
 const (
 	NOT_ASSIGNED = iota
 	IN_PROGRESS

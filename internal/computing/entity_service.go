@@ -71,10 +71,6 @@ func (jobServ JobService) SaveJobEntity(job *models.JobEntity) (err error) {
 	return jobServ.Save(job).Error
 }
 
-func (jobServ JobService) UpdateJobEntityBySpaceUuid(job *models.JobEntity) (err error) {
-	return jobServ.Model(&models.JobEntity{}).Where("space_uuid=? and delete_at=?", job.SpaceUuid, models.UN_DELETEED_FLAG).Updates(job).Error
-}
-
 func (jobServ JobService) UpdateJobEntityByJobUuid(job *models.JobEntity) (err error) {
 	return jobServ.Where("job_uuid=? and delete_at=?", job.JobUuid, models.UN_DELETEED_FLAG).Updates(job).Error
 }
@@ -89,20 +85,28 @@ func (jobServ JobService) GetJobEntityByTaskUuid(taskUuid string) (models.JobEnt
 	return job, err
 }
 
-func (jobServ JobService) GetJobEntityBySpaceUuid(spaceUuid string) (models.JobEntity, error) {
-	var job models.JobEntity
-	err := jobServ.Model(&models.JobEntity{}).Where("space_uuid=? and delete_at=?", spaceUuid, models.UN_DELETEED_FLAG).Find(&job).Error
-	return job, err
+func (jobServ JobService) GetJobEntityBySpaceUuid(spaceUuid string) int64 {
+	var count int64
+	jobServ.Model(&models.JobEntity{}).Where("space_uuid=? and delete_at=?", spaceUuid, models.UN_DELETEED_FLAG).Count(&count)
+	return count
 }
 
 func (jobServ JobService) GetJobEntityByJobUuid(jobUuid string) (models.JobEntity, error) {
 	var job models.JobEntity
-	err := jobServ.Model(&models.JobEntity{}).Where("job_uuid=? and delete_at=?", jobUuid, models.UN_DELETEED_FLAG).Find(&job).Error
+	err := jobServ.Model(&models.JobEntity{}).Where("job_uuid=?", jobUuid).Find(&job).Error
 	return job, err
 }
 
-func (jobServ JobService) DeleteJobEntityBySpaceUuId(spaceUuid string, jobStatus int) error {
-	return jobServ.Model(&models.JobEntity{}).Where("space_uuid=? and delete_at=?", spaceUuid, models.UN_DELETEED_FLAG).Updates(map[string]interface{}{
+func (jobServ JobService) DeleteJobEntityByJobUuId(jobUuid string, jobStatus int) error {
+	return jobServ.Model(&models.JobEntity{}).Where("job_uuid=? and delete_at=?", jobUuid, models.UN_DELETEED_FLAG).Updates(map[string]interface{}{
+		"delete_at":  models.DELETED_FLAG,
+		"status":     jobStatus,
+		"pod_status": models.POD_DELETE_STATUS,
+	}).Error
+}
+
+func (jobServ JobService) DeleteJobEntityBySpaceUuId(spaceUuid, jobUuid string, jobStatus int) error {
+	return jobServ.Model(&models.JobEntity{}).Where("job_uuid=? and space_uuid=? and delete_at=?", jobUuid, spaceUuid, models.UN_DELETEED_FLAG).Updates(map[string]interface{}{
 		"delete_at":  models.DELETED_FLAG,
 		"status":     jobStatus,
 		"pod_status": models.POD_DELETE_STATUS,
@@ -129,18 +133,6 @@ func (jobServ JobService) UpdateJobScannedBlock(taskUuid string, end uint64) (er
 func (jobServ JobService) GetJobListByNoReward() (list []*models.JobEntity, err error) {
 	err = jobServ.Model(&models.JobEntity{}).Where("status in ? and (reward is null or reward ='')", []int{models.JOB_COMPLETED_STATUS, models.TERMINATED}).Find(&list).Error
 	return
-}
-
-func (jobServ JobService) DeleteJobs(spaceIds []string) (err error) {
-	return jobServ.Model(&models.JobEntity{}).Where("space_uuid in ? and delete_at=?", spaceIds, models.UN_DELETEED_FLAG).Update("delete_at", models.DELETED_FLAG).Error
-}
-
-func (jobServ JobService) UpdateAllJobStatusToDeleted() error {
-	return jobServ.Model(&models.JobEntity{}).Where("delete_at=?", models.UN_DELETEED_FLAG).Updates(map[string]interface{}{
-		"delete_at":  models.DELETED_FLAG,
-		"status":     models.JOB_COMPLETED_STATUS,
-		"pod_status": models.POD_DELETE_STATUS,
-	}).Error
 }
 
 type CpInfoService struct {

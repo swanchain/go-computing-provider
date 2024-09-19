@@ -26,8 +26,5 @@ clean:
 mainnet: GOFLAGS+= -ldflags="$(ldflags) -X github.com/swanchain/go-computing-provider/build.NetWorkTag=mainnet"
 mainnet: computing-provider
 
-testnet: GOFLAGS+= -ldflags="$(ldflags) -X github.com/swanchain/go-computing-provider/build.NetWorkTag=proxima"
+testnet: GOFLAGS+= -ldflags="$(ldflags) -X github.com/swanchain/go-computing-provider/build.NetWorkTag=testnet"
 testnet: computing-provider
-
-dev: GOFLAGS+= -ldflags="$(ldflags) -X github.com/swanchain/go-computing-provider/build.NetWorkTag=dev-proxima"
-dev: computing-provider

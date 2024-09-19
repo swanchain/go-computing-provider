@@ -84,7 +84,7 @@ func (s *CollateralStub) Deposit(amount *big.Int) (string, error) {
 
 	transaction, err := s.collateral.Deposit(txOptions, common.HexToAddress(s.cpAccountAddress), amount)
 	if err != nil {
-		return "", fmt.Errorf("address: %s, ECP collateral client create deposit tx error: %+v", publicAddress, err)
+		return "", fmt.Errorf("address: %s, ECP collateral client deposit tx error: %+v", publicAddress, err)
 	}
 	return transaction.Hash().String(), nil
 }
@@ -110,7 +110,7 @@ func (s *CollateralStub) Withdraw(amount *big.Int) (string, error) {
 
 	transaction, err := s.collateral.Withdraw(txOptions, common.HexToAddress(s.cpAccountAddress), amount)
 	if err != nil {
-		return "", fmt.Errorf("address: %s, ECP collateral client create withdraw tx error: %+v", publicAddress, err)
+		return "", fmt.Errorf("address: %s, ECP collateral client withdraw tx error: %+v", publicAddress, err)
 	}
 	return transaction.Hash().String(), nil
 }

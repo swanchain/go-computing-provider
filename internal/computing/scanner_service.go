@@ -15,9 +15,10 @@ import (
 type TaskManagerContract struct {
 	cpAccount         string
 	taskManagerClient *fcp.FcpTaskManager
+	job               *models.JobEntity
 }
 
-func NewTaskManagerContract() *TaskManagerContract {
+func NewTaskManagerContract(job *models.JobEntity) *TaskManagerContract {
 	cpAccountAddress, err := contract.GetCpAccountAddress()
 	if err != nil {
 		logs.GetLogger().Errorf("get cp account contract address failed, error: %v", err)
@@ -25,10 +26,19 @@ func NewTaskManagerContract() *TaskManagerContract {
 	}
 	return &TaskManagerContract{
 		cpAccount: cpAccountAddress,
+		job:       job,
 	}
 }
 
-func (taskManager *TaskManagerContract) Scan(job *models.JobEntity) {
+func (taskManager *TaskManagerContract) Scan() {
+	job := taskManager.job
+	var end uint64
+	defer func() {
+		if err := NewJobService().UpdateJobScannedBlock(job.TaskUuid, end); err != nil {
+			logs.GetLogger().Errorf("save job %s scanned block %d err: %v", job.TaskUuid, end, err)
+		}
+	}()
+
 	scannedBlock := taskManager.ScannedBlock(job)
 	start := scannedBlock
 	if scannedBlock != 0 {
@@ -67,8 +77,9 @@ func (taskManager *TaskManagerContract) Scan(job *models.JobEntity) {
 	}
 
 	var step uint64 = 1000
+
 	for i := start; i <= endBlockNumber; i = i + step {
-		end := i + step - 1
+		end = i + step - 1
 		if end > endBlockNumber {
 			end = endBlockNumber
 		}
@@ -80,9 +91,6 @@ func (taskManager *TaskManagerContract) Scan(job *models.JobEntity) {
 		if err := taskManager.scanTaskRewards(job, filterOps); err != nil {
 			logs.GetLogger().Error(err)
 			return
-		}
-		if err := NewJobService().UpdateJobScannedBlock(job.TaskUuid, end); err != nil {
-			logs.GetLogger().Errorf("save job %s scanned block %d err: %v", job.TaskUuid, end, err)
 		}
 	}
 }
