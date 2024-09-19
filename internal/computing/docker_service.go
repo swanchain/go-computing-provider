@@ -455,6 +455,22 @@ func (ds *DockerService) SaveDockerImage(imageName string) (string, error) {
 	return tarFile, nil
 }
 
+func (ds *DockerService) GetContainerStatus() (map[string]string, error) {
+	ctx := context.Background()
+	containers, err := ds.c.ContainerList(ctx, container.ListOptions{All: true})
+	if err != nil {
+		return nil, fmt.Errorf("Error getting container list: %s\n", err)
+	}
+
+	var containerStatus = make(map[string]string)
+	for _, c := range containers {
+		for _, name := range c.Names {
+			containerStatus[name] = c.Status
+		}
+	}
+	return containerStatus, nil
+}
+
 func ImportImageToContainerd(tarFile string) error {
 	defer os.Remove(tarFile)
 	client, err := containerd.New("/run/containerd/containerd.sock")

@@ -102,6 +102,17 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
 }
 
+func (*ImageJobService) GetJobStatus(c *gin.Context) {
+	status, err := NewDockerService().GetContainerStatus()
+	if err != nil {
+		return
+	}
+	for k, v := range status {
+		fmt.Printf("container name: %s, status: %s \n", k, v)
+	}
+
+}
+
 func (*ImageJobService) DeleteJob(c *gin.Context) {
 	jobUuId := c.Param("job_uuid")
 	if strings.TrimSpace(jobUuId) == "" {

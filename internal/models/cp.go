@@ -94,8 +94,11 @@ type UbiC2Proof struct {
 }
 
 type TaskResource struct {
-	CPU     string `json:"cpu"`
-	GPU     string `json:"gpu"`
+	CPU string `json:"cpu"`
+	GPU struct {
+		ProductName string `json:"product_name"`
+		Count       string `json:"count"`
+	} `json:"gpu"`
 	Memory  string `json:"memory"`
 	Storage string `json:"storage"`
 }
