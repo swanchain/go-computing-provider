@@ -168,7 +168,7 @@ func (cpServ EcpJobService) SaveEcpJobEntity(job *models.EcpJobEntity) (err erro
 	return cpServ.Save(job).Error
 }
 
-func (cpServ EcpJobService) DeleteCpInfoByNodeId(uuid string) (err error) {
+func (cpServ EcpJobService) DeleteContainerByUuid(uuid string) (err error) {
 	return cpServ.Model(&models.EcpJobEntity{}).Where("uuid =?", uuid).Update("delete_at", "1").Error
 }
 

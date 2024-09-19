@@ -119,5 +119,7 @@ func (*ImageJobService) DeleteJob(c *gin.Context) {
 		logs.GetLogger().Errorf("failed to remove container, job_uuid: %s, error: %v", jobUuId, err)
 		return
 	}
+	NewEcpJobService().DeleteContainerByUuid(jobUuId)
+
 	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
 }
