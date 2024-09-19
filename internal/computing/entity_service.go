@@ -160,7 +160,7 @@ type EcpJobService struct {
 
 func (cpServ EcpJobService) GetEcpJobByUuid(uuid string) (*models.EcpJobEntity, error) {
 	var job models.EcpJobEntity
-	err := cpServ.Model(&models.EcpJobEntity{}).Where("uuid=?", uuid).Find(&job).Error
+	err := cpServ.Model(&models.EcpJobEntity{}).Where("uuid=? and delete_at=0", uuid).Find(&job).Error
 	return &job, err
 }
 
