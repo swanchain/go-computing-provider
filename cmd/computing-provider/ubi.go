@@ -197,9 +197,7 @@ var daemonCmd = &cli.Command{
 		}))
 		pprof.Register(r)
 
-		v1 := r.Group("/api/v1")
-		router := v1.Group("/computing")
-
+		router := r.Group("/api/v1/computing")
 		router.GET("/cp", computing.GetCpResource)
 		router.POST("/cp/ubi", computing.DoUbiTaskForDocker)
 		router.POST("/cp/docker/receive/ubi", computing.ReceiveUbiProof)
