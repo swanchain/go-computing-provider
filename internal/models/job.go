@@ -6,7 +6,7 @@ type EcpJobCreateReq struct {
 	Image    string            `json:"image"`
 	EnvVar   map[string]string `json:"env_var"`
 	Duration int               `json:"duration"`
-	Resource *TaskResource     `json:"resource"`
+	//Resource *TaskResource     `json:"resource"`
 }
 
 type EcpJobDeleteReq struct {

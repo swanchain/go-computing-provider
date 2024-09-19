@@ -115,7 +115,7 @@ func (*ImageJobService) GetJobStatus(c *gin.Context) {
 
 	for _, entity := range ecpJobs {
 		if status, ok := containerStatus[entity.ContainerName]; ok {
-			fmt.Printf("container name: %s, status: %s \n", entity.Name, status)
+			fmt.Printf("container name: %s, status: %s \n", entity.ContainerName, status)
 		}
 	}
 }
