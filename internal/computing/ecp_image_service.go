@@ -48,7 +48,20 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
 
+	var needResource container.Resources
+	needResource = container.Resources{
+		DeviceRequests: []container.DeviceRequest{
+			{
+				Driver:       "nvidia",
+				Count:        -1,
+				Capabilities: [][]string{{"gpu"}},
+				Options:      nil,
+			},
+		},
+	}
+
 	hostConfig := &container.HostConfig{
+		Resources:  needResource,
 		Privileged: true,
 	}
 	containerConfig := &container.Config{
