@@ -8,6 +8,7 @@ import (
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"github.com/swanchain/go-computing-provider/util"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -28,6 +29,19 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 	}
 	logs.GetLogger().Infof("Job received Data: %+v", job)
 
+	checkPriceFlag, totalCost, err := checkPrice(job.Price, job.Duration, job.Resource)
+	if err != nil {
+		logs.GetLogger().Errorf("failed to check price, job_uuid: %s, error: %v", job.UUID, err)
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
+		return
+	}
+
+	if !checkPriceFlag {
+		logs.GetLogger().Errorf("bid below the set price, job_uuid: %s, pid: %s, need: %0.4f", job.UUID, job.Price, totalCost)
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BelowPriceError))
+		return
+	}
+
 	if strings.TrimSpace(job.Name) == "" {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: name"))
 		return
@@ -44,7 +58,7 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 	}
 
 	var env []string
-	for k, v := range job.EnvVar {
+	for k, v := range job.Envs {
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
 
@@ -75,27 +89,26 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 	containerName := job.Name + "-" + generateString(5)
 	dockerService := NewDockerService()
 	if err := dockerService.ContainerCreateAndStart(containerConfig, hostConfig, containerName); err != nil {
-		logs.GetLogger().Errorf("failed to create job container, job_uuid: %s, error: %v", job.Uuid, err)
+		logs.GetLogger().Errorf("failed to create job container, job_uuid: %s, error: %v", job.UUID, err)
 		return
 	}
-	logs.GetLogger().Warnf("job_uuid: %s, starting container, container name: %s", job.Uuid, containerName)
+	logs.GetLogger().Warnf("job_uuid: %s, starting container, container name: %s", job.UUID, containerName)
 
 	time.Sleep(3 * time.Second)
 	if !dockerService.IsExistContainer(containerName) {
-		logs.GetLogger().Warnf("job_uuid: %s, not found container", job.Uuid)
+		logs.GetLogger().Warnf("job_uuid: %s, not found container", job.UUID)
 		return
 	}
-	logs.GetLogger().Warnf("job_uuid: %s, started container, container name: %s", job.Uuid, containerName)
+	logs.GetLogger().Warnf("job_uuid: %s, started container, container name: %s", job.UUID, containerName)
 
-	err := NewEcpJobService().SaveEcpJobEntity(&models.EcpJobEntity{
-		Uuid:          job.Uuid,
+	if err = NewEcpJobService().SaveEcpJobEntity(&models.EcpJobEntity{
+		Uuid:          job.UUID,
 		Name:          job.Name,
 		Image:         job.Image,
 		Env:           strings.Join(env, ","),
 		ContainerName: containerName,
 		CreateTime:    time.Now().Unix(),
-	})
-	if err != nil {
+	}); err != nil {
 		logs.GetLogger().Errorf("failed to save job to db, error: %v", err)
 		return
 	}
@@ -140,4 +153,49 @@ func (*ImageJobService) DeleteJob(c *gin.Context) {
 	NewEcpJobService().DeleteContainerByUuid(jobUuId)
 
 	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
+}
+
+func checkPrice(userPrice string, duration int, resource models.HardwareResource) (bool, float64, error) {
+	priceConfig, err := ReadPriceConfig()
+	if err != nil {
+		return false, 0, err
+	}
+
+	userPayPrice, err := parsePrice(userPrice)
+	if err != nil {
+		return false, 0, fmt.Errorf("failed to converting user price: %v", err)
+	}
+
+	// Convert price strings to float64
+	cpuPrice, err := parsePrice(priceConfig.TARGET_CPU)
+	if err != nil {
+		return false, 0, fmt.Errorf("failed to converting CPU price: %v", err)
+	}
+	memoryPrice, err := parsePrice(priceConfig.TARGET_MEMORY)
+	if err != nil {
+		return false, 0, fmt.Errorf("failed to converting Memory price: %v", err)
+	}
+	storagePrice, err := parsePrice(priceConfig.TARGET_HD_EPHEMERAL)
+	if err != nil {
+		return false, 0, fmt.Errorf("failed to converting Storage price: %v", err)
+	}
+	gpuPrice, err := parsePrice(priceConfig.TARGET_GPU_DEFAULT)
+	if err != nil {
+		return false, 0, fmt.Errorf("failed to converting GPU price: %v", err)
+	}
+
+	// Calculate total cost
+	cpuCost := float64(resource.CPU) * cpuPrice * float64(duration/3600)
+	memoryCost := float64(resource.Memory) * memoryPrice * float64(duration/3600)
+	storageCost := float64(resource.Storage) * storagePrice * float64(duration/3600)
+	gpuCost := float64(resource.GPU) * gpuPrice * float64(duration/3600)
+
+	totalCost := cpuCost + memoryCost + storageCost + gpuCost
+
+	// Compare user's price with total cost
+	return userPayPrice >= totalCost, totalCost, nil
+}
+
+func parsePrice(priceStr string) (float64, error) {
+	return strconv.ParseFloat(priceStr, 64)
 }

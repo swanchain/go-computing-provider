@@ -60,6 +60,8 @@ const (
 	GenerateRsaError           = 4017
 	SaveRsaKeyError            = 4018
 	ReadRsaKeyError            = 4019
+	CheckPriceError            = 4020
+	BelowPriceError            = 4021
 
 	ProofParamError   = 7001
 	ProofReadLogError = 7002
@@ -95,6 +97,8 @@ var codeMsg = map[int]string{
 	GenerateRsaError:           "An error occurred while generate rsa key pair",
 	SaveRsaKeyError:            "An error occurred while save rsa key pair",
 	ReadRsaKeyError:            "An error occurred while read rsa key pair",
+	CheckPriceError:            "An error occurred while check price",
+	BelowPriceError:            "Bid below the set price",
 
 	ProofReadLogError: "An error occurred while read the log of proof",
 	ProofError:        "An error occurred while executing the calculation task",
