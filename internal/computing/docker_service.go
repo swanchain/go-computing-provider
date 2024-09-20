@@ -462,6 +462,7 @@ func (ds *DockerService) GetContainerStatus() (map[string]string, error) {
 		return nil, fmt.Errorf("Error getting container list: %s\n", err)
 	}
 
+	// created|restarting|running|removing|paused|exited|dead
 	var containerStatus = make(map[string]string)
 	for _, c := range containers {
 		for _, name := range c.Names {
