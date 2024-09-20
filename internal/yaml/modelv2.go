@@ -6,11 +6,16 @@ import (
 	"strings"
 )
 
+const (
+	ServiceTypeNodePort = "node-port"
+)
+
 type DeployYamlV2 struct {
-	Version    string                `yaml:"version"`
-	Services   map[string]Service    `yaml:"services"`
-	Profiles   Profiles              `yaml:"profiles"`
-	Deployment map[string]Deployment `yaml:"deployment"`
+	Version     string                `yaml:"version"`
+	ServiceType string                `yaml:"type"`
+	Services    map[string]Service    `yaml:"services"`
+	Profiles    Profiles              `yaml:"profiles"`
+	Deployment  map[string]Deployment `yaml:"deployment"`
 }
 
 func (dy *DeployYamlV2) checkRequired() error {
@@ -31,6 +36,7 @@ func (dy *DeployYamlV2) ServiceToK8sResource() ([]ContainerResource, error) {
 		containerNew := new(ContainerResource)
 		if service, ok := dy.Services[name]; ok {
 			containerNew.Name = name
+			containerNew.ServiceType = dy.ServiceType
 
 			var depends []ContainerResource
 			for _, depend := range service.DependsOn {
@@ -47,10 +53,11 @@ func (dy *DeployYamlV2) ServiceToK8sResource() ([]ContainerResource, error) {
 					if len(service.Env) > 0 {
 						var envVars []corev1.EnvVar
 						for _, env := range service.Env {
-							envSplit := strings.Split(strings.TrimSpace(env), "=")
+							trimSpaceEnv := strings.TrimSpace(env)
+							index := strings.Index(trimSpaceEnv, "=")
 							envVars = append(envVars, corev1.EnvVar{
-								Name:  envSplit[0],
-								Value: envSplit[1],
+								Name:  trimSpaceEnv[:index],
+								Value: trimSpaceEnv[index+1:],
 							})
 						}
 						container.Env = envVars
@@ -83,7 +90,6 @@ func (dy *DeployYamlV2) ServiceToK8sResource() ([]ContainerResource, error) {
 					if deployment.Lagrange.Count != 0 {
 						container.Count = deployment.Lagrange.Count
 					}
-
 					depends = append(depends, *container)
 					waitDelete = append(waitDelete, depend)
 				}
@@ -99,10 +105,11 @@ func (dy *DeployYamlV2) ServiceToK8sResource() ([]ContainerResource, error) {
 			if len(service.Env) > 0 {
 				var envVars []corev1.EnvVar
 				for _, env := range service.Env {
-					envSplit := strings.Split(strings.TrimSpace(env), "=")
+					trimSpaceEnv := strings.TrimSpace(env)
+					index := strings.Index(trimSpaceEnv, "=")
 					envVars = append(envVars, corev1.EnvVar{
-						Name:  envSplit[0],
-						Value: envSplit[1],
+						Name:  trimSpaceEnv[:index],
+						Value: trimSpaceEnv[index+1:],
 					})
 				}
 				containerNew.Env = envVars
@@ -113,6 +120,7 @@ func (dy *DeployYamlV2) ServiceToK8sResource() ([]ContainerResource, error) {
 					ports = append(ports, corev1.ContainerPort{
 						ContainerPort: int32(expose.Port),
 						Protocol:      getProtocol(expose.Protocol),
+						HostPort:      int32(expose.As),
 					})
 				}
 				containerNew.Ports = ports

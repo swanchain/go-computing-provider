@@ -100,9 +100,9 @@ func commonPrefix(strs []string) string {
 	}
 }
 
-func BuildImagesByDockerfile(jobUuid, spaceUuid, spaceName, imagePath string) (string, string) {
+func BuildImagesByDockerfile(jobUuid, spaceName, imagePath string) (string, string) {
 	updateJobStatus(jobUuid, models.DEPLOY_BUILD_IMAGE)
-	spaceFlag := spaceName + spaceUuid[strings.LastIndex(spaceUuid, "-"):]
+	spaceFlag := spaceName + jobUuid[strings.LastIndex(jobUuid, "-"):]
 	imageName := fmt.Sprintf("lagrange/%s:%d", spaceFlag, time.Now().Unix())
 	if conf.GetConfig().Registry.ServerAddress != "" {
 		imageName = fmt.Sprintf("%s/%s:%d",
@@ -118,6 +118,7 @@ func BuildImagesByDockerfile(jobUuid, spaceUuid, spaceName, imagePath string) (s
 			return "", ""
 		}
 	}
+
 	log.Printf("Image path: %s", imagePath)
 
 	dockerService := NewDockerService()

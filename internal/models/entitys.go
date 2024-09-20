@@ -230,6 +230,7 @@ const (
 	Task_TYPE_ALEO
 	Task_TYPE_AI
 	Task_TYPE_FIL_C2_32
+	Task_TYPE_NODE_PORT
 )
 
 func TaskTypeStr(taskType int) string {
@@ -243,6 +244,8 @@ func TaskTypeStr(taskType int) string {
 		typeStr = "AI"
 	case Task_TYPE_FIL_C2_32:
 		typeStr = "Fil-C2-32G"
+	case Task_TYPE_NODE_PORT:
+		typeStr = "NodePort-Service"
 	}
 	return typeStr
 }
