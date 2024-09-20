@@ -580,6 +580,7 @@ func GetPublicKey(c *gin.Context) {
 }
 
 func CheckNodeportServiceEnv(c *gin.Context) {
+	CheckClusterNetworkPolicy()
 	k8sService := NewK8sService()
 	usedPorts, err := k8sService.GetUsedNodePorts()
 	if err != nil {
@@ -602,6 +603,10 @@ func CheckNodeportServiceEnv(c *gin.Context) {
 
 	if daemonSet == nil {
 		msg = "failed to check resource-limit"
+	}
+
+	if !NetworkPolicyFlag {
+		msg = "failed to check network policy"
 	}
 
 	if msg == "" {

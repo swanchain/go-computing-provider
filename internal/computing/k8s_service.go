@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	calicov3 "github.com/projectcalico/api/pkg/apis/projectcalico/v3"
+	calicoclientset "github.com/projectcalico/api/pkg/client/clientset_generated/clientset"
 	"github.com/swanchain/go-computing-provider/constants"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"io"
@@ -707,6 +709,49 @@ func (s *K8sService) GetDeploymentActiveCount() (int, error) {
 		}
 	}
 	return total, nil
+}
+
+func (s *K8sService) GetGlobalNetworkSet(gnsName string) (*calicov3.GlobalNetworkSet, error) {
+	calicoCs, err := calicoclientset.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create calico client, error: %v", err)
+	}
+	networkSetList, err := calicoCs.ProjectcalicoV3().GlobalNetworkSets().List(context.Background(), metaV1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get globalNetworkSets list, error: %v", err)
+	}
+
+	var gns calicov3.GlobalNetworkSet
+	for _, item := range networkSetList.Items {
+		if item.Name == gnsName {
+			gns = item
+		}
+	}
+	return &gns, nil
+}
+
+func (s *K8sService) GetGlobalNetworkPolicy(gnpName string) (*calicov3.GlobalNetworkPolicy, error) {
+	calicoCs, err := calicoclientset.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create calico client, error: %v", err)
+	}
+
+	networkPolicyList, err := calicoCs.ProjectcalicoV3().GlobalNetworkPolicies().List(context.Background(), metaV1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get globalNetworkSets list, error: %v", err)
+	}
+
+	var gnp calicov3.GlobalNetworkPolicy
+	for _, item := range networkPolicyList.Items {
+		if item.Name == gnpName {
+			gnp = item
+		} else {
+			if models.ExistResource(item.Name) {
+				continue
+			}
+		}
+	}
+	return &gnp, nil
 }
 
 func (s *K8sService) GetUsedNodePorts() (map[int32]struct{}, error) {

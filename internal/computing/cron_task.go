@@ -19,6 +19,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+var NetworkPolicyFlag bool
+
 var deployingChan = make(chan models.Job)
 var TaskMap sync.Map
 
@@ -42,6 +44,77 @@ func (task *CronTask) RunTask() {
 	task.getUbiTaskReward()
 	task.checkJobReward()
 	task.cleanImageResource()
+}
+
+func CheckClusterNetworkPolicy() {
+	var err error
+
+	netset, err := NewK8sService().GetGlobalNetworkSet(models.NetworkNetset)
+	if err != nil {
+		logs.GetLogger().Error(err)
+		return
+	}
+	if netset.GetName() == "" {
+		return
+	}
+
+	if netset != nil {
+		subNetGnp, err := NewK8sService().GetGlobalNetworkPolicy(models.NetworkGlobalSubnet)
+		if err != nil {
+			logs.GetLogger().Error(err)
+			return
+		}
+		if subNetGnp.Name == "" {
+			return
+		}
+
+		outAccessGnp, err := NewK8sService().GetGlobalNetworkPolicy(models.NetworkGlobalOutAccess)
+		if err != nil {
+			logs.GetLogger().Error(err)
+			return
+		}
+		if outAccessGnp.Name == "" {
+			return
+		}
+
+		inAccessGnp, err := NewK8sService().GetGlobalNetworkPolicy(models.NetworkGlobalInAccess)
+		if err != nil {
+			logs.GetLogger().Error(err)
+			return
+		}
+		if inAccessGnp.Name == "" {
+			return
+		}
+
+		namespaceGnp, err := NewK8sService().GetGlobalNetworkPolicy(models.NetworkGlobalNamespace)
+		if err != nil {
+			logs.GetLogger().Error(err)
+			return
+		}
+		if namespaceGnp.Name == "" {
+			return
+		}
+
+		dnsGnp, err := NewK8sService().GetGlobalNetworkPolicy(models.NetworkGlobalDns)
+		if err != nil {
+			logs.GetLogger().Error(err)
+			return
+		}
+		if dnsGnp.Name == "" {
+			return
+		}
+
+		podInNsGnp, err := NewK8sService().GetGlobalNetworkPolicy(models.NetworkGlobalPodInNamespace)
+		if err != nil {
+			logs.GetLogger().Error(err)
+			return
+		}
+		if podInNsGnp.Name == "" {
+			return
+		}
+	}
+
+	NetworkPolicyFlag = true
 }
 
 func checkJobStatus() {

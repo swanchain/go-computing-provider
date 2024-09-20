@@ -2,19 +2,19 @@
 apiVersion: projectcalico.org/v3
 kind: GlobalNetworkSet
 metadata:
-  name: host-network
+  name: netset-cp-01
   labels:
     net: host-network
 spec:
   nets:
     - 30.39.10.0/24
     - 30.39.6.0/24
-
 ---
+
 apiVersion: projectcalico.org/v3
 kind: GlobalNetworkPolicy
 metadata:
-  name: deny-all-subnet
+  name: global-subnet-01
 spec:
   order: 201
   namespaceSelector: has(projectcalico.org/name) && projectcalico.org/name not in {"kube-system", "calico-system", "calico-apiserver","ingress-nginx"}
@@ -38,10 +38,11 @@ spec:
           - 1:65535
         selector: net == 'host-network'
 ---
+
 apiVersion: projectcalico.org/v3
 kind: GlobalNetworkPolicy
 metadata:
-  name: allow-out-access
+  name: global-out-01
 spec:
   order: 210
   namespaceSelector: has(projectcalico.org/name) && projectcalico.org/name not in {"kube-system", "calico-system", "calico-apiserver"}
@@ -57,10 +58,11 @@ spec:
         ports:
           - 1:65535
 ---
+
 apiVersion: projectcalico.org/v3
 kind: GlobalNetworkPolicy
 metadata:
-  name: allow-all-out
+  name: global-in-01
 spec:
   order: 220
   namespaceSelector: has(projectcalico.org/name) && projectcalico.org/name not in {"kube-system", "calico-system", "calico-apiserver"}
@@ -75,11 +77,10 @@ spec:
       protocol: UDP
 ---
 
-
 apiVersion: projectcalico.org/v3
 kind: GlobalNetworkPolicy
 metadata:
-  name: deny-to-ns
+  name: global-ns-01
 spec:
   order: 150
   namespaceSelector: has(projectcalico.org/name) && projectcalico.org/name not in {"kube-system", "calico-system", "calico-apiserver", "ingress-nginx"}
@@ -90,10 +91,11 @@ spec:
       destination:
         namespaceSelector: projectcalico.org/name in {"kube-system", "calico-system", "calico-apiserver", "ingress-nginx"}
 ---
+
 apiVersion: projectcalico.org/v3
 kind: GlobalNetworkPolicy
 metadata:
-  name: permit-to-dns
+  name: global-dns-01
 spec:
   order: 140
   namespaceSelector: has(projectcalico.org/name) && projectcalico.org/name not in {"kube-system", "calico-system", "calico-apiserver", "ingress-nginx"}
@@ -119,7 +121,7 @@ spec:
 apiVersion: projectcalico.org/v3
 kind: GlobalNetworkPolicy
 metadata:
-  name: ns-ns-pod-access
+  name: global-pod-ns-01
 spec:
   order: 110
   namespaceSelector: has(projectcalico.org/name) && projectcalico.org/name not in {"kube-system", "calico-system", "calico-apiserver", "ingress-nginx"}

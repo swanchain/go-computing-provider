@@ -304,3 +304,25 @@ func (c *CpInfoEntity) AfterFind(tx *gorm.DB) (err error) {
 	}
 	return nil
 }
+
+const (
+	NetworkNetset               = "netset-cp-01"
+	NetworkGlobalSubnet         = "global-subnet-01"
+	NetworkGlobalOutAccess      = "global-out-01"
+	NetworkGlobalInAccess       = "global-in-01"
+	NetworkGlobalNamespace      = "global-ns-01"
+	NetworkGlobalDns            = "global-dns-01"
+	NetworkGlobalPodInNamespace = "global-pod-ns-01"
+)
+
+var networkPolicyMap = []string{NetworkGlobalSubnet, NetworkGlobalOutAccess,
+	NetworkGlobalInAccess, NetworkGlobalNamespace, NetworkGlobalDns}
+
+func ExistResource(name string) bool {
+	for _, s := range networkPolicyMap {
+		if s == name {
+			return true
+		}
+	}
+	return false
+}
