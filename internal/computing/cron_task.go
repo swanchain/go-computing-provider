@@ -48,7 +48,7 @@ func (task *CronTask) RunTask() {
 
 func CheckClusterNetworkPolicy() {
 	var err error
-
+	NetworkPolicyFlag = false
 	netset, err := NewK8sService().GetGlobalNetworkSet(models.NetworkNetset)
 	if err != nil {
 		logs.GetLogger().Error(err)

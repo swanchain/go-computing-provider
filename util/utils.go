@@ -53,7 +53,6 @@ func startServer(wg *sync.WaitGroup, port int) bool {
 	var isListen bool
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logs.GetLogger().Errorf("Port %d is closed: %v", port, err)
 			isListen = true
 		}
 	}()
