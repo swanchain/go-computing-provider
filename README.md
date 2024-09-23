@@ -32,9 +32,10 @@ As a resource provider, you can run a **ECP**(Edge Computing Provider) and **FCP
  	- [Install the Hardware resource-exporter](#Install-the-Hardware-resource-exporter)
  	- [Build and config the Computing Provider](#Build-and-config-the-Computing-Provider)
  	- [Install AI Inference Dependency(Optional)](#optional-Install-AI-Inference-Dependency)
- 	- [Config and Receive UBI Tasks(Optional)](#optional-Config-and-Receive-UBI-Tasks)
-	 - [Start the Computing Provider](#Start-the-Computing-Provider)
-	 - [CLI of Computing Provider](#CLI-of-Computing-Provider)
+    - [Install Resource Isolation service on the k8s cluster(Optional)](#optional-install-resource-isolation-service-on-the-k8s-cluster)
+    - [Config and Receive UBI Tasks(Optional)](#optional-Config-and-Receive-UBI-Tasks)
+    - [Start the Computing Provider](#Start-the-Computing-Provider)
+    - [CLI of Computing Provider](#CLI-of-Computing-Provider)
  
 ## Prerequisites
 Before you install the Computing Provider, you need to know there are some resources required:
@@ -442,6 +443,12 @@ It is necessary for the Computing Provider to deploy the AI inference endpoint. 
 ```bash
 export CP_PATH=<YOUR_CP_PATH>
 ./install.sh
+```
+
+## [**OPTIONAL**] Install Resource Isolation service on the k8s cluster
+In order to view the actual available resources of the container, you need to install a resource isolation service on the cluster.
+```
+kubectl apply -f https://github.com/swanchain/go-computing-provider/blob/releases/resource-isolation.yaml
 ```
 
 ## [**OPTIONAL**] Config and Receive ZK Tasks
