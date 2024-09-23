@@ -3,13 +3,11 @@ package main
 import (
 	_ "embed"
 	"fmt"
-	calicov3 "github.com/projectcalico/api/pkg/apis/projectcalico/v3"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"github.com/swanchain/go-computing-provider/internal/yaml"
 	"github.com/urfave/cli/v2"
 	yaml2 "gopkg.in/yaml.v2"
-	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"os"
 	"path/filepath"
 	"strings"
@@ -44,18 +42,32 @@ var generateNetworkCmd = &cli.Command{
 			return fmt.Errorf("failed to get host subnet mask, error: %v", err)
 		}
 
-		gns := &calicov3.GlobalNetworkSet{
-			TypeMeta: metaV1.TypeMeta{
-				APIVersion: "projectcalico.org/v3",
-				Kind:       "GlobalNetworkSet",
-			},
-			ObjectMeta: metaV1.ObjectMeta{
+		type networkSet struct {
+			Kind       string `yaml:"kind"`
+			APIVersion string `yaml:"apiVersion"`
+			Metadata   struct {
+				Name   string            `yaml:"name"`
+				Labels map[string]string `yaml:"labels"`
+			} `yaml:"metadata"`
+			Spec struct {
+				Nets []string `yaml:"nets"`
+			} `yaml:"spec"`
+		}
+		gns := &networkSet{
+			APIVersion: "projectcalico.org/v3",
+			Kind:       "GlobalNetworkSet",
+			Metadata: struct {
+				Name   string            `yaml:"name"`
+				Labels map[string]string `yaml:"labels"`
+			}{
 				Name: models.NetworkNetset,
 				Labels: map[string]string{
 					"net": models.NetworkNetset,
 				},
 			},
-			Spec: calicov3.GlobalNetworkSetSpec{
+			Spec: struct {
+				Nets []string `yaml:"nets"`
+			}{
 				Nets: netSegment,
 			},
 		}
