@@ -32,7 +32,7 @@ As a resource provider, you can run a **ECP**(Edge Computing Provider) and **FCP
  	- [Install the Hardware resource-exporter](#Install-the-Hardware-resource-exporter)
  	- [Build and config the Computing Provider](#Build-and-config-the-Computing-Provider)
  	- [Install AI Inference Dependency(Optional)](#optional-Install-AI-Inference-Dependency)
-    - [Install Resource Isolation service on the k8s cluster(Optional)](#optional-install-resource-isolation-service-on-the-k8s-cluster)
+    - [Install Node-Port Service Dependency (Optional)](#optional-install-node-port-service-dependency)
     - [Config and Receive UBI Tasks(Optional)](#optional-Config-and-Receive-UBI-Tasks)
     - [Start the Computing Provider](#Start-the-Computing-Provider)
     - [CLI of Computing Provider](#CLI-of-Computing-Provider)
@@ -445,11 +445,21 @@ export CP_PATH=<YOUR_CP_PATH>
 ./install.sh
 ```
 
-## [**OPTIONAL**] Install Resource Isolation service on the k8s cluster
-In order to view the actual available resources of the container, you need to install a resource isolation service on the cluster.
-```
-kubectl apply -f https://raw.githubusercontent.com/swanchain/go-computing-provider/refs/heads/fix-check-contract-address/resource-isolation.yaml
-```
+## [**OPTIONAL**] Install Node-Port Service Dependency
+- Install Resource Isolation service on the k8s cluster
+	In order to view the actual available resources of the container, you need to install a resource isolation service on the cluster.
+	```
+	kubectl apply -f https://raw.githubusercontent.com/swanchain/go-computing-provider/refs/heads/fix-check-contract-address/resource-isolation.yaml
+	```
+- Install network policies
+	- Generate Network Policy (location at $CP_PATH/network-policy.yaml )
+	```bash 
+	computing-provider network generate
+	```
+	- Deploy Network Policy
+	```bash
+	kubectl apply -f $CP_PATH/network-policy.yaml
+	```
 
 ## [**OPTIONAL**] Config and Receive ZK Tasks
 This section mainly introduces how to enable the function of receiving ZK tasks on FCP, which is equivalent to running an ECP. This function is optional. Once enabled, FCP can earn double benefits simultaneously, but it will also consume certain resources.
