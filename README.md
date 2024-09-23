@@ -448,7 +448,7 @@ export CP_PATH=<YOUR_CP_PATH>
 ## [**OPTIONAL**] Install Resource Isolation service on the k8s cluster
 In order to view the actual available resources of the container, you need to install a resource isolation service on the cluster.
 ```
-kubectl apply -f https://github.com/swanchain/go-computing-provider/blob/releases/resource-isolation.yaml
+kubectl apply -f https://raw.githubusercontent.com/swanchain/go-computing-provider/refs/heads/fix-check-contract-address/resource-isolation.yaml
 ```
 
 ## [**OPTIONAL**] Config and Receive ZK Tasks
