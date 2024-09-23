@@ -1,14 +1,5 @@
 ##Global
-apiVersion: projectcalico.org/v3
-kind: GlobalNetworkSet
-metadata:
-  name: host-network
-  labels:
-    net: host-network
-spec:
-  nets:
-    - $
-
+$NETWORK_SET
 ---
 
 apiVersion: projectcalico.org/v3
