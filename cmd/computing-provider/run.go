@@ -86,6 +86,7 @@ func cpManager(router *gin.RouterGroup) {
 	router.GET("/lagrange/job/:job_uuid", computing.GetJobStatus)
 	router.GET("/lagrange/cp/public_key", computing.GetPublicKey)
 	router.GET("/lagrange/cp/price", computing.GetPrice)
+	router.GET("/lagrange/cp/check_node_port", computing.CheckNodeportServiceEnv)
 
 	router.POST("/cp/ubi", computing.DoUbiTaskForK8s)
 	router.POST("/cp/receive/ubi", computing.ReceiveUbiProof)
@@ -542,7 +543,7 @@ var createAccountCmd = &cli.Command{
 		},
 		&cli.StringFlag{
 			Name:  "task-types",
-			Usage: "Task types of CP (1:Fil-C2-512M, 2:Aleo, 3:AI, 4:Fil-C2-32G), separated by commas",
+			Usage: "Task types of CP (1:Fil-C2-512M, 2:Aleo, 3:AI, 4:Fil-C2-32G, 5:NodePort-Service), separated by commas",
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -849,7 +850,7 @@ var changeWorkerAddressCmd = &cli.Command{
 
 var changeTaskTypesCmd = &cli.Command{
 	Name:      "changeTaskTypes",
-	Usage:     "Update taskTypes of CP (1:Fil-C2-512M, 2:Aleo, 3: AI, 4:Fil-C2-32G), separated by commas",
+	Usage:     "Update taskTypes of CP (1:Fil-C2-512M, 2:Aleo, 3: AI, 4:Fil-C2-32G, 5:NodePort-Service), separated by commas",
 	ArgsUsage: "[TaskTypes]",
 	Flags: []cli.Flag{
 		&cli.StringFlag{

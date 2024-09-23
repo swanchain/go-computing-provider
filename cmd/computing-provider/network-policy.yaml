@@ -1,0 +1,133 @@
+##Global
+$NETWORK_SET
+---
+
+apiVersion: projectcalico.org/v3
+kind: GlobalNetworkPolicy
+metadata:
+  name: $G_SUBNET_NAME
+spec:
+  order: 201
+  namespaceSelector: has(projectcalico.org/name) && projectcalico.org/name not in {"kube-system", "calico-system", "calico-apiserver","ingress-nginx"}
+  types:
+    - Egress
+  egress:
+    - action: Deny
+      protocol: ICMP
+      destination:
+        selector: net == 'host-network'
+    - action: Deny
+      protocol: TCP
+      destination:
+        ports:
+          - 1:65535
+        selector: net == 'host-network'
+    - action: Deny
+      protocol: UDP
+      destination:
+        ports:
+          - 1:65535
+        selector: net == 'host-network'
+---
+
+apiVersion: projectcalico.org/v3
+kind: GlobalNetworkPolicy
+metadata:
+  name: $G_OUT_NAME
+spec:
+  order: 210
+  namespaceSelector: has(projectcalico.org/name) && projectcalico.org/name not in {"kube-system", "calico-system", "calico-apiserver"}
+  types:
+    - Ingress
+  ingress:
+    - action: Allow
+      protocol: TCP
+      source:
+        nets:
+          - 0.0.0.0/0
+      destination:
+        ports:
+          - 1:65535
+---
+
+apiVersion: projectcalico.org/v3
+kind: GlobalNetworkPolicy
+metadata:
+  name: $G_IN_NAME
+spec:
+  order: 220
+  namespaceSelector: has(projectcalico.org/name) && projectcalico.org/name not in {"kube-system", "calico-system", "calico-apiserver"}
+  types:
+    - Egress
+  egress:
+    - action: Allow
+      protocol: ICMP
+    - action: Allow
+      protocol: TCP
+    - action: Allow
+      protocol: UDP
+---
+
+apiVersion: projectcalico.org/v3
+kind: GlobalNetworkPolicy
+metadata:
+  name: $G_NS_NAME
+spec:
+  order: 150
+  namespaceSelector: has(projectcalico.org/name) && projectcalico.org/name not in {"kube-system", "calico-system", "calico-apiserver", "ingress-nginx"}
+  types:
+    - Egress
+  egress:
+    - action: Deny
+      destination:
+        namespaceSelector: projectcalico.org/name in {"kube-system", "calico-system", "calico-apiserver", "ingress-nginx"}
+---
+
+apiVersion: projectcalico.org/v3
+kind: GlobalNetworkPolicy
+metadata:
+  name: $G_DNS_NAME
+spec:
+  order: 140
+  namespaceSelector: has(projectcalico.org/name) && projectcalico.org/name not in {"kube-system", "calico-system", "calico-apiserver", "ingress-nginx"}
+  types:
+    - Egress
+  egress:
+    - action: Allow
+      protocol: UDP
+      destination:
+        namespaceSelector: projectcalico.org/name == "kube-system"
+        selector: k8s-app == "kube-dns"
+        ports:
+          - 53
+    - action: Allow
+      protocol: TCP
+      destination:
+        namespaceSelector: projectcalico.org/name == "kube-system"
+        selector: k8s-app == "kube-dns"
+        ports:
+          - 53
+---
+
+apiVersion: projectcalico.org/v3
+kind: GlobalNetworkPolicy
+metadata:
+  name: $G_POD_NS_NAME
+spec:
+  order: 110
+  namespaceSelector: has(projectcalico.org/name) && projectcalico.org/name not in {"kube-system", "calico-system", "calico-apiserver", "ingress-nginx"}
+  types:
+    - Egress
+  egress:
+    - action: Deny
+      protocol: TCP
+      destination:
+        namespaceSelector: has(projectcalico.org/name) && projectcalico.org/name not in {"kube-system", "calico-system", "calico-apiserver", "ingress-nginx"}
+    - action: Deny
+      protocol: UDP
+      destination:
+        namespaceSelector: has(projectcalico.org/name) && projectcalico.org/name not in {"kube-system", "calico-system", "calico-apiserver", "ingress-nginx"}
+    - action: Deny
+      protocol: ICMP
+      destination:
+        namespaceSelector: has(projectcalico.org/name) && projectcalico.org/name not in {"kube-system", "calico-system", "calico-apiserver", "ingress-nginx"}

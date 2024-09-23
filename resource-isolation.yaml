@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: resource-limit
+  namespace: kube-system
+  labels:
+    app: resource-limit
+spec:
+  selector:
+    matchLabels:
+      app: resource-limit
+  template:
+    metadata:
+      labels:
+        app: resource-limit
+    spec:
+      hostPID: true
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+      containers:
+        - name: lxcfs
+          image: filswan/lxcfs-lite:6.0.1
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: cgroup
+              mountPath: /sys/fs/cgroup
+            - name: lxcfs
+              mountPath: /var/lib/lxcfs
+              mountPropagation: Bidirectional
+            - name: usr-local
+              mountPath: /usr/local
+            - name: usr-lib64
+              mountPath: /usr/lib64
+      volumes:
+        - name: cgroup
+          hostPath:
+            path: /sys/fs/cgroup
+        - name: usr-local
+          hostPath:
+            path: /usr/local
+        - name: usr-lib64
+          hostPath:
+            path: /usr/lib64
+        - name: lxcfs
+          hostPath:
+            path: /var/lib/lxcfs
+            type: DirectoryOrCreate
