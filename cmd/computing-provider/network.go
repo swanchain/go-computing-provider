@@ -18,7 +18,6 @@ var networkCmd = &cli.Command{
 	Usage: "Manage cp network policy",
 	Subcommands: []*cli.Command{
 		generateNetworkCmd,
-		viewCmd,
 	},
 	Before: func(c *cli.Context) error {
 		cpRepoPath, _ := os.LookupEnv("CP_PATH")
