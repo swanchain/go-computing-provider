@@ -64,6 +64,8 @@ const (
 	CheckResourceLimitError    = 4021
 	NotAcceptNodePortError     = 4022
 	RpcConnectError            = 4023
+	CheckPriceError            = 4024
+	BelowPriceError            = 4025
 
 	ProofParamError   = 7001
 	ProofReadLogError = 7002
@@ -103,6 +105,8 @@ var codeMsg = map[int]string{
 	CheckResourceLimitError:    "An error occurred while check resource limit components",
 	NotAcceptNodePortError:     "not accept node port type job",
 	RpcConnectError:            "An error occurred while connect rpc",
+	CheckPriceError:            "An error occurred while check price",
+	BelowPriceError:            "Bid below the set price",
 
 	ProofReadLogError: "An error occurred while read the log of proof",
 	ProofError:        "An error occurred while executing the calculation task",

@@ -306,13 +306,13 @@ func (c *CpInfoEntity) AfterFind(tx *gorm.DB) (err error) {
 }
 
 const (
-	NetworkNetset               = "netset-cp-01"
-	NetworkGlobalSubnet         = "global-subnet-01"
-	NetworkGlobalOutAccess      = "global-out-01"
-	NetworkGlobalInAccess       = "global-in-01"
-	NetworkGlobalNamespace      = "global-ns-01"
-	NetworkGlobalDns            = "global-dns-01"
-	NetworkGlobalPodInNamespace = "global-pod-ns-01"
+	NetworkNetset               = "netset-2300e518e9ad45"
+	NetworkGlobalSubnet         = "global-e59cad59af9c65"
+	NetworkGlobalOutAccess      = "global-pd6sdo8cjd61yd"
+	NetworkGlobalInAccess       = "global-01kls78xh7dk4n"
+	NetworkGlobalNamespace      = "global-ao9kq72mjc0sl3"
+	NetworkGlobalDns            = "global-s92ms87dl3j6do"
+	NetworkGlobalPodInNamespace = "global-pod1namespace1"
 )
 
 var networkPolicyMap = []string{NetworkGlobalSubnet, NetworkGlobalOutAccess,
