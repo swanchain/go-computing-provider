@@ -60,21 +60,6 @@ func ReceiveJob(c *gin.Context) {
 	}
 	logs.GetLogger().Infof("Job received Data: %+v", jobData)
 
-	if jobData.JobType == 1 {
-		checkPriceFlag, totalCost, err := checkPrice(jobData.BidPrice, jobData.Duration, jobData.Resource)
-		if err != nil {
-			logs.GetLogger().Errorf("failed to check price, job_uuid: %s, error: %v", jobData.UUID, err)
-			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
-			return
-		}
-
-		if !checkPriceFlag {
-			logs.GetLogger().Errorf("bid below the set price, job_uuid: %s, pid: %s, need: %0.4f", jobData.UUID, jobData.BidPrice, totalCost)
-			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BelowPriceError))
-			return
-		}
-	}
-
 	if !CheckWalletWhiteList(jobData.JobSourceURI) {
 		logs.GetLogger().Errorf("This cp does not accept tasks from wallet addresses outside the whitelist")
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SpaceCheckWhiteListError))
@@ -121,6 +106,21 @@ func ReceiveJob(c *gin.Context) {
 		logs.GetLogger().Errorln(err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SpaceParseResourceUriError))
 		return
+	}
+
+	if jobData.JobType == 1 {
+		checkPriceFlag, totalCost, err := checkPrice(jobData.BidPrice, jobData.Duration, spaceDetail.Data.Space.ActiveOrder.Config)
+		if err != nil {
+			logs.GetLogger().Errorf("failed to check price, job_uuid: %s, error: %v", jobData.UUID, err)
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
+			return
+		}
+
+		if !checkPriceFlag {
+			logs.GetLogger().Warnf("the price is too low, job_uuid: %s, paid: %s, required: %0.4f", jobData.UUID, jobData.BidPrice, totalCost)
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BelowPriceError))
+			return
+		}
 	}
 
 	available, gpuProductName, err := checkResourceAvailableForSpace(spaceDetail.Data.Space.ActiveOrder.Config.Description)
@@ -277,7 +277,7 @@ func ReceiveJob(c *gin.Context) {
 			logs.GetLogger().Infof("successfully uploaded to MCS, jobuuid: %s", jobData.UUID)
 		}()
 
-		DeploySpaceTask(jobData, deployParam, hostName, gpuProductName, serviceNodePort)
+		DeploySpaceTask(jobData, deployParam, hostName, gpuProductName, serviceNodePort, jobData.JobType)
 	}()
 
 	c.JSON(http.StatusOK, util.CreateSuccessResponse(jobData))
@@ -940,7 +940,7 @@ func handleConnection(conn *websocket.Conn, jobDetail models.JobEntity, logType 
 	}
 }
 
-func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName string, gpuProductName string, nodePort int32) {
+func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName string, gpuProductName string, nodePort int32, jobType int) {
 	updateJobStatus(jobData.UUID, models.DEPLOY_UPLOAD_RESULT)
 	var success bool
 	var jobUuid string
@@ -970,12 +970,17 @@ func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName s
 	jobUuid = strings.ToLower(jobData.UUID)
 	spaceHardware := spaceDetail.Data.Space.ActiveOrder.Config
 
-	logs.GetLogger().Infof("job_uuid: %s, spaceName: %s, hardwareName: %s", jobData.UUID, spaceName, spaceHardware.Description)
-	if len(spaceHardware.Description) == 0 {
-		return
+	var deploy *Deploy
+	if jobType == 0 {
+		logs.GetLogger().Infof("job_uuid: %s, spaceName: %s, hardwareName: %s", jobData.UUID, spaceName, spaceHardware.Description)
+		if len(spaceHardware.Description) == 0 {
+			return
+		}
+		deploy = NewDeploy(jobData.UUID, jobUuid, hostName, walletAddress, spaceHardware.Description, int64(jobData.Duration), constants.SPACE_TYPE_PUBLIC, spaceHardware, jobType)
+	} else if jobType == 1 {
+		deploy = NewDeploy(jobData.UUID, jobUuid, hostName, walletAddress, "", int64(jobData.Duration), constants.SPACE_TYPE_PUBLIC, spaceHardware, jobType)
 	}
 
-	deploy := NewDeploy(jobData.UUID, jobUuid, hostName, walletAddress, spaceHardware.Description, int64(jobData.Duration), constants.SPACE_TYPE_PUBLIC)
 	deploy.WithSpaceName(spaceName)
 	deploy.WithGpuProductName(gpuProductName)
 	deploy.WithSpacePath(deployParam.BuildImagePath)
@@ -1640,7 +1645,7 @@ func deleteGpuCache(gpuProductName string) {
 
 }
 
-func checkPrice(userPrice string, duration int, resource models.HardwareResource) (bool, float64, error) {
+func checkPrice(userPrice string, duration int, resource models.SpaceHardware) (bool, float64, error) {
 	priceConfig, err := ReadPriceConfig()
 	if err != nil {
 		return false, 0, err
@@ -1668,7 +1673,8 @@ func checkPrice(userPrice string, duration int, resource models.HardwareResource
 	var gpuPriceStr string
 	var gpuPrice float64
 	if len(priceConfig.GpusPrice) != 0 {
-		gpuName := strings.ReplaceAll(resource.GPUModel, "NVIDIA ", "")
+
+		gpuName := strings.ReplaceAll(resource.Hardware, "NVIDIA ", "")
 		gpuName = strings.ReplaceAll(gpuName, " ", "_")
 		key := "TARGET_GPU_" + gpuName
 		if price, ok := priceConfig.GpusPrice[key]; ok {
@@ -1684,10 +1690,10 @@ func checkPrice(userPrice string, duration int, resource models.HardwareResource
 	}
 
 	// Calculate total cost
-	cpuCost := float64(resource.CPU) * cpuPrice * float64(duration/3600)
+	cpuCost := float64(resource.Vcpu) * cpuPrice * float64(duration/3600)
 	memoryCost := float64(resource.Memory/1024/1024/1024) * memoryPrice * float64(duration/3600)
 	storageCost := float64(resource.Storage/1024/1024/1024) * storagePrice * float64(duration/3600)
-	gpuCost := float64(resource.GPU) * gpuPrice * float64(duration/3600)
+	gpuCost := float64(1) * gpuPrice * float64(duration/3600)
 
 	totalCost := cpuCost + memoryCost + storageCost + gpuCost
 

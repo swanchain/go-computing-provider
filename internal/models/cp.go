@@ -6,28 +6,19 @@ import (
 )
 
 type JobData struct {
-	UUID                        string           `json:"uuid"`
-	Name                        string           `json:"name"`
-	Duration                    int              `json:"duration"`
-	JobSourceURI                string           `json:"job_source_uri"`
-	JobResultURI                string           `json:"job_result_uri,omitempty"`
-	StorageSource               string           `json:"storage_source,omitempty"`
-	TaskUUID                    string           `json:"task_uuid"`
-	BuildLog                    string           `json:"build_log,omitempty"`
-	ContainerLog                string           `json:"container_log"`
-	NodeIdJobSourceUriSignature string           `json:"node_id_job_source_uri_signature,omitempty"`
-	JobRealUri                  string           `json:"job_real_uri,omitempty"`
-	Resource                    HardwareResource `json:"resource"`
-	JobType                     int              `json:"job_type"`  // 0: Standard job; 1: Custom job
-	BidPrice                    string           `json:"bid_price"` // Amount users are willing to pay
-}
-
-type HardwareResource struct {
-	CPU      int64  `json:"cpu"`       // unit int
-	Memory   int64  `json:"memory"`    // unit bytes
-	Storage  int64  `json:"storage"`   // unit bytes
-	GPU      int64  `json:"gpu"`       // unit int
-	GPUModel string `json:"gpu_model"` // gpu name
+	UUID                        string `json:"uuid"`
+	Name                        string `json:"name"`
+	Duration                    int    `json:"duration"`
+	JobSourceURI                string `json:"job_source_uri"`
+	JobResultURI                string `json:"job_result_uri,omitempty"`
+	StorageSource               string `json:"storage_source,omitempty"`
+	TaskUUID                    string `json:"task_uuid"`
+	BuildLog                    string `json:"build_log,omitempty"`
+	ContainerLog                string `json:"container_log"`
+	NodeIdJobSourceUriSignature string `json:"node_id_job_source_uri_signature,omitempty"`
+	JobRealUri                  string `json:"job_real_uri,omitempty"`
+	JobType                     int    `json:"job_type"`  // 0: Standard job; 1: Custom job
+	BidPrice                    string `json:"bid_price"` // Amount users are willing to pay
 }
 
 type Job struct {
@@ -66,9 +57,11 @@ type SpaceFile struct {
 type SpaceHardware struct {
 	Description  string `json:"description"`
 	HardwareType string `json:"hardware_type"`
-	Memory       int    `json:"memory"`
+	Hardware     string `json:"hardware"` // Nvidia 3080  CPU only
+	Memory       int64  `json:"memory"`   // unit bytes
 	Name         string `json:"name"`
-	Vcpu         int    `json:"vcpu"`
+	Vcpu         int64  `json:"vcpu"`
+	Storage      int64  `json:"storage"` // unit bytes
 }
 
 type Resource struct {
