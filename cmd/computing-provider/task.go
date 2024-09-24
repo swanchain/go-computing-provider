@@ -130,7 +130,7 @@ var taskDetail = &cli.Command{
 	ArgsUsage: "[job_uuid]",
 	Action: func(cctx *cli.Context) error {
 		if cctx.NArg() != 1 {
-			return fmt.Errorf("incorrect number of arguments, got %d, missing args: task_uuid", cctx.NArg())
+			return fmt.Errorf("incorrect number of arguments, got %d, missing args: job_uuid", cctx.NArg())
 		}
 
 		cpRepoPath, ok := os.LookupEnv("CP_PATH")

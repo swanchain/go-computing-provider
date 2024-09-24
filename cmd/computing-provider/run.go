@@ -287,6 +287,10 @@ var stateInfoCmd = &cli.Command{
 		defer client.Close()
 
 		cpAccountAddress := cctx.Args().Get(0)
+		if !strings.HasPrefix(cpAccountAddress, "0x") {
+			return fmt.Errorf("the %s parameter must start with 0x", cpAccountAddress)
+		}
+
 		cpAccount := common.HexToAddress(cpAccountAddress)
 		bytecode, err := client.CodeAt(context.Background(), cpAccount, nil)
 		if err != nil {
@@ -416,6 +420,10 @@ var taskInfoCmd = &cli.Command{
 		taskContract := cctx.Args().Get(0)
 		if strings.TrimSpace(taskContract) == "" {
 			return fmt.Errorf("the task contract address is required")
+		}
+
+		if !strings.HasPrefix(taskContract, "0x") {
+			return fmt.Errorf("the %s parameter must start with 0x", taskContract)
 		}
 
 		chainRpc, err := conf.GetRpcByNetWorkName()

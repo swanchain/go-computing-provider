@@ -1217,17 +1217,17 @@ func syncTaskStatusForSequencerService() error {
 	return nil
 }
 
-func SyncCpAccountInfo() {
+func SyncCpAccountInfo() (*models.Account, error) {
 	cpAccountAddress, err := contract.GetCpAccountAddress()
 	if err != nil {
-		logs.GetLogger().Fatalf("get cp account contract address failed, error: %v", err)
-		return
+		logs.GetLogger().Errorf("get cp account contract address failed, error: %v", err)
+		return nil, err
 	}
 
 	cpAccount, err := account.GetAccountInfo()
 	if err != nil {
 		logs.GetLogger().Errorf("get cpAccount failed, error: %v", err)
-		return
+		return nil, err
 	}
 
 	var cpInfo = new(models.CpInfoEntity)
@@ -1243,8 +1243,9 @@ func SyncCpAccountInfo() {
 	cpInfo.TaskTypes = cpAccount.TaskTypes
 	if err = NewCpInfoService().SaveCpInfoEntity(cpInfo); err != nil {
 		logs.GetLogger().Errorf("save cp info to db failed, error: %v", err)
-		return
+		return nil, err
 	}
+	return &cpAccount, nil
 }
 
 func RestartResourceExporter() error {
