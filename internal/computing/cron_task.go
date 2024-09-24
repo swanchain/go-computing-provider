@@ -526,7 +526,6 @@ func addNodeLabel() {
 		return
 	}
 
-	logs.GetLogger().Infof("collect all node: %d", len(nodes.Items))
 	for _, node := range nodes.Items {
 		cpNode := node
 		if collectInfo, ok := nodeGpuInfoMap[cpNode.Name]; ok {
