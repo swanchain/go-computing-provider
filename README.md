@@ -451,6 +451,7 @@ export CP_PATH=<YOUR_CP_PATH>
 	```
 	kubectl apply -f https://raw.githubusercontent.com/swanchain/go-computing-provider/refs/heads/releases/resource-isolation.yaml
 	```
+  **Note:** This service currently supports `Ubuntu 20.04`.
 - Install network policies
 	- Generate Network Policy (location at $CP_PATH/network-policy.yaml )
 	```bash 
@@ -460,7 +461,7 @@ export CP_PATH=<YOUR_CP_PATH>
 	```bash
 	kubectl apply -f $CP_PATH/network-policy.yaml
 	```
- **Note:** The nodes for deploying CP need to open ports in the range of `30000-32767`.
+ **Note:** The nodes for deploying CP need to open ports in the range of `30000-32767`
 
 ## [**OPTIONAL**] Config and Receive ZK Tasks
 This section mainly introduces how to enable the function of receiving ZK tasks on FCP, which is equivalent to running an ECP. This function is optional. Once enabled, FCP can earn double benefits simultaneously, but it will also consume certain resources.
