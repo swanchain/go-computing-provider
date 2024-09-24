@@ -106,7 +106,7 @@ var codeMsg = map[int]string{
 	NotAcceptNodePortError:     "not accept node port type job",
 	RpcConnectError:            "An error occurred while connect rpc",
 	CheckPriceError:            "An error occurred while check price",
-	BelowPriceError:            "Bid below the set price",
+	BelowPriceError:            "the price is too low",
 
 	ProofReadLogError: "An error occurred while read the log of proof",
 	ProofError:        "An error occurred while executing the calculation task",

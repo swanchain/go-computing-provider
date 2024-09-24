@@ -50,13 +50,21 @@ type Deploy struct {
 	userName    string
 }
 
-func NewDeploy(originalJobUuid, lowerJobUuid, hostName, walletAddress, hardwareDesc string, duration int64, spaceType string) *Deploy {
+func NewDeploy(originalJobUuid, lowerJobUuid, hostName, walletAddress, hardwareDesc string, duration int64, spaceType string, spaceHardware models.SpaceHardware, jobType int) *Deploy {
 
 	var taskType string
 	var hardwareDetail models.Resource
-	if hardwareDesc != "" {
-		taskType, hardwareDetail = getHardwareDetail(hardwareDesc)
+
+	if jobType == 0 {
+		if hardwareDesc != "" {
+			taskType, hardwareDetail = getHardwareDetail(hardwareDesc)
+		}
 	}
+
+	if jobType == 1 {
+		taskType, hardwareDetail = getHardwareDetailByByte(spaceHardware)
+	}
+
 	return &Deploy{
 		originalJobUuid:  originalJobUuid,
 		jobUuid:          lowerJobUuid,
@@ -733,6 +741,30 @@ func getHardwareDetail(description string) (string, models.Resource) {
 	hardwareResource.Memory.Unit = strings.ReplaceAll(memSplits[2], "B", "")
 
 	return taskType, hardwareResource
+}
+
+func getHardwareDetailByByte(spaceHardware models.SpaceHardware) (string, models.Resource) {
+	var hardwareResource models.Resource
+
+	hardwareResource.Cpu.Unit = "vCPU"
+	hardwareResource.Cpu.Quantity = spaceHardware.Vcpu
+	hardwareResource.Memory.Unit = "Gi"
+	hardwareResource.Memory.Quantity = spaceHardware.Memory
+	hardwareResource.Storage.Unit = "Gi"
+	hardwareResource.Storage.Quantity = spaceHardware.Storage
+
+	if spaceHardware.Storage == 0 {
+		hardwareResource.Storage.Quantity = 5
+	}
+
+	if strings.Contains(spaceHardware.HardwareType, "GPU") {
+		hardwareResource.Gpu.Quantity = 1
+		hardwareResource.Gpu.Unit = strings.ReplaceAll(spaceHardware.Hardware, "Nvidia", "NVIDIA")
+		if spaceHardware.Storage == 0 {
+			hardwareResource.Storage.Quantity = 50
+		}
+	}
+	return spaceHardware.HardwareType, hardwareResource
 }
 
 func getHardwareDetailForPrivate(cpu, memory, storage int, gpuModel string, gpuNum int) (string, models.Resource) {
