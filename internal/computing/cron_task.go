@@ -138,24 +138,16 @@ func checkJobStatus() {
 }
 
 func (task *CronTask) addLabelToNode() {
-	ticker := time.NewTicker(10 * time.Minute)
-	defer ticker.Stop()
-
-	go func() {
-		for {
-			select {
-			case <-ticker.C:
-				func() {
-					defer func() {
-						if err := recover(); err != nil {
-							logs.GetLogger().Errorf("failed to add label for cluster node, error: %+v", err)
-						}
-					}()
-					addNodeLabel()
-				}()
+	c := cron.New(cron.WithSeconds())
+	c.AddFunc("* 0/10 * * * ?", func() {
+		defer func() {
+			if err := recover(); err != nil {
+				logs.GetLogger().Errorf("failed to add label for cluster node, error: %+v", err)
 			}
-		}
-	}()
+		}()
+		addNodeLabel()
+	})
+	c.Start()
 }
 
 func (task *CronTask) reportClusterResource() {
