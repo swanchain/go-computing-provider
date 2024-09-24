@@ -749,13 +749,20 @@ func getHardwareDetailByByte(spaceHardware models.SpaceHardware) (string, models
 	hardwareResource.Cpu.Unit = "vCPU"
 	hardwareResource.Cpu.Quantity = spaceHardware.Vcpu
 	hardwareResource.Memory.Unit = "Gi"
-	hardwareResource.Memory.Quantity = spaceHardware.Memory / 1024 / 1024 / 1024
+	hardwareResource.Memory.Quantity = spaceHardware.Memory
 	hardwareResource.Storage.Unit = "Gi"
-	hardwareResource.Storage.Quantity = spaceHardware.Storage / 1024 / 1024 / 1024
+	hardwareResource.Storage.Quantity = spaceHardware.Storage
+
+	if spaceHardware.Storage == 0 {
+		hardwareResource.Storage.Quantity = 5
+	}
 
 	if strings.Contains(spaceHardware.HardwareType, "GPU") {
 		hardwareResource.Gpu.Quantity = 1
 		hardwareResource.Gpu.Unit = strings.ReplaceAll(spaceHardware.Hardware, "Nvidia", "NVIDIA")
+		if spaceHardware.Storage == 0 {
+			hardwareResource.Storage.Quantity = 50
+		}
 	}
 	return spaceHardware.HardwareType, hardwareResource
 }
