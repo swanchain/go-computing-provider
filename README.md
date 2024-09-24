@@ -448,10 +448,27 @@ export CP_PATH=<YOUR_CP_PATH>
 ## [**OPTIONAL**] Install Node-Port Service Dependency
 - Install Resource Isolation service on the k8s cluster
 	In order to view the actual available resources of the container, you need to install a resource isolation service on the cluster.
-	```
-	kubectl apply -f https://raw.githubusercontent.com/swanchain/go-computing-provider/refs/heads/releases/resource-isolation.yaml
-	```
-	**Note:** This service currently supports Ubuntu 20.04 and higher.
+	- For Ubuntu 20.04:
+    	```
+    	kubectl apply -f https://raw.githubusercontent.com/swanchain/go-computing-provider/refs/heads/releases/resource-isolation-20.04.yaml
+		```
+    - For Ubuntu 22.04 and higher.
+      - Edit `/etc/default/grub` and modify it to the following content:
+      ```bash
+	     GRUB_CMDLINE_LINUX_DEFAULT="quiet splash systemd.unified_cgroup_hierarchy=0"
+	  ```
+      - Update grub configuration
+      ```
+      update-grub
+      ```
+      - Reboot the system
+      ```bash
+	     reboot now
+      ```
+      - Install resource-isolation service on k8s
+      ```
+        kubectl apply -f https://raw.githubusercontent.com/swanchain/go-computing-provider/refs/heads/releases/resource-isolation.yaml
+      ```
 - Install network policies
 	- Generate Network Policy (location at $CP_PATH/network-policy.yaml )
 	```bash 
