@@ -31,7 +31,6 @@ func TestJobOnChain(t *testing.T) {
 		return
 	}
 
-	// d280767f-efd7-4626-8731-2019ee3c57f6
 	taskInfo, err := taskManagerStub.GetTaskInfo("326ffafb-9b21-4075-b457-e21011a1dc2f")
 	if err != nil {
 		t.Error(err)

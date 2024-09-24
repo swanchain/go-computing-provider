@@ -82,7 +82,17 @@ func GetOwnerAddressAndWorkerAddress() (string, string, error) {
 		return "", "", fmt.Errorf("get cp info failed, account address: %s, error: %v", cpAccountAddress, err)
 	}
 
-	ownerAddress := cpInfoEntity.OwnerAddress
-	workerAddress := cpInfoEntity.WorkerAddress
+	var ownerAddress, workerAddress string
+	if cpInfoEntity.WorkerAddress == "" || cpInfoEntity.OwnerAddress == "" {
+		info, err := SyncCpAccountInfo()
+		if err != nil {
+			return "", "", fmt.Errorf("failed to sync cp info from chain, error: %v", err)
+		}
+		ownerAddress = info.OwnerAddress
+		workerAddress = info.WorkerAddress
+	} else {
+		ownerAddress = cpInfoEntity.OwnerAddress
+		workerAddress = cpInfoEntity.WorkerAddress
+	}
 	return ownerAddress, workerAddress, nil
 }
