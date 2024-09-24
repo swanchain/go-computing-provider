@@ -917,6 +917,9 @@ func handleConnection(conn *websocket.Conn, jobDetail models.JobEntity, logType 
 		if len(pods.Items) > 0 {
 			line := int64(1000)
 			containerStatuses := pods.Items[0].Status.ContainerStatuses
+			if len(containerStatuses) == 0 {
+				return
+			}
 			lastIndex := len(containerStatuses) - 1
 			req := k8sService.k8sClient.CoreV1().Pods(k8sNameSpace).GetLogs(pods.Items[0].Name, &v1.PodLogOptions{
 				Container:  containerStatuses[lastIndex].Name,

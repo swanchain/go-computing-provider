@@ -20,7 +20,7 @@ spec:
           effect: NoSchedule
       containers:
         - name: lxcfs
-          image: filswan/lxcfs-22.04:v4
+          image: filswan/lxcfs-lite:6.0.1
           imagePullPolicy: IfNotPresent
           securityContext:
             privileged: true
