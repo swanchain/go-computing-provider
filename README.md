@@ -451,7 +451,7 @@ export CP_PATH=<YOUR_CP_PATH>
 	```
 	kubectl apply -f https://raw.githubusercontent.com/swanchain/go-computing-provider/refs/heads/releases/resource-isolation.yaml
 	```
-	**Note:** This service currently supports `Ubuntu 20.04`.
+	**Note:** This service currently supports Ubuntu 20.04 and higher.
 - Install network policies
 	- Generate Network Policy (location at $CP_PATH/network-policy.yaml )
 	```bash 
