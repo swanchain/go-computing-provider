@@ -478,7 +478,22 @@ export CP_PATH=<YOUR_CP_PATH>
 	```bash
 	kubectl apply -f $CP_PATH/network-policy.yaml
 	```
- 	**Note:** The nodes for deploying CP need to open ports in the range of `30000-32767`
+ 	- Confirm that all of the network policy are running with the following command.
+	```
+	# kubectl get gnp
+	NAME                    CREATED AT
+	global-01kls78xh7dk4n   2024-09-25T04:00:59Z
+	global-ao9kq72mjc0sl3   2024-09-25T04:00:59Z
+	global-e59cad59af9c65   2024-09-25T04:00:59Z
+	global-pd6sdo8cjd61yd   2024-09-25T04:00:59Z
+	global-pod1namespace1   2024-09-25T04:01:00Z
+	global-s92ms87dl3j6do   2024-09-25T04:01:00Z
+	
+	# kubectl get globalnetworksets
+	NAME                    CREATED AT
+	netset-2300e518e9ad45   2024-09-25T04:00:59Z
+	```
+  **Note:** The nodes for deploying CP need to open ports in the range of `30000-32767`
 - Change the `tasktypes`
 ```bash
 computing-provider account changeTaskTypes --ownerAddress <YOUR_OWNER_WALLET_ADDRESS> 5
