@@ -18,6 +18,7 @@ type HardwareResource struct {
 	GPUModel string `json:"gpu_model"`
 }
 
-type EcpJobDeleteReq struct {
-	Uuid string `json:"uuid"`
+type EcpJobStatusResp struct {
+	Uuid   string `json:"uuid"`
+	Status string `json:"status"`
 }

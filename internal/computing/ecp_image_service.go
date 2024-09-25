@@ -126,11 +126,14 @@ func (*ImageJobService) GetJobStatus(c *gin.Context) {
 		return
 	}
 
+	var result []models.EcpJobStatusResp
 	for _, entity := range ecpJobs {
 		if status, ok := containerStatus[entity.ContainerName]; ok {
 			fmt.Printf("container name: %s, status: %s \n", entity.ContainerName, status)
+			result = append(result, models.EcpJobStatusResp{Uuid: entity.Uuid, Status: status})
 		}
 	}
+	c.JSON(http.StatusOK, util.CreateSuccessResponse(result))
 }
 
 func (*ImageJobService) DeleteJob(c *gin.Context) {
