@@ -245,7 +245,7 @@ func TaskTypeStr(taskType int) string {
 	case Task_TYPE_FIL_C2_32:
 		typeStr = "Fil-C2-32G"
 	case Task_TYPE_NODE_PORT:
-		typeStr = "NodePort-Service"
+		typeStr = "NodePort"
 	}
 	return typeStr
 }
