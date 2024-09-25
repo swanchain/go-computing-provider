@@ -15,10 +15,10 @@ import (
 const resourceConfigFile = "price.toml"
 
 var resourcePrice = `
-TARGET_CPU="1.60"          # SWAN/thread-hour
-TARGET_MEMORY="0.80"       # SWAN/GB-hour
-TARGET_HD_EPHEMERAL="0.02" # SWAN/GB-hour
-TARGET_GPU_DEFAULT="1.0"  # SWAN/Default GPU unit a hour
+TARGET_CPU="0.25"          # SWAN/thread-hour
+TARGET_MEMORY="0.139"       # SWAN/GB-hour
+TARGET_HD_EPHEMERAL="0.035" # SWAN/GB-hour
+TARGET_GPU_DEFAULT="17.5"  # SWAN/Default GPU unit a hour
 `
 
 func GeneratePriceConfig() error {
