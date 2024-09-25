@@ -1158,6 +1158,7 @@ func syncTaskStatusForSequencerService() error {
 		}
 
 		for _, item := range group.Items {
+			var taskAddress = item.SequenceTaskAddr
 			if t, ok := taskMap[item.Id]; ok {
 				item.Reward = "0.00"
 				item.SequenceCid = t.SequenceCid
@@ -1202,7 +1203,7 @@ func syncTaskStatusForSequencerService() error {
 					}
 				}
 
-				if item.Status == status {
+				if item.Status == status && taskAddress == item.SequenceTaskAddr {
 					continue
 				}
 				taskIdAndStatus[item.Id] = models.TaskStatusStr(status)
