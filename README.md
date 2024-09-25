@@ -32,7 +32,7 @@ As a resource provider, you can run a **ECP**(Edge Computing Provider) and **FCP
  	- [Install the Hardware resource-exporter](#Install-the-Hardware-resource-exporter)
  	- [Build and config the Computing Provider](#Build-and-config-the-Computing-Provider)
  	- [Install AI Inference Dependency(Optional)](#optional-Install-AI-Inference-Dependency)
-    - [Install Node-Port Service Dependency (Optional)](#optional-install-node-port-service-dependency)
+    - [Install Node-Port Dependency (Optional)](#optional-install-node-port-dependency)
     - [Config and Receive UBI Tasks(Optional)](#optional-Config-and-Receive-UBI-Tasks)
     - [Start the Computing Provider](#Start-the-Computing-Provider)
     - [CLI of Computing Provider](#CLI-of-Computing-Provider)
@@ -445,7 +445,7 @@ export CP_PATH=<YOUR_CP_PATH>
 ./install.sh
 ```
 
-## [**OPTIONAL**] Install Node-Port Service Dependency
+## [**OPTIONAL**] Install Node-Port Dependency
 - Install Resource Isolation service on the k8s cluster
 	In order to view the actual available resources of the container, you need to install a resource isolation service on the cluster.
 	- For Ubuntu 20.04:
@@ -479,6 +479,16 @@ export CP_PATH=<YOUR_CP_PATH>
 	kubectl apply -f $CP_PATH/network-policy.yaml
 	```
  	**Note:** The nodes for deploying CP need to open ports in the range of `30000-32767`
+- Change the `tasktypes`
+```bash
+computing-provider account changeTaskTypes --ownerAddress <YOUR_OWNER_WALLET_ADDRESS> 5
+```
+> **Note:** `--task-types` Supports 4 task types:
+>  - `1`: FIL-C2-512M
+>  - `2`: Aleo
+>  - `3`: AI
+>  - `4`: FIL-C2-32G
+>  - `5`: NodePort
 
 ## [**OPTIONAL**] Config and Receive ZK Tasks
 This section mainly introduces how to enable the function of receiving ZK tasks on FCP, which is equivalent to running an ECP. This function is optional. Once enabled, FCP can earn double benefits simultaneously, but it will also consume certain resources.

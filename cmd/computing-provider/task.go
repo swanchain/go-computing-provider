@@ -93,12 +93,14 @@ var taskList = &cli.Command{
 
 				var jobUuid string
 				if len(job.JobUuid) > 0 {
-					jobUuid = "..." + job.JobUuid[26:]
+					jobUuidLen := len(job.JobUuid) - 1
+					jobUuid = "..." + job.JobUuid[jobUuidLen-5:]
 				}
 
 				var spaceUuid string
 				if len(job.SpaceUuid) > 0 {
-					spaceUuid = "..." + job.SpaceUuid[26:]
+					spaceUuidLen := len(job.SpaceUuid) - 1
+					spaceUuid = "..." + job.SpaceUuid[spaceUuidLen-5:]
 				}
 
 				taskData = append(taskData,
