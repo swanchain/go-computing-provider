@@ -1,6 +1,7 @@
 package computing
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/docker/docker/api/types/container"
 	"github.com/filswan/go-swan-lib/logs"
@@ -62,12 +63,22 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
 
+	_, _, needCpu, needMemory, err := checkResourceForImage(job.Resource)
+
+	if err := NewDockerService().PullImage(job.Image); err != nil {
+		logs.GetLogger().Errorf("failed to pull %s image, error: %v", job.Image, err)
+		return
+	}
+
 	var needResource container.Resources
 	needResource = container.Resources{
+		CPUQuota: needCpu * 100000,
+		Memory:   needMemory,
 		DeviceRequests: []container.DeviceRequest{
 			{
 				Driver:       "nvidia",
 				Count:        -1,
+				DeviceIDs:    []string{},
 				Capabilities: [][]string{{"gpu"}},
 				Options:      nil,
 			},
@@ -189,8 +200,8 @@ func checkPrice(userPrice string, duration int, resource models.HardwareResource
 
 	// Calculate total cost
 	cpuCost := float64(resource.CPU) * cpuPrice * float64(duration/3600)
-	memoryCost := float64(resource.Memory) * memoryPrice * float64(duration/3600)
-	storageCost := float64(resource.Storage) * storagePrice * float64(duration/3600)
+	memoryCost := formatGiB(resource.Memory) * memoryPrice * float64(duration/3600)
+	storageCost := formatGiB(resource.Storage) * storagePrice * float64(duration/3600)
 	gpuCost := float64(resource.GPU) * gpuPrice * float64(duration/3600)
 
 	totalCost := cpuCost + memoryCost + storageCost + gpuCost
@@ -199,6 +210,99 @@ func checkPrice(userPrice string, duration int, resource models.HardwareResource
 	return userPayPrice >= totalCost, totalCost, nil
 }
 
+func checkResourceForImage(resource models.HardwareResource) (bool, string, int64, int64, error) {
+	dockerService := NewDockerService()
+	containerLogStr, err := dockerService.ContainerLogs("resource-exporter")
+	if err != nil {
+		return false, "", 0, 0, err
+	}
+
+	var nodeResource models.NodeResource
+	if err := json.Unmarshal([]byte(containerLogStr), &nodeResource); err != nil {
+		return false, "", 0, 0, err
+	}
+
+	needCpu := resource.CPU
+	var needMemory, needStorage float64
+	if resource.Memory > 0 {
+		needMemory = formatGiB(resource.Memory)
+
+	}
+	if resource.Storage > 0 {
+		needMemory = formatGiB(resource.Storage)
+	}
+
+	remainderCpu, _ := strconv.ParseInt(nodeResource.Cpu.Free, 10, 64)
+
+	var remainderMemory, remainderStorage float64
+	if len(strings.Split(strings.TrimSpace(nodeResource.Memory.Free), " ")) > 0 {
+		remainderMemory, _ = strconv.ParseFloat(strings.Split(strings.TrimSpace(nodeResource.Memory.Free), " ")[0], 64)
+	}
+	if len(strings.Split(strings.TrimSpace(nodeResource.Storage.Free), " ")) > 0 {
+		remainderStorage, err = strconv.ParseFloat(strings.Split(strings.TrimSpace(nodeResource.Storage.Free), " ")[0], 64)
+	}
+
+	var gpuMap = make(map[string]int)
+	if nodeResource.Gpu.AttachedGpus > 0 {
+		for _, detail := range nodeResource.Gpu.Details {
+			if detail.Status == models.Available {
+				gpuMap[detail.ProductName] += 1
+			}
+		}
+	}
+
+	logs.GetLogger().Infof("checkResourceForImage: needCpu: %d, needMemory: %.2f, needStorage: %.2f, needGpu: %d, gpuName: %s", needCpu, needMemory, needStorage, resource.GPU, resource.GPUModel)
+	logs.GetLogger().Infof("checkResourceForImage: remainingCpu: %d, remainingMemory: %.2f, remainingStorage: %.2f, remainingGpu: %+v", remainderCpu, remainderMemory, remainderStorage, gpuMap)
+	if needCpu <= remainderCpu && needMemory <= remainderMemory && needStorage <= remainderStorage {
+		if resource.GPUModel != "" {
+			var flag bool
+			for k, num := range gpuMap {
+				if strings.ToUpper(k) == resource.GPUModel && num > 0 {
+					flag = true
+					break
+				}
+			}
+			if flag {
+				return true, nodeResource.CpuName, needCpu, int64(needMemory), nil
+			} else {
+				return false, nodeResource.CpuName, needCpu, int64(needMemory), nil
+			}
+		}
+		return true, nodeResource.CpuName, needCpu, int64(needMemory), nil
+	}
+	return false, nodeResource.CpuName, needCpu, int64(needMemory), nil
+}
+
 func parsePrice(priceStr string) (float64, error) {
 	return strconv.ParseFloat(priceStr, 64)
+}
+
+func formatTiB(bytes int64) float64 {
+	return float64(bytes) / float64(1<<40)
+}
+
+func formatGiB(bytes int64) float64 {
+	return float64(bytes) / float64(1<<30)
+}
+
+func formatMiB(bytes int64) float64 {
+	return float64(bytes) / float64(1<<20)
+}
+
+func formatKiB(bytes int64) float64 {
+	return float64(bytes) / float64(1<<10)
+}
+
+func BytesToHumanReadable(bytes int64) string {
+	switch {
+	case bytes >= 1<<40:
+		return fmt.Sprintf("%.2f Ti", formatTiB(bytes))
+	case bytes >= 1<<30:
+		return fmt.Sprintf("%.2f Gi", formatGiB(bytes))
+	case bytes >= 1<<20:
+		return fmt.Sprintf("%.2f Mi", formatMiB(bytes))
+	case bytes >= 1<<10:
+		return fmt.Sprintf("%.2f Ki", formatKiB(bytes))
+	}
+	return ""
 }
