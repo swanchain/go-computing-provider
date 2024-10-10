@@ -63,7 +63,7 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
 
-	_, _, needCpu, needMemory, err := checkResourceForImage(job.Resource)
+	_, _, needCpu, _, err := checkResourceForImage(job.Resource)
 
 	if err := NewDockerService().PullImage(job.Image); err != nil {
 		logs.GetLogger().Errorf("failed to pull %s image, error: %v", job.Image, err)
@@ -73,7 +73,7 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 	var needResource container.Resources
 	needResource = container.Resources{
 		CPUQuota: needCpu * 100000,
-		Memory:   needMemory,
+		Memory:   job.Resource.Memory,
 		DeviceRequests: []container.DeviceRequest{
 			{
 				Driver:       "nvidia",
