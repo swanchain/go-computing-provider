@@ -127,7 +127,8 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 }
 
 func (*ImageJobService) GetJobStatus(c *gin.Context) {
-	ecpJobs, err := NewEcpJobService().GetEcpJobs()
+	jobUuid := c.Query("job_uuid")
+	ecpJobs, err := NewEcpJobService().GetEcpJobs(jobUuid)
 	if err != nil {
 		return
 	}

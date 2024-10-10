@@ -164,9 +164,14 @@ func (cpServ EcpJobService) GetEcpJobByUuid(uuid string) (*models.EcpJobEntity, 
 	return &job, err
 }
 
-func (cpServ EcpJobService) GetEcpJobs() ([]models.EcpJobEntity, error) {
+func (cpServ EcpJobService) GetEcpJobs(jobUuid string) ([]models.EcpJobEntity, error) {
 	var job []models.EcpJobEntity
-	err := cpServ.Model(&models.EcpJobEntity{}).Where("delete_at=0").Find(&job).Error
+	var err error
+	if jobUuid != "" {
+		err = cpServ.Model(&models.EcpJobEntity{}).Where("uuid=? and delete_at=0", jobUuid).Find(&job).Error
+	} else {
+		err = cpServ.Model(&models.EcpJobEntity{}).Where("delete_at=0").Find(&job).Error
+	}
 	return job, err
 }
 
