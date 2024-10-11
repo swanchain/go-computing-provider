@@ -775,81 +775,112 @@ func generateVolume() ([]coreV1.VolumeMount, []coreV1.Volume) {
 	fileType := coreV1.HostPathFile
 	return []coreV1.VolumeMount{
 			{
-				Name:      "cpuinfo",
+				Name:      "shm",
+				MountPath: "/dev/shm",
+			},
+			{
+				Name:      "lxcfs-proc-cpuinfo",
 				MountPath: "/proc/cpuinfo",
+				ReadOnly:  true,
 			},
 			{
-				Name:      "meminfo",
-				MountPath: "/proc/meminfo",
+				Name:      "system-cpu-online",
+				MountPath: "/sys/devices/system/cpu/online",
 			},
 			{
-				Name:      "diskstats",
+				Name:      "lxcfs-proc-diskstats",
 				MountPath: "/proc/diskstats",
+				ReadOnly:  true,
 			},
 			{
-				Name:      "stat",
+				Name:      "lxcfs-proc-meminfo",
+				MountPath: "/proc/meminfo",
+				ReadOnly:  true,
+			},
+			{
+				Name:      "lxcfs-proc-stat",
 				MountPath: "/proc/stat",
+				ReadOnly:  true,
 			},
 			{
-				Name:      "swaps",
+				Name:      "lxcfs-proc-swaps",
 				MountPath: "/proc/swaps",
+				ReadOnly:  true,
 			},
 			{
-				Name:      "uptime",
+				Name:      "lxcfs-proc-uptime",
 				MountPath: "/proc/uptime",
+				ReadOnly:  true,
 			},
 		}, []coreV1.Volume{
 			{
-				Name: "cpuinfo",
+				Name: "shm",
+				VolumeSource: coreV1.VolumeSource{
+					EmptyDir: &coreV1.EmptyDirVolumeSource{
+						Medium: coreV1.StorageMediumMemory,
+					},
+				},
+			},
+			{
+				Name: "lxcfs-proc-cpuinfo",
 				VolumeSource: coreV1.VolumeSource{
 					HostPath: &coreV1.HostPathVolumeSource{
-						Type: &fileType,
 						Path: "/var/lib/lxcfs/proc/cpuinfo",
+						Type: &fileType,
 					},
 				},
 			},
 			{
-				Name: "meminfo",
+				Name: "system-cpu-online",
 				VolumeSource: coreV1.VolumeSource{
 					HostPath: &coreV1.HostPathVolumeSource{
+						Path: "/var/lib/lxcfs/sys/devices/system/cpu/online",
 						Type: &fileType,
-						Path: "/var/lib/lxcfs/proc/meminfo",
 					},
 				},
 			},
 			{
-				Name: "diskstats",
+				Name: "lxcfs-proc-diskstats",
 				VolumeSource: coreV1.VolumeSource{
 					HostPath: &coreV1.HostPathVolumeSource{
-						Type: &fileType,
 						Path: "/var/lib/lxcfs/proc/diskstats",
+						Type: &fileType,
 					},
 				},
 			},
 			{
-				Name: "stat",
+				Name: "lxcfs-proc-meminfo",
 				VolumeSource: coreV1.VolumeSource{
 					HostPath: &coreV1.HostPathVolumeSource{
+						Path: "/var/lib/lxcfs/proc/meminfo",
 						Type: &fileType,
+					},
+				},
+			},
+			{
+				Name: "lxcfs-proc-stat",
+				VolumeSource: coreV1.VolumeSource{
+					HostPath: &coreV1.HostPathVolumeSource{
 						Path: "/var/lib/lxcfs/proc/stat",
+						Type: &fileType,
 					},
 				},
 			},
 			{
-				Name: "swaps",
+				Name: "lxcfs-proc-swaps",
 				VolumeSource: coreV1.VolumeSource{
 					HostPath: &coreV1.HostPathVolumeSource{
-						Type: &fileType,
 						Path: "/var/lib/lxcfs/proc/swaps",
+						Type: &fileType,
 					},
 				},
 			},
 			{
-				Name: "uptime",
+				Name: "lxcfs-proc-uptime",
 				VolumeSource: coreV1.VolumeSource{
 					HostPath: &coreV1.HostPathVolumeSource{
-						Type: &fileType,
 						Path: "/var/lib/lxcfs/proc/uptime",
+						Type: &fileType,
 					},
 				},
 			},
