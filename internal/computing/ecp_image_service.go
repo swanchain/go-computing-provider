@@ -43,7 +43,7 @@ func (*ImageJobService) CheckJobCondition(c *gin.Context) {
 		return
 	}
 
-	receive, _, _, _, err := checkResourceForImage(job.Resource)
+	receive, _, _, _, _, err := checkResourceForImage(job.Resource)
 	if receive {
 		c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
 	} else {
@@ -94,7 +94,7 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
 
-	_, _, needCpu, _, err := checkResourceForImage(job.Resource)
+	_, _, needCpu, _, gids, err := checkResourceForImage(job.Resource)
 
 	if err := NewDockerService().PullImage(job.Image); err != nil {
 		logs.GetLogger().Errorf("failed to pull %s image, error: %v", job.Image, err)
@@ -102,18 +102,34 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 	}
 
 	var needResource container.Resources
-	needResource = container.Resources{
-		CPUQuota: needCpu * 100000,
-		Memory:   job.Resource.Memory,
-		DeviceRequests: []container.DeviceRequest{
-			{
-				Driver:       "nvidia",
-				Count:        -1,
-				DeviceIDs:    []string{},
-				Capabilities: [][]string{{"gpu"}},
-				Options:      nil,
+
+	if job.Resource.GPUModel != "" && job.Resource.GPU > 0 {
+		var useGids []string
+		for i := 0; i < int(job.Resource.GPU); i++ {
+			if i > len(gids) {
+				break
+			}
+			useGids = append(useGids, gids[i])
+		}
+
+		needResource = container.Resources{
+			CPUQuota: needCpu * 100000,
+			Memory:   job.Resource.Memory,
+			DeviceRequests: []container.DeviceRequest{
+				{
+					Driver:       "nvidia",
+					Count:        int(job.Resource.GPU),
+					DeviceIDs:    useGids,
+					Capabilities: [][]string{{"gpu"}},
+					Options:      nil,
+				},
 			},
-		},
+		}
+	} else {
+		needResource = container.Resources{
+			CPUQuota: needCpu * 100000,
+			Memory:   job.Resource.Memory,
+		}
 	}
 
 	hostConfig := &container.HostConfig{
@@ -242,20 +258,21 @@ func checkPrice(userPrice string, duration int, resource models.HardwareResource
 	return userPayPrice >= totalCost, totalCost, nil
 }
 
-func checkResourceForImage(resource models.HardwareResource) (bool, string, int64, int64, error) {
+func checkResourceForImage(resource models.HardwareResource) (bool, string, int64, int64, []string, error) {
 	dockerService := NewDockerService()
 	containerLogStr, err := dockerService.ContainerLogs("resource-exporter")
 	if err != nil {
-		return false, "", 0, 0, err
+		return false, "", 0, 0, nil, err
 	}
 
 	var nodeResource models.NodeResource
 	if err := json.Unmarshal([]byte(containerLogStr), &nodeResource); err != nil {
-		return false, "", 0, 0, err
+		return false, "", 0, 0, nil, err
 	}
 
 	needCpu := resource.CPU
 	var needMemory, needStorage float64
+	var gids []string
 	if resource.Memory > 0 {
 		needMemory = formatGiB(resource.Memory)
 
@@ -274,11 +291,29 @@ func checkResourceForImage(resource models.HardwareResource) (bool, string, int6
 		remainderStorage, err = strconv.ParseFloat(strings.Split(strings.TrimSpace(nodeResource.Storage.Free), " ")[0], 64)
 	}
 
-	var gpuMap = make(map[string]int)
+	type gpuData struct {
+		num  int
+		gids []string
+	}
+
+	var gpuMap = make(map[string]gpuData)
 	if nodeResource.Gpu.AttachedGpus > 0 {
 		for _, detail := range nodeResource.Gpu.Details {
 			if detail.Status == models.Available {
-				gpuMap[detail.ProductName] += 1
+				data, ok := gpuMap[detail.ProductName]
+				if ok {
+					data.num += 1
+					data.gids = append(data.gids, detail.Guid)
+					gpuMap[detail.ProductName] = data
+				} else {
+					gids := make([]string, 0)
+					gids = append(gids, detail.Guid)
+					var dataNew = gpuData{
+						num:  1,
+						gids: gids,
+					}
+					gpuMap[detail.ProductName] = dataNew
+				}
 			}
 		}
 	}
@@ -288,21 +323,22 @@ func checkResourceForImage(resource models.HardwareResource) (bool, string, int6
 	if needCpu <= remainderCpu && needMemory <= remainderMemory && needStorage <= remainderStorage {
 		if resource.GPUModel != "" {
 			var flag bool
-			for k, num := range gpuMap {
-				if strings.ToUpper(k) == resource.GPUModel && num > 0 {
+			for k, gd := range gpuMap {
+				if strings.ToUpper(k) == resource.GPUModel && gd.num > 0 {
+					gids = gd.gids
 					flag = true
 					break
 				}
 			}
 			if flag {
-				return true, nodeResource.CpuName, needCpu, int64(needMemory), nil
+				return true, nodeResource.CpuName, needCpu, int64(needMemory), gids, nil
 			} else {
-				return false, nodeResource.CpuName, needCpu, int64(needMemory), nil
+				return false, nodeResource.CpuName, needCpu, int64(needMemory), gids, nil
 			}
 		}
-		return true, nodeResource.CpuName, needCpu, int64(needMemory), nil
+		return true, nodeResource.CpuName, needCpu, int64(needMemory), gids, nil
 	}
-	return false, nodeResource.CpuName, needCpu, int64(needMemory), nil
+	return false, nodeResource.CpuName, needCpu, int64(needMemory), gids, nil
 }
 
 func parsePrice(priceStr string) (float64, error) {
