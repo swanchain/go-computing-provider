@@ -203,6 +203,7 @@ var daemonCmd = &cli.Command{
 		router.POST("/cp/docker/receive/ubi", computing.ReceiveUbiProof)
 
 		ecpImageService := computing.NewImageJobService()
+		router.POST("/cp/deploy/check", ecpImageService.CheckJobCondition)
 		router.POST("/cp/deploy", ecpImageService.DeployJob)
 		router.GET("/cp/job/status", ecpImageService.GetJobStatus)
 		router.DELETE("/cp/job/:job_uuid", ecpImageService.DeleteJob)

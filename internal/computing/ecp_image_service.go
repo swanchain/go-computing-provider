@@ -21,6 +21,37 @@ func NewImageJobService() *ImageJobService {
 	return &ImageJobService{}
 }
 
+func (*ImageJobService) CheckJobCondition(c *gin.Context) {
+	var job models.EcpJobCreateReq
+	if err := c.ShouldBindJSON(&job); err != nil {
+		logs.GetLogger().Errorf("failed to parse json, error: %v", err)
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
+		return
+	}
+	logs.GetLogger().Infof("Job received Data: %+v", job)
+
+	checkPriceFlag, totalCost, err := checkPrice(job.Price, job.Duration, job.Resource)
+	if err != nil {
+		logs.GetLogger().Errorf("failed to check price, job_uuid: %s, error: %v", job.UUID, err)
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
+		return
+	}
+
+	if !checkPriceFlag {
+		logs.GetLogger().Errorf("bid below the set price, job_uuid: %s, pid: %s, need: %0.4f", job.UUID, job.Price, totalCost)
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BelowPriceError))
+		return
+	}
+
+	receive, _, _, _, err := checkResourceForImage(job.Resource)
+	if receive {
+		c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
+	} else {
+		c.JSON(http.StatusOK, util.CreateSuccessResponse(util.NoAvailableResourcesError))
+	}
+	return
+}
+
 func (*ImageJobService) DeployJob(c *gin.Context) {
 	var job models.EcpJobCreateReq
 	if err := c.ShouldBindJSON(&job); err != nil {
