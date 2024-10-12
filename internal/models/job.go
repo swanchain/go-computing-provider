@@ -1,10 +1,10 @@
 package models
 
 type EcpJobCreateReq struct {
-	UUID     string            `json:"uuid"`
-	Name     string            `json:"name"`
-	Image    string            `json:"image"`
-	Envs     map[string]string `json:"envs"`
+	UUID     string            `json:"uuid,omitempty"`
+	Name     string            `json:"name,omitempty"`
+	Image    string            `json:"image,omitempty"`
+	Envs     map[string]string `json:"envs,omitempty"`
 	Resource HardwareResource  `json:"resource"`
 	Price    string            `json:"price"`
 	Duration int               `json:"duration"`

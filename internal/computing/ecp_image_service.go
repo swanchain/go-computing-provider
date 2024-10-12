@@ -28,7 +28,7 @@ func (*ImageJobService) CheckJobCondition(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
 		return
 	}
-	logs.GetLogger().Infof("Job received Data: %+v", job)
+	logs.GetLogger().Infof("check job condition, received Data: %+v", job)
 
 	checkPriceFlag, totalCost, err := checkPrice(job.Price, job.Duration, job.Resource)
 	if err != nil {
