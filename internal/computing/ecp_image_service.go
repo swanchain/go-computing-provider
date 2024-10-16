@@ -30,7 +30,7 @@ func (*ImageJobService) CheckJobCondition(c *gin.Context) {
 	}
 	logs.GetLogger().Infof("check job condition, received Data: %+v", job)
 
-	checkPriceFlag, totalCost, err := checkPrice(job.Price, job.Duration, job.Resource)
+	checkPriceFlag, totalCost, err := checkPriceForDocker(job.Price, job.Duration, job.Resource)
 	if err != nil {
 		logs.GetLogger().Errorf("failed to check price, job_uuid: %s, error: %v", job.UUID, err)
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
@@ -61,7 +61,7 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 	}
 	logs.GetLogger().Infof("Job received Data: %+v", job)
 
-	checkPriceFlag, totalCost, err := checkPrice(job.Price, job.Duration, job.Resource)
+	checkPriceFlag, totalCost, err := checkPriceForDocker(job.Price, job.Duration, job.Resource)
 	if err != nil {
 		logs.GetLogger().Errorf("failed to check price, job_uuid: %s, error: %v", job.UUID, err)
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
@@ -217,7 +217,7 @@ func (*ImageJobService) DeleteJob(c *gin.Context) {
 	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
 }
 
-func checkPrice(userPrice string, duration int, resource models.HardwareResource) (bool, float64, error) {
+func checkPriceForDocker(userPrice string, duration int, resource models.HardwareResource) (bool, float64, error) {
 	priceConfig, err := ReadPriceConfig()
 	if err != nil {
 		return false, 0, err

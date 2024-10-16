@@ -1701,7 +1701,3 @@ func checkPrice(userPrice string, duration int, resource models.SpaceHardware) (
 	// Compare user's price with total cost
 	return userPayPrice >= totalCost, totalCost, nil
 }
-
-func parsePrice(priceStr string) (float64, error) {
-	return strconv.ParseFloat(priceStr, 64)
-}
