@@ -421,7 +421,6 @@ func CancelJob(c *gin.Context) {
 	}
 
 	if conf.GetConfig().HUB.VerifySign {
-
 		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 		nodeID := GetNodeId(cpRepoPath)
 
@@ -516,19 +515,21 @@ func GetJobStatus(c *gin.Context) {
 		return
 	}
 
-	cpRepoPath, _ := os.LookupEnv("CP_PATH")
-	nodeID := GetNodeId(cpRepoPath)
-	signature, err := verifySignatureForHub(conf.GetConfig().HUB.OrchestratorPk, fmt.Sprintf("%s%s%s", cpAccountAddress, nodeID, jobUuId), signatureMsg)
-	if err != nil {
-		logs.GetLogger().Errorf("verifySignature for space job failed, error: %+v", err)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
-		return
-	}
+	if conf.GetConfig().HUB.VerifySign {
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
+		nodeID := GetNodeId(cpRepoPath)
+		signature, err := verifySignatureForHub(conf.GetConfig().HUB.OrchestratorPk, fmt.Sprintf("%s%s%s", cpAccountAddress, nodeID, jobUuId), signatureMsg)
+		if err != nil {
+			logs.GetLogger().Errorf("verifySignature for space job failed, error: %+v", err)
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
+			return
+		}
 
-	if !signature {
-		logs.GetLogger().Errorf("get job status sign verifing, jobUuid: %s, verify: %t", jobUuId, signature)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError))
-		return
+		if !signature {
+			logs.GetLogger().Errorf("get job status sign verifing, jobUuid: %s, verify: %t", jobUuId, signature)
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError))
+			return
+		}
 	}
 
 	jobEntity, err := NewJobService().GetJobEntityByJobUuid(jobUuId)

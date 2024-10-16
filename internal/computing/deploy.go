@@ -759,6 +759,9 @@ func getHardwareDetailByByte(spaceHardware models.SpaceHardware) (string, models
 
 	if strings.Contains(spaceHardware.HardwareType, "GPU") {
 		hardwareResource.Gpu.Quantity = 1
+		if spaceHardware.Gpu != 0 {
+			hardwareResource.Gpu.Quantity = spaceHardware.Gpu
+		}
 		hardwareResource.Gpu.Unit = strings.ReplaceAll(spaceHardware.Hardware, "Nvidia", "NVIDIA")
 		if spaceHardware.Storage == 0 {
 			hardwareResource.Storage.Quantity = 50

@@ -62,6 +62,7 @@ type SpaceHardware struct {
 	Name         string `json:"name"`
 	Vcpu         int64  `json:"vcpu"`
 	Storage      int64  `json:"storage"` // unit bytes
+	Gpu          int64  `json:"gpu"`
 }
 
 type Resource struct {
