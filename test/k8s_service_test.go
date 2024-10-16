@@ -69,11 +69,6 @@ func TestTar(t *testing.T) {
 	fmt.Println("Archive created successfully!")
 }
 
-func TestDockerBuild(t *testing.T) {
-	dockerService := computing2.NewDockerService()
-	dockerService.CleanResource()
-}
-
 func TestNewStorageService(t *testing.T) {
 	service, _ := computing2.NewStorageService()
 	service.McsApiKey = "wxE8QdLUANzq6zAwosEUOw"

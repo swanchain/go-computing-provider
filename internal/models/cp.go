@@ -17,6 +17,8 @@ type JobData struct {
 	ContainerLog                string `json:"container_log"`
 	NodeIdJobSourceUriSignature string `json:"node_id_job_source_uri_signature,omitempty"`
 	JobRealUri                  string `json:"job_real_uri,omitempty"`
+	JobType                     int    `json:"job_type"`  // 0: Standard job; 1: Custom job
+	BidPrice                    string `json:"bid_price"` // Amount users are willing to pay
 }
 
 type Job struct {
@@ -55,9 +57,12 @@ type SpaceFile struct {
 type SpaceHardware struct {
 	Description  string `json:"description"`
 	HardwareType string `json:"hardware_type"`
-	Memory       int    `json:"memory"`
+	Hardware     string `json:"hardware"` // Nvidia 3080  CPU only
+	Memory       int64  `json:"memory"`   // unit bytes
 	Name         string `json:"name"`
-	Vcpu         int    `json:"vcpu"`
+	Vcpu         int64  `json:"vcpu"`
+	Storage      int64  `json:"storage"` // unit bytes
+	Gpu          int64  `json:"gpu"`
 }
 
 type Resource struct {
@@ -171,9 +176,9 @@ type ResourcePrice struct {
 	CpuPrice         string            `json:"cpu_price"`
 	MemoryPrice      string            `json:"memory_price"`
 	HdEphemeralPrice string            `json:"hd_ephemeral_price"`
-	HdPersHddPrice   string            `json:"hd_pers_hdd_price"`
-	HdPersSsdPrice   string            `json:"hd_pers_ssd_price"`
-	HdPersNvmePrice  string            `json:"hd_pers_nvme_price"`
+	HdPersHddPrice   string            `json:"hd_pers_hdd_price,omitempty"`
+	HdPersSsdPrice   string            `json:"hd_pers_ssd_price,omitempty"`
+	HdPersNvmePrice  string            `json:"hd_pers_nvme_price,omitempty"`
 	GpuDefaultPrice  string            `json:"gpu_default_price"`
 	GpusPrice        map[string]string `json:"gpus_price"`
 }

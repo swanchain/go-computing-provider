@@ -93,12 +93,14 @@ var taskList = &cli.Command{
 
 				var jobUuid string
 				if len(job.JobUuid) > 0 {
-					jobUuid = "..." + job.JobUuid[26:]
+					jobUuidLen := len(job.JobUuid) - 1
+					jobUuid = "..." + job.JobUuid[jobUuidLen-5:]
 				}
 
 				var spaceUuid string
 				if len(job.SpaceUuid) > 0 {
-					spaceUuid = "..." + job.SpaceUuid[26:]
+					spaceUuidLen := len(job.SpaceUuid) - 1
+					spaceUuid = "..." + job.SpaceUuid[spaceUuidLen-5:]
 				}
 
 				taskData = append(taskData,
@@ -130,7 +132,7 @@ var taskDetail = &cli.Command{
 	ArgsUsage: "[job_uuid]",
 	Action: func(cctx *cli.Context) error {
 		if cctx.NArg() != 1 {
-			return fmt.Errorf("incorrect number of arguments, got %d, missing args: task_uuid", cctx.NArg())
+			return fmt.Errorf("incorrect number of arguments, got %d, missing args: job_uuid", cctx.NArg())
 		}
 
 		cpRepoPath, ok := os.LookupEnv("CP_PATH")
@@ -155,6 +157,7 @@ var taskDetail = &cli.Command{
 		taskData = append(taskData, []string{"SPACE URL:", job.RealUrl})
 		taskData = append(taskData, []string{"HARDWARE:", job.Hardware})
 		taskData = append(taskData, []string{"STATUS:", models.GetJobStatus(job.Status)})
+		taskData = append(taskData, []string{"RESULT URL:", job.ResultUrl})
 		taskData = append(taskData, []string{"CREATE TIME:", time.Unix(job.CreateTime, 0).Format("2006-01-02 15:04:05")})
 		taskData = append(taskData, []string{"EXPIRE TIME:", time.Unix(job.ExpireTime, 0).Format("2006-01-02 15:04:05")})
 

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
+	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/constants"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"github.com/swanchain/go-computing-provider/internal/yaml"
@@ -14,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -23,6 +25,7 @@ import (
 )
 
 type Deploy struct {
+	originalJobUuid   string
 	jobUuid           string
 	hostName          string
 	walletAddress     string
@@ -40,18 +43,31 @@ type Deploy struct {
 	taskUuid          string
 	gpuProductName    string
 
-	spaceType string
+	// ===
+	spaceType   string
+	sshKey      string
+	nodePortUrl string
+	userName    string
 }
 
-func NewDeploy(jobUuid, hostName, walletAddress, hardwareDesc string, duration int64, spaceType string) *Deploy {
+func NewDeploy(originalJobUuid, lowerJobUuid, hostName, walletAddress, hardwareDesc string, duration int64, spaceType string, spaceHardware models.SpaceHardware, jobType int) *Deploy {
 
 	var taskType string
 	var hardwareDetail models.Resource
-	if hardwareDesc != "" {
-		taskType, hardwareDetail = getHardwareDetail(hardwareDesc)
+
+	if jobType == 0 {
+		if hardwareDesc != "" {
+			taskType, hardwareDetail = getHardwareDetail(hardwareDesc)
+		}
 	}
+
+	if jobType == 1 {
+		taskType, hardwareDetail = getHardwareDetailByByte(spaceHardware)
+	}
+
 	return &Deploy{
-		jobUuid:          jobUuid,
+		originalJobUuid:  originalJobUuid,
+		jobUuid:          lowerJobUuid,
 		hostName:         hostName,
 		walletAddress:    walletAddress,
 		duration:         duration,
@@ -67,6 +83,11 @@ func (d *Deploy) WithHardware(cpu, memory, storage int, gpuModel string, gpuNum 
 	taskType, hardwareDetail := getHardwareDetailForPrivate(cpu, memory, storage, gpuModel, gpuNum)
 	d.hardwareResource = hardwareDetail
 	d.TaskType = taskType
+	return d
+}
+
+func (d *Deploy) WithSshKey(sshKey string) *Deploy {
+	d.sshKey = sshKey
 	return d
 }
 
@@ -164,26 +185,48 @@ func (d *Deploy) DockerfileToK8s() {
 		logs.GetLogger().Error(err)
 		return
 	}
-	updateJobStatus(d.jobUuid, models.DEPLOY_PULL_IMAGE)
+	updateJobStatus(d.originalJobUuid, models.DEPLOY_PULL_IMAGE)
 
 	if _, err := d.deployK8sResource(int32(containerPort)); err != nil {
 		logs.GetLogger().Error(err)
 		return
 	}
-	updateJobStatus(d.jobUuid, models.DEPLOY_TO_K8S, "https://"+d.hostName)
+	updateJobStatus(d.originalJobUuid, models.DEPLOY_TO_K8S, "https://"+d.hostName)
 
 	d.watchContainerRunningTime()
 	return
 }
 
-func (d *Deploy) YamlToK8s() error {
+func (d *Deploy) YamlToK8s(nodePort int32) error {
 	containerResources, err := yaml.HandlerYaml(d.yamlPath)
 	if err != nil {
+		logs.GetLogger().Error(err)
 		return err
 	}
 
 	if err = d.deployNamespace(); err != nil {
+		logs.GetLogger().Error(err)
 		return err
+	}
+
+	if len(containerResources) == 1 && containerResources[0].ServiceType == yaml.ServiceTypeNodePort {
+		service := containerResources[0]
+		for _, envVar := range service.Env {
+			if envVar.Name == "sshkey" {
+				d.sshKey = envVar.Value
+				d.image = service.ImageName
+			}
+
+			if envVar.Name == "username" {
+				d.userName = envVar.Value
+			}
+		}
+
+		if err := d.DeploySshTaskToK8s(service, nodePort); err != nil {
+			logs.GetLogger().Error(err)
+			return err
+		}
+		return nil
 	}
 
 	k8sService := NewK8sService()
@@ -201,6 +244,7 @@ func (d *Deploy) YamlToK8s() error {
 			fileNameWithoutExt := filepath.Base(cr.VolumeMounts.Name[:len(cr.VolumeMounts.Name)-len(filepath.Ext(cr.VolumeMounts.Name))])
 			configMap, err := k8sService.CreateConfigMap(context.TODO(), d.k8sNameSpace, d.jobUuid, filepath.Dir(d.yamlPath), cr.VolumeMounts.Name)
 			if err != nil {
+				logs.GetLogger().Error(err)
 				return err
 			}
 			configName := configMap.GetName()
@@ -226,6 +270,14 @@ func (d *Deploy) YamlToK8s() error {
 
 		var containers []coreV1.Container
 		for _, depend := range cr.Depends {
+			var ports []coreV1.ContainerPort
+			for _, port := range depend.Ports {
+				ports = append(ports, coreV1.ContainerPort{
+					ContainerPort: port.ContainerPort,
+					Protocol:      port.Protocol,
+				})
+			}
+
 			var handler = new(coreV1.ExecAction)
 			handler.Command = depend.ReadyCmd
 			containers = append(containers, coreV1.Container{
@@ -234,7 +286,7 @@ func (d *Deploy) YamlToK8s() error {
 				Command:         depend.Command,
 				Args:            depend.Args,
 				Env:             depend.Env,
-				Ports:           depend.Ports,
+				Ports:           ports,
 				ImagePullPolicy: coreV1.PullIfNotPresent,
 				Resources:       coreV1.ResourceRequirements{},
 				ReadinessProbe: &coreV1.Probe{
@@ -262,13 +314,21 @@ func (d *Deploy) YamlToK8s() error {
 			},
 		}...)
 
+		var ports []coreV1.ContainerPort
+		for _, port := range cr.Ports {
+			ports = append(ports, coreV1.ContainerPort{
+				ContainerPort: port.ContainerPort,
+				Protocol:      port.Protocol,
+			})
+		}
+
 		containers = append(containers, coreV1.Container{
 			Name:            d.jobUuid + "-" + cr.Name,
 			Image:           cr.ImageName,
 			Command:         cr.Command,
 			Args:            cr.Args,
 			Env:             cr.Env,
-			Ports:           cr.Ports,
+			Ports:           ports,
 			ImagePullPolicy: coreV1.PullIfNotPresent,
 			Resources:       d.createResources(),
 			VolumeMounts:    volumeMount,
@@ -301,18 +361,19 @@ func (d *Deploy) YamlToK8s() error {
 				},
 			}}
 
-		_, err = k8sService.CreateDeployment(context.TODO(), d.k8sNameSpace, deployment)
-		if err != nil {
+		if _, err = k8sService.CreateDeployment(context.TODO(), d.k8sNameSpace, deployment); err != nil {
+			logs.GetLogger().Error(err)
 			return err
 		}
-		updateJobStatus(d.jobUuid, models.DEPLOY_PULL_IMAGE)
+		updateJobStatus(d.originalJobUuid, models.DEPLOY_PULL_IMAGE)
 
 		serviceHost, err := d.deployK8sResource(cr.Ports[0].ContainerPort)
 		if err != nil {
+			logs.GetLogger().Error(err)
 			return err
 		}
 
-		updateJobStatus(d.jobUuid, models.DEPLOY_TO_K8S, "https://"+d.hostName)
+		updateJobStatus(d.originalJobUuid, models.DEPLOY_TO_K8S, "https://"+d.hostName)
 
 		if len(cr.Models) > 0 {
 			for _, res := range cr.Models {
@@ -423,18 +484,110 @@ func (d *Deploy) ModelInferenceToK8s() error {
 				},
 			},
 		}}
-	_, err = k8sService.CreateDeployment(context.TODO(), d.k8sNameSpace, deployment)
-	if err != nil {
+	if _, err = k8sService.CreateDeployment(context.TODO(), d.k8sNameSpace, deployment); err != nil {
 		logs.GetLogger().Error(err)
 		return err
 	}
-	updateJobStatus(d.jobUuid, models.DEPLOY_PULL_IMAGE)
+	updateJobStatus(d.originalJobUuid, models.DEPLOY_PULL_IMAGE)
 
-	if _, err := d.deployK8sResource(int32(80)); err != nil {
+	if _, err = d.deployK8sResource(int32(80)); err != nil {
 		logs.GetLogger().Error(err)
 		return err
 	}
-	updateJobStatus(d.jobUuid, models.DEPLOY_TO_K8S)
+	updateJobStatus(d.originalJobUuid, models.DEPLOY_TO_K8S)
+	d.watchContainerRunningTime()
+	return nil
+}
+
+func (d *Deploy) DeploySshTaskToK8s(containerResource yaml.ContainerResource, nodePort int32) error {
+	k8sService := NewK8sService()
+	volumeMounts, volumes := generateVolume()
+
+	var exclude22Port []int32
+	for _, port := range containerResource.Ports {
+		if port.ContainerPort != 22 {
+			exclude22Port = append(exclude22Port, port.ContainerPort)
+		}
+	}
+
+	deployment := &appV1.Deployment{
+		TypeMeta: metaV1.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: "apps/v1",
+		},
+		ObjectMeta: metaV1.ObjectMeta{
+			Name:      constants.K8S_DEPLOY_NAME_PREFIX + d.jobUuid,
+			Namespace: d.k8sNameSpace,
+			Annotations: map[string]string{
+				"initializer.kubernetes.io/lxcfs": "true",
+			},
+		},
+		Spec: appV1.DeploymentSpec{
+			Selector: &metaV1.LabelSelector{
+				MatchLabels: map[string]string{"hub-private": d.jobUuid},
+			},
+
+			Template: coreV1.PodTemplateSpec{
+				ObjectMeta: metaV1.ObjectMeta{
+					Labels:    map[string]string{"hub-private": d.jobUuid},
+					Namespace: d.k8sNameSpace,
+				},
+
+				Spec: coreV1.PodSpec{
+					Hostname:     d.spaceName + "-" + generateString(4),
+					NodeSelector: generateLabel(d.gpuProductName),
+					Containers: []coreV1.Container{
+						{
+							Name:            constants.K8S_PRIVATE_CONTAINER_PREFIX + d.jobUuid,
+							Image:           d.image,
+							ImagePullPolicy: coreV1.PullIfNotPresent,
+							Ports:           containerResource.Ports,
+							Resources:       d.createResources(),
+							VolumeMounts:    volumeMounts,
+						},
+					},
+					Volumes: volumes,
+				},
+			},
+		}}
+	if _, err := k8sService.CreateDeployment(context.TODO(), d.k8sNameSpace, deployment); err != nil {
+		return fmt.Errorf("failed to create deployment, job_uuid: %s error: %v", d.jobUuid, err)
+	}
+	updateJobStatus(d.originalJobUuid, models.DEPLOY_PULL_IMAGE)
+
+	podName, err := k8sService.WaitForPodRunningByTcp(d.k8sNameSpace, d.jobUuid)
+	if err != nil {
+		return fmt.Errorf("job_uuid: %s, %v", d.jobUuid, err)
+	}
+
+	sshkeyCmd := []string{"sh", "-c", fmt.Sprintf("echo '%s' > /root/.ssh/authorized_keys", d.sshKey)}
+	if err = k8sService.PodDoCommand(d.k8sNameSpace, podName, "", sshkeyCmd); err != nil {
+		return fmt.Errorf("failed to add sshkey, job_uuid: %s error: %v", d.jobUuid, err)
+	}
+
+	randomPassword := generateRandomPassword(8)
+	usernameAndPwdCmd := []string{"sh", "-c", fmt.Sprintf("useradd %s && echo \"%s:%s\" | chpasswd", d.userName, d.userName, randomPassword)}
+	if err = k8sService.PodDoCommand(d.k8sNameSpace, podName, "", usernameAndPwdCmd); err != nil {
+		return fmt.Errorf("failed to add user, job_uuid: %s error: %v", d.jobUuid, err)
+	}
+
+	userDir := fmt.Sprintf("/home/%s", d.userName)
+	userDirCmd := []string{"sh", "-c", fmt.Sprintf("mkdir -p %s && chown %s:%s %s && chmod 755 %s", userDir, d.userName, d.userName, userDir, userDir)}
+	if err = k8sService.PodDoCommand(d.k8sNameSpace, podName, "", userDirCmd); err != nil {
+		return fmt.Errorf("failed to create user directory, job_uuid: %s error: %v", d.jobUuid, err)
+	}
+
+	createService, err := k8sService.CreateServiceByNodePort(context.TODO(), d.k8sNameSpace, d.jobUuid, 22, nodePort, exclude22Port)
+	if err != nil {
+		return fmt.Errorf("failed to create service, job_uuid: %s error: %v", d.jobUuid, err)
+	}
+
+	var portMap string
+	for _, port := range createService.Spec.Ports {
+		portMap += fmt.Sprintf("%s:%d, ", port.TargetPort.String(), port.NodePort)
+	}
+	d.nodePortUrl = fmt.Sprintf("ssh root@%s -p%d、username: %s,password: %s; %s",
+		strings.Split(conf.GetConfig().API.MultiAddress, "/")[2], nodePort, d.userName, randomPassword, portMap)
 	d.watchContainerRunningTime()
 	return nil
 }
@@ -525,11 +678,12 @@ func (d *Deploy) deployK8sResource(containerPort int32) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to create service, error: %w", err)
 	}
+
 	serviceHost := fmt.Sprintf("http://%s:%d", createService.Spec.ClusterIP, createService.Spec.Ports[0].Port)
 
 	_, err = k8sService.CreateIngress(context.TODO(), d.k8sNameSpace, d.jobUuid, d.hostName, containerPort)
 	if err != nil {
-		return "", fmt.Errorf("failed create ingress, error: %w", err)
+		return "", fmt.Errorf("failed to create ingress, error: %w", err)
 	}
 	return serviceHost, nil
 }
@@ -545,6 +699,16 @@ func (d *Deploy) watchContainerRunningTime() {
 		return
 	}
 	logs.GetLogger().Infof("space service deployed, job_uuid: %s, spaceName: %s", d.jobUuid, d.spaceName)
+}
+
+func generateRandomPassword(length int) string {
+	charset := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	seededRand := rand.New(rand.NewSource(time.Now().UnixNano()))
+	password := make([]byte, length)
+	for i := range password {
+		password[i] = charset[seededRand.Intn(len(charset))]
+	}
+	return string(password)
 }
 
 func getHardwareDetail(description string) (string, models.Resource) {
@@ -577,6 +741,33 @@ func getHardwareDetail(description string) (string, models.Resource) {
 	hardwareResource.Memory.Unit = strings.ReplaceAll(memSplits[2], "B", "")
 
 	return taskType, hardwareResource
+}
+
+func getHardwareDetailByByte(spaceHardware models.SpaceHardware) (string, models.Resource) {
+	var hardwareResource models.Resource
+
+	hardwareResource.Cpu.Unit = "vCPU"
+	hardwareResource.Cpu.Quantity = spaceHardware.Vcpu
+	hardwareResource.Memory.Unit = "Gi"
+	hardwareResource.Memory.Quantity = spaceHardware.Memory
+	hardwareResource.Storage.Unit = "Gi"
+	hardwareResource.Storage.Quantity = spaceHardware.Storage
+
+	if spaceHardware.Storage == 0 {
+		hardwareResource.Storage.Quantity = 5
+	}
+
+	if strings.Contains(spaceHardware.HardwareType, "GPU") {
+		hardwareResource.Gpu.Quantity = 1
+		if spaceHardware.Gpu != 0 {
+			hardwareResource.Gpu.Quantity = spaceHardware.Gpu
+		}
+		hardwareResource.Gpu.Unit = strings.ReplaceAll(spaceHardware.Hardware, "Nvidia", "NVIDIA")
+		if spaceHardware.Storage == 0 {
+			hardwareResource.Storage.Quantity = 50
+		}
+	}
+	return spaceHardware.HardwareType, hardwareResource
 }
 
 func getHardwareDetailForPrivate(cpu, memory, storage int, gpuModel string, gpuNum int) (string, models.Resource) {

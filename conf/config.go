@@ -178,6 +178,10 @@ func requiredFieldsAreGiven(metaData toml.MetaData) bool {
 		{"UBI", "AutoChainProof"},
 		{"UBI", "SequencerUrl"},
 
+		{"HUB", "OrchestratorPk"},
+		{"HUB", "BalanceThreshold"},
+		{"HUB", "VerifySign"},
+
 		{"MCS", "ApiKey"},
 		{"MCS", "BucketName"},
 		{"MCS", "Network"},
