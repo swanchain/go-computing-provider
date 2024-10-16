@@ -593,7 +593,7 @@ var collateralWithDrawViewCmd = &cli.Command{
 			confirmableBlockStr = fmt.Sprintf("%d\u200B(%s+\u200B%s)", confirmableBlock, timeStr, timeZone)
 		}
 		var taskData [][]string
-		taskData = append(taskData, []string{"Amount(SWANC):", amount})
+		taskData = append(taskData, []string{"Amount(SWAN):", amount})
 		taskData = append(taskData, []string{"Latest Block:", strconv.FormatUint(latestBlockNumber, 10)})
 		taskData = append(taskData, []string{"Request Block:", strconv.Itoa(int(requestBlock))})
 		taskData = append(taskData, []string{"Confirmable Block:", confirmableBlockStr})
