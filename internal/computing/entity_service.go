@@ -56,7 +56,7 @@ func (taskServ TaskService) GetTaskEntity(taskId int64) (*models.TaskEntity, err
 }
 
 func (taskServ TaskService) GetTaskListNoReward() (list []*models.TaskEntity, err error) {
-	err = taskServ.Model(&models.TaskEntity{}).Where("sequence_cid !='-1' or settlement_cid !='' ").Find(&list).Error
+	err = taskServ.Model(&models.TaskEntity{}).Where("status < ?", models.TASK_VERIFIED_STATUS).Find(&list).Error
 	if err != nil {
 		return nil, err
 	}
