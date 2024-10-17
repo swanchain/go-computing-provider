@@ -492,6 +492,7 @@ func DoUbiTaskForDocker(c *gin.Context) {
 
 	var ubiTask models.UBITaskReq
 	if err := c.ShouldBindJSON(&ubiTask); err != nil {
+		logs.GetLogger().Error("failed to parse json, error: %s", err)
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
 		return
 	}
