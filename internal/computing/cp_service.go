@@ -1541,13 +1541,13 @@ func CheckWalletWhiteList(jobSourceURI string) bool {
 	whiteList, err := getWalletList(walletWhiteListUrl)
 	if err != nil {
 		logs.GetLogger().Errorf("get whiteList By url failed, url: %s, error: %v", err)
-		return false
+		return true
 	}
 
 	spaceDetail, err := getSpaceDetail(jobSourceURI)
 	if err != nil {
 		logs.GetLogger().Errorln(err)
-		return false
+		return true
 	}
 	userWalletAddress := spaceDetail.Data.Owner.PublicAddress
 
