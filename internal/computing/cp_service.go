@@ -1547,7 +1547,7 @@ func CheckWalletWhiteList(jobSourceURI string) bool {
 	spaceDetail, err := getSpaceDetail(jobSourceURI)
 	if err != nil {
 		logs.GetLogger().Errorln(err)
-		return false
+		return true
 	}
 	userWalletAddress := spaceDetail.Data.Owner.PublicAddress
 
