@@ -1541,7 +1541,7 @@ func CheckWalletWhiteList(jobSourceURI string) bool {
 	whiteList, err := getWalletList(walletWhiteListUrl)
 	if err != nil {
 		logs.GetLogger().Errorf("get whiteList By url failed, url: %s, error: %v", err)
-		return false
+		return true
 	}
 
 	spaceDetail, err := getSpaceDetail(jobSourceURI)
@@ -1567,7 +1567,7 @@ func CheckWalletBlackList(jobSourceURI string) bool {
 	blackList, err := getWalletList(walletBlackListUrl)
 	if err != nil {
 		logs.GetLogger().Errorf("get blacklist By url failed, url: %s, error: %v", err)
-		return false
+		return true
 	}
 
 	spaceDetail, err := getSpaceDetail(jobSourceURI)
