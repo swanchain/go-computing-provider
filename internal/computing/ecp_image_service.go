@@ -257,6 +257,11 @@ func checkPriceForDocker(userPrice string, duration int, resource models.Hardwar
 
 	totalCost := cpuCost + memoryCost + storageCost + gpuCost
 
+	if userPayPrice == 0 {
+		logs.GetLogger().Warnf("user's price is 0, use cp price")
+		return true, totalCost, nil
+	}
+
 	// Compare user's price with total cost
 	return userPayPrice >= totalCost, totalCost, nil
 }
