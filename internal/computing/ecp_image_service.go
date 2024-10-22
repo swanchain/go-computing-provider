@@ -45,7 +45,9 @@ func (*ImageJobService) CheckJobCondition(c *gin.Context) {
 
 	receive, _, _, _, _, err := checkResourceForImage(job.Resource)
 	if receive {
-		c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
+		c.JSON(http.StatusOK, util.CreateSuccessResponse(map[string]interface{}{
+			"price": totalCost,
+		}))
 	} else {
 		c.JSON(http.StatusOK, util.CreateSuccessResponse(util.NoAvailableResourcesError))
 	}
@@ -169,7 +171,9 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 		logs.GetLogger().Errorf("failed to save job to db, error: %v", err)
 		return
 	}
-	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
+	c.JSON(http.StatusOK, util.CreateSuccessResponse(map[string]interface{}{
+		"price": totalCost,
+	}))
 }
 
 func (*ImageJobService) GetJobStatus(c *gin.Context) {
@@ -246,10 +250,10 @@ func checkPriceForDocker(userPrice string, duration int, resource models.Hardwar
 	}
 
 	// Calculate total cost
-	cpuCost := float64(resource.CPU) * cpuPrice * float64(duration/3600)
-	memoryCost := formatGiB(resource.Memory) * memoryPrice * float64(duration/3600)
-	storageCost := formatGiB(resource.Storage) * storagePrice * float64(duration/3600)
-	gpuCost := float64(resource.GPU) * gpuPrice * float64(duration/3600)
+	cpuCost := float64(resource.CPU) * cpuPrice
+	memoryCost := formatGiB(resource.Memory) * memoryPrice
+	storageCost := formatGiB(resource.Storage) * storagePrice
+	gpuCost := float64(resource.GPU) * gpuPrice
 
 	totalCost := cpuCost + memoryCost + storageCost + gpuCost
 
