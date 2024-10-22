@@ -32,13 +32,13 @@ func (*ImageJobService) CheckJobCondition(c *gin.Context) {
 
 	checkPriceFlag, totalCost, err := checkPriceForDocker(job.Price, job.Duration, job.Resource)
 	if err != nil {
-		logs.GetLogger().Errorf("failed to check price, job_uuid: %s, error: %v", job.UUID, err)
+		logs.GetLogger().Errorf("failed to check price, error: %v", err)
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
 		return
 	}
 
 	if !checkPriceFlag {
-		logs.GetLogger().Errorf("bid below the set price, job_uuid: %s, pid: %s, need: %0.4f", job.UUID, job.Price, totalCost)
+		logs.GetLogger().Errorf("bid below the set price, pid: %s, need: %0.4f", job.Price, totalCost)
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BelowPriceError))
 		return
 	}

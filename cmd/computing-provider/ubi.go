@@ -204,6 +204,7 @@ var daemonCmd = &cli.Command{
 
 		ecpImageService := computing.NewImageJobService()
 		router.POST("/cp/deploy/check", ecpImageService.CheckJobCondition)
+		router.GET("/cp/price", computing.GetPrice)
 		router.POST("/cp/deploy", ecpImageService.DeployJob)
 		router.GET("/cp/job/status", ecpImageService.GetJobStatus)
 		router.DELETE("/cp/job/:job_uuid", ecpImageService.DeleteJob)
