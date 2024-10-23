@@ -314,6 +314,7 @@ func generateDefaultConfig() ComputeNode {
 			NodeName:        "<YOUR_CP_Node_Name>",
 			WalletWhiteList: "",
 			WalletBlackList: "",
+			Pricing:         true,
 		},
 		UBI: UBI{
 			UbiEnginePk:     "",
