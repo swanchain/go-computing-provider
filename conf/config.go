@@ -35,6 +35,7 @@ type API struct {
 	NodeName        string
 	WalletWhiteList string
 	WalletBlackList string
+	Pricing         bool
 }
 type UBI struct {
 	UbiEnginePk     string

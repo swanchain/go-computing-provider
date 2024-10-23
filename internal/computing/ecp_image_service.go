@@ -6,6 +6,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/filswan/go-swan-lib/logs"
 	"github.com/gin-gonic/gin"
+	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"github.com/swanchain/go-computing-provider/util"
 	"net/http"
@@ -23,24 +24,29 @@ func NewImageJobService() *ImageJobService {
 
 func (*ImageJobService) CheckJobCondition(c *gin.Context) {
 	var job models.EcpJobCreateReq
-	if err := c.ShouldBindJSON(&job); err != nil {
+	err := c.ShouldBindJSON(&job)
+	if err != nil {
 		logs.GetLogger().Errorf("failed to parse json, error: %v", err)
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
 		return
 	}
 	logs.GetLogger().Infof("check job condition, received Data: %+v", job)
 
-	checkPriceFlag, totalCost, err := checkPriceForDocker(job.Price, job.Duration, job.Resource)
-	if err != nil {
-		logs.GetLogger().Errorf("failed to check price, error: %v", err)
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
-		return
-	}
+	var totalCost float64
+	var checkPriceFlag bool
+	if !conf.GetConfig().API.Pricing {
+		checkPriceFlag, totalCost, err = checkPriceForDocker(job.Price, job.Duration, job.Resource)
+		if err != nil {
+			logs.GetLogger().Errorf("failed to check price, error: %v", err)
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
+			return
+		}
 
-	if !checkPriceFlag {
-		logs.GetLogger().Errorf("bid below the set price, pid: %s, need: %0.4f", job.Price, totalCost)
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BelowPriceError))
-		return
+		if !checkPriceFlag {
+			logs.GetLogger().Errorf("bid below the set price, pid: %s, need: %0.4f", job.Price, totalCost)
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BelowPriceError))
+			return
+		}
 	}
 
 	receive, _, _, _, _, err := checkResourceForImage(job.Resource)
@@ -56,24 +62,29 @@ func (*ImageJobService) CheckJobCondition(c *gin.Context) {
 
 func (*ImageJobService) DeployJob(c *gin.Context) {
 	var job models.EcpJobCreateReq
-	if err := c.ShouldBindJSON(&job); err != nil {
+	err := c.ShouldBindJSON(&job)
+	if err != nil {
 		logs.GetLogger().Errorf("failed to parse json, error: %v", err)
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
 		return
 	}
 	logs.GetLogger().Infof("Job received Data: %+v", job)
 
-	checkPriceFlag, totalCost, err := checkPriceForDocker(job.Price, job.Duration, job.Resource)
-	if err != nil {
-		logs.GetLogger().Errorf("failed to check price, job_uuid: %s, error: %v", job.UUID, err)
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
-		return
-	}
+	var totalCost float64
+	var checkPriceFlag bool
+	if !conf.GetConfig().API.Pricing {
+		checkPriceFlag, totalCost, err = checkPriceForDocker(job.Price, job.Duration, job.Resource)
+		if err != nil {
+			logs.GetLogger().Errorf("failed to check price, job_uuid: %s, error: %v", job.UUID, err)
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
+			return
+		}
 
-	if !checkPriceFlag {
-		logs.GetLogger().Errorf("bid below the set price, job_uuid: %s, pid: %s, need: %0.4f", job.UUID, job.Price, totalCost)
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BelowPriceError))
-		return
+		if !checkPriceFlag {
+			logs.GetLogger().Errorf("bid below the set price, job_uuid: %s, pid: %s, need: %0.4f", job.UUID, job.Price, totalCost)
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BelowPriceError))
+			return
+		}
 	}
 
 	if strings.TrimSpace(job.Name) == "" {

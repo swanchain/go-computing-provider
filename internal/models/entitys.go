@@ -214,6 +214,7 @@ type JobEntity struct {
 	CreateTime      int64  `json:"create_time" gorm:"create_time"`
 	Error           string `json:"error" gorm:"error"`
 	DeleteAt        int    `json:"delete_at" gorm:"delete_at; default:0"` // 1 deleted
+	IpWhiteList     string `json:"ip_white_list"`
 	PodStatus       int    `json:"pod_status"`
 	Status          int    `json:"status"`
 	StartedBlock    uint64 `json:"started_block" gorm:"column:started_block;not null;default:0"`

@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/BurntSushi/toml"
 	"github.com/swanchain/go-computing-provider/internal/contract/account"
 	"github.com/swanchain/go-computing-provider/internal/yaml"
 	"io"
@@ -109,17 +108,19 @@ func ReceiveJob(c *gin.Context) {
 	}
 
 	if jobData.JobType == 1 {
-		checkPriceFlag, totalCost, err := checkPrice(jobData.BidPrice, jobData.Duration, spaceDetail.Data.Space.ActiveOrder.Config)
-		if err != nil {
-			logs.GetLogger().Errorf("failed to check price, job_uuid: %s, error: %v", jobData.UUID, err)
-			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
-			return
-		}
+		if !conf.GetConfig().API.Pricing {
+			checkPriceFlag, totalCost, err := checkPrice(jobData.BidPrice, jobData.Duration, spaceDetail.Data.Space.ActiveOrder.Config)
+			if err != nil {
+				logs.GetLogger().Errorf("failed to check price, job_uuid: %s, error: %v", jobData.UUID, err)
+				c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
+				return
+			}
 
-		if !checkPriceFlag {
-			logs.GetLogger().Warnf("the price is too low, job_uuid: %s, paid: %s, required: %0.4f", jobData.UUID, jobData.BidPrice, totalCost)
-			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BelowPriceError))
-			return
+			if !checkPriceFlag {
+				logs.GetLogger().Warnf("the price is too low, job_uuid: %s, paid: %s, required: %0.4f", jobData.UUID, jobData.BidPrice, totalCost)
+				c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BelowPriceError))
+				return
+			}
 		}
 	}
 
@@ -264,6 +265,7 @@ func ReceiveJob(c *gin.Context) {
 		jobEntity.K8sDeployName = constants.K8S_DEPLOY_NAME_PREFIX + strings.ToLower(jobData.UUID)
 		jobEntity.Status = models.JOB_RECEIVED_STATUS
 		jobEntity.K8sResourceType = "deployment"
+		jobEntity.IpWhiteList = strings.Join(jobData.IpWhiteList, ",")
 		err = NewJobService().SaveJobEntity(jobEntity)
 		if err != nil {
 			logs.GetLogger().Errorf("failed to save job to db, job_uuid: %s, error: %+v", jobData.UUID, err)
@@ -277,7 +279,7 @@ func ReceiveJob(c *gin.Context) {
 			logs.GetLogger().Infof("successfully uploaded to MCS, jobuuid: %s", jobData.UUID)
 		}()
 
-		DeploySpaceTask(jobData, deployParam, hostName, gpuProductName, serviceNodePort, jobData.JobType)
+		DeploySpaceTask(jobData, deployParam, hostName, gpuProductName, serviceNodePort, jobData.JobType, jobData.IpWhiteList)
 	}()
 
 	c.JSON(http.StatusOK, util.CreateSuccessResponse(jobData))
@@ -633,36 +635,21 @@ func CheckNodeportServiceEnv(c *gin.Context) {
 }
 
 func GetPrice(c *gin.Context) {
-	cpRepoPath, _ := os.LookupEnv("CP_PATH")
-	if _, err := os.Stat(filepath.Join(cpRepoPath, resourceConfigFile)); err != nil {
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ReadRsaKeyError))
-		return
-	}
-
-	var config Config
-	_, err := toml.DecodeFile(filepath.Join(cpRepoPath, resourceConfigFile), &config.Resources)
+	readPriceConfig, err := ReadPriceConfig()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ReadRsaKeyError))
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ReadPriceError))
 		return
 	}
 
-	var resourcePrice models.ResourcePrice
-	resourcePrice.GpusPrice = make(map[string]string)
-	for key, value := range config.Resources {
-		switch key {
-		case "TARGET_CPU":
-			resourcePrice.CpuPrice = value
-		case "TARGET_MEMORY":
-			resourcePrice.MemoryPrice = value
-		case "TARGET_HD_EPHEMERAL":
-			resourcePrice.HdEphemeralPrice = value
-		case "TARGET_GPU_DEFAULT":
-			resourcePrice.GpuDefaultPrice = value
-		default:
-			resourcePrice.GpusPrice[key] = value
-		}
-	}
-	c.JSON(http.StatusOK, util.CreateSuccessResponse(resourcePrice))
+	var resourcePriceResp models.ResourcePrice
+	resourcePriceResp.CpuPrice = readPriceConfig.TARGET_CPU
+	resourcePriceResp.MemoryPrice = readPriceConfig.TARGET_MEMORY
+	resourcePriceResp.HdEphemeralPrice = readPriceConfig.TARGET_HD_EPHEMERAL
+	resourcePriceResp.GpuDefaultPrice = readPriceConfig.TARGET_GPU_DEFAULT
+	resourcePriceResp.GpusPrice = readPriceConfig.GpusPrice
+	resourcePriceResp.Pricing = conf.GetConfig().API.Pricing
+
+	c.JSON(http.StatusOK, util.CreateSuccessResponse(resourcePriceResp))
 }
 
 func StatisticalSources(c *gin.Context) {
@@ -941,7 +928,7 @@ func handleConnection(conn *websocket.Conn, jobDetail models.JobEntity, logType 
 	}
 }
 
-func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName string, gpuProductName string, nodePort int32, jobType int) {
+func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName string, gpuProductName string, nodePort int32, jobType int, ipWhiteList []string) {
 	updateJobStatus(jobData.UUID, models.DEPLOY_UPLOAD_RESULT)
 	var success bool
 	var jobUuid string
@@ -982,6 +969,7 @@ func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName s
 		deploy = NewDeploy(jobData.UUID, jobUuid, hostName, walletAddress, "", int64(jobData.Duration), constants.SPACE_TYPE_PUBLIC, spaceHardware, jobType)
 	}
 
+	deploy.WithIpWhiteList(ipWhiteList)
 	deploy.WithSpaceName(spaceName)
 	deploy.WithGpuProductName(gpuProductName)
 	deploy.WithSpacePath(deployParam.BuildImagePath)
