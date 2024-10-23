@@ -6,6 +6,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/BurntSushi/toml"
+	"github.com/swanchain/go-computing-provider/internal/contract/account"
+	"github.com/swanchain/go-computing-provider/internal/yaml"
 	"io"
 	"math/rand"
 	"net/http"
@@ -79,20 +82,20 @@ func ReceiveJob(c *gin.Context) {
 
 		cpAccountAddress, err := contract.GetCpAccountAddress()
 		if err != nil {
-			logs.GetLogger().Errorf("get cp account contract address failed, error: %v", err)
+			logs.GetLogger().Errorf("failed to get cp account contract address, error: %v", err)
 			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.GetCpAccountError))
 			return
 		}
 
 		signature, err := verifySignatureForHub(conf.GetConfig().HUB.OrchestratorPk, fmt.Sprintf("%s%s%s", cpAccountAddress, nodeID, jobData.JobSourceURI), jobData.NodeIdJobSourceUriSignature)
 		if err != nil {
-			logs.GetLogger().Errorf("verifySignature for space job failed, error: %+v", err)
+			logs.GetLogger().Errorf("failed to verify signature for space job, error: %+v", err)
 			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
 			return
 		}
 
 		if !signature {
-			logs.GetLogger().Errorf("space job sign verifing, task_id: %s, verify: %v", jobData.TaskUUID, signature)
+			logs.GetLogger().Errorf("space job sign verifing, job_uuid: %s, verify: %v", jobData.UUID, signature)
 			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "signature verify failed"))
 			return
 		}
@@ -105,9 +108,24 @@ func ReceiveJob(c *gin.Context) {
 		return
 	}
 
+	if jobData.JobType == 1 {
+		checkPriceFlag, totalCost, err := checkPrice(jobData.BidPrice, jobData.Duration, spaceDetail.Data.Space.ActiveOrder.Config)
+		if err != nil {
+			logs.GetLogger().Errorf("failed to check price, job_uuid: %s, error: %v", jobData.UUID, err)
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
+			return
+		}
+
+		if !checkPriceFlag {
+			logs.GetLogger().Warnf("the price is too low, job_uuid: %s, paid: %s, required: %0.4f", jobData.UUID, jobData.BidPrice, totalCost)
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BelowPriceError))
+			return
+		}
+	}
+
 	available, gpuProductName, err := checkResourceAvailableForSpace(spaceDetail.Data.Space.ActiveOrder.Config.Description)
 	if err != nil {
-		logs.GetLogger().Errorf("check job resource failed, error: %+v", err)
+		logs.GetLogger().Errorf("failed to check job resource, error: %+v", err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
 		return
 	}
@@ -115,7 +133,7 @@ func ReceiveJob(c *gin.Context) {
 	saveGpuCache(gpuProductName)
 
 	if !available {
-		logs.GetLogger().Warnf(" task id: %s, name: %s, not found a resources available", jobData.TaskUUID, jobData.Name)
+		logs.GetLogger().Warnf("job_uuid: %s, name: %s, not found a resources available", jobData.UUID, jobData.Name)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError))
 		return
 	}
@@ -134,29 +152,84 @@ func ReceiveJob(c *gin.Context) {
 	multiAddressSplit := strings.Split(conf.GetConfig().API.MultiAddress, "/")
 	jobSourceUri := jobData.JobSourceURI
 	spaceUuid := spaceDetail.Data.Space.Uuid
-	wsUrl := fmt.Sprintf("wss://%s:%s/api/v1/computing/lagrange/spaces/log?space_id=%s", logHost, multiAddressSplit[4], spaceUuid)
+	wsUrl := fmt.Sprintf("wss://%s:%s/api/v1/computing/lagrange/spaces/log?job_uuid=%s", logHost, multiAddressSplit[4], jobData.UUID)
 	jobData.BuildLog = wsUrl + "&type=build"
 	jobData.ContainerLog = wsUrl + "&type=container"
 	jobData.JobRealUri = fmt.Sprintf("https://%s", hostName)
 	jobData.NodeIdJobSourceUriSignature = ""
 
-	deployParam, err := BuildSpaceTaskImage(spaceDetail.Data.Space.Uuid, spaceDetail.Data.Files)
+	deployParam, err := DownloadSpaceResources(jobData.UUID, spaceDetail.Data.Files)
 	if err != nil {
-		logs.GetLogger().Errorf("failed to download space resource, error: %+v", err)
+		logs.GetLogger().Errorf("failed to download space resource, job_uuid: %s, error: %v", jobData.UUID, err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.DownloadResourceError))
 		return
 	}
 
-	go func() {
-		job, err := NewJobService().GetJobEntityBySpaceUuid(spaceUuid)
+	var serviceNodePort int32
+	if deployParam.ContainsYaml {
+		containerResources, err := yaml.HandlerYaml(deployParam.YamlFilePath)
 		if err != nil {
-			logs.GetLogger().Errorf("get job failed, error: %+v", err)
+			logs.GetLogger().Errorf("failed to parse yaml, job_uuid: %s, error: %v", jobData.UUID, err)
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.DownloadResourceError))
 			return
 		}
-		if job.SpaceUuid != "" {
-			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid, models.JOB_TERMINATED_STATUS)
-		}
 
+		if len(containerResources) == 1 && containerResources[0].ServiceType == yaml.ServiceTypeNodePort {
+			chainRpc, err := conf.GetRpcByNetWorkName()
+			if err != nil {
+				logs.GetLogger().Errorf("failed to get rpc, job_uuid: %s, error: %v", jobData.UUID, err)
+				c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.RpcConnectError))
+				return
+			}
+			client, err := ethclient.Dial(chainRpc)
+			if err != nil {
+				logs.GetLogger().Errorf("failed to connect rpc, job_uuid: %s, error: %v", jobData.UUID, err)
+				c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.RpcConnectError))
+				return
+			}
+			defer client.Close()
+
+			cpStub, err := account.NewAccountStub(client)
+			if err != nil {
+				logs.GetLogger().Errorf("job_uuid: %s, error: %v", jobData.UUID, err)
+				c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.RpcConnectError))
+				return
+			}
+			cpAccount, err := cpStub.GetCpAccountInfo()
+			if err != nil {
+				logs.GetLogger().Errorf("job_uuid: %s, error: %v", jobData.UUID, err)
+				c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.RpcConnectError))
+				return
+			}
+
+			var sshTaskFlag bool
+			for _, taskType := range cpAccount.TaskTypes {
+				if taskType == 5 {
+					sshTaskFlag = true
+					break
+				}
+			}
+
+			if !sshTaskFlag {
+				c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NotAcceptNodePortError))
+				return
+			}
+
+			_, serviceNodePort, err = NewK8sService().CheckServiceNodePort(0)
+			if err != nil {
+				logs.GetLogger().Errorf("failed to check port, error: %v", err)
+				c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.PortNoAvailableError))
+				return
+			}
+
+			realUrl := fmt.Sprintf("ssh root@%s -p%d", multiAddressSplit[2], serviceNodePort)
+			jobData.JobRealUri = realUrl
+			jobData.ContainerLog = jobData.ContainerLog + "&order=private"
+			logs.GetLogger().Infof("job_uuid: %s, real url: %s", jobData.UUID, realUrl)
+		}
+	}
+
+	go func() {
 		var currentBlockNumber uint64
 		for i := 0; i < 5; i++ {
 			currentBlockNumber, err = getChainBlockNumber()
@@ -182,20 +255,29 @@ func ReceiveJob(c *gin.Context) {
 		jobEntity.ExpireTime = time.Now().Unix() + int64(jobData.Duration)
 		jobEntity.StartedBlock = conf.GetConfig().CONTRACT.JobManagerCreated
 		jobEntity.ScannedBlock = currentBlockNumber
+		jobEntity.WalletAddress = spaceDetail.Data.Owner.PublicAddress
+		jobEntity.Name = spaceDetail.Data.Space.Name
+		jobEntity.Hardware = spaceDetail.Data.Space.ActiveOrder.Config.Description
+		jobEntity.SpaceType = 0
+		jobEntity.ResourceType = spaceDetail.Data.Space.ActiveOrder.Config.HardwareType
+		jobEntity.NameSpace = constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(spaceDetail.Data.Owner.PublicAddress)
+		jobEntity.K8sDeployName = constants.K8S_DEPLOY_NAME_PREFIX + strings.ToLower(jobData.UUID)
+		jobEntity.Status = models.JOB_RECEIVED_STATUS
+		jobEntity.K8sResourceType = "deployment"
 		err = NewJobService().SaveJobEntity(jobEntity)
 		if err != nil {
-			logs.GetLogger().Errorf("failed to save job to db, spaceUuid: %s, error: %+v", spaceUuid, err)
+			logs.GetLogger().Errorf("failed to save job to db, job_uuid: %s, error: %+v", jobData.UUID, err)
 		}
 
 		go func() {
 			if err = submitJob(&jobData); err != nil {
-				logs.GetLogger().Errorf("failed to upload job data to MCS, jobUuid: %s, spaceUuid: %s, error: %v", jobData.UUID, spaceUuid, err)
+				logs.GetLogger().Errorf("failed to upload job data to MCS, job_uuid: %s, spaceUuid: %s, error: %v", jobData.UUID, spaceUuid, err)
 				return
 			}
 			logs.GetLogger().Infof("successfully uploaded to MCS, jobuuid: %s", jobData.UUID)
 		}()
 
-		DeploySpaceTask(jobData, deployParam, hostName, gpuProductName)
+		DeploySpaceTask(jobData, deployParam, hostName, gpuProductName, serviceNodePort, jobData.JobType)
 	}()
 
 	c.JSON(http.StatusOK, util.CreateSuccessResponse(jobData))
@@ -233,12 +315,12 @@ func submitJob(jobData *models.JobData) error {
 	jobData.JobResultURI = jobData.JobRealUri
 	bytes, err := json.Marshal(jobData)
 	if err != nil {
-		return fmt.Errorf(" parse to json failed, error: %v", err)
+		return fmt.Errorf("failed to parse to json, error: %v", err)
 	}
 
 	f, err := os.OpenFile(taskDetailFilePath, os.O_RDWR|os.O_CREATE, 0777)
 	if err != nil {
-		logs.GetLogger().Errorf("Failed to open file, error: %v", err)
+		logs.GetLogger().Errorf("failed to open file, error: %v", err)
 		return err
 	}
 	defer f.Close()
@@ -255,7 +337,7 @@ func submitJob(jobData *models.JobData) error {
 		}
 		mcsOssFile, err := storageService.UploadFileToBucket(jobDetailFile, taskDetailFilePath, true)
 		if err != nil {
-			logs.GetLogger().Errorf("upload file to bucket failed, error: %v", err)
+			logs.GetLogger().Errorf("failed to upload file to bucket, error: %v", err)
 			continue
 		}
 
@@ -265,7 +347,7 @@ func submitJob(jobData *models.JobData) error {
 
 		gatewayUrl, err := storageService.GetGatewayUrl()
 		if err != nil {
-			logs.GetLogger().Errorf("get mcs ipfs gatewayUrl failed, error: %v", err)
+			logs.GetLogger().Errorf("failed to get mcs ipfs gatewayUrl, error: %v", err)
 			continue
 		}
 		resultMcsUrl = *gatewayUrl + "/ipfs/" + mcsOssFile.PayloadCid
@@ -298,7 +380,7 @@ func ReNewJob(c *gin.Context) {
 
 	jobEntity, err := NewJobService().GetJobEntityByTaskUuid(jobData.TaskUuid)
 	if err != nil {
-		logs.GetLogger().Errorf("Failed get job from db, taskUuid: %s, error: %+v", jobData.TaskUuid, err)
+		logs.GetLogger().Errorf("failed get job from db, taskUuid: %s, error: %+v", jobData.TaskUuid, err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.FoundJobEntityError))
 		return
 	}
@@ -316,7 +398,7 @@ func ReNewJob(c *gin.Context) {
 
 		err = NewJobService().SaveJobEntity(&jobEntity)
 		if err != nil {
-			logs.GetLogger().Errorf("update job expireTime failed, taskUuid: %s, error: %+v", jobData.TaskUuid, err)
+			logs.GetLogger().Errorf("failed to update job expireTime, taskUuid: %s, error: %+v", jobData.TaskUuid, err)
 			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SaveJobEntityError))
 			return
 		}
@@ -339,7 +421,6 @@ func CancelJob(c *gin.Context) {
 	}
 
 	if conf.GetConfig().HUB.VerifySign {
-
 		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 		nodeID := GetNodeId(cpRepoPath)
 
@@ -383,8 +464,10 @@ func CancelJob(c *gin.Context) {
 			}
 		}()
 		k8sNameSpace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(jobEntity.WalletAddress)
-		deleteJob(k8sNameSpace, jobEntity.SpaceUuid, "")
-		NewJobService().DeleteJobEntityBySpaceUuId(jobEntity.SpaceUuid, models.JOB_TERMINATED_STATUS)
+		//Compatible with old versions
+		DeleteJob(k8sNameSpace, jobEntity.SpaceUuid, "compatible with old versions, terminated job form hub")
+		DeleteJob(k8sNameSpace, jobEntity.JobUuid, "terminated job form hub")
+		NewJobService().DeleteJobEntityByJobUuId(jobEntity.JobUuid, models.JOB_TERMINATED_STATUS)
 	}()
 
 	c.JSON(http.StatusOK, util.CreateSuccessResponse("deleted success"))
@@ -432,19 +515,21 @@ func GetJobStatus(c *gin.Context) {
 		return
 	}
 
-	cpRepoPath, _ := os.LookupEnv("CP_PATH")
-	nodeID := GetNodeId(cpRepoPath)
-	signature, err := verifySignatureForHub(conf.GetConfig().HUB.OrchestratorPk, fmt.Sprintf("%s%s%s", cpAccountAddress, nodeID, jobUuId), signatureMsg)
-	if err != nil {
-		logs.GetLogger().Errorf("verifySignature for space job failed, error: %+v", err)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
-		return
-	}
+	if conf.GetConfig().HUB.VerifySign {
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
+		nodeID := GetNodeId(cpRepoPath)
+		signature, err := verifySignatureForHub(conf.GetConfig().HUB.OrchestratorPk, fmt.Sprintf("%s%s%s", cpAccountAddress, nodeID, jobUuId), signatureMsg)
+		if err != nil {
+			logs.GetLogger().Errorf("verifySignature for space job failed, error: %+v", err)
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
+			return
+		}
 
-	if !signature {
-		logs.GetLogger().Errorf("get job status sign verifing, jobUuid: %s, verify: %t", jobUuId, signature)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError))
-		return
+		if !signature {
+			logs.GetLogger().Errorf("get job status sign verifing, jobUuid: %s, verify: %t", jobUuId, signature)
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError))
+			return
+		}
 	}
 
 	jobEntity, err := NewJobService().GetJobEntityByJobUuid(jobUuId)
@@ -510,6 +595,76 @@ func GetPublicKey(c *gin.Context) {
 	}))
 }
 
+func CheckNodeportServiceEnv(c *gin.Context) {
+	CheckClusterNetworkPolicy()
+	k8sService := NewK8sService()
+	usedPorts, err := k8sService.GetUsedNodePorts()
+	if err != nil {
+		logs.GetLogger().Errorf("failed to get used node-port, error: %v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckNodePortError))
+		return
+	}
+	var msg string
+	availability := util.CheckPortAvailability(usedPorts)
+	if !availability {
+		msg = "failed to check node port"
+	}
+
+	daemonSet, err := k8sService.k8sClient.AppsV1().DaemonSets("kube-system").Get(context.TODO(), "resource-limit", metaV1.GetOptions{})
+	if err != nil {
+		logs.GetLogger().Errorf("failed to get resource-limit daemonSet, error: %v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourceLimitError))
+		return
+	}
+
+	if daemonSet == nil {
+		msg = "failed to check resource-limit"
+	}
+
+	if !NetworkPolicyFlag {
+		msg = "failed to check network policy"
+	}
+
+	if msg == "" {
+		c.JSON(http.StatusOK, util.CreateSuccessResponse("All checks have passed"))
+	} else {
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(http.StatusInternalServerError, msg))
+	}
+}
+
+func GetPrice(c *gin.Context) {
+	cpRepoPath, _ := os.LookupEnv("CP_PATH")
+	if _, err := os.Stat(filepath.Join(cpRepoPath, resourceConfigFile)); err != nil {
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ReadRsaKeyError))
+		return
+	}
+
+	var config Config
+	_, err := toml.DecodeFile(filepath.Join(cpRepoPath, resourceConfigFile), &config.Resources)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ReadRsaKeyError))
+		return
+	}
+
+	var resourcePrice models.ResourcePrice
+	resourcePrice.GpusPrice = make(map[string]string)
+	for key, value := range config.Resources {
+		switch key {
+		case "TARGET_CPU":
+			resourcePrice.CpuPrice = value
+		case "TARGET_MEMORY":
+			resourcePrice.MemoryPrice = value
+		case "TARGET_HD_EPHEMERAL":
+			resourcePrice.HdEphemeralPrice = value
+		case "TARGET_GPU_DEFAULT":
+			resourcePrice.GpuDefaultPrice = value
+		default:
+			resourcePrice.GpusPrice[key] = value
+		}
+	}
+	c.JSON(http.StatusOK, util.CreateSuccessResponse(resourcePrice))
+}
+
 func StatisticalSources(c *gin.Context) {
 	location, err := getLocation()
 	if err != nil {
@@ -519,6 +674,12 @@ func StatisticalSources(c *gin.Context) {
 
 	k8sService := NewK8sService()
 	statisticalSources, err := k8sService.StatisticalSources(context.TODO())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.GeResourceError))
+		return
+	}
+
+	clusterRuntime, err := k8sService.GetClusterRuntime()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.GeResourceError))
 		return
@@ -537,16 +698,17 @@ func StatisticalSources(c *gin.Context) {
 		NodeName:         conf.GetConfig().API.NodeName,
 		NodeId:           GetNodeId(cpRepo),
 		CpAccountAddress: cpAccountAddress,
+		Runtime:          clusterRuntime,
 	})
 }
 
 func GetSpaceLog(c *gin.Context) {
-	spaceUuid := c.Query("space_id")
+	jobUuid := c.Query("job_uuid")
 	logType := c.Query("type")
 	orderType := c.Query("order")
-	if strings.TrimSpace(spaceUuid) == "" {
-		logs.GetLogger().Errorf("get space log failed, space_id is empty: %s", spaceUuid)
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BadParamError, "missing required field: space_id"))
+	if strings.TrimSpace(jobUuid) == "" {
+		logs.GetLogger().Errorf("get space log failed, job_uuid is empty: %s", jobUuid)
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BadParamError, "missing required field: job_uuid"))
 		return
 	}
 
@@ -562,7 +724,7 @@ func GetSpaceLog(c *gin.Context) {
 		return
 	}
 
-	jobEntity, err := NewJobService().GetJobEntityBySpaceUuid(spaceUuid)
+	jobEntity, err := NewJobService().GetJobEntityByJobUuid(jobUuid)
 	if err != nil {
 		logs.GetLogger().Error(err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.FoundJobEntityError))
@@ -577,7 +739,7 @@ func GetSpaceLog(c *gin.Context) {
 	}
 
 	if orderType == "private" {
-		handlePodEvent(conn, jobEntity.SpaceUuid, jobEntity.WalletAddress)
+		handlePodEvent(conn, jobEntity.JobUuid, jobEntity.WalletAddress)
 	} else {
 		handleConnection(conn, jobEntity, logType)
 	}
@@ -706,7 +868,7 @@ func DoProof(c *gin.Context) {
 	c.JSON(http.StatusOK, util.CreateSuccessResponse(string(bytes)))
 }
 
-func handlePodEvent(conn *websocket.Conn, spaceUuid string, walletAddress string) {
+func handlePodEvent(conn *websocket.Conn, jobUuid string, walletAddress string) {
 	client := NewWsClient(conn)
 
 	k8sNameSpace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(walletAddress)
@@ -719,7 +881,7 @@ func handlePodEvent(conn *websocket.Conn, spaceUuid string, walletAddress string
 
 	var buffer strings.Builder
 	for _, event := range events.Items {
-		if strings.Contains(event.InvolvedObject.Name, spaceUuid) {
+		if strings.Contains(event.InvolvedObject.Name, jobUuid) {
 			buffer.WriteString(event.Message)
 			buffer.WriteString("\n")
 		}
@@ -746,7 +908,7 @@ func handleConnection(conn *websocket.Conn, jobDetail models.JobEntity, logType 
 
 		k8sService := NewK8sService()
 		pods, err := k8sService.k8sClient.CoreV1().Pods(k8sNameSpace).List(context.TODO(), metaV1.ListOptions{
-			LabelSelector: fmt.Sprintf("lad_app=%s", jobDetail.SpaceUuid),
+			LabelSelector: fmt.Sprintf("lad_app=%s", jobDetail.JobUuid),
 		})
 		if err != nil {
 			logs.GetLogger().Errorf("Error listing Pods: %v", err)
@@ -756,6 +918,9 @@ func handleConnection(conn *websocket.Conn, jobDetail models.JobEntity, logType 
 		if len(pods.Items) > 0 {
 			line := int64(1000)
 			containerStatuses := pods.Items[0].Status.ContainerStatuses
+			if len(containerStatuses) == 0 {
+				return
+			}
 			lastIndex := len(containerStatuses) - 1
 			req := k8sService.k8sClient.CoreV1().Pods(k8sNameSpace).GetLogs(pods.Items[0].Name, &v1.PodLogOptions{
 				Container:  containerStatuses[lastIndex].Name,
@@ -776,18 +941,17 @@ func handleConnection(conn *websocket.Conn, jobDetail models.JobEntity, logType 
 	}
 }
 
-func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName string, gpuProductName string) {
+func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName string, gpuProductName string, nodePort int32, jobType int) {
 	updateJobStatus(jobData.UUID, models.DEPLOY_UPLOAD_RESULT)
-
 	var success bool
-	var spaceUuid string
+	var jobUuid string
 	var walletAddress string
 	defer func() {
 		deleteGpuCache(gpuProductName)
 		if !success {
 			k8sNameSpace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(walletAddress)
-			deleteJob(k8sNameSpace, spaceUuid, "failed to deploy space")
-			NewJobService().DeleteJobEntityBySpaceUuId(spaceUuid, models.JOB_TERMINATED_STATUS)
+			DeleteJob(k8sNameSpace, jobUuid, "failed to deploy space")
+			NewJobService().DeleteJobEntityByJobUuId(jobData.UUID, models.JOB_TERMINATED_STATUS)
 		}
 
 		if err := recover(); err != nil {
@@ -804,31 +968,22 @@ func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName s
 
 	walletAddress = spaceDetail.Data.Owner.PublicAddress
 	spaceName := spaceDetail.Data.Space.Name
-	spaceUuid = strings.ToLower(spaceDetail.Data.Space.Uuid)
+	jobUuid = strings.ToLower(jobData.UUID)
 	spaceHardware := spaceDetail.Data.Space.ActiveOrder.Config
 
-	logs.GetLogger().Infof("uuid: %s, spaceName: %s, hardwareName: %s", spaceUuid, spaceName, spaceHardware.Description)
-	if len(spaceHardware.Description) == 0 {
-		return
+	var deploy *Deploy
+	if jobType == 0 {
+		logs.GetLogger().Infof("job_uuid: %s, spaceName: %s, hardwareName: %s", jobData.UUID, spaceName, spaceHardware.Description)
+		if len(spaceHardware.Description) == 0 {
+			return
+		}
+		deploy = NewDeploy(jobData.UUID, jobUuid, hostName, walletAddress, spaceHardware.Description, int64(jobData.Duration), constants.SPACE_TYPE_PUBLIC, spaceHardware, jobType)
+	} else if jobType == 1 {
+		deploy = NewDeploy(jobData.UUID, jobUuid, hostName, walletAddress, "", int64(jobData.Duration), constants.SPACE_TYPE_PUBLIC, spaceHardware, jobType)
 	}
 
-	var job = new(models.JobEntity)
-	job.WalletAddress = walletAddress
-	job.Name = spaceName
-	job.SpaceUuid = spaceDetail.Data.Space.Uuid
-	job.Hardware = spaceHardware.Description
-	job.SpaceType = 0
-	if err = NewJobService().UpdateJobEntityBySpaceUuid(job); err != nil {
-		logs.GetLogger().Errorf("update job info failed, error: %v", err)
-		return
-	}
-
-	deploy := NewDeploy(jobData.UUID, hostName, walletAddress, spaceHardware.Description, int64(jobData.Duration), jobData.TaskUUID, constants.SPACE_TYPE_PUBLIC)
-	deploy.WithSpaceInfo(spaceUuid, spaceName)
+	deploy.WithSpaceName(spaceName)
 	deploy.WithGpuProductName(gpuProductName)
-
-	updateJobStatus(jobData.UUID, models.DEPLOY_DOWNLOAD_SOURCE)
-
 	deploy.WithSpacePath(deployParam.BuildImagePath)
 	if len(deployParam.ModelsSettingFilePath) > 0 {
 		err := deploy.WithModelSettingFile(deployParam.ModelsSettingFilePath).ModelInferenceToK8s()
@@ -841,23 +996,51 @@ func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName s
 	}
 
 	if deployParam.ContainsYaml {
-		err := deploy.WithYamlInfo(deployParam.YamlFilePath).YamlToK8s()
+		err := deploy.WithYamlInfo(deployParam.YamlFilePath).YamlToK8s(nodePort)
 		if err != nil {
-			logs.GetLogger().Error(err)
+			logs.GetLogger().Errorf("failed to use yaml to deploy job, error: %v", err)
 			return
 		}
+		if deploy.nodePortUrl != "" {
+			jobData.JobRealUri = deploy.nodePortUrl[:len(deploy.nodePortUrl)-2]
+			if err = submitJob(&jobData); err != nil {
+				logs.GetLogger().Errorf("failed to upload job result to MCS, jobUuid: %s, error: %v", jobData.UUID, err)
+				return
+			}
+			updateJobStatus(jobData.UUID, models.DEPLOY_TO_K8S)
+		}
+		success = true
 	} else {
-		imageName, dockerfilePath := BuildImagesByDockerfile(jobData.UUID, spaceUuid, spaceName, deployParam.BuildImagePath)
-		deploy.WithDockerfile(imageName, dockerfilePath).DockerfileToK8s()
+		imageName, dockerfilePath := BuildImagesByDockerfile(jobData.UUID, spaceName, deployParam.BuildImagePath)
+
+		clusterRuntime, err := NewK8sService().GetClusterRuntime()
+		if err != nil {
+			logs.GetLogger().Errorf("failed to get cluster runtime, error: %v", err)
+		} else {
+			logs.GetLogger().Infof("cluster runtime: %s", clusterRuntime)
+			if strings.Contains(strings.ToLower(clusterRuntime), "containerd") {
+				imageTar, err := NewDockerService().SaveDockerImage(imageName)
+				if err != nil {
+					logs.GetLogger().Errorf("failed to save image, imageName: %s error: %v", imageName, err)
+					return
+				}
+				if err = ImportImageToContainerd(imageTar); err != nil {
+					logs.GetLogger().Errorf("failed to load image into containerd, imageName: %s error: %v", imageName, err)
+					return
+				}
+			}
+			deploy.WithDockerfile(imageName, dockerfilePath).DockerfileToK8s()
+			success = true
+		}
 	}
-	success = true
 	return
 }
 
-func deleteJob(namespace, spaceUuid string, msg string) error {
-	deployName := constants.K8S_DEPLOY_NAME_PREFIX + spaceUuid
-	serviceName := constants.K8S_SERVICE_NAME_PREFIX + spaceUuid
-	ingressName := constants.K8S_INGRESS_NAME_PREFIX + spaceUuid
+func DeleteJob(namespace, jobUuid string, msg string) error {
+	jobUuid = strings.ToLower(jobUuid)
+	deployName := constants.K8S_DEPLOY_NAME_PREFIX + jobUuid
+	serviceName := constants.K8S_SERVICE_NAME_PREFIX + jobUuid
+	ingressName := constants.K8S_INGRESS_NAME_PREFIX + jobUuid
 
 	k8sService := NewK8sService()
 
@@ -866,11 +1049,13 @@ func deleteJob(namespace, spaceUuid string, msg string) error {
 			logs.GetLogger().Errorf("Failed delete ingress, ingressName: %s, error: %+v", ingressName, err)
 			return err
 		}
+		logs.GetLogger().Infof(" deleted ingress, job_uuid: %s, ingressName: %s", jobUuid, ingressName)
 
 		if err := k8sService.DeleteService(context.TODO(), namespace, serviceName); err != nil && !errors.IsNotFound(err) {
 			logs.GetLogger().Errorf("Failed delete service, serviceName: %s, error: %+v", serviceName, err)
 			return err
 		}
+		logs.GetLogger().Infof(" deleted service, job_uuid: %s, serviceName: %s", jobUuid, serviceName)
 
 		dockerService := NewDockerService()
 		deployImageIds, err := k8sService.GetDeploymentImages(context.TODO(), namespace, deployName)
@@ -880,23 +1065,27 @@ func deleteJob(namespace, spaceUuid string, msg string) error {
 		}
 		for _, imageId := range deployImageIds {
 			dockerService.RemoveImage(imageId)
+			logs.GetLogger().Infof(" deleted images, job_uuid: %s, image: %s", jobUuid, imageId)
 		}
 
 		if err := k8sService.DeleteDeployment(context.TODO(), namespace, deployName); err != nil && !errors.IsNotFound(err) {
 			logs.GetLogger().Errorf("Failed delete deployment, deployName: %s, error: %+v", deployName, err)
 			return err
 		}
+		logs.GetLogger().Infof(" deleted deployment, job_uuid: %s, deployName: %s", jobUuid, deployName)
 		time.Sleep(6 * time.Second)
 
-		if err := k8sService.DeleteDeployRs(context.TODO(), namespace, spaceUuid); err != nil && !errors.IsNotFound(err) {
-			logs.GetLogger().Errorf("Failed delete ReplicaSetsController, spaceUuid: %s, error: %+v", spaceUuid, err)
+		if err := k8sService.DeleteDeployRs(context.TODO(), namespace, jobUuid); err != nil && !errors.IsNotFound(err) {
+			logs.GetLogger().Errorf("Failed delete ReplicaSetsController, job_uuid: %s, error: %+v", jobUuid, err)
 			return err
 		}
+		logs.GetLogger().Infof(" deleted ReplicaSetsController, job_uuid: %s", jobUuid)
 
-		if err := k8sService.DeletePod(context.TODO(), namespace, spaceUuid); err != nil && !errors.IsNotFound(err) {
-			logs.GetLogger().Errorf("Failed delete pods, spaceUuid: %s, error: %+v", spaceUuid, err)
+		if err := k8sService.DeletePod(context.TODO(), namespace, jobUuid); err != nil && !errors.IsNotFound(err) {
+			logs.GetLogger().Errorf("Failed delete pods, job_uuid: %s, error: %+v", jobUuid, err)
 			return err
 		}
+		logs.GetLogger().Infof(" deleted pod, jobUuid: %s", jobUuid)
 	}
 
 	ticker := time.NewTicker(3 * time.Second)
@@ -908,7 +1097,7 @@ func deleteJob(namespace, spaceUuid string, msg string) error {
 		if count >= 20 {
 			break
 		}
-		getPods, err := k8sService.GetPods(namespace, spaceUuid)
+		getPods, err := k8sService.GetPods(namespace, jobUuid)
 		if err != nil && !errors.IsNotFound(err) {
 			logs.GetLogger().Errorf("Failed get pods form namespace, namepace: %s, error: %+v", namespace, err)
 			continue
@@ -919,17 +1108,17 @@ func deleteJob(namespace, spaceUuid string, msg string) error {
 	}
 
 	if msg != "" {
-		logs.GetLogger().Infof("%s, space_uuid: %s", msg, spaceUuid)
+		logs.GetLogger().Infof("%s, job_uuid: %s", msg, jobUuid)
 	} else {
-		logs.GetLogger().Infof("delete space service finished, space_uuid: %s", spaceUuid)
+		logs.GetLogger().Infof("delete job service finished, job_uuid: %s", jobUuid)
 	}
 
 	return nil
 }
 
-func downloadModelUrl(namespace, spaceUuid, serviceIp string, podCmd []string) {
+func downloadModelUrl(namespace, jobUuid, serviceIp string, podCmd []string) {
 	k8sService := NewK8sService()
-	podName, err := k8sService.WaitForPodRunningByHttp(namespace, spaceUuid, serviceIp)
+	podName, err := k8sService.WaitForPodRunningByHttp(namespace, jobUuid, serviceIp)
 	if err != nil {
 		logs.GetLogger().Error(err)
 		return
@@ -1455,4 +1644,64 @@ func deleteGpuCache(gpuProductName string) {
 	}
 	gpuResourceCache.Store(gpuProductName, value)
 
+}
+
+func checkPrice(userPrice string, duration int, resource models.SpaceHardware) (bool, float64, error) {
+	priceConfig, err := ReadPriceConfig()
+	if err != nil {
+		return false, 0, err
+	}
+
+	userPayPrice, err := parsePrice(userPrice)
+	if err != nil {
+		return false, 0, fmt.Errorf("failed to converting user price: %v", err)
+	}
+
+	// Convert price strings to float64
+	cpuPrice, err := parsePrice(priceConfig.TARGET_CPU)
+	if err != nil {
+		return false, 0, fmt.Errorf("failed to converting CPU price: %v", err)
+	}
+	memoryPrice, err := parsePrice(priceConfig.TARGET_MEMORY)
+	if err != nil {
+		return false, 0, fmt.Errorf("failed to converting Memory price: %v", err)
+	}
+	storagePrice, err := parsePrice(priceConfig.TARGET_HD_EPHEMERAL)
+	if err != nil {
+		return false, 0, fmt.Errorf("failed to converting Storage price: %v", err)
+	}
+
+	var gpuPriceStr string
+	var gpuPrice float64
+	if len(priceConfig.GpusPrice) != 0 {
+
+		gpuName := strings.ReplaceAll(resource.Hardware, "NVIDIA ", "")
+		gpuName = strings.ReplaceAll(gpuName, " ", "_")
+		key := "TARGET_GPU_" + gpuName
+		if price, ok := priceConfig.GpusPrice[key]; ok {
+			gpuPriceStr = price
+		}
+	}
+	if gpuPriceStr == "" {
+		gpuPriceStr = priceConfig.TARGET_GPU_DEFAULT
+	}
+	gpuPrice, err = parsePrice(priceConfig.TARGET_GPU_DEFAULT)
+	if err != nil {
+		return false, 0, fmt.Errorf("failed to converting GPU price: %v", err)
+	}
+
+	// Calculate total cost
+	cpuCost := float64(resource.Vcpu) * cpuPrice * float64(duration/3600)
+	memoryCost := float64(resource.Memory/1024/1024/1024) * memoryPrice * float64(duration/3600)
+	storageCost := float64(resource.Storage/1024/1024/1024) * storagePrice * float64(duration/3600)
+	gpuCost := float64(1) * gpuPrice * float64(duration/3600)
+
+	totalCost := cpuCost + memoryCost + storageCost + gpuCost
+
+	// Compare user's price with total cost
+	return userPayPrice >= totalCost, totalCost, nil
+}
+
+func parsePrice(priceStr string) (float64, error) {
+	return strconv.ParseFloat(priceStr, 64)
 }

@@ -1158,6 +1158,7 @@ func syncTaskStatusForSequencerService() error {
 		}
 
 		for _, item := range group.Items {
+			var taskAddress = item.SequenceTaskAddr
 			if t, ok := taskMap[item.Id]; ok {
 				item.Reward = "0.00"
 				item.SequenceCid = t.SequenceCid
@@ -1202,7 +1203,7 @@ func syncTaskStatusForSequencerService() error {
 					}
 				}
 
-				if item.Status == status {
+				if item.Status == status && taskAddress == item.SequenceTaskAddr {
 					continue
 				}
 				taskIdAndStatus[item.Id] = models.TaskStatusStr(status)
@@ -1217,17 +1218,17 @@ func syncTaskStatusForSequencerService() error {
 	return nil
 }
 
-func SyncCpAccountInfo() {
+func SyncCpAccountInfo() (*models.Account, error) {
 	cpAccountAddress, err := contract.GetCpAccountAddress()
 	if err != nil {
-		logs.GetLogger().Fatalf("get cp account contract address failed, error: %v", err)
-		return
+		logs.GetLogger().Errorf("get cp account contract address failed, error: %v", err)
+		return nil, err
 	}
 
 	cpAccount, err := account.GetAccountInfo()
 	if err != nil {
 		logs.GetLogger().Errorf("get cpAccount failed, error: %v", err)
-		return
+		return nil, err
 	}
 
 	var cpInfo = new(models.CpInfoEntity)
@@ -1243,8 +1244,9 @@ func SyncCpAccountInfo() {
 	cpInfo.TaskTypes = cpAccount.TaskTypes
 	if err = NewCpInfoService().SaveCpInfoEntity(cpInfo); err != nil {
 		logs.GetLogger().Errorf("save cp info to db failed, error: %v", err)
-		return
+		return nil, err
 	}
+	return &cpAccount, nil
 }
 
 func RestartResourceExporter() error {
@@ -1263,7 +1265,7 @@ func RestartResourceExporter() error {
 		Tty:          true,
 	}, &container.HostConfig{
 		RestartPolicy: container.RestartPolicy{
-			Name:              container.RestartPolicyAlways,
+			Name:              container.RestartPolicyOnFailure,
 			MaximumRetryCount: 3,
 		},
 		Privileged: true,
@@ -1414,12 +1416,12 @@ func checkBalance(cpAccountAddress string) (bool, error) {
 
 	_, workerAddress, err := GetOwnerAddressAndWorkerAddress()
 	if err != nil {
-		return false, fmt.Errorf("failed to get worker address, cpAccount: %d,error: %v", cpAccountAddress, err)
+		return false, fmt.Errorf("failed to get worker address, cpAccount: %s,error: %v", cpAccountAddress, err)
 	}
 
 	workerBalance, err := wallet.BalanceNumber(client, workerAddress)
 	if err != nil {
-		return false, fmt.Errorf("failed to get worker banlance, cpAccount: %d,error: %v", cpAccountAddress, err)
+		return false, fmt.Errorf("failed to get worker banlance, cpAccount: %s,error: %v", cpAccountAddress, err)
 	}
 
 	sequencerStub, err := ecp.NewSequencerStub(client, ecp.WithSequencerCpAccountAddress(cpAccountAddress))

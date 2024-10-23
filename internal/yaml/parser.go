@@ -21,6 +21,7 @@ type ContainerResource struct {
 	ReadyCmd      []string
 	GpuModel      string
 	Models        []ModelResource
+	ServiceType   string
 }
 
 type ConfigFile struct {

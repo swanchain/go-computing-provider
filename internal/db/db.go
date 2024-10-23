@@ -19,7 +19,7 @@ var DB *gorm.DB
 func InitDb(cpRepoPath string) {
 	var err error
 
-	DB, err = gorm.Open(sqlite.Open(path.Join(cpRepoPath, cpDBName)), &gorm.Config{
+	DB, err = gorm.Open(sqlite.Open(fmt.Sprintf("%s?journal_mode=wal&cache=shared&timeout=5s&busy_timeout=60000&synchronous=NORMAL", path.Join(cpRepoPath, cpDBName))), &gorm.Config{
 		Logger: logger.New(myLog{}, logger.Config{
 			SlowThreshold: 5 * time.Second, // Slow SQL threshold
 			LogLevel:      logger.Error,    // Log level
@@ -29,6 +29,18 @@ func InitDb(cpRepoPath string) {
 	if err != nil {
 		panic("failed to connect database")
 	}
+
+	DB.Exec("PRAGMA journal_mode=WAL;")
+	DB.Exec("PRAGMA synchronous=NORMAL;")
+
+	sqlDB, err := DB.DB()
+	if err != nil {
+		panic("failed to connect database")
+	}
+
+	sqlDB.SetMaxOpenConns(1)
+	sqlDB.SetMaxIdleConns(1)
+	sqlDB.SetConnMaxLifetime(0)
 
 	if err = DB.AutoMigrate(
 		&models.TaskEntity{},

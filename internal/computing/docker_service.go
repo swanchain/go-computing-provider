@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/containerd/containerd/namespaces"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
@@ -25,6 +26,7 @@ import (
 
 	"github.com/swanchain/go-computing-provider/conf"
 
+	"github.com/containerd/containerd"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 )
@@ -48,7 +50,7 @@ func NewDockerService() *DockerService {
 func ExtractExposedPort(dockerfilePath string) (string, error) {
 	file, err := os.Open(dockerfilePath)
 	if err != nil {
-		return "", fmt.Errorf("unable to open Dockerfile: %v", err)
+		return "", fmt.Errorf("failed to open Dockerfile, path: %s, error: %v", dockerfilePath, err)
 	}
 	defer file.Close()
 
@@ -149,7 +151,7 @@ func (ds *DockerService) PushImage(imagesName string) error {
 	}
 	authConfigBytes, _ := json.Marshal(authConfig)
 	authConfigEncoded := base64.URLEncoding.EncodeToString(authConfigBytes)
-	opts := types.ImagePushOptions{RegistryAuth: authConfigEncoded}
+	opts := image.PushOptions{RegistryAuth: authConfigEncoded}
 
 	// retry
 	retries := 5
@@ -425,4 +427,55 @@ func (ds *DockerService) IsExistContainer(containerName string) bool {
 	} else {
 		return false
 	}
+}
+
+func (ds *DockerService) SaveDockerImage(imageName string) (string, error) {
+	ctx := context.Background()
+	out, err := ds.c.ImageSave(ctx, []string{imageName})
+	if err != nil {
+		return "", err
+	}
+	defer out.Close()
+
+	cpRepoPath, _ := os.LookupEnv("CP_PATH")
+	imageFolder := filepath.Join(cpRepoPath, "images_cache")
+	tarFile := filepath.Join(imageFolder, imageName+".tar")
+
+	os.MkdirAll(filepath.Dir(tarFile), os.ModePerm)
+	file, err := os.Create(tarFile)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	_, err = file.ReadFrom(out)
+	if err != nil {
+		return "", err
+	}
+	return tarFile, nil
+}
+
+func ImportImageToContainerd(tarFile string) error {
+	defer os.Remove(tarFile)
+	client, err := containerd.New("/run/containerd/containerd.sock")
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	file, err := os.Open(tarFile)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	ctx := namespaces.WithNamespace(context.Background(), "k8s.io")
+	img, err := client.Import(ctx, file)
+	if err != nil {
+		return err
+	}
+	for _, i := range img {
+		fmt.Println("containerd imported image:", i.Name)
+	}
+	return nil
 }

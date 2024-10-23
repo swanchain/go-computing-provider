@@ -85,6 +85,8 @@ func cpManager(router *gin.RouterGroup) {
 	router.GET("/lagrange/cp/blacklist", computing.BlackList)
 	router.GET("/lagrange/job/:job_uuid", computing.GetJobStatus)
 	router.GET("/lagrange/cp/public_key", computing.GetPublicKey)
+	router.GET("/lagrange/cp/price", computing.GetPrice)
+	router.GET("/lagrange/cp/check_node_port", computing.CheckNodeportServiceEnv)
 
 	router.POST("/cp/ubi", computing.DoUbiTaskForK8s)
 	router.POST("/cp/receive/ubi", computing.ReceiveUbiProof)
@@ -284,6 +286,21 @@ var stateInfoCmd = &cli.Command{
 		}
 		defer client.Close()
 
+		cpAccountAddress := cctx.Args().Get(0)
+		if !strings.HasPrefix(cpAccountAddress, "0x") {
+			return fmt.Errorf("the %s parameter must start with 0x", cpAccountAddress)
+		}
+
+		cpAccount := common.HexToAddress(cpAccountAddress)
+		bytecode, err := client.CodeAt(context.Background(), cpAccount, nil)
+		if err != nil {
+			return fmt.Errorf("failed to check cp account contract address, error: %v", err)
+		}
+
+		if len(bytecode) <= 0 {
+			return fmt.Errorf("the %s parameter is not a cpAccount contract address", cpAccountAddress)
+		}
+
 		var sequencerBalance = "0.0000"
 		var fcpCollateralBalance = "0.0000"
 		var fcpEscrowBalance = "0.0000"
@@ -294,7 +311,7 @@ var stateInfoCmd = &cli.Command{
 		var chainMultiAddress string
 		var contractAddress, ownerAddress, workerAddress, beneficiaryAddress, taskTypes, chainNodeId, version string
 
-		cpStub, err := account.NewAccountStub(client, account.WithContractAddress(cctx.Args().Get(0)))
+		cpStub, err := account.NewAccountStub(client, account.WithContractAddress(cpAccountAddress))
 		if err == nil {
 			cpAccount, err := cpStub.GetCpAccountInfo()
 			if err != nil {
@@ -405,6 +422,30 @@ var taskInfoCmd = &cli.Command{
 			return fmt.Errorf("the task contract address is required")
 		}
 
+		if !strings.HasPrefix(taskContract, "0x") {
+			return fmt.Errorf("the %s parameter must start with 0x", taskContract)
+		}
+
+		chainRpc, err := conf.GetRpcByNetWorkName()
+		if err != nil {
+			return err
+		}
+		client, err := ethclient.Dial(chainRpc)
+		if err != nil {
+			return err
+		}
+		defer client.Close()
+
+		taskContractAddress := common.HexToAddress(taskContract)
+		bytecode, err := client.CodeAt(context.Background(), taskContractAddress, nil)
+		if err != nil {
+			return fmt.Errorf("failed to check the task contract address, error: %v", err)
+		}
+
+		if len(bytecode) <= 0 {
+			return fmt.Errorf("the %s parameter is not a task contract address", taskContract)
+		}
+
 		taskInfo, err := computing.GetTaskInfoOnChain(taskContract)
 		if err == nil {
 			var taskData [][]string
@@ -510,7 +551,7 @@ var createAccountCmd = &cli.Command{
 		},
 		&cli.StringFlag{
 			Name:  "task-types",
-			Usage: "Task types of CP (1:Fil-C2-512M, 2:Aleo, 3:AI, 4:Fil-C2-32G), separated by commas",
+			Usage: "Task types of CP (1:Fil-C2-512M, 2:Aleo, 3:AI, 4:Fil-C2-32G, 5:NodePort), separated by commas",
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -817,7 +858,7 @@ var changeWorkerAddressCmd = &cli.Command{
 
 var changeTaskTypesCmd = &cli.Command{
 	Name:      "changeTaskTypes",
-	Usage:     "Update taskTypes of CP (1:Fil-C2-512M, 2:Aleo, 3: AI, 4:Fil-C2-32G), separated by commas",
+	Usage:     "Update taskTypes of CP (1:Fil-C2-512M, 2:Aleo, 3: AI, 4:Fil-C2-32G, 5:NodePort), separated by commas",
 	ArgsUsage: "[TaskTypes]",
 	Flags: []cli.Flag{
 		&cli.StringFlag{

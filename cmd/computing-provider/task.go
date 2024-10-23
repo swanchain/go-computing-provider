@@ -3,17 +3,16 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/swanchain/go-computing-provider/constants"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/swanchain/go-computing-provider/conf"
-	"github.com/swanchain/go-computing-provider/constants"
 	"github.com/swanchain/go-computing-provider/internal/computing"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"github.com/urfave/cli/v2"
-	"k8s.io/apimachinery/pkg/api/errors"
 )
 
 var taskCmd = &cli.Command{
@@ -66,10 +65,6 @@ var taskList = &cli.Command{
 			return fmt.Errorf("get jobs failed, error: %+v", err)
 		}
 		for i, job := range list {
-			var fullSpaceUuid string
-			if len(job.K8sDeployName) > 0 {
-				fullSpaceUuid = job.K8sDeployName[7:]
-			}
 
 			expireTime := time.Unix(job.ExpireTime, 0).Format("2006-01-02 15:04:05")
 
@@ -78,53 +73,52 @@ var taskList = &cli.Command{
 				reward = job.Reward
 			}
 
+			rowColor := getColor(job.Status)
+
 			if fullFlag {
 				taskData = append(taskData,
-					[]string{job.TaskUuid, job.ResourceType, job.WalletAddress, fullSpaceUuid, job.Name, models.GetJobStatus(job.Status), reward, expireTime})
+					[]string{job.JobUuid, job.TaskUuid, job.ResourceType, job.WalletAddress, job.SpaceUuid, job.Name, models.GetJobStatus(job.Status), reward, expireTime})
+
+				rowColorList = append(rowColorList, RowColor{
+					row:    i,
+					column: []int{6},
+					color:  rowColor,
+				})
+
 			} else {
 				var walletAddress string
 				if len(job.WalletAddress) > 0 {
 					walletAddress = job.WalletAddress[:5] + "..." + job.WalletAddress[37:]
 				}
 
-				var taskUuid string
-				if len(job.TaskUuid) > 0 {
-					taskUuid = "..." + job.TaskUuid[26:]
+				var jobUuid string
+				if len(job.JobUuid) > 0 {
+					jobUuidLen := len(job.JobUuid) - 1
+					jobUuid = "..." + job.JobUuid[jobUuidLen-5:]
 				}
 
 				var spaceUuid string
 				if len(job.SpaceUuid) > 0 {
-					spaceUuid = "..." + job.SpaceUuid[26:]
+					spaceUuidLen := len(job.SpaceUuid) - 1
+					spaceUuid = "..." + job.SpaceUuid[spaceUuidLen-5:]
 				}
 
 				taskData = append(taskData,
-					[]string{taskUuid, job.ResourceType, walletAddress, spaceUuid, job.Name, models.GetJobStatus(job.Status), expireTime})
-			}
+					[]string{jobUuid, job.ResourceType, walletAddress, spaceUuid, job.Name, models.GetJobStatus(job.Status), expireTime})
 
-			var rowColor []tablewriter.Colors
-			switch job.Status {
-			case models.JOB_DEPLOY_STATUS:
-				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgYellowColor}}
-			case models.JOB_RUNNING_STATUS:
-				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
-			case models.JOB_TERMINATED_STATUS:
-				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
-			case models.JOB_COMPLETED_STATUS:
-				rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiMagentaColor}}
+				rowColorList = append(rowColorList, RowColor{
+					row:    i,
+					column: []int{5},
+					color:  rowColor,
+				})
 			}
-
-			rowColorList = append(rowColorList, RowColor{
-				row:    i,
-				column: []int{5},
-				color:  rowColor,
-			})
 		}
 
 		if fullFlag {
-			header := []string{"TASK UUID", "TASK TYPE", "WALLET ADDRESS", "SPACE UUID", "SPACE NAME", "STATUS", "REWARD", "EXPIRE TIME"}
+			header := []string{"JOB UUID", "TASK UUID", "TASK TYPE", "WALLET ADDRESS", "SPACE UUID", "SPACE NAME", "STATUS", "REWARD", "EXPIRE TIME"}
 			NewVisualTable(header, taskData, rowColorList).Generate(true)
 		} else {
-			header := []string{"TASK UUID", "TASK TYPE", "WALLET ADDRESS", "SPACE UUID", "SPACE NAME", "STATUS", "EXPIRE TIME"}
+			header := []string{"JOB UUID", "TASK TYPE", "WALLET ADDRESS", "SPACE UUID", "SPACE NAME", "STATUS", "EXPIRE TIME"}
 			NewVisualTable(header, taskData, rowColorList).Generate(true)
 		}
 
@@ -134,11 +128,11 @@ var taskList = &cli.Command{
 
 var taskDetail = &cli.Command{
 	Name:      "get",
-	Usage:     "Get task detail info",
-	ArgsUsage: "[task_uuid]",
+	Usage:     "Get job detail info",
+	ArgsUsage: "[job_uuid]",
 	Action: func(cctx *cli.Context) error {
 		if cctx.NArg() != 1 {
-			return fmt.Errorf("incorrect number of arguments, got %d, missing args: task_uuid", cctx.NArg())
+			return fmt.Errorf("incorrect number of arguments, got %d, missing args: job_uuid", cctx.NArg())
 		}
 
 		cpRepoPath, ok := os.LookupEnv("CP_PATH")
@@ -149,33 +143,26 @@ var taskDetail = &cli.Command{
 			return fmt.Errorf("load config file failed, error: %+v", err)
 		}
 
-		taskUuid := cctx.Args().First()
-		job, err := computing.NewJobService().GetJobEntityByTaskUuid(taskUuid)
+		jobUuid := cctx.Args().First()
+		job, err := computing.NewJobService().GetJobEntityByJobUuid(jobUuid)
 		if err != nil {
-			return fmt.Errorf("task_uuid: %s, get job detail failed, error: %+v", taskUuid, err)
+			return fmt.Errorf("job_uuid: %s, get job detail failed, error: %+v", jobUuid, err)
 		}
 
 		var taskData [][]string
+		taskData = append(taskData, []string{"TASK UUID:", job.TaskUuid})
 		taskData = append(taskData, []string{"TASK TYPE:", job.ResourceType})
 		taskData = append(taskData, []string{"WALLET ADDRESS:", job.WalletAddress})
 		taskData = append(taskData, []string{"SPACE NAME:", job.Name})
 		taskData = append(taskData, []string{"SPACE URL:", job.RealUrl})
 		taskData = append(taskData, []string{"HARDWARE:", job.Hardware})
 		taskData = append(taskData, []string{"STATUS:", models.GetJobStatus(job.Status)})
+		taskData = append(taskData, []string{"RESULT URL:", job.ResultUrl})
+		taskData = append(taskData, []string{"CREATE TIME:", time.Unix(job.CreateTime, 0).Format("2006-01-02 15:04:05")})
+		taskData = append(taskData, []string{"EXPIRE TIME:", time.Unix(job.ExpireTime, 0).Format("2006-01-02 15:04:05")})
 
-		var rowColor []tablewriter.Colors
-		switch job.Status {
-		case models.JOB_DEPLOY_STATUS:
-			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgYellowColor}}
-		case models.JOB_RUNNING_STATUS:
-			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
-		case models.JOB_TERMINATED_STATUS:
-			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
-		case models.JOB_COMPLETED_STATUS:
-			rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiMagentaColor}}
-		}
-
-		header := []string{"TASK UUID:", job.TaskUuid}
+		rowColor := getColor(job.Status)
+		header := []string{"JOB UUID:", job.JobUuid}
 
 		var rowColorList []RowColor
 		rowColorList = append(rowColorList, RowColor{
@@ -183,7 +170,7 @@ var taskDetail = &cli.Command{
 			column: []int{1},
 			color:  rowColor,
 		})
-		NewVisualTable(header, taskData, rowColorList).Generate(false)
+		NewVisualTable(header, taskData, rowColorList).SetAutoWrapText(false).Generate(false)
 		return nil
 	},
 }
@@ -191,7 +178,7 @@ var taskDetail = &cli.Command{
 var taskDelete = &cli.Command{
 	Name:      "delete",
 	Usage:     "Delete an task from the k8s",
-	ArgsUsage: "[task_uuid]",
+	ArgsUsage: "[job_uuid]",
 	Action: func(cctx *cli.Context) error {
 		if cctx.NArg() != 1 {
 			return fmt.Errorf("incorrect number of arguments, got %d, missing args: task_uuid", cctx.NArg())
@@ -202,28 +189,50 @@ var taskDelete = &cli.Command{
 			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
 		}
 		if err := conf.InitConfig(cpRepoPath, true); err != nil {
-			return fmt.Errorf("load config file failed, error: %+v", err)
+			return fmt.Errorf("failed to load config file, error: %+v", err)
 		}
 
-		taskUuid := strings.ToLower(cctx.Args().First())
-		job, err := computing.NewJobService().GetJobEntityByTaskUuid(taskUuid)
+		jobUuid := strings.ToLower(cctx.Args().First())
+		job, err := computing.NewJobService().GetJobEntityByJobUuid(jobUuid)
 		if err != nil {
-			return fmt.Errorf("failed get job detail: %s, error: %+v", taskUuid, err)
+			return fmt.Errorf("failed to get job detail, job_uuid: %s, error: %+v", jobUuid, err)
 		}
 
-		deployName := constants.K8S_DEPLOY_NAME_PREFIX + job.SpaceUuid
-		namespace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(job.WalletAddress)
+		if job.JobUuid == "" {
+			return fmt.Errorf("not found the job_uuid='%s' job detail", jobUuid)
+		}
+
+		serviceName := constants.K8S_SERVICE_NAME_PREFIX + jobUuid
+		ingressName := constants.K8S_INGRESS_NAME_PREFIX + jobUuid
+
 		k8sService := computing.NewK8sService()
-		if err := k8sService.DeleteDeployment(context.TODO(), namespace, deployName); err != nil && !errors.IsNotFound(err) {
-			return err
-		}
+		k8sService.DeleteIngress(context.TODO(), job.NameSpace, ingressName)
+		k8sService.DeleteService(context.TODO(), job.NameSpace, serviceName)
+		k8sService.DeleteDeployment(context.TODO(), job.NameSpace, job.K8sDeployName)
 		time.Sleep(3 * time.Second)
+		k8sService.DeleteDeployRs(context.TODO(), job.NameSpace, job.JobUuid)
 
-		if err := k8sService.DeleteDeployRs(context.TODO(), namespace, job.SpaceUuid); err != nil && !errors.IsNotFound(err) {
-			return err
-		}
-		computing.NewJobService().DeleteJobEntityBySpaceUuId(job.SpaceUuid, models.JOB_TERMINATED_STATUS)
-		fmt.Printf("space_uuid: %s space serivce successfully deleted \n", job.SpaceUuid)
+		computing.NewJobService().DeleteJobEntityByJobUuId(job.JobUuid, models.JOB_TERMINATED_STATUS)
+		fmt.Printf("job_uuid: %s space serivce successfully deleted \n", jobUuid)
 		return nil
 	},
+}
+
+func getColor(status int) []tablewriter.Colors {
+	var rowColor []tablewriter.Colors
+	switch status {
+	case models.JOB_DEPLOY_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgYellowColor}}
+	case models.JOB_RUNNING_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
+	case models.JOB_TERMINATED_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
+	case models.JOB_COMPLETED_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiMagentaColor}}
+	case models.JOB_RECEIVED_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiBlueColor}}
+	default:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiCyanColor}}
+	}
+	return rowColor
 }

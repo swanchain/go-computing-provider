@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	calicov3 "github.com/projectcalico/api/pkg/apis/projectcalico/v3"
+	calicoclientset "github.com/projectcalico/api/pkg/client/clientset_generated/clientset"
 	"github.com/swanchain/go-computing-provider/constants"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"io"
@@ -87,9 +89,9 @@ func (s *K8sService) DeletePod(ctx context.Context, namespace, spaceUuid string)
 	})
 }
 
-func (s *K8sService) DeleteDeployRs(ctx context.Context, namespace, spaceUuid string) error {
+func (s *K8sService) DeleteDeployRs(ctx context.Context, namespace, jobUuid string) error {
 	return s.k8sClient.AppsV1().ReplicaSets(namespace).DeleteCollection(ctx, *metaV1.NewDeleteOptions(0), metaV1.ListOptions{
-		LabelSelector: fmt.Sprintf("lad_app=%s", spaceUuid),
+		LabelSelector: fmt.Sprintf("lad_app=%s", jobUuid),
 	})
 }
 
@@ -151,7 +153,21 @@ func (s *K8sService) CreateService(ctx context.Context, nameSpace, spaceUuid str
 	return s.k8sClient.CoreV1().Services(nameSpace).Create(ctx, service, metaV1.CreateOptions{})
 }
 
-func (s *K8sService) CreateServiceByNodePort(ctx context.Context, nameSpace, taskUuid string, containerPort int32) (result *coreV1.Service, err error) {
+func (s *K8sService) CreateServiceByNodePort(ctx context.Context, nameSpace, taskUuid string, containerPort int32, nodePort int32, exclude22Port []int32) (result *coreV1.Service, err error) {
+	var servicePort []coreV1.ServicePort
+
+	servicePort = append(servicePort, coreV1.ServicePort{
+		Name:     fmt.Sprintf("tcp-%d", containerPort),
+		Port:     containerPort,
+		NodePort: nodePort,
+	})
+	for _, port := range exclude22Port {
+		servicePort = append(servicePort, coreV1.ServicePort{
+			Name: fmt.Sprintf("tcp-%d", port),
+			Port: port,
+		})
+	}
+
 	service := &coreV1.Service{
 		TypeMeta: metaV1.TypeMeta{
 			Kind:       "Service",
@@ -162,13 +178,8 @@ func (s *K8sService) CreateServiceByNodePort(ctx context.Context, nameSpace, tas
 			Namespace: nameSpace,
 		},
 		Spec: coreV1.ServiceSpec{
-			Type: coreV1.ServiceTypeNodePort,
-			Ports: []coreV1.ServicePort{
-				{
-					Name: "tcp",
-					Port: containerPort,
-				},
-			},
+			Type:  coreV1.ServiceTypeNodePort,
+			Ports: servicePort,
 			Selector: map[string]string{
 				"hub-private": taskUuid,
 			},
@@ -225,7 +236,7 @@ func (s *K8sService) DeleteIngress(ctx context.Context, nameSpace, ingressName s
 	return s.k8sClient.NetworkingV1().Ingresses(nameSpace).Delete(ctx, ingressName, metaV1.DeleteOptions{})
 }
 
-func (s *K8sService) CreateConfigMap(ctx context.Context, k8sNameSpace, spaceUuid, basePath, configName string) (*coreV1.ConfigMap, error) {
+func (s *K8sService) CreateConfigMap(ctx context.Context, k8sNameSpace, jobUuid, basePath, configName string) (*coreV1.ConfigMap, error) {
 	configFilePath := filepath.Join(basePath, configName)
 
 	fileNameWithoutExt := filepath.Base(configName[:len(configName)-len(filepath.Ext(configName))])
@@ -237,7 +248,7 @@ func (s *K8sService) CreateConfigMap(ctx context.Context, k8sNameSpace, spaceUui
 
 	configMap := &coreV1.ConfigMap{
 		ObjectMeta: metaV1.ObjectMeta{
-			Name: spaceUuid + "-" + fileNameWithoutExt,
+			Name: jobUuid + "-" + fileNameWithoutExt,
 		},
 		Data: map[string]string{
 			configName: string(iniData),
@@ -246,11 +257,11 @@ func (s *K8sService) CreateConfigMap(ctx context.Context, k8sNameSpace, spaceUui
 	return s.k8sClient.CoreV1().ConfigMaps(k8sNameSpace).Create(ctx, configMap, metaV1.CreateOptions{})
 }
 
-func (s *K8sService) GetPods(namespace, spaceUuid string) (bool, error) {
+func (s *K8sService) GetPods(namespace, jobUuid string) (bool, error) {
 	listOption := metaV1.ListOptions{}
-	if spaceUuid != "" {
+	if jobUuid != "" {
 		listOption = metaV1.ListOptions{
-			LabelSelector: fmt.Sprintf("lad_app=%s", spaceUuid),
+			LabelSelector: fmt.Sprintf("lad_app=%s", jobUuid),
 		}
 	}
 	podList, err := s.k8sClient.CoreV1().Pods(namespace).List(context.TODO(), listOption)
@@ -267,18 +278,31 @@ func (s *K8sService) GetPods(namespace, spaceUuid string) (bool, error) {
 func (s *K8sService) CreateNetworkPolicy(ctx context.Context, namespace string) (*networkingv1.NetworkPolicy, error) {
 	networkPolicy := &networkingv1.NetworkPolicy{
 		ObjectMeta: metaV1.ObjectMeta{
-			Name:      namespace + "-" + generateString(4),
+			Name:      namespace + "-" + generateString(10),
 			Namespace: namespace,
 		},
 		Spec: networkingv1.NetworkPolicySpec{
-			PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress},
+			PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress, networkingv1.PolicyTypeEgress},
 			Ingress: []networkingv1.NetworkPolicyIngressRule{
 				{
 					From: []networkingv1.NetworkPolicyPeer{
 						{
 							NamespaceSelector: &metaV1.LabelSelector{
 								MatchLabels: map[string]string{
-									"kubernetes.io/metadata.name": "ingress-nginx",
+									"kubernetes.io/metadata.name": namespace,
+								},
+							},
+						},
+					},
+				},
+			},
+			Egress: []networkingv1.NetworkPolicyEgressRule{
+				{
+					To: []networkingv1.NetworkPolicyPeer{
+						{
+							NamespaceSelector: &metaV1.LabelSelector{
+								MatchLabels: map[string]string{
+									"kubernetes.io/metadata.name": namespace,
 								},
 							},
 						},
@@ -329,6 +353,42 @@ func (s *K8sService) ListNamespace(ctx context.Context) ([]string, error) {
 		namespaces = append(namespaces, item.Name)
 	}
 	return namespaces, nil
+}
+
+func (s *K8sService) CheckServiceNodePort(targetNodePort int32) (bool, int32, error) {
+	services, err := s.k8sClient.CoreV1().Services("").List(context.TODO(), metaV1.ListOptions{})
+	if err != nil {
+		return false, 0, err
+	}
+
+	var usedPorts = make(map[int32]struct{})
+	for _, service := range services.Items {
+		for _, port := range service.Spec.Ports {
+			usedPorts[port.NodePort] = struct{}{}
+		}
+	}
+
+	var resultPort int32
+	var flag bool
+	if targetNodePort == 0 {
+		for i := 30000; i < 32768; i++ {
+			if _, ok := usedPorts[int32(i)]; !ok {
+				resultPort = int32(i)
+				flag = true
+				break
+			}
+		}
+	} else {
+		if _, ok := usedPorts[targetNodePort]; ok {
+			flag = false
+			err = fmt.Errorf("invalid value: %d, provided port is already allocated", targetNodePort)
+		} else {
+			flag = true
+			resultPort = targetNodePort
+		}
+
+	}
+	return flag, resultPort, err
 }
 
 func (s *K8sService) StatisticalSources(ctx context.Context) ([]*models.NodeResource, error) {
@@ -450,13 +510,9 @@ func (s *K8sService) GetResourceExporterPodLog(ctx context.Context) (map[string]
 			continue
 		}
 
-		if strings.Contains(podLog, "ERROR::") {
-			continue
-		}
-
 		var nodeInfo models.CollectNodeInfo
 		if err := json.Unmarshal([]byte(podLog), &nodeInfo); err != nil {
-			logs.GetLogger().Error("nodeName: %s, collect gpu error: %+v", pod.Spec.NodeName, err)
+			s.k8sClient.CoreV1().Pods("kube-system").Delete(ctx, pod.Name, metaV1.DeleteOptions{})
 			continue
 		}
 		result[pod.Spec.NodeName] = nodeInfo
@@ -492,7 +548,7 @@ func (s *K8sService) AddNodeLabel(nodeName, key string) error {
 	return nil
 }
 
-func (s *K8sService) WaitForPodRunningByHttp(namespace, spaceUuid, serviceIp string) (string, error) {
+func (s *K8sService) WaitForPodRunningByHttp(namespace, jobUuid, serviceIp string) (string, error) {
 	var podName string
 	var podErr = errors.New("get pod status failed")
 
@@ -506,7 +562,7 @@ func (s *K8sService) WaitForPodRunningByHttp(namespace, spaceUuid, serviceIp str
 			return podErr
 		}
 		podList, err := s.k8sClient.CoreV1().Pods(namespace).List(context.TODO(), metaV1.ListOptions{
-			LabelSelector: fmt.Sprintf("lad_app==%s", spaceUuid),
+			LabelSelector: fmt.Sprintf("lad_app==%s", jobUuid),
 		})
 		if err != nil {
 			logs.GetLogger().Error(err)
@@ -523,11 +579,11 @@ func (s *K8sService) WaitForPodRunningByHttp(namespace, spaceUuid, serviceIp str
 	return podName, nil
 }
 
-func (s *K8sService) WaitForPodRunningByTcp(namespace, taskUuid string) (string, error) {
+func (s *K8sService) WaitForPodRunningByTcp(namespace, jobUuid string) (string, error) {
 	var podName string
 	err := wait.PollImmediate(time.Second*5, time.Minute*10, func() (done bool, err error) {
 		podList, err := s.k8sClient.CoreV1().Pods(namespace).List(context.TODO(), metaV1.ListOptions{
-			LabelSelector: fmt.Sprintf("hub-private==%s", taskUuid),
+			LabelSelector: fmt.Sprintf("hub-private==%s", jobUuid),
 		})
 		if err != nil {
 			logs.GetLogger().Error(err)
@@ -653,6 +709,196 @@ func (s *K8sService) GetDeploymentActiveCount() (int, error) {
 		}
 	}
 	return total, nil
+}
+
+func (s *K8sService) GetGlobalNetworkSet(gnsName string) (*calicov3.GlobalNetworkSet, error) {
+	calicoCs, err := calicoclientset.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create calico client, error: %v", err)
+	}
+	networkSetList, err := calicoCs.ProjectcalicoV3().GlobalNetworkSets().List(context.Background(), metaV1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get globalNetworkSets list, error: %v", err)
+	}
+
+	var gns calicov3.GlobalNetworkSet
+	for _, item := range networkSetList.Items {
+		if item.Name == gnsName {
+			gns = item
+		}
+	}
+	return &gns, nil
+}
+
+func (s *K8sService) GetGlobalNetworkPolicy(gnpName string) (*calicov3.GlobalNetworkPolicy, error) {
+	calicoCs, err := calicoclientset.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create calico client, error: %v", err)
+	}
+
+	networkPolicyList, err := calicoCs.ProjectcalicoV3().GlobalNetworkPolicies().List(context.Background(), metaV1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get globalNetworkSets list, error: %v", err)
+	}
+
+	var gnp calicov3.GlobalNetworkPolicy
+	for _, item := range networkPolicyList.Items {
+		if item.Name == gnpName {
+			gnp = item
+		} else {
+			if models.ExistResource(item.Name) {
+				continue
+			}
+		}
+	}
+	return &gnp, nil
+}
+
+func (s *K8sService) GetUsedNodePorts() (map[int32]struct{}, error) {
+	services, err := s.k8sClient.CoreV1().Services(metaV1.NamespaceAll).List(context.TODO(), metaV1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	nodePorts := make(map[int32]struct{})
+	for _, svc := range services.Items {
+		for _, port := range svc.Spec.Ports {
+			if port.NodePort != 0 {
+				nodePorts[port.NodePort] = struct{}{}
+			}
+		}
+	}
+	return nodePorts, nil
+}
+
+func generateVolume() ([]coreV1.VolumeMount, []coreV1.Volume) {
+	fileType := coreV1.HostPathFile
+	return []coreV1.VolumeMount{
+			{
+				Name:      "shm",
+				MountPath: "/dev/shm",
+			},
+			{
+				Name:      "lxcfs-proc-cpuinfo",
+				MountPath: "/proc/cpuinfo",
+				ReadOnly:  true,
+			},
+			{
+				Name:      "system-cpu-online",
+				MountPath: "/sys/devices/system/cpu/online",
+			},
+			{
+				Name:      "lxcfs-proc-diskstats",
+				MountPath: "/proc/diskstats",
+				ReadOnly:  true,
+			},
+			{
+				Name:      "lxcfs-proc-meminfo",
+				MountPath: "/proc/meminfo",
+				ReadOnly:  true,
+			},
+			{
+				Name:      "lxcfs-proc-stat",
+				MountPath: "/proc/stat",
+				ReadOnly:  true,
+			},
+			{
+				Name:      "lxcfs-proc-swaps",
+				MountPath: "/proc/swaps",
+				ReadOnly:  true,
+			},
+			{
+				Name:      "lxcfs-proc-uptime",
+				MountPath: "/proc/uptime",
+				ReadOnly:  true,
+			},
+		}, []coreV1.Volume{
+			{
+				Name: "shm",
+				VolumeSource: coreV1.VolumeSource{
+					EmptyDir: &coreV1.EmptyDirVolumeSource{
+						Medium: coreV1.StorageMediumMemory,
+					},
+				},
+			},
+			{
+				Name: "lxcfs-proc-cpuinfo",
+				VolumeSource: coreV1.VolumeSource{
+					HostPath: &coreV1.HostPathVolumeSource{
+						Path: "/var/lib/lxcfs/proc/cpuinfo",
+						Type: &fileType,
+					},
+				},
+			},
+			{
+				Name: "system-cpu-online",
+				VolumeSource: coreV1.VolumeSource{
+					HostPath: &coreV1.HostPathVolumeSource{
+						Path: "/var/lib/lxcfs/sys/devices/system/cpu/online",
+						Type: &fileType,
+					},
+				},
+			},
+			{
+				Name: "lxcfs-proc-diskstats",
+				VolumeSource: coreV1.VolumeSource{
+					HostPath: &coreV1.HostPathVolumeSource{
+						Path: "/var/lib/lxcfs/proc/diskstats",
+						Type: &fileType,
+					},
+				},
+			},
+			{
+				Name: "lxcfs-proc-meminfo",
+				VolumeSource: coreV1.VolumeSource{
+					HostPath: &coreV1.HostPathVolumeSource{
+						Path: "/var/lib/lxcfs/proc/meminfo",
+						Type: &fileType,
+					},
+				},
+			},
+			{
+				Name: "lxcfs-proc-stat",
+				VolumeSource: coreV1.VolumeSource{
+					HostPath: &coreV1.HostPathVolumeSource{
+						Path: "/var/lib/lxcfs/proc/stat",
+						Type: &fileType,
+					},
+				},
+			},
+			{
+				Name: "lxcfs-proc-swaps",
+				VolumeSource: coreV1.VolumeSource{
+					HostPath: &coreV1.HostPathVolumeSource{
+						Path: "/var/lib/lxcfs/proc/swaps",
+						Type: &fileType,
+					},
+				},
+			},
+			{
+				Name: "lxcfs-proc-uptime",
+				VolumeSource: coreV1.VolumeSource{
+					HostPath: &coreV1.HostPathVolumeSource{
+						Path: "/var/lib/lxcfs/proc/uptime",
+						Type: &fileType,
+					},
+				},
+			},
+		}
+}
+
+func (s *K8sService) GetClusterRuntime() (string, error) {
+	nodes, err := s.k8sClient.CoreV1().Nodes().List(context.TODO(), metaV1.ListOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to get node list, error: %v", err)
+	}
+
+	var runtime string
+	for _, node := range nodes.Items {
+		runtime = node.Status.NodeInfo.ContainerRuntimeVersion
+		break
+	}
+	return runtime, nil
 }
 
 func readLog(req *rest.Request) (*strings.Builder, error) {

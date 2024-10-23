@@ -32,9 +32,10 @@ As a resource provider, you can run a **ECP**(Edge Computing Provider) and **FCP
  	- [Install the Hardware resource-exporter](#Install-the-Hardware-resource-exporter)
  	- [Build and config the Computing Provider](#Build-and-config-the-Computing-Provider)
  	- [Install AI Inference Dependency(Optional)](#optional-Install-AI-Inference-Dependency)
- 	- [Config and Receive UBI Tasks(Optional)](#optional-Config-and-Receive-UBI-Tasks)
-	 - [Start the Computing Provider](#Start-the-Computing-Provider)
-	 - [CLI of Computing Provider](#CLI-of-Computing-Provider)
+    - [Install Node-Port Dependency (Optional)](#optional-install-node-port-dependency)
+    - [Config and Receive UBI Tasks(Optional)](#optional-Config-and-Receive-UBI-Tasks)
+    - [Start the Computing Provider](#Start-the-Computing-Provider)
+    - [CLI of Computing Provider](#CLI-of-Computing-Provider)
  
 ## Prerequisites
 Before you install the Computing Provider, you need to know there are some resources required:
@@ -444,6 +445,66 @@ export CP_PATH=<YOUR_CP_PATH>
 ./install.sh
 ```
 
+## [**OPTIONAL**] Install Node-Port Dependency
+- Install Resource Isolation service on the k8s cluster
+	In order to view the actual available resources of the container, you need to install a resource isolation service on the cluster.
+	- For Ubuntu 20.04:
+    	```
+    	kubectl apply -f https://raw.githubusercontent.com/swanchain/go-computing-provider/refs/heads/releases/resource-isolation-20.04.yaml
+		```
+    - For Ubuntu 22.04 and higher.
+      - Edit `/etc/default/grub` and modify it to the following content:
+      ```bash
+	     GRUB_CMDLINE_LINUX_DEFAULT="quiet splash systemd.unified_cgroup_hierarchy=0"
+	  ```
+      - Update grub configuration
+      ```
+      update-grub
+      ```
+      - Reboot the system
+      ```bash
+	     reboot now
+      ```
+      - Install resource-isolation service on k8s
+      ```
+        kubectl apply -f https://raw.githubusercontent.com/swanchain/go-computing-provider/refs/heads/releases/resource-isolation.yaml
+      ```
+- Install network policies
+	- Generate Network Policy (location at $CP_PATH/network-policy.yaml )
+	```bash 
+	computing-provider network generate
+	```
+	- Deploy Network Policy
+	```bash
+	kubectl apply -f $CP_PATH/network-policy.yaml
+	```
+ 	- Confirm that all of the network policy are running with the following command.
+	```
+	# kubectl get gnp
+	NAME                    CREATED AT
+	global-01kls78xh7dk4n   2024-09-25T04:00:59Z
+	global-ao9kq72mjc0sl3   2024-09-25T04:00:59Z
+	global-e59cad59af9c65   2024-09-25T04:00:59Z
+	global-pd6sdo8cjd61yd   2024-09-25T04:00:59Z
+	global-pod1namespace1   2024-09-25T04:01:00Z
+	global-s92ms87dl3j6do   2024-09-25T04:01:00Z
+	
+	# kubectl get globalnetworksets
+	NAME                    CREATED AT
+	netset-2300e518e9ad45   2024-09-25T04:00:59Z
+	```
+  **Note:** The nodes for deploying CP need to open ports in the range of `30000-32767`
+- Change the `tasktypes`
+```bash
+computing-provider account changeTaskTypes --ownerAddress <YOUR_OWNER_WALLET_ADDRESS> 5
+```
+> **Note:** `--task-types` Supports 4 task types:
+>  - `1`: FIL-C2-512M
+>  - `2`: Aleo
+>  - `3`: AI
+>  - `4`: FIL-C2-32G
+>  - `5`: NodePort
+
 ## [**OPTIONAL**] Config and Receive ZK Tasks
 This section mainly introduces how to enable the function of receiving ZK tasks on FCP, which is equivalent to running an ECP. This function is optional. Once enabled, FCP can earn double benefits simultaneously, but it will also consume certain resources.
 
@@ -566,13 +627,13 @@ nohup computing-provider run >> cp.log 2>&1 &
 ```
 computing-provider task list 
 ```
-* Retrieve detailed information for a specific task using `task_uuid`
+* Retrieve detailed information for a specific task using `job_uuid`
 ```
-computing-provider task get [task_uuid]
+computing-provider task get [job_uuid]
 ```
-* Delete task by `task_uuid`
+* Delete task by `job_uuid`
 ```
-computing-provider task delete [task_uuid]
+computing-provider task delete [job_uuid]
 ```
 
 ## Getting Help
