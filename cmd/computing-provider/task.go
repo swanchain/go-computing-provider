@@ -270,6 +270,8 @@ func edgeTaskList(showCompleted, fullFlag bool) error {
 		createTime := time.Unix(entity.CreateTime, 0).Format("2006-01-02 15:04:05")
 		if status, ok := containerStatus[entity.ContainerName]; ok {
 			taskData = append(taskData, []string{entity.Uuid, entity.Name, entity.Image, entity.ContainerName, status, createTime})
+		} else {
+			taskData = append(taskData, []string{entity.Uuid, entity.Name, entity.Image, entity.ContainerName, "", createTime})
 		}
 	}
 	header := []string{"TASK UUID", "TASK NAME", "IMAGE NAME", "CONTAINER NAME", "CONTAINER STATUS", "CREATE TIME"}
