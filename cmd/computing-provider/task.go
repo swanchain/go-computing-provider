@@ -272,8 +272,8 @@ func edgeTaskList(showCompleted, fullFlag bool) error {
 		if status, ok := containerStatus[entity.ContainerName]; ok {
 			computing.NewEcpJobService().UpdateEcpJobEntity(entity.Uuid, status)
 			statusStr = status
-			taskData = append(taskData, []string{entity.Uuid, entity.Name, entity.Image, entity.ContainerName, statusStr, createTime})
 		}
+		taskData = append(taskData, []string{entity.Uuid, entity.Name, entity.Image, entity.ContainerName, statusStr, createTime})
 		rowColorList = append(rowColorList, RowColor{
 			row:    i,
 			column: []int{4},
