@@ -123,7 +123,7 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 				break
 			}
 			useIndexs = append(useIndexs, indexs[i])
-			env = append(env, fmt.Sprintf("NVIDIA_VISIBLE_DEVICES =%s", strings.Join(useIndexs, ",")))
+			env = append(env, fmt.Sprintf("CUDA_VISIBLE_DEVICES=%s", strings.Join(useIndexs, ",")))
 		}
 
 		needResource = container.Resources{
