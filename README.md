@@ -413,7 +413,7 @@ computing-provider account create --ownerAddress <YOUR_OWNER_WALLET_ADDRESS> \
 	--beneficiaryAddress <YOUR_BENEFICIARY_WALLET_ADDRESS>  \
 	--task-types 3
 ```
-**Note:** `--task-types`: Supports 4 task types (`1`: Fil-C2-512M, `2`: Aleo, `3`: AI, `4`: Fil-C2-32G), separated by commas. For FCP, it needs to be set to 3.
+**Note:** `--task-types`: Supports 4 task types (`1`: Fil-C2-512M, `2`: Mining, `3`: AI, `4`: Fil-C2-32G), separated by commas. For FCP, it needs to be set to 3.
 
 **Output:**
 ```
@@ -504,7 +504,7 @@ computing-provider account changeTaskTypes --ownerAddress <YOUR_OWNER_WALLET_ADD
 ```
 > **Note:** `--task-types` Supports 4 task types:
 >  - `1`: FIL-C2-512M
->  - `2`: Aleo
+>  - `2`: Mining
 >  - `3`: AI
 >  - `4`: FIL-C2-32G
 >  - `5`: NodePort
@@ -554,7 +554,7 @@ computing-provider account changeTaskTypes --ownerAddress <YOUR_OWNER_WALLET_ADD
 ```
 > **Note:** `--task-types` Supports 4 task types:
 >  - `1`: FIL-C2-512M
->  - `2`: Aleo
+>  - `2`: Mining
 >  - `3`: AI
 >  - `4`: FIL-C2-32G
 

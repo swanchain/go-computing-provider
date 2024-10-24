@@ -228,7 +228,7 @@ func (*JobEntity) TableName() string {
 
 const (
 	Task_TYPE_FIL_C2_512 = iota + 1
-	Task_TYPE_ALEO
+	Task_TYPE_MINING
 	Task_TYPE_AI
 	Task_TYPE_FIL_C2_32
 	Task_TYPE_NODE_PORT
@@ -239,8 +239,8 @@ func TaskTypeStr(taskType int) string {
 	switch taskType {
 	case Task_TYPE_FIL_C2_512:
 		typeStr = "Fil-C2-512M"
-	case Task_TYPE_ALEO:
-		typeStr = "Aleo"
+	case Task_TYPE_MINING:
+		typeStr = "Mining"
 	case Task_TYPE_AI:
 		typeStr = "AI"
 	case Task_TYPE_FIL_C2_32:
@@ -264,7 +264,7 @@ type CpInfoEntity struct {
 	CreateAt           string   `json:"create_at" gorm:"create_at"`
 	UpdateAt           string   `json:"update_at" gorm:"update_at"`
 	MultiAddresses     []string `json:"multi_addresses" gorm:"-"`
-	TaskTypes          []uint8  `json:"task_types" gorm:"-"` // 1:Fil-C2-512M, 2:Aleo, 3: AI, 4:Fil-C2-32G
+	TaskTypes          []uint8  `json:"task_types" gorm:"-"` // 1:Fil-C2-512M, 2:mining, 3: AI, 4:Fil-C2-32G
 
 }
 

@@ -551,7 +551,7 @@ var createAccountCmd = &cli.Command{
 		},
 		&cli.StringFlag{
 			Name:  "task-types",
-			Usage: "Task types of CP (1:Fil-C2-512M, 2:Aleo, 3:AI, 4:Fil-C2-32G, 5:NodePort), separated by commas",
+			Usage: "Task types of CP (1:Fil-C2-512M, 2:Mining, 3:AI, 4:Fil-C2-32G, 5:NodePort), separated by commas",
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -858,7 +858,7 @@ var changeWorkerAddressCmd = &cli.Command{
 
 var changeTaskTypesCmd = &cli.Command{
 	Name:      "changeTaskTypes",
-	Usage:     "Update taskTypes of CP (1:Fil-C2-512M, 2:Aleo, 3: AI, 4:Fil-C2-32G, 5:NodePort), separated by commas",
+	Usage:     "Update taskTypes of CP (1:Fil-C2-512M, 2:Mining, 3: AI, 4:Fil-C2-32G, 5:NodePort), separated by commas",
 	ArgsUsage: "[TaskTypes]",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
