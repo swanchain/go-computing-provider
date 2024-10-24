@@ -334,6 +334,7 @@ type EcpJobEntity struct {
 	Name          string `json:"name" gorm:"name"`
 	Image         string `json:"image" gorm:"image"`
 	Env           string `json:"env" gorm:"env"`
+	Status        string `json:"status"` // created|restarting|running|removing|paused|exited|dead
 	ContainerName string `json:"container_name" gorm:"container_name"`
 	CreateTime    int64  `json:"create_time" gorm:"create_time"`
 	DeleteAt      int    `json:"delete_at" gorm:"delete_at; default:0"` // 1 deleted

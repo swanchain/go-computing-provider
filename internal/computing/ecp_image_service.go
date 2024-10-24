@@ -185,6 +185,7 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 		Name:          job.Name,
 		Image:         job.Image,
 		Env:           strings.Join(env, ","),
+		Status:        "created",
 		ContainerName: containerName,
 		CreateTime:    time.Now().Unix(),
 	}); err != nil {

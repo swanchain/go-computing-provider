@@ -175,12 +175,19 @@ func (cpServ EcpJobService) GetEcpJobs(jobUuid string) ([]models.EcpJobEntity, e
 	return job, err
 }
 
+func (cpServ EcpJobService) UpdateEcpJobEntity(jobUuid, status string) (err error) {
+	return cpServ.Model(&models.EcpJobEntity{}).Where("uuid =?", jobUuid).Update("status", status).Error
+}
+
 func (cpServ EcpJobService) SaveEcpJobEntity(job *models.EcpJobEntity) (err error) {
 	return cpServ.Save(job).Error
 }
 
 func (cpServ EcpJobService) DeleteContainerByUuid(uuid string) (err error) {
-	return cpServ.Model(&models.EcpJobEntity{}).Where("uuid =?", uuid).Update("delete_at", "1").Error
+	return cpServ.Model(&models.EcpJobEntity{}).Where("uuid =?", uuid).Updates(map[string]string{
+		"delete_at": "1",
+		"status":    "terminated",
+	}).Error
 }
 
 var taskSet = wire.NewSet(db.NewDbService, wire.Struct(new(TaskService), "*"))

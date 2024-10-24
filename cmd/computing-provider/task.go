@@ -266,15 +266,42 @@ func edgeTaskList(showCompleted, fullFlag bool) error {
 		return err
 	}
 
-	for _, entity := range ecpJobs {
+	for i, entity := range ecpJobs {
 		createTime := time.Unix(entity.CreateTime, 0).Format("2006-01-02 15:04:05")
+		statusStr := "terminated"
 		if status, ok := containerStatus[entity.ContainerName]; ok {
-			taskData = append(taskData, []string{entity.Uuid, entity.Name, entity.Image, entity.ContainerName, status, createTime})
-		} else {
-			taskData = append(taskData, []string{entity.Uuid, entity.Name, entity.Image, entity.ContainerName, "", createTime})
+			computing.NewEcpJobService().UpdateEcpJobEntity(entity.Uuid, status)
+			statusStr = status
+			taskData = append(taskData, []string{entity.Uuid, entity.Name, entity.Image, entity.ContainerName, statusStr, createTime})
 		}
+		rowColorList = append(rowColorList, RowColor{
+			row:    i,
+			column: []int{4},
+			color:  getContainerStatusColor(statusStr),
+		})
 	}
 	header := []string{"TASK UUID", "TASK NAME", "IMAGE NAME", "CONTAINER NAME", "CONTAINER STATUS", "CREATE TIME"}
 	NewVisualTable(header, taskData, rowColorList).Generate(true)
 	return nil
+}
+
+func getContainerStatusColor(status string) []tablewriter.Colors {
+	var rowColor []tablewriter.Colors
+	switch status {
+	case "created":
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgYellowColor}}
+	case "running":
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}}
+	case "removing":
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
+	case "paused":
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiMagentaColor}}
+	case "exited":
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiBlueColor}}
+	case "terminated":
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiBlueColor}}
+	default:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiCyanColor}}
+	}
+	return rowColor
 }
