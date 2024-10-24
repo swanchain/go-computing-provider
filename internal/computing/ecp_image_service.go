@@ -131,7 +131,6 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 			DeviceRequests: []container.DeviceRequest{
 				{
 					Driver:       "nvidia",
-					Count:        -1,
 					DeviceIDs:    useIndexs,
 					Capabilities: [][]string{{"compute", "utility"}},
 				},
