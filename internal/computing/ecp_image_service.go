@@ -117,12 +117,12 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 	var needResource container.Resources
 
 	if job.Resource.GPUModel != "" && job.Resource.GPU > 0 {
-		var useGids []string
+		var useIndexs []string
 		for i := 0; i < int(job.Resource.GPU); i++ {
 			if i >= len(indexs) {
 				break
 			}
-			useGids = append(useGids, indexs[i])
+			useIndexs = append(useIndexs, indexs[i])
 		}
 
 		needResource = container.Resources{
@@ -131,9 +131,8 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 			DeviceRequests: []container.DeviceRequest{
 				{
 					Driver:       "nvidia",
-					DeviceIDs:    useGids,
-					Capabilities: [][]string{{"gpu"}},
-					Options:      nil,
+					DeviceIDs:    useIndexs,
+					Capabilities: [][]string{{"compute", "utility"}},
 				},
 			},
 		}
