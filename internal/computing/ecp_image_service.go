@@ -107,7 +107,16 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
 
-	_, _, needCpu, _, indexs, err := checkResourceForImage(job.Resource)
+	isReceive, _, needCpu, _, indexs, err := checkResourceForImage(job.Resource)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
+		return
+	}
+
+	if !isReceive {
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError))
+		return
+	}
 
 	if err := NewDockerService().PullImage(job.Image); err != nil {
 		logs.GetLogger().Errorf("failed to pull %s image, error: %v", job.Image, err)
