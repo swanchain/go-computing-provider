@@ -1,10 +1,16 @@
 package contract
 
 import (
+	"context"
 	"fmt"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
 	"math/big"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 func BalanceToStr(balance *big.Int) string {
@@ -50,4 +56,27 @@ func GetCpAccountAddress() (string, error) {
 	}
 
 	return string(accountAddress), err
+}
+
+func GetEthClient(rpcUrl string) (*ethclient.Client, error) {
+	httpClient := &http.Client{
+		Timeout: 15 * time.Second,
+		Transport: &http.Transport{
+			DialContext: (&net.Dialer{
+				Timeout:   10 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		},
+	}
+
+	rpcClient, err := rpc.DialOptions(context.TODO(), rpcUrl, rpc.WithHTTPClient(httpClient))
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to the rpc client: %v", err)
+	}
+	return ethclient.NewClient(rpcClient), nil
+
 }

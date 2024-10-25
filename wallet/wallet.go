@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/swanchain/go-computing-provider/conf"
+	"github.com/swanchain/go-computing-provider/internal/contract"
 	"github.com/swanchain/go-computing-provider/internal/contract/account"
 	"github.com/swanchain/go-computing-provider/internal/contract/ecp"
 	"github.com/swanchain/go-computing-provider/internal/contract/fcp"
@@ -707,7 +708,7 @@ func (w *LocalWallet) CollateralSend(ctx context.Context, from, to string, amoun
 		return "", xerrors.Errorf("the address: %s, private key %w,", to, ErrKeyInfoNotFound)
 	}
 
-	client, err := ethclient.Dial(chainUrl)
+	client, err := contract.GetEthClient(chainUrl)
 	if err != nil {
 		return "", err
 	}
