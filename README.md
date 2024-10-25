@@ -291,7 +291,7 @@ spec:
     spec:
       containers:
       - name: resource-exporter
-        image: filswan/resource-exporter:v11.2.9
+        image: filswan/resource-exporter:v11.3.0
         imagePullPolicy: IfNotPresent
         securityContext:
           privileged: true
@@ -346,7 +346,8 @@ make install
        NodeName = ""                                  # The computing-provider node name
        WalletWhiteList = ""                           # CP only accepts user addresses from this whitelist for space deployment
        WalletBlackList = ""                           # CP reject user addresses from this blacklist for space deployment
- 
+       Pricing = true                                 # Bid mode. true: auto; false: manual
+   
        [UBI]
        UbiEnginePk = "0xB5aeb540B4895cd024c1625E146684940A849ED9"              # UBI Engine's public key, CP only accept the task from this UBI engine
        EnableSequencer = true                                                  # Submit the proof to Sequencer service(default: true)
@@ -403,7 +404,7 @@ make install
 	```bash
 	computing-provider wallet send --from <YOUR_WALLET_ADDRESS> 0x7791f48931DB81668854921fA70bFf0eB85B8211 0.01
 	```
-	**Note:** If you don't have `SwanETH` and `SWANC`, please follow [the guideline](https://docs.swanchain.io/swan-mainnet/getting-started-guide) to [bridge ETH to Swan Mainnet](https://bridge.swanchain.io), and [claim the SWANC](https://faucet.swanchain.io) as collaterals.
+	**Note:** If you don't have `SwanETH` and `SWANU`, please follow [the guideline](https://docs.swanchain.io/swan-mainnet/getting-started-guide) to [bridge ETH to Swan Mainnet](https://bridge.swanchain.io), and [claim the SWANU](https://faucet.swanchain.io) as collaterals.
 
 ## Initialization CP Account
 Deploy a CP account contract:
@@ -421,14 +422,14 @@ Contract deployed! Address: 0x3091c9647Ea5248079273B52C3707c958a3f2658
 Transaction hash: 0xb8fd9cc9bfac2b2890230b4f14999b9d449e050339b252273379ab11fac15926
 ```
 
-## Collateral `SWANC` for FCP
+## Collateral `SWANU` for FCP
 ```bash
  computing-provider collateral add --fcp --from <YOUR_WALLET_ADDRESS>  <amount>
 ```
-**Note:** Currently one AI task requires 5 `SWANC`. Please deposit enough collaterals for the tasks
+**Note:** Currently one AI task requires 5 `SWANU`. Please deposit enough collaterals for the tasks
 
 
-## Withdraw `SWANC` from FCP
+## Withdraw `SWANU` from FCP
 ```bash
  computing-provider collateral withdraw --fcp --owner <YOUR_WALLET_ADDRESS> --account <YOUR_CP_ACCOUNT> <amount>
 ```
@@ -534,18 +535,18 @@ This section mainly introduces how to enable the function of receiving ZK tasks 
 * Adjust the value of `RUST_GPU_TOOLS_CUSTOM_GPU` based on the GPU used by the CP's Kubernetes cluster for fil-c2 tasks.
 * For more device choices, please refer to this page:[https://github.com/filecoin-project/bellperson](https://github.com/filecoin-project/bellperson)
 
-### Step 2: Collateral `SWANC` for ZK tasks
+### Step 2: Collateral `SWANU` for ZK tasks
 
 ```bash
 computing-provider collateral add --ecp --from <YOUR_WALLET_ADDRESS>  <amount>
 ```
 
-> If you want to withdraw the collateral `SWANC`: 
+> If you want to withdraw the collateral `SWANU`: 
 > ```bash
 > computing-provider collateral withdraw --ecp --owner <YOUR_WALLET_ADDRESS> --account <YOUR_CP_ACCOUNT> <amount>
 > ```
 
-> **Note:** A minimum of 100 `SWANC` collateral is required to receive a ZK task.
+> **Note:** A minimum of 100 `SWANU` collateral is required to receive a ZK task.
 
 ### Step 3: Change the `tasktypes`
 
@@ -557,6 +558,7 @@ computing-provider account changeTaskTypes --ownerAddress <YOUR_OWNER_WALLET_ADD
 >  - `2`: Mining
 >  - `3`: AI
 >  - `4`: FIL-C2-32G
+>  - `5`: NodePort
 
 > If you need to run FCP and ECP at the same time, you need to set it to `1,2,3,4`
 

@@ -29,7 +29,7 @@ curl -fsSL https://raw.githubusercontent.com/swanchain/go-computing-provider/rel
 ## Install ECP and Init CP Account
 - Download `computing-provider`
 ```bash
-wget https://github.com/swanchain/go-computing-provider/releases/download/v0.6.5/computing-provider
+wget https://github.com/swanchain/go-computing-provider/releases/download/v0.7.0/computing-provider
 ```
 
 - Initialize ECP repo
@@ -64,19 +64,19 @@ Output:
                     --ownerAddress <YOUR_OWNER_ADDRESS> \
                     --workerAddress <YOUR_WORKER_ADDRESS> \
                     --beneficiaryAddress <YOUR_BENEFICIAERY_ADDRESS>  \
-                    --task-types 1,4
+                    --task-types 1,2,4
 ```
-**Note:** `--task-types`: Supports 4 task types (1: Fil-C2-512M, 2: Mining, 3: AI, 4: Fil-C2-32G), separated by commas. For ECP, it needs to be set to 1,2,4.
-- Collateral `SWANC` for ECP
+**Note:** `--task-types`: Supports 4 task types (1: Fil-C2-512M, 2: Mining, 3: AI, 4: Fil-C2-32G, 5: NodePort), separated by commas. For ECP, it needs to be set to 1,2,4.
+- Collateral `SWANU` for ECP
 ```bash
 computing-provider collateral add --ecp --from <YOUR_WALLET_ADDRESS>  <AMOUNT>   
 ```
-> If you want to withdraw `SWANC` from ECP
+> If you want to withdraw `SWANU` from ECP
 >```bash
 >computing-provider collateral withdraw --ecp --owner <YOUR_WALLET_ADDRESS> --account <YOUR_CP_ACCOUNT> <amount>
 >```
 
->**Note:** A minimum of 100 `SWANC` collateral is currently required to receive a ZK task.
+>**Note:** A minimum of 100 `SWANU` collateral is currently required to receive a ZK task.
 
 - Deposit `SwanETH` to Sequencer Account
     ```bash
