@@ -21,3 +21,8 @@ func NewCpInfoService() CpInfoService {
 	wire.Build(cpInfoSet)
 	return CpInfoService{}
 }
+
+func NewEcpJobService() EcpJobService {
+	wire.Build(ecpJobSet)
+	return EcpJobService{}
+}

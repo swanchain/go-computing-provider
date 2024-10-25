@@ -56,7 +56,7 @@ func (taskServ TaskService) GetTaskEntity(taskId int64) (*models.TaskEntity, err
 }
 
 func (taskServ TaskService) GetTaskListNoReward() (list []*models.TaskEntity, err error) {
-	err = taskServ.Model(&models.TaskEntity{}).Where("sequence_cid !='-1' or settlement_cid !='' ").Find(&list).Error
+	err = taskServ.Model(&models.TaskEntity{}).Where("status < ?", models.TASK_VERIFIED_STATUS).Find(&list).Error
 	if err != nil {
 		return nil, err
 	}
@@ -154,6 +154,43 @@ func (cpServ CpInfoService) UpdateCpInfoByNodeId(cp *models.CpInfoEntity) (err e
 	return cpServ.Model(&models.CpInfoEntity{}).Where("node_id =?", cp.NodeId).Updates(cp).Error
 }
 
+type EcpJobService struct {
+	*gorm.DB
+}
+
+func (cpServ EcpJobService) GetEcpJobByUuid(uuid string) (*models.EcpJobEntity, error) {
+	var job models.EcpJobEntity
+	err := cpServ.Model(&models.EcpJobEntity{}).Where("uuid=? and delete_at=0", uuid).Find(&job).Error
+	return &job, err
+}
+
+func (cpServ EcpJobService) GetEcpJobs(jobUuid string) ([]models.EcpJobEntity, error) {
+	var job []models.EcpJobEntity
+	var err error
+	if jobUuid != "" {
+		err = cpServ.Model(&models.EcpJobEntity{}).Where("uuid=? and delete_at=0", jobUuid).Find(&job).Error
+	} else {
+		err = cpServ.Model(&models.EcpJobEntity{}).Where("delete_at=0").Find(&job).Error
+	}
+	return job, err
+}
+
+func (cpServ EcpJobService) UpdateEcpJobEntity(jobUuid, status string) (err error) {
+	return cpServ.Model(&models.EcpJobEntity{}).Where("uuid =?", jobUuid).Update("status", status).Error
+}
+
+func (cpServ EcpJobService) SaveEcpJobEntity(job *models.EcpJobEntity) (err error) {
+	return cpServ.Save(job).Error
+}
+
+func (cpServ EcpJobService) DeleteContainerByUuid(uuid string) (err error) {
+	return cpServ.Model(&models.EcpJobEntity{}).Where("uuid =?", uuid).Updates(map[string]string{
+		"delete_at": "1",
+		"status":    "terminated",
+	}).Error
+}
+
 var taskSet = wire.NewSet(db.NewDbService, wire.Struct(new(TaskService), "*"))
 var jobSet = wire.NewSet(db.NewDbService, wire.Struct(new(JobService), "*"))
 var cpInfoSet = wire.NewSet(db.NewDbService, wire.Struct(new(CpInfoService), "*"))
+var ecpJobSet = wire.NewSet(db.NewDbService, wire.Struct(new(EcpJobService), "*"))

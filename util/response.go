@@ -66,6 +66,7 @@ const (
 	RpcConnectError            = 4023
 	CheckPriceError            = 4024
 	BelowPriceError            = 4025
+	ReadPriceError             = 4026
 
 	ProofParamError   = 7001
 	ProofReadLogError = 7002
@@ -101,12 +102,13 @@ var codeMsg = map[int]string{
 	GenerateRsaError:           "An error occurred while generate rsa key pair",
 	SaveRsaKeyError:            "An error occurred while save rsa key pair",
 	ReadRsaKeyError:            "An error occurred while read rsa key pair",
+	CheckPriceError:            "An error occurred while check price",
+	BelowPriceError:            "Bid below the set price",
 	CheckNodePortError:         "An error occurred while check cluster port availability",
 	CheckResourceLimitError:    "An error occurred while check resource limit components",
 	NotAcceptNodePortError:     "not accept node port type job",
 	RpcConnectError:            "An error occurred while connect rpc",
-	CheckPriceError:            "An error occurred while check price",
-	BelowPriceError:            "the price is too low",
+	ReadPriceError:             "An error occurred while read price info",
 
 	ProofReadLogError: "An error occurred while read the log of proof",
 	ProofError:        "An error occurred while executing the calculation task",

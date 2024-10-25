@@ -2,8 +2,8 @@ package test
 
 import (
 	"fmt"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/swanchain/go-computing-provider/conf"
+	"github.com/swanchain/go-computing-provider/internal/contract"
 	"github.com/swanchain/go-computing-provider/internal/contract/fcp"
 	"testing"
 )
@@ -19,7 +19,7 @@ func TestJobOnChain(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	client, err := ethclient.Dial(chainRpc)
+	client, err := contract.GetEthClient(chainRpc)
 	if err != nil {
 		t.Error(err)
 		return

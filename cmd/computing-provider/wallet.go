@@ -5,9 +5,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/computing"
+	"github.com/swanchain/go-computing-provider/internal/contract"
 	"github.com/swanchain/go-computing-provider/wallet"
 	"github.com/urfave/cli/v2"
 	"math/big"
@@ -557,7 +557,7 @@ var collateralWithDrawViewCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		client, err := ethclient.Dial(chainRpc)
+		client, err := contract.GetEthClient(chainRpc)
 		if err != nil {
 			return err
 		}
@@ -593,7 +593,7 @@ var collateralWithDrawViewCmd = &cli.Command{
 			confirmableBlockStr = fmt.Sprintf("%d\u200B(%s+\u200B%s)", confirmableBlock, timeStr, timeZone)
 		}
 		var taskData [][]string
-		taskData = append(taskData, []string{"Amount(SWANC):", amount})
+		taskData = append(taskData, []string{"Amount(SWAN):", amount})
 		taskData = append(taskData, []string{"Latest Block:", strconv.FormatUint(latestBlockNumber, 10)})
 		taskData = append(taskData, []string{"Request Block:", strconv.Itoa(int(requestBlock))})
 		taskData = append(taskData, []string{"Confirmable Block:", confirmableBlockStr})

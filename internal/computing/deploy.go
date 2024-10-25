@@ -48,6 +48,7 @@ type Deploy struct {
 	sshKey      string
 	nodePortUrl string
 	userName    string
+	ipWhiteList []string
 }
 
 func NewDeploy(originalJobUuid, lowerJobUuid, hostName, walletAddress, hardwareDesc string, duration int64, spaceType string, spaceHardware models.SpaceHardware, jobType int) *Deploy {
@@ -98,6 +99,11 @@ func (d *Deploy) WithImage(images string) *Deploy {
 
 func (d *Deploy) WithSpaceName(spaceName string) *Deploy {
 	d.spaceName = spaceName
+	return d
+}
+
+func (d *Deploy) WithIpWhiteList(ipWhiteList []string) *Deploy {
+	d.ipWhiteList = ipWhiteList
 	return d
 }
 
@@ -681,7 +687,7 @@ func (d *Deploy) deployK8sResource(containerPort int32) (string, error) {
 
 	serviceHost := fmt.Sprintf("http://%s:%d", createService.Spec.ClusterIP, createService.Spec.Ports[0].Port)
 
-	_, err = k8sService.CreateIngress(context.TODO(), d.k8sNameSpace, d.jobUuid, d.hostName, containerPort)
+	_, err = k8sService.CreateIngress(context.TODO(), d.k8sNameSpace, d.jobUuid, d.hostName, containerPort, d.ipWhiteList)
 	if err != nil {
 		return "", fmt.Errorf("failed to create ingress, error: %w", err)
 	}

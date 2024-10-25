@@ -31,10 +31,11 @@ type Gpu struct {
 }
 
 type GpuDetail struct {
-	ProductName     string    `json:"product_name"`
-	Status          GpuStatus `json:"status"`
-	FbMemoryUsage   Common    `json:"fb_memory_usage"`
-	Bar1MemoryUsage Common    `json:"bar1_memory_usage"`
+	ProductName   string    `json:"product_name"`
+	Status        GpuStatus `json:"status"`
+	FbMemoryUsage Common    `json:"fb_memory_usage"`
+	OriginalName  string    `json:"original_name"`
+	Index         string    `json:"index"`
 }
 
 type Common struct {

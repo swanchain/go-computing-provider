@@ -3,12 +3,12 @@ package computing
 import (
 	"context"
 	"fmt"
+	"github.com/swanchain/go-computing-provider/internal/contract"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/robfig/cron/v3"
 	"github.com/swanchain/go-computing-provider/conf"
@@ -567,7 +567,7 @@ func checkFcpCollateralBalance() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	client, err := ethclient.Dial(chainRpc)
+	client, err := contract.GetEthClient(chainRpc)
 	if err != nil {
 		return "", err
 	}
@@ -592,7 +592,7 @@ func checkFcpJobInfoInChain(job *models.JobEntity) {
 	if err != nil {
 		return
 	}
-	client, err := ethclient.Dial(chainRpc)
+	client, err := contract.GetEthClient(chainRpc)
 	if err != nil {
 		return
 	}

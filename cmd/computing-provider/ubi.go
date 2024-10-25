@@ -197,12 +197,17 @@ var daemonCmd = &cli.Command{
 		}))
 		pprof.Register(r)
 
-		v1 := r.Group("/api/v1")
-		router := v1.Group("/computing")
-
+		router := r.Group("/api/v1/computing")
 		router.GET("/cp", computing.GetCpResource)
 		router.POST("/cp/ubi", computing.DoUbiTaskForDocker)
 		router.POST("/cp/docker/receive/ubi", computing.ReceiveUbiProof)
+
+		ecpImageService := computing.NewImageJobService()
+		router.POST("/cp/deploy/check", ecpImageService.CheckJobCondition)
+		router.GET("/cp/price", computing.GetPrice)
+		router.POST("/cp/deploy", ecpImageService.DeployJob)
+		router.GET("/cp/job/status", ecpImageService.GetJobStatus)
+		router.DELETE("/cp/job/:job_uuid", ecpImageService.DeleteJob)
 
 		shutdownChan := make(chan struct{})
 		httpStopper, err := util.ServeHttp(r, "cp-api", ":"+strconv.Itoa(conf.GetConfig().API.Port), false)

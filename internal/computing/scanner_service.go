@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/contract"
@@ -58,7 +57,7 @@ func (taskManager *TaskManagerContract) Scan() {
 		logs.GetLogger().Errorf("failed to get rpc url, error: %v", err)
 		return
 	}
-	client, err := ethclient.Dial(chainUrl)
+	client, err := contract.GetEthClient(chainUrl)
 	if err != nil {
 		logs.GetLogger().Errorf("failed to dial rpc, error: %v", err)
 		return

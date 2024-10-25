@@ -15,19 +15,19 @@ spec:
     - action: Deny
       protocol: ICMP
       destination:
-        selector: net == 'host-network'
+        selector: net == '$G_SUBNET_NAME'
     - action: Deny
       protocol: TCP
       destination:
         ports:
           - 1:65535
-        selector: net == 'host-network'
+        selector: net == '$G_SUBNET_NAME'
     - action: Deny
       protocol: UDP
       destination:
         ports:
           - 1:65535
-        selector: net == 'host-network'
+        selector: net == '$G_SUBNET_NAME'
 ---
 
 apiVersion: projectcalico.org/v3

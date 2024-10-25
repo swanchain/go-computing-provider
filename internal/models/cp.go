@@ -6,19 +6,20 @@ import (
 )
 
 type JobData struct {
-	UUID                        string `json:"uuid"`
-	Name                        string `json:"name"`
-	Duration                    int    `json:"duration"`
-	JobSourceURI                string `json:"job_source_uri"`
-	JobResultURI                string `json:"job_result_uri,omitempty"`
-	StorageSource               string `json:"storage_source,omitempty"`
-	TaskUUID                    string `json:"task_uuid"`
-	BuildLog                    string `json:"build_log,omitempty"`
-	ContainerLog                string `json:"container_log"`
-	NodeIdJobSourceUriSignature string `json:"node_id_job_source_uri_signature,omitempty"`
-	JobRealUri                  string `json:"job_real_uri,omitempty"`
-	JobType                     int    `json:"job_type"`  // 0: Standard job; 1: Custom job
-	BidPrice                    string `json:"bid_price"` // Amount users are willing to pay
+	UUID                        string   `json:"uuid"`
+	Name                        string   `json:"name"`
+	Duration                    int      `json:"duration"`
+	JobSourceURI                string   `json:"job_source_uri"`
+	JobResultURI                string   `json:"job_result_uri,omitempty"`
+	StorageSource               string   `json:"storage_source,omitempty"`
+	TaskUUID                    string   `json:"task_uuid"`
+	BuildLog                    string   `json:"build_log,omitempty"`
+	ContainerLog                string   `json:"container_log"`
+	NodeIdJobSourceUriSignature string   `json:"node_id_job_source_uri_signature,omitempty"`
+	JobRealUri                  string   `json:"job_real_uri,omitempty"`
+	JobType                     int      `json:"job_type"`  // 0: Standard job; 1: Custom job
+	BidPrice                    string   `json:"bid_price"` // Amount users are willing to pay
+	IpWhiteList                 []string `json:"ip_white_list"`
 }
 
 type Job struct {
@@ -99,8 +100,12 @@ type UbiC2Proof struct {
 }
 
 type TaskResource struct {
-	CPU     string `json:"cpu"`
-	GPU     string `json:"gpu"`
+	CPU       string `json:"cpu"`
+	Gpu       string `json:"gpu"`
+	GpuDetail struct {
+		ProductName string `json:"product_name"`
+		Count       string `json:"count"`
+	} `json:"gpu_detail"`
 	Memory  string `json:"memory"`
 	Storage string `json:"storage"`
 }
@@ -109,7 +114,7 @@ type Account struct {
 	OwnerAddress   string
 	NodeId         string
 	MultiAddresses []string
-	TaskTypes      []uint8 // 1:Fil-C2-512M, 2:Aleo, 3: AI, 4:Fil-C2-32G
+	TaskTypes      []uint8 // 1:Fil-C2-512M, 2:mining, 3: AI, 4:Fil-C2-32G
 	Beneficiary    string
 	WorkerAddress  string
 	Version        string
@@ -178,6 +183,7 @@ type ResourcePrice struct {
 	HdPersNvmePrice  string            `json:"hd_pers_nvme_price,omitempty"`
 	GpuDefaultPrice  string            `json:"gpu_default_price"`
 	GpusPrice        map[string]string `json:"gpus_price"`
+	Pricing          bool              `json:"pricing"`
 }
 
 const (

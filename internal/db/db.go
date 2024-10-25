@@ -45,7 +45,8 @@ func InitDb(cpRepoPath string) {
 	if err = DB.AutoMigrate(
 		&models.TaskEntity{},
 		&models.JobEntity{},
-		&models.CpInfoEntity{}); err != nil {
+		&models.CpInfoEntity{},
+		&models.EcpJobEntity{}); err != nil {
 		panic("failed to auto migrate for provider db")
 	}
 }
