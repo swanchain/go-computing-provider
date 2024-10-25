@@ -11,7 +11,7 @@
       "job_manager_contract": "0x6e810C56d97d0cf64FB625d2Ed756379d0EDbC32",
       "job_manager_contract_created": 2129000,
       "register_cp_contract": "0xbef1ec33e5Ac3a491fFeE1600e0b00eac97cb138",
-      "zk_collateral_contract": "0x0b84cc9CcE1459c85337b511872528cE947C3962",
+      "zk_collateral_contract": "0x7A099B665e760BCCF3Aa0cBbb66C8da47F13C03d",
       "register_task_contract": "0x4Cd9b2450c3e412a1F0F0aE78C79271337241E31",
       "sequencer_contract": "0xE0a88F1fA56D8a8D73E9bb9Fc03506439cb386Bd"
     }
