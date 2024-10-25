@@ -70,6 +70,21 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 	}
 	logs.GetLogger().Infof("Job received Data: %+v", job)
 
+	if strings.TrimSpace(job.UUID) == "" {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: uuid"))
+		return
+	}
+
+	if strings.TrimSpace(job.Name) == "" {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: name"))
+		return
+	}
+
+	if strings.TrimSpace(job.Image) == "" {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: image"))
+		return
+	}
+
 	var totalCost float64
 	var checkPriceFlag bool
 	if !conf.GetConfig().API.Pricing {
@@ -85,16 +100,6 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BelowPriceError))
 			return
 		}
-	}
-
-	if strings.TrimSpace(job.Name) == "" {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: name"))
-		return
-	}
-
-	if strings.TrimSpace(job.Image) == "" {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: image"))
-		return
 	}
 
 	if err := NewDockerService().PullImage(job.Image); err != nil {
@@ -118,80 +123,81 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 		return
 	}
 
-	if err := NewDockerService().PullImage(job.Image); err != nil {
-		logs.GetLogger().Errorf("failed to pull %s image, error: %v", job.Image, err)
-		return
-	}
-
-	var needResource container.Resources
-
-	if job.Resource.GPUModel != "" && job.Resource.GPU > 0 {
-		var useIndexs []string
-		for i := 0; i < int(job.Resource.GPU); i++ {
-			if i >= len(indexs) {
-				break
+	go func() {
+		if err := NewDockerService().PullImage(job.Image); err != nil {
+			logs.GetLogger().Errorf("failed to pull %s image, job_uuid: %s, error: %v", job.Image, job.UUID, err)
+			return
+		}
+		var needResource container.Resources
+		if job.Resource.GPUModel != "" && job.Resource.GPU > 0 {
+			var useIndexs []string
+			for i := 0; i < int(job.Resource.GPU); i++ {
+				if i >= len(indexs) {
+					break
+				}
+				useIndexs = append(useIndexs, indexs[i])
+				env = append(env, fmt.Sprintf("CUDA_VISIBLE_DEVICES=%s", strings.Join(useIndexs, ",")))
 			}
-			useIndexs = append(useIndexs, indexs[i])
-			env = append(env, fmt.Sprintf("CUDA_VISIBLE_DEVICES=%s", strings.Join(useIndexs, ",")))
-		}
 
-		needResource = container.Resources{
-			CPUQuota: needCpu * 100000,
-			Memory:   job.Resource.Memory,
-			DeviceRequests: []container.DeviceRequest{
-				{
-					Driver:       "nvidia",
-					DeviceIDs:    useIndexs,
-					Capabilities: [][]string{{"compute", "utility"}},
+			needResource = container.Resources{
+				CPUQuota: needCpu * 100000,
+				Memory:   job.Resource.Memory,
+				DeviceRequests: []container.DeviceRequest{
+					{
+						Driver:       "nvidia",
+						DeviceIDs:    useIndexs,
+						Capabilities: [][]string{{"compute", "utility"}},
+					},
 				},
-			},
+			}
+		} else {
+			needResource = container.Resources{
+				CPUQuota: needCpu * 100000,
+				Memory:   job.Resource.Memory,
+			}
 		}
-	} else {
-		needResource = container.Resources{
-			CPUQuota: needCpu * 100000,
-			Memory:   job.Resource.Memory,
+
+		hostConfig := &container.HostConfig{
+			Resources:  needResource,
+			Privileged: true,
 		}
-	}
+		containerConfig := &container.Config{
+			Image:        job.Image,
+			Env:          env,
+			AttachStdout: true,
+			AttachStderr: true,
+			Tty:          true,
+		}
 
-	hostConfig := &container.HostConfig{
-		Resources:  needResource,
-		Privileged: true,
-	}
-	containerConfig := &container.Config{
-		Image:        job.Image,
-		Env:          env,
-		AttachStdout: true,
-		AttachStderr: true,
-		Tty:          true,
-	}
+		containerName := job.Name + "-" + generateString(5)
+		dockerService := NewDockerService()
+		if err := dockerService.ContainerCreateAndStart(containerConfig, hostConfig, containerName); err != nil {
+			logs.GetLogger().Errorf("failed to create job container, job_uuid: %s, error: %v", job.UUID, err)
+			return
+		}
+		logs.GetLogger().Warnf("job_uuid: %s, starting container, container name: %s", job.UUID, containerName)
 
-	containerName := job.Name + "-" + generateString(5)
-	dockerService := NewDockerService()
-	if err := dockerService.ContainerCreateAndStart(containerConfig, hostConfig, containerName); err != nil {
-		logs.GetLogger().Errorf("failed to create job container, job_uuid: %s, error: %v", job.UUID, err)
-		return
-	}
-	logs.GetLogger().Warnf("job_uuid: %s, starting container, container name: %s", job.UUID, containerName)
+		time.Sleep(3 * time.Second)
+		if !dockerService.IsExistContainer(containerName) {
+			logs.GetLogger().Warnf("job_uuid: %s, not found container", job.UUID)
+			return
+		}
+		logs.GetLogger().Warnf("job_uuid: %s, started container, container name: %s", job.UUID, containerName)
 
-	time.Sleep(3 * time.Second)
-	if !dockerService.IsExistContainer(containerName) {
-		logs.GetLogger().Warnf("job_uuid: %s, not found container", job.UUID)
-		return
-	}
-	logs.GetLogger().Warnf("job_uuid: %s, started container, container name: %s", job.UUID, containerName)
+		if err = NewEcpJobService().SaveEcpJobEntity(&models.EcpJobEntity{
+			Uuid:          job.UUID,
+			Name:          job.Name,
+			Image:         job.Image,
+			Env:           strings.Join(env, ","),
+			Status:        "created",
+			ContainerName: containerName,
+			CreateTime:    time.Now().Unix(),
+		}); err != nil {
+			logs.GetLogger().Errorf("failed to save job to db, error: %v", err)
+			return
+		}
+	}()
 
-	if err = NewEcpJobService().SaveEcpJobEntity(&models.EcpJobEntity{
-		Uuid:          job.UUID,
-		Name:          job.Name,
-		Image:         job.Image,
-		Env:           strings.Join(env, ","),
-		Status:        "created",
-		ContainerName: containerName,
-		CreateTime:    time.Now().Unix(),
-	}); err != nil {
-		logs.GetLogger().Errorf("failed to save job to db, error: %v", err)
-		return
-	}
 	c.JSON(http.StatusOK, util.CreateSuccessResponse(map[string]interface{}{
 		"price": totalCost,
 	}))
