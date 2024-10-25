@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/computing"
+	"github.com/swanchain/go-computing-provider/internal/contract"
 	"github.com/swanchain/go-computing-provider/internal/contract/account"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"github.com/swanchain/go-computing-provider/wallet"
@@ -36,7 +37,7 @@ func createAccount(cpRepoPath, ownerAddress, beneficiaryAddress string, workerAd
 		return fmt.Errorf("the address: %s, private key %v", ownerAddress, wallet.ErrKeyInfoNotFound)
 	}
 
-	client, err := ethclient.Dial(chainUrl)
+	client, err := contract.GetEthClient(chainUrl)
 	if err != nil {
 		return fmt.Errorf("dial rpc connect failed, error: %v", err)
 	}
@@ -119,7 +120,7 @@ func getVerifyAccountClient(ownerAddress string) (*ethclient.Client, *account.Cp
 		return nil, nil, fmt.Errorf("get rpc url failed, error: %v", err)
 	}
 
-	client, err := ethclient.Dial(chainUrl)
+	client, err := contract.GetEthClient(chainUrl)
 	if err != nil {
 		client.Close()
 		return nil, nil, fmt.Errorf("dial rpc connect failed, error: %v", err)

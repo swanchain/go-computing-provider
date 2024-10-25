@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
@@ -13,6 +12,7 @@ import (
 	"github.com/swanchain/go-computing-provider/build"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/computing"
+	"github.com/swanchain/go-computing-provider/internal/contract"
 	"github.com/swanchain/go-computing-provider/internal/contract/account"
 	"github.com/swanchain/go-computing-provider/internal/contract/ecp"
 	"github.com/swanchain/go-computing-provider/internal/contract/fcp"
@@ -118,7 +118,7 @@ var infoCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		client, err := ethclient.Dial(chainRpc)
+		client, err := contract.GetEthClient(chainRpc)
 		if err != nil {
 			return err
 		}
@@ -280,7 +280,7 @@ var stateInfoCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		client, err := ethclient.Dial(chainRpc)
+		client, err := contract.GetEthClient(chainRpc)
 		if err != nil {
 			return err
 		}
@@ -430,7 +430,7 @@ var taskInfoCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		client, err := ethclient.Dial(chainRpc)
+		client, err := contract.GetEthClient(chainRpc)
 		if err != nil {
 			return err
 		}
@@ -991,7 +991,7 @@ func checkWalletAddress(walletAddress string, msg string) error {
 		return err
 	}
 
-	client, err := ethclient.Dial(chainUrl)
+	client, err := contract.GetEthClient(chainUrl)
 	if err != nil {
 		return err
 	}

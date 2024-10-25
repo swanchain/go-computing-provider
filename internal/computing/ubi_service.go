@@ -8,7 +8,6 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/filswan/go-swan-lib/logs"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -845,7 +844,7 @@ func submitUBIProof(c2Proof models.UbiC2Proof, task *models.TaskEntity) {
 		logs.GetLogger().Errorf("failed to get rpc url, taskId: %s, error: %v", c2Proof.TaskId, err)
 		return
 	}
-	client, err := ethclient.Dial(chainUrl)
+	client, err := contract.GetEthClient(chainUrl)
 	if err != nil {
 		logs.GetLogger().Errorf("failed to dial rpc, taskId: %s, error: %v", c2Proof.TaskId, err)
 		return
@@ -1010,7 +1009,7 @@ func GetTaskInfoOnChain(taskContract string) (models.EcpTaskInfo, error) {
 	if err != nil {
 		return taskInfo, err
 	}
-	client, err := ethclient.Dial(chainRpc)
+	client, err := contract.GetEthClient(chainRpc)
 	if err != nil {
 		return taskInfo, err
 	}
@@ -1034,7 +1033,7 @@ func GetAggregatedTaskInfo(taskContract string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	client, err := ethclient.Dial(chainRpc)
+	client, err := contract.GetEthClient(chainRpc)
 	if err != nil {
 		return "", err
 	}
@@ -1333,7 +1332,7 @@ func submitTaskToSequencer(proof string, task *models.TaskEntity, timeOut int64,
 			if err != nil {
 				return fmt.Errorf("failed to get rpc url, taskId: %d, error: %v", task.Id, err)
 			}
-			client, err := ethclient.Dial(chainUrl)
+			client, err := contract.GetEthClient(chainUrl)
 			if err != nil {
 				return fmt.Errorf("failed to dial rpc, taskId: %d, error: %v", task.Id, err)
 			}
@@ -1409,7 +1408,7 @@ func checkBalance(cpAccountAddress string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("failed to get rpc url, cpAccount: %s, error: %v", cpAccountAddress, err)
 	}
-	client, err := ethclient.Dial(chainUrl)
+	client, err := contract.GetEthClient(chainUrl)
 	if err != nil {
 		return false, fmt.Errorf("failed to dial rpc, cpAccount: %d, error: %v", cpAccountAddress, err)
 	}

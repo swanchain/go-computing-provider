@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/swanchain/go-computing-provider/conf"
+	"github.com/swanchain/go-computing-provider/internal/contract"
 	"github.com/swanchain/go-computing-provider/internal/contract/account"
 	"github.com/swanchain/go-computing-provider/wallet"
 	"golang.org/x/xerrors"
@@ -65,7 +65,7 @@ func (s *Sequencer) GetToken() error {
 	if err != nil {
 		return fmt.Errorf("failed to get rpc url, error: %v", err)
 	}
-	client, err := ethclient.Dial(chainUrl)
+	client, err := contract.GetEthClient(chainUrl)
 	if err != nil {
 		return fmt.Errorf("failed to dial rpc connect, error: %v", err)
 	}

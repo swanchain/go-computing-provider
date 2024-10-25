@@ -9,7 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/contract"
 	"github.com/swanchain/go-computing-provider/internal/contract/account"
@@ -156,7 +155,7 @@ func (w *LocalWallet) WalletList(ctx context.Context, contractFlag bool) error {
 	if err != nil {
 		return err
 	}
-	client, err := ethclient.Dial(chainRpc)
+	client, err := contract.GetEthClient(chainRpc)
 	if err != nil {
 		return err
 	}
@@ -253,7 +252,7 @@ func (w *LocalWallet) WalletSend(ctx context.Context, from, to string, amount st
 		return "", xerrors.Errorf("the address: %s, private %w,", from, ErrKeyInfoNotFound)
 	}
 
-	client, err := ethclient.Dial(chainUrl)
+	client, err := contract.GetEthClient(chainUrl)
 	if err != nil {
 		return "", err
 	}
@@ -289,7 +288,7 @@ func (w *LocalWallet) WalletCollateral(ctx context.Context, from string, amount 
 		return "", xerrors.Errorf("the address: %s, private key %w,", from, ErrKeyInfoNotFound)
 	}
 
-	client, err := ethclient.Dial(chainUrl)
+	client, err := contract.GetEthClient(chainUrl)
 	if err != nil {
 		return "", err
 	}
@@ -429,7 +428,7 @@ func (w *LocalWallet) CollateralWithdraw(ctx context.Context, address string, am
 		return "", xerrors.Errorf("the address: %s, private key %w,", address, ErrKeyInfoNotFound)
 	}
 
-	client, err := ethclient.Dial(chainUrl)
+	client, err := contract.GetEthClient(chainUrl)
 	if err != nil {
 		return "", err
 	}
@@ -486,7 +485,7 @@ func (w *LocalWallet) SequencerDeposit(ctx context.Context, from string, amount 
 		return "", xerrors.Errorf("the address: %s, private key %w,", from, ErrKeyInfoNotFound)
 	}
 
-	client, err := ethclient.Dial(chainUrl)
+	client, err := contract.GetEthClient(chainUrl)
 	if err != nil {
 		return "", err
 	}
@@ -538,7 +537,7 @@ func (w *LocalWallet) SequencerWithdraw(ctx context.Context, address string, amo
 		return "", xerrors.Errorf("the address: %s, private key %w,", address, ErrKeyInfoNotFound)
 	}
 
-	client, err := ethclient.Dial(chainUrl)
+	client, err := contract.GetEthClient(chainUrl)
 	if err != nil {
 		return "", err
 	}
@@ -582,7 +581,7 @@ func (w *LocalWallet) CollateralWithdrawRequest(ctx context.Context, address str
 		return "", xerrors.Errorf("the address: %s, private key %w,", address, ErrKeyInfoNotFound)
 	}
 
-	client, err := ethclient.Dial(chainUrl)
+	client, err := contract.GetEthClient(chainUrl)
 	if err != nil {
 		return "", err
 	}
@@ -621,7 +620,7 @@ func (w *LocalWallet) CollateralWithdrawConfirm(ctx context.Context, address str
 		return "", xerrors.Errorf("the address: %s, private key %w,", address, ErrKeyInfoNotFound)
 	}
 
-	client, err := ethclient.Dial(chainUrl)
+	client, err := contract.GetEthClient(chainUrl)
 	if err != nil {
 		return "", err
 	}
@@ -653,7 +652,7 @@ func (w *LocalWallet) CollateralWithdrawView(ctx context.Context, cpAccountAddre
 		return withdrawRequest, err
 	}
 
-	client, err := ethclient.Dial(chainUrl)
+	client, err := contract.GetEthClient(chainUrl)
 	if err != nil {
 		return withdrawRequest, err
 	}

@@ -231,7 +231,7 @@ func GetAccountInfo() (models.Account, error) {
 		return models.Account{}, fmt.Errorf("failed to get rpc url, error: %v", err)
 	}
 
-	client, err := ethclient.Dial(chainUrl)
+	client, err := contract.GetEthClient(chainUrl)
 	if err != nil {
 		return models.Account{}, fmt.Errorf("failed to dial rpc connect, error: %v", err)
 	}

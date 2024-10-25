@@ -21,7 +21,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -182,7 +181,7 @@ func ReceiveJob(c *gin.Context) {
 				c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.RpcConnectError))
 				return
 			}
-			client, err := ethclient.Dial(chainRpc)
+			client, err := contract.GetEthClient(chainRpc)
 			if err != nil {
 				logs.GetLogger().Errorf("failed to connect rpc, job_uuid: %s, error: %v", jobData.UUID, err)
 				c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.RpcConnectError))
@@ -291,7 +290,7 @@ func getChainBlockNumber() (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	client, err := ethclient.Dial(chainUrl)
+	client, err := contract.GetEthClient(chainUrl)
 	if err != nil {
 		return 0, err
 	}
@@ -1595,7 +1594,7 @@ func getJobOnChain(taskUuid string) (models.TaskInfoOnChain, error) {
 	if err != nil {
 		return models.TaskInfoOnChain{}, err
 	}
-	client, err := ethclient.Dial(chainRpc)
+	client, err := contract.GetEthClient(chainRpc)
 	if err != nil {
 		return models.TaskInfoOnChain{}, fmt.Errorf("failed to rpc, error: %v", err)
 	}
