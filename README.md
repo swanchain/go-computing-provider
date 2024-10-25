@@ -346,7 +346,7 @@ make install
        NodeName = ""                                  # The computing-provider node name
        WalletWhiteList = ""                           # CP only accepts user addresses from this whitelist for space deployment
        WalletBlackList = ""                           # CP reject user addresses from this blacklist for space deployment
-       Pricing = true                                 # Bid mode. true: auto; false: manual
+       Pricing = true                                 # default True, indicating acceptance of smart pricing orders, which may include orders priced lower than self-determined pricing.
    
        [UBI]
        UbiEnginePk = "0xB5aeb540B4895cd024c1625E146684940A849ED9"              # UBI Engine's public key, CP only accept the task from this UBI engine
@@ -414,7 +414,7 @@ computing-provider account create --ownerAddress <YOUR_OWNER_WALLET_ADDRESS> \
 	--beneficiaryAddress <YOUR_BENEFICIARY_WALLET_ADDRESS>  \
 	--task-types 3
 ```
-**Note:** `--task-types`: Supports 4 task types (`1`: Fil-C2-512M, `2`: Mining, `3`: AI, `4`: Fil-C2-32G), separated by commas. For FCP, it needs to be set to 3.
+**Note:** `--task-types`: Supports 4 task types (`1`: Fil-C2-512M, `2`: Mining, `3`: AI, `4`: Fil-C2-32G, `5`: NodePort), separated by commas. For FCP, it needs to be set to 3.
 
 **Output:**
 ```
@@ -426,7 +426,7 @@ Transaction hash: 0xb8fd9cc9bfac2b2890230b4f14999b9d449e050339b252273379ab11fac1
 ```bash
  computing-provider collateral add --fcp --from <YOUR_WALLET_ADDRESS>  <amount>
 ```
-**Note:** Currently one AI task requires 5 `SWANU`. Please deposit enough collaterals for the tasks
+**Note:** Please deposit enough collaterals for the tasks
 
 
 ## Withdraw `SWANU` from FCP
@@ -545,8 +545,6 @@ computing-provider collateral add --ecp --from <YOUR_WALLET_ADDRESS>  <amount>
 > ```bash
 > computing-provider collateral withdraw --ecp --owner <YOUR_WALLET_ADDRESS> --account <YOUR_CP_ACCOUNT> <amount>
 > ```
-
-> **Note:** A minimum of 100 `SWANU` collateral is required to receive a ZK task.
 
 ### Step 3: Change the `tasktypes`
 
