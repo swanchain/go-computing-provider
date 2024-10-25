@@ -30,7 +30,7 @@ func (*ImageJobService) CheckJobCondition(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
 		return
 	}
-	logs.GetLogger().Infof("check job condition, received Data: %+v", job)
+	logs.GetLogger().Infof("check job condition, received Data: %+v", job.Resource)
 
 	var totalCost float64
 	var checkPriceFlag bool
