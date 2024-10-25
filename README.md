@@ -198,10 +198,11 @@ The `ingress-nginx` is an ingress controller for Kubernetes using `NGINX` as a r
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.7.1/deploy/static/provider/cloud/deploy.yaml
 ```
 **Note**
- - If you want to support the deployment of jobs with IP whitelists, you need to change the configuration of the configmap of the Ingress-nginx Controller. First download the `deploy.yaml` file, modify the `ConfigMap` resource object in the configuration file, and add a line under`data`:
+ - If you want to support the deployment of jobs with IP whitelists, you need to change the configuration of the configmap of the Ingress-nginx Controller and apply it. First download the `deploy.yaml` file, modify the `ConfigMap` resource object in the configuration file, and add a line under`data`:
 ```bash
 use-forwarded-headers: "true"
 ```
+
 
 If you have installed it correctly, you can see the result shown in the figure by the command: 
 
