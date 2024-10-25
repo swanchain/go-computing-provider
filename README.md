@@ -404,7 +404,7 @@ make install
 	```bash
 	computing-provider wallet send --from <YOUR_WALLET_ADDRESS> 0x7791f48931DB81668854921fA70bFf0eB85B8211 0.01
 	```
-	**Note:** If you don't have `SwanETH` and `SWANU`, please follow [the guideline](https://docs.swanchain.io/swan-mainnet/getting-started-guide) to [bridge ETH to Swan Mainnet](https://bridge.swanchain.io), and [claim the SWANU](https://faucet.swanchain.io) as collaterals.
+	**Note:** If you don't have `SwanETH` and `SWANU`, please follow [the guideline](https://docs.swanchain.io/swan-mainnet/getting-started-guide) to [bridge ETH to Swan Mainnet](https://bridge.swanchain.io).
 
 ## Initialization CP Account
 Deploy a CP account contract:
