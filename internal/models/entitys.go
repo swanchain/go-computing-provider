@@ -214,6 +214,7 @@ type JobEntity struct {
 	CreateTime      int64  `json:"create_time" gorm:"create_time"`
 	Error           string `json:"error" gorm:"error"`
 	DeleteAt        int    `json:"delete_at" gorm:"delete_at; default:0"` // 1 deleted
+	IpWhiteList     string `json:"ip_white_list"`
 	PodStatus       int    `json:"pod_status"`
 	Status          int    `json:"status"`
 	StartedBlock    uint64 `json:"started_block" gorm:"column:started_block;not null;default:0"`
@@ -227,7 +228,7 @@ func (*JobEntity) TableName() string {
 
 const (
 	Task_TYPE_FIL_C2_512 = iota + 1
-	Task_TYPE_ALEO
+	Task_TYPE_MINING
 	Task_TYPE_AI
 	Task_TYPE_FIL_C2_32
 	Task_TYPE_NODE_PORT
@@ -238,8 +239,8 @@ func TaskTypeStr(taskType int) string {
 	switch taskType {
 	case Task_TYPE_FIL_C2_512:
 		typeStr = "Fil-C2-512M"
-	case Task_TYPE_ALEO:
-		typeStr = "Aleo"
+	case Task_TYPE_MINING:
+		typeStr = "Mining"
 	case Task_TYPE_AI:
 		typeStr = "AI"
 	case Task_TYPE_FIL_C2_32:
@@ -263,7 +264,7 @@ type CpInfoEntity struct {
 	CreateAt           string   `json:"create_at" gorm:"create_at"`
 	UpdateAt           string   `json:"update_at" gorm:"update_at"`
 	MultiAddresses     []string `json:"multi_addresses" gorm:"-"`
-	TaskTypes          []uint8  `json:"task_types" gorm:"-"` // 1:Fil-C2-512M, 2:Aleo, 3: AI, 4:Fil-C2-32G
+	TaskTypes          []uint8  `json:"task_types" gorm:"-"` // 1:Fil-C2-512M, 2:mining, 3: AI, 4:Fil-C2-32G
 
 }
 
@@ -325,4 +326,20 @@ func ExistResource(name string) bool {
 		}
 	}
 	return false
+}
+
+type EcpJobEntity struct {
+	Id            int64  `json:"id" gorm:"primaryKey;autoIncrement"`
+	Uuid          string `json:"uuid" gorm:"uuid"`
+	Name          string `json:"name" gorm:"name"`
+	Image         string `json:"image" gorm:"image"`
+	Env           string `json:"env" gorm:"env"`
+	Status        string `json:"status"` // created|restarting|running|removing|paused|exited|dead
+	ContainerName string `json:"container_name" gorm:"container_name"`
+	CreateTime    int64  `json:"create_time" gorm:"create_time"`
+	DeleteAt      int    `json:"delete_at" gorm:"delete_at; default:0"` // 1 deleted
+}
+
+func (*EcpJobEntity) TableName() string {
+	return "t_ecp_job"
 }

@@ -39,3 +39,11 @@ func NewCpInfoService() CpInfoService {
 	}
 	return cpInfoService
 }
+
+func NewEcpJobService() EcpJobService {
+	gormDB := db.NewDbService()
+	ecpJobService := EcpJobService{
+		DB: gormDB,
+	}
+	return ecpJobService
+}

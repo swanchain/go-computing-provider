@@ -17,7 +17,7 @@ import (
 
 type Stub struct {
 	client           *ethclient.Client
-	collateral       *FcpCollateral
+	collateral       *SwanCreditCollateral
 	privateK         string
 	publicK          string
 	cpAccountAddress string
@@ -44,7 +44,7 @@ func NewCollateralStub(client *ethclient.Client, options ...Option) (*Stub, erro
 	}
 
 	collateralAddress := common.HexToAddress(conf.GetConfig().CONTRACT.JobCollateral)
-	collateralClient, err := NewFcpCollateral(collateralAddress, client)
+	collateralClient, err := NewSwanCreditCollateral(collateralAddress, client)
 	if err != nil {
 		return nil, fmt.Errorf("create fcp collateral contract client, error: %+v", err)
 	}
@@ -97,7 +97,7 @@ func (s *Stub) CollateralInfo() (models.CpCollateralInfoForFCP, error) {
 
 	cpInfo.CpAddress = collateralInfo.CpAccount.Hex()
 	cpInfo.AvailableBalance = contract.BalanceToStr(collateralInfo.AvailableBalance)
-	cpInfo.LockedCollateral = contract.BalanceToStr(collateralInfo.LockedCollateral)
+	cpInfo.LockedCollateral = contract.BalanceToStr(collateralInfo.LockedBalance)
 	cpInfo.Status = collateralInfo.Status
 	return cpInfo, nil
 }

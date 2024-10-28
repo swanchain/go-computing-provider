@@ -192,14 +192,21 @@ func (s *K8sService) DeleteService(ctx context.Context, namespace, serviceName s
 	return s.k8sClient.CoreV1().Services(namespace).Delete(ctx, serviceName, metaV1.DeleteOptions{})
 }
 
-func (s *K8sService) CreateIngress(ctx context.Context, k8sNameSpace, spaceUuid, hostName string, port int32) (*networkingv1.Ingress, error) {
+func (s *K8sService) CreateIngress(ctx context.Context, k8sNameSpace, spaceUuid, hostName string, port int32, ipWhiteList []string) (*networkingv1.Ingress, error) {
 	var ingressClassName = "nginx"
+
+	var annotations = map[string]string{
+		"nginx.ingress.kubernetes.io/use-regex": "true",
+	}
+	if len(ipWhiteList) > 0 {
+		annotations["nginx.ingress.kubernetes.io/use-forwarded-headers"] = "true"
+		annotations["nginx.ingress.kubernetes.io/whitelist-source-range"] = strings.Join(ipWhiteList, ",")
+	}
+
 	ingress := &networkingv1.Ingress{
 		ObjectMeta: metaV1.ObjectMeta{
-			Name: constants.K8S_INGRESS_NAME_PREFIX + spaceUuid,
-			Annotations: map[string]string{
-				"nginx.ingress.kubernetes.io/use-regex": "true",
-			},
+			Name:        constants.K8S_INGRESS_NAME_PREFIX + spaceUuid,
+			Annotations: annotations,
 		},
 		Spec: networkingv1.IngressSpec{
 			IngressClassName: &ingressClassName,

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
@@ -13,6 +12,7 @@ import (
 	"github.com/swanchain/go-computing-provider/build"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/computing"
+	"github.com/swanchain/go-computing-provider/internal/contract"
 	"github.com/swanchain/go-computing-provider/internal/contract/account"
 	"github.com/swanchain/go-computing-provider/internal/contract/ecp"
 	"github.com/swanchain/go-computing-provider/internal/contract/fcp"
@@ -118,7 +118,7 @@ var infoCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		client, err := ethclient.Dial(chainRpc)
+		client, err := contract.GetEthClient(chainRpc)
 		if err != nil {
 			return err
 		}
@@ -216,10 +216,10 @@ var infoCmd = &cli.Command{
 		taskData = append(taskData, []string{"Worker Balance(ETH):", workerBalance})
 		taskData = append(taskData, []string{"Sequencer Balance(ETH):", sequencerBalance})
 		taskData = append(taskData, []string{""})
-		taskData = append(taskData, []string{"ECP Balance(SWANC):"})
+		taskData = append(taskData, []string{"ECP Balance(SWAN):"})
 		taskData = append(taskData, []string{"   Collateral:", ecpCollateralBalance})
 		taskData = append(taskData, []string{"   Escrow:", ecpEscrowBalance})
-		taskData = append(taskData, []string{"FCP Balance(SWANC):"})
+		taskData = append(taskData, []string{"FCP Balance(SWAN):"})
 		taskData = append(taskData, []string{"   Collateral:", fcpCollateralBalance})
 		taskData = append(taskData, []string{"   Escrow:", fcpEscrowBalance})
 
@@ -280,7 +280,7 @@ var stateInfoCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		client, err := ethclient.Dial(chainRpc)
+		client, err := contract.GetEthClient(chainRpc)
 		if err != nil {
 			return err
 		}
@@ -375,10 +375,10 @@ var stateInfoCmd = &cli.Command{
 		taskData = append(taskData, []string{"Worker Balance(ETH):", workerBalance})
 		taskData = append(taskData, []string{"Sequencer Balance(ETH):", sequencerBalance})
 		taskData = append(taskData, []string{""})
-		taskData = append(taskData, []string{"ECP Balance(SWANC):"})
+		taskData = append(taskData, []string{"ECP Balance(SWAN):"})
 		taskData = append(taskData, []string{"   Collateral:", ecpCollateralBalance})
 		taskData = append(taskData, []string{"   Escrow:", ecpEscrowBalance})
-		taskData = append(taskData, []string{"FCP Balance(SWANC):"})
+		taskData = append(taskData, []string{"FCP Balance(SWAN):"})
 		taskData = append(taskData, []string{"   Collateral:", fcpCollateralBalance})
 		taskData = append(taskData, []string{"   Escrow:", fcpEscrowBalance})
 
@@ -430,7 +430,7 @@ var taskInfoCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		client, err := ethclient.Dial(chainRpc)
+		client, err := contract.GetEthClient(chainRpc)
 		if err != nil {
 			return err
 		}
@@ -551,7 +551,7 @@ var createAccountCmd = &cli.Command{
 		},
 		&cli.StringFlag{
 			Name:  "task-types",
-			Usage: "Task types of CP (1:Fil-C2-512M, 2:Aleo, 3:AI, 4:Fil-C2-32G, 5:NodePort), separated by commas",
+			Usage: "Task types of CP (1:Fil-C2-512M, 2:Mining, 3:AI, 4:Fil-C2-32G, 5:NodePort), separated by commas",
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -858,7 +858,7 @@ var changeWorkerAddressCmd = &cli.Command{
 
 var changeTaskTypesCmd = &cli.Command{
 	Name:      "changeTaskTypes",
-	Usage:     "Update taskTypes of CP (1:Fil-C2-512M, 2:Aleo, 3: AI, 4:Fil-C2-32G, 5:NodePort), separated by commas",
+	Usage:     "Update taskTypes of CP (1:Fil-C2-512M, 2:Mining, 3: AI, 4:Fil-C2-32G, 5:NodePort), separated by commas",
 	ArgsUsage: "[TaskTypes]",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
@@ -991,7 +991,7 @@ func checkWalletAddress(walletAddress string, msg string) error {
 		return err
 	}
 
-	client, err := ethclient.Dial(chainUrl)
+	client, err := contract.GetEthClient(chainUrl)
 	if err != nil {
 		return err
 	}

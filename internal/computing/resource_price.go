@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/BurntSushi/toml"
+	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -20,6 +21,13 @@ TARGET_MEMORY="0.139"       # SWAN/GB-hour
 TARGET_HD_EPHEMERAL="0.035" # SWAN/GB-hour
 TARGET_GPU_DEFAULT="17.5"  # SWAN/Default GPU unit a hour
 `
+
+var resourcePriceDefault = map[string]string{
+	"TARGET_CPU":          "0.25",
+	"TARGET_MEMORY":       "0.139",
+	"TARGET_HD_EPHEMERAL": "0.035",
+	"TARGET_GPU_DEFAULT":  "17.5",
+}
 
 func GeneratePriceConfig() error {
 	cpRepoPath, _ := os.LookupEnv("CP_PATH")
@@ -61,17 +69,22 @@ func ReadPriceConfig() (HardwarePrice, error) {
 	var hardwarePrice HardwarePrice
 	hardwarePrice.GpusPrice = make(map[string]string)
 	cpRepoPath, _ := os.LookupEnv("CP_PATH")
-	if _, err := os.Stat(filepath.Join(cpRepoPath, resourceConfigFile)); err != nil {
-		return hardwarePrice, err
-	}
 
-	var config Config
-	_, err := toml.DecodeFile(filepath.Join(cpRepoPath, resourceConfigFile), &config.Resources)
+	var priceConfig map[string]string
+	_, err := os.Stat(filepath.Join(cpRepoPath, resourceConfigFile))
 	if err != nil {
-		return hardwarePrice, err
+		logs.GetLogger().Warnf("no price configured, use default price")
+		priceConfig = resourcePriceDefault
+	} else {
+		var rc Config
+		_, err = toml.DecodeFile(filepath.Join(cpRepoPath, resourceConfigFile), &rc.Resources)
+		if err != nil {
+			return hardwarePrice, err
+		}
+		priceConfig = rc.Resources
 	}
 
-	for key, value := range config.Resources {
+	for key, value := range priceConfig {
 		switch key {
 		case "TARGET_CPU":
 			hardwarePrice.TARGET_CPU = value

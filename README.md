@@ -197,6 +197,13 @@ The `ingress-nginx` is an ingress controller for Kubernetes using `NGINX` as a r
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.7.1/deploy/static/provider/cloud/deploy.yaml
 ```
+**Note**
+ - If you want to support the deployment of jobs with IP whitelists, you need to change the configuration of the configmap of the Ingress-nginx Controller and apply it. First download the `deploy.yaml` file, modify the `ConfigMap` resource object in the configuration file, and add a line under`data`:
+```bash
+use-forwarded-headers: "true"
+```
+
+
 If you have installed it correctly, you can see the result shown in the figure by the command: 
 
  - Run `kubectl get po -n ingress-nginx`
@@ -240,10 +247,14 @@ server {
 
         server_name *.example.com;                                            # need to config your domain
         location / {
-          proxy_pass http://127.0.0.1:<port>;  	# Need to configure the Intranet port corresponding to ingress-nginx-controller service port 80 
-          proxy_set_header Host $http_host;
+          proxy_pass http://127.0.0.1:<port>;  	# Need to configure the Intranet port corresponding to ingress-nginx-controller service port 80
           proxy_set_header Upgrade $http_upgrade;
           proxy_set_header Connection $connection_upgrade;
+          proxy_cookie_path / "/; HttpOnly; Secure; SameSite=None";
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
        }
 }
 ```
@@ -287,7 +298,7 @@ spec:
     spec:
       containers:
       - name: resource-exporter
-        image: filswan/resource-exporter:v11.2.9
+        image: filswan/resource-exporter:v11.3.0
         imagePullPolicy: IfNotPresent
         securityContext:
           privileged: true
@@ -342,7 +353,8 @@ make install
        NodeName = ""                                  # The computing-provider node name
        WalletWhiteList = ""                           # CP only accepts user addresses from this whitelist for space deployment
        WalletBlackList = ""                           # CP reject user addresses from this blacklist for space deployment
- 
+       Pricing = true                                 # default True, indicating acceptance of smart pricing orders, which may include orders priced lower than self-determined pricing.
+   
        [UBI]
        UbiEnginePk = "0xB5aeb540B4895cd024c1625E146684940A849ED9"              # UBI Engine's public key, CP only accept the task from this UBI engine
        EnableSequencer = true                                                  # Submit the proof to Sequencer service(default: true)
@@ -399,7 +411,7 @@ make install
 	```bash
 	computing-provider wallet send --from <YOUR_WALLET_ADDRESS> 0x7791f48931DB81668854921fA70bFf0eB85B8211 0.01
 	```
-	**Note:** If you don't have `SwanETH` and `SWANC`, please follow [the guideline](https://docs.swanchain.io/swan-mainnet/getting-started-guide) to [bridge ETH to Swan Mainnet](https://bridge.swanchain.io), and [claim the SWANC](https://faucet.swanchain.io) as collaterals.
+	**Note:** If you don't have `SwanETH` and `SWANU`, please follow [the guideline](https://docs.swanchain.io/swan-mainnet/getting-started-guide) to [bridge ETH to Swan Mainnet](https://bridge.swanchain.io).
 
 ## Initialization CP Account
 Deploy a CP account contract:
@@ -409,7 +421,7 @@ computing-provider account create --ownerAddress <YOUR_OWNER_WALLET_ADDRESS> \
 	--beneficiaryAddress <YOUR_BENEFICIARY_WALLET_ADDRESS>  \
 	--task-types 3
 ```
-**Note:** `--task-types`: Supports 4 task types (`1`: Fil-C2-512M, `2`: Aleo, `3`: AI, `4`: Fil-C2-32G), separated by commas. For FCP, it needs to be set to 3.
+**Note:** `--task-types`: Supports 4 task types (`1`: Fil-C2-512M, `2`: Mining, `3`: AI, `4`: Fil-C2-32G, `5`: NodePort), separated by commas. For FCP, it needs to be set to 3.
 
 **Output:**
 ```
@@ -417,14 +429,14 @@ Contract deployed! Address: 0x3091c9647Ea5248079273B52C3707c958a3f2658
 Transaction hash: 0xb8fd9cc9bfac2b2890230b4f14999b9d449e050339b252273379ab11fac15926
 ```
 
-## Collateral `SWANC` for FCP
+## Collateral `SWANU` for FCP
 ```bash
  computing-provider collateral add --fcp --from <YOUR_WALLET_ADDRESS>  <amount>
 ```
-**Note:** Currently one AI task requires 5 `SWANC`. Please deposit enough collaterals for the tasks
+**Note:** Please deposit enough collaterals for the tasks
 
 
-## Withdraw `SWANC` from FCP
+## Withdraw `SWANU` from FCP
 ```bash
  computing-provider collateral withdraw --fcp --owner <YOUR_WALLET_ADDRESS> --account <YOUR_CP_ACCOUNT> <amount>
 ```
@@ -500,7 +512,7 @@ computing-provider account changeTaskTypes --ownerAddress <YOUR_OWNER_WALLET_ADD
 ```
 > **Note:** `--task-types` Supports 4 task types:
 >  - `1`: FIL-C2-512M
->  - `2`: Aleo
+>  - `2`: Mining
 >  - `3`: AI
 >  - `4`: FIL-C2-32G
 >  - `5`: NodePort
@@ -530,18 +542,16 @@ This section mainly introduces how to enable the function of receiving ZK tasks 
 * Adjust the value of `RUST_GPU_TOOLS_CUSTOM_GPU` based on the GPU used by the CP's Kubernetes cluster for fil-c2 tasks.
 * For more device choices, please refer to this page:[https://github.com/filecoin-project/bellperson](https://github.com/filecoin-project/bellperson)
 
-### Step 2: Collateral `SWANC` for ZK tasks
+### Step 2: Collateral `SWANU` for ZK tasks
 
 ```bash
 computing-provider collateral add --ecp --from <YOUR_WALLET_ADDRESS>  <amount>
 ```
 
-> If you want to withdraw the collateral `SWANC`: 
+> If you want to withdraw the collateral `SWANU`: 
 > ```bash
 > computing-provider collateral withdraw --ecp --owner <YOUR_WALLET_ADDRESS> --account <YOUR_CP_ACCOUNT> <amount>
 > ```
-
-> **Note:** A minimum of 100 `SWANC` collateral is required to receive a ZK task.
 
 ### Step 3: Change the `tasktypes`
 
@@ -550,9 +560,10 @@ computing-provider account changeTaskTypes --ownerAddress <YOUR_OWNER_WALLET_ADD
 ```
 > **Note:** `--task-types` Supports 4 task types:
 >  - `1`: FIL-C2-512M
->  - `2`: Aleo
+>  - `2`: Mining
 >  - `3`: AI
 >  - `4`: FIL-C2-32G
+>  - `5`: NodePort
 
 > If you need to run FCP and ECP at the same time, you need to set it to `1,2,3,4`
 
@@ -625,7 +636,7 @@ nohup computing-provider run >> cp.log 2>&1 &
 ## CLI of Computing Provider
 * Check the current list of tasks running on CP, display detailed information for tasks using `-v`
 ```
-computing-provider task list 
+computing-provider task list --type fcp
 ```
 * Retrieve detailed information for a specific task using `job_uuid`
 ```

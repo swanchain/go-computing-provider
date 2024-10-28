@@ -10,13 +10,13 @@ var CurrentCommit string
 
 var NetWorkTag string
 
-const BuildVersion = "0.6.5"
+const BuildVersion = "0.7.0"
 
 const UBITaskImageIntelCpu = "filswan/ubi-worker-cpu-intel:latest"
 const UBITaskImageIntelGpu = "filswan/ubi-worker-gpu-intel:latest"
 const UBITaskImageAmdCpu = "filswan/ubi-worker-cpu-amd:latest"
 const UBITaskImageAmdGpu = "filswan/ubi-worker-gpu-amd:latest"
-const UBIResourceExporterDockerImage = "filswan/resource-exporter:v11.2.9"
+const UBIResourceExporterDockerImage = "filswan/resource-exporter:v11.3.0"
 
 func UserVersion() string {
 	return BuildVersion + "+" + NetWorkTag + CurrentCommit
