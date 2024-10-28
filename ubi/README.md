@@ -86,7 +86,7 @@ computing-provider collateral add --ecp --from <YOUR_WALLET_ADDRESS>  <AMOUNT>
 >    computing-provider sequencer withdraw --owner <YOUR_OWNER_WALLET_ADDRESS>  <amount>
 >    ```
     
->**Note:** Currently one zk-task requires 0.000005 SwanETH, 
+>**Note:** Currently one zk-task requires 0.0000005 SwanETH, 
 
 ## Start ECP service
 ```bash
@@ -107,7 +107,7 @@ nohup ./computing-provider ubi daemon >> cp.log 2>&1 &
 ### Why need Sequencer?
 In past tests, we discovered that due to the frequent interactions required by ECP (Ethereum Compliance Proof) to submit proofs to the blockchain, ECP incurs significant gas costs. To reduce these gas costs, the Sequencer has emerged as a Layer 3 solution.
 
-The ECP can submit proofs to the Sequencer service, which will then package and submit all proofs from the entire network over a period of time (**currently 24 hours**) in a single transaction. This way, ECP only needs to pay a minimal gas fee to the Sequencer (currently, **a single proof requires 0.00001 SwanETH**). For more detailed information, see [here](https://docs.swanchain.io/swan-provider/market-provider-mp/zk-engine/sequencer).
+The ECP can submit proofs to the Sequencer service, which will then package and submit all proofs from the entire network over a period of time (**currently 24 hours**) in a single transaction. This way, ECP only needs to pay a minimal gas fee to the Sequencer (currently, **a single proof requires 0.0000005 SwanETH**). For more detailed information, see [here](https://docs.swanchain.io/swan-provider/market-provider-mp/zk-engine/sequencer).
 
 ### How to Set it?
 We **strongly recommend** enabling the Sequencer feature (enabled by default). The steps to enable it are as follows:
