@@ -141,7 +141,7 @@ var listCmd = &cli.Command{
 
 				taskData = append(taskData,
 					[]string{strconv.Itoa(int(task.Id)), contract, models.GetResourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type),
-						models.TaskStatusStr(task.Status), task.Reward, sequencerStr, createTime})
+						models.TaskStatusStr(task.Status), sequencerStr, createTime})
 
 				rowColorList = append(rowColorList, RowColor{
 					row:    i,
