@@ -16,7 +16,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -95,13 +94,6 @@ var listCmd = &cli.Command{
 					sequencerStr = ""
 				}
 
-				if len(strings.TrimSpace(task.Reward)) == 0 {
-					task.Reward = "0.00"
-				}
-				if len(task.Reward) >= 4 {
-					task.Reward = task.Reward[:4]
-				}
-
 				taskData = append(taskData,
 					[]string{strconv.Itoa(int(task.Id)), contract, models.GetResourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type),
 						task.CheckCode, task.Sign, models.TaskStatusStr(task.Status), sequencerStr, createTime})
@@ -130,13 +122,6 @@ var listCmd = &cli.Command{
 					contract = task.Contract
 				} else {
 					sequencerStr = ""
-				}
-
-				if len(strings.TrimSpace(task.Reward)) == 0 {
-					task.Reward = "0.00"
-				}
-				if len(task.Reward) >= 4 {
-					task.Reward = task.Reward[:4]
 				}
 
 				taskData = append(taskData,
