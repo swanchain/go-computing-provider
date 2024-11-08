@@ -104,7 +104,7 @@ var listCmd = &cli.Command{
 
 				taskData = append(taskData,
 					[]string{strconv.Itoa(int(task.Id)), contract, models.GetResourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type),
-						task.CheckCode, task.Sign, models.TaskStatusStr(task.Status), task.Reward, sequencerStr, task.SettlementTaskAddr, createTime})
+						task.CheckCode, task.Sign, models.TaskStatusStr(task.Status), sequencerStr, createTime})
 
 				rowColorList = append(rowColorList, RowColor{
 					row:    i,
@@ -112,7 +112,7 @@ var listCmd = &cli.Command{
 					color:  getStatusColor(task.Status),
 				})
 			}
-			header := []string{"TASK ID", "TASK CONTRACT", "TASK TYPE", "ZK TYPE", "CHECK CODE", "SIGNATURE", "STATUS", "REWARD", "SEQUENCER", "SETTLEMENT CONTRACT", "CREATE TIME"}
+			header := []string{"TASK ID", "TASK CONTRACT", "TASK TYPE", "ZK TYPE", "CHECK CODE", "SIGNATURE", "STATUS", "SEQUENCER", "CREATE TIME"}
 			NewVisualTable(header, taskData, rowColorList).Generate(false)
 
 		} else {
@@ -150,7 +150,7 @@ var listCmd = &cli.Command{
 				})
 			}
 
-			header := []string{"TASK ID", "TASK CONTRACT", "TASK TYPE", "ZK TYPE", "STATUS", "REWARD", "SEQUENCER", "CREATE TIME"}
+			header := []string{"TASK ID", "TASK CONTRACT", "TASK TYPE", "ZK TYPE", "STATUS", "SEQUENCER", "CREATE TIME"}
 			NewVisualTable(header, taskData, rowColorList).Generate(false)
 		}
 		return nil

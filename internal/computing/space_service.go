@@ -123,7 +123,7 @@ func ReceiveJob(c *gin.Context) {
 		}
 	}
 
-	available, gpuProductName, err := checkResourceAvailableForSpace(spaceDetail.Data.Space.ActiveOrder.Config.Description)
+	available, gpuProductName, err := checkResourceAvailableForSpace(jobData.JobType, spaceDetail.Data.Space.ActiveOrder.Config)
 	if err != nil {
 		logs.GetLogger().Errorf("failed to check job resource, error: %+v", err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
@@ -1166,8 +1166,15 @@ func getSpaceDetail(jobSourceURI string) (models.SpaceJSON, error) {
 	return spaceJson, nil
 }
 
-func checkResourceAvailableForSpace(configDescription string) (bool, string, error) {
-	taskType, hardwareDetail := getHardwareDetail(configDescription)
+func checkResourceAvailableForSpace(jobType int, resourceConfig models.SpaceHardware) (bool, string, error) {
+	var taskType string
+	var hardwareDetail models.Resource
+	if jobType == 1 {
+		taskType, hardwareDetail = getHardwareDetailByByte(resourceConfig)
+	} else {
+		taskType, hardwareDetail = getHardwareDetail(resourceConfig.Description)
+	}
+
 	k8sService := NewK8sService()
 
 	activePods, err := k8sService.GetAllActivePod(context.TODO())
