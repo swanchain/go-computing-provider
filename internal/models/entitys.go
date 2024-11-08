@@ -79,6 +79,10 @@ const (
 	RESOURCE_TYPE_GPU = 1
 )
 
+const (
+	TaskSequencer = 1
+)
+
 func GetResourceTypeStr(resourceType int) string {
 	switch resourceType {
 	case RESOURCE_TYPE_CPU:

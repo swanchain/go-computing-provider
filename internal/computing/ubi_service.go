@@ -836,6 +836,7 @@ func GetCpResource(c *gin.Context) {
 		NodeName:         conf.GetConfig().API.NodeName,
 		NodeId:           GetNodeId(cpRepo),
 		CpAccountAddress: cpAccountAddress,
+		ClientType:       "ECP",
 	})
 }
 

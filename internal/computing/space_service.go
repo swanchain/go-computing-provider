@@ -685,6 +685,7 @@ func StatisticalSources(c *gin.Context) {
 		NodeId:           GetNodeId(cpRepo),
 		CpAccountAddress: cpAccountAddress,
 		Runtime:          clusterRuntime,
+		ClientType:       "FCP",
 	})
 }
 
