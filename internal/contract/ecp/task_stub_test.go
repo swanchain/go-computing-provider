@@ -3,6 +3,9 @@ package ecp
 import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/swanchain/go-computing-provider/conf"
+	"github.com/swanchain/go-computing-provider/internal/computing"
+	"github.com/swanchain/go-computing-provider/internal/db"
 	"log"
 	"testing"
 )
@@ -27,4 +30,15 @@ func TestTaskStub_GetTaskInfo(t *testing.T) {
 		return
 	}
 	fmt.Printf("info: %+v", info)
+}
+
+func TestTaskPayment_ScannerTaskPaymentEvents(t *testing.T) {
+	cpRepoPath := ""
+	if err := conf.InitConfig(cpRepoPath, true); err != nil {
+		t.Errorf("failed to load config file, error: %v", err)
+		return
+	}
+	db.InitDb(cpRepoPath)
+
+	computing.NewTaskPaymentService().ScannerChainGetTaskPayment()
 }

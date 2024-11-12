@@ -555,6 +555,37 @@ func (s *K8sService) AddNodeLabel(nodeName, key string) error {
 	return nil
 }
 
+func (s *K8sService) AddNodeLabelForArchitecture(nodeName, key string) error {
+	key = strings.ReplaceAll(key, " ", "-")
+
+	node, err := s.k8sClient.CoreV1().Nodes().Get(context.Background(), nodeName, metaV1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	if strings.EqualFold(strings.TrimSpace(key), constants.CPU_AMD) {
+		if value, exists := node.Labels[constants.CPU_INTEL]; exists && value == "true" {
+			delete(node.Labels, constants.CPU_INTEL)
+		}
+	}
+
+	if strings.EqualFold(strings.TrimSpace(key), constants.CPU_INTEL) {
+		if value, exists := node.Labels[constants.CPU_AMD]; exists && value == "true" {
+			delete(node.Labels, constants.CPU_AMD)
+		}
+	}
+	node.Labels[key] = "true"
+
+	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		_, updateErr := s.k8sClient.CoreV1().Nodes().Update(context.Background(), node, metaV1.UpdateOptions{})
+		return updateErr
+	})
+	if retryErr != nil {
+		return fmt.Errorf("failed update node label: %w", retryErr)
+	}
+	return nil
+}
+
 func (s *K8sService) WaitForPodRunningByHttp(namespace, jobUuid, serviceIp string) (string, error) {
 	var podName string
 	var podErr = errors.New("get pod status failed")

@@ -535,7 +535,7 @@ func addNodeLabel() {
 					continue
 				}
 			}
-			err := k8sService.AddNodeLabel(cpNode.Name, collectInfo.CpuName)
+			err := k8sService.AddNodeLabelForArchitecture(cpNode.Name, collectInfo.CpuName)
 			if err != nil {
 				logs.GetLogger().Errorf("nodeName: %s, error: %v", cpNode.Name, err)
 			}

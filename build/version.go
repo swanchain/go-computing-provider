@@ -49,5 +49,8 @@ type NetworkConfig struct {
 		ZkCollateralContract           string `json:"zk_collateral_contract"`
 		RegisterTaskContract           string `json:"register_task_contract"`
 		SequencerContract              string `json:"sequencer_contract"`
+		EdgeUrl                        string `json:"edge_url"`
+		EdgeTaskPayment                string `json:"edge_task_payment"`
+		EdgeTaskPaymentCreated         int64  `json:"edge_task_payment_created"`
 	} `json:"config"`
 }

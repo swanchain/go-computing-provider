@@ -16,13 +16,13 @@ func UbiTaskTypeStr(typeInt int) string {
 	var typeStr string
 	switch typeInt {
 	case FIL_C2_CPU512:
-		typeStr = "fil-c2-512M"
+		typeStr = "fil-c2"
 	case FIL_C2_CPU32G:
-		typeStr = "fil-c2-32G"
+		typeStr = "fil-c2"
 	case FIL_C2_GPU512:
-		typeStr = "fil-c2-512M"
+		typeStr = "fil-c2"
 	case FIL_C2_GPU32G:
-		typeStr = "fil-c2-32G"
+		typeStr = "fil-c2"
 	}
 	return typeStr
 }
@@ -333,17 +333,33 @@ func ExistResource(name string) bool {
 }
 
 type EcpJobEntity struct {
-	Id            int64  `json:"id" gorm:"primaryKey;autoIncrement"`
-	Uuid          string `json:"uuid" gorm:"uuid"`
-	Name          string `json:"name" gorm:"name"`
-	Image         string `json:"image" gorm:"image"`
-	Env           string `json:"env" gorm:"env"`
-	Status        string `json:"status"` // created|restarting|running|removing|paused|exited|dead
-	ContainerName string `json:"container_name" gorm:"container_name"`
-	CreateTime    int64  `json:"create_time" gorm:"create_time"`
-	DeleteAt      int    `json:"delete_at" gorm:"delete_at; default:0"` // 1 deleted
+	Id              int64   `json:"id" gorm:"primaryKey;autoIncrement"`
+	Uuid            string  `json:"uuid" gorm:"uuid"`
+	Name            string  `json:"name" gorm:"name"`
+	Image           string  `json:"image" gorm:"image"`
+	Env             string  `json:"env" gorm:"env"`
+	Status          string  `json:"status"` // created|restarting|running|removing|paused|exited|dead
+	Reward          float64 `json:"reward"`
+	ContainerName   string  `json:"container_name" gorm:"container_name"`
+	LastBlockNumber int64   `json:"last_block_number" gorm:"last_block_number"`
+	CreateTime      int64   `json:"create_time" gorm:"create_time"`
+	DeleteAt        int     `json:"delete_at" gorm:"delete_at; default:0"` // 1 deleted
 }
 
 func (*EcpJobEntity) TableName() string {
 	return "t_ecp_job"
 }
+
+type ScanChainEntity struct {
+	Id          int64  `json:"id" gorm:"primaryKey"`
+	BlockNumber int64  `json:"block_number" gorm:"block_number"`
+	UpdateTime  string `json:"update_time" gorm:"update_time"`
+}
+
+func (*ScanChainEntity) TableName() string {
+	return "t_scan_chain"
+}
+
+const (
+	ScannerTaskPaymentId = 1
+)

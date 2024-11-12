@@ -11,7 +11,8 @@ Pricing = true                                                           # Bid m
 UbiEnginePk = "0xB5aeb540B4895cd024c1625E146684940A849ED9"                # UBI Engine's public key, CP only accept the task from this UBI engine
 EnableSequencer = true                                                    # Enable aa Sequencer to receive zk-task proofs
 AutoChainProof = true                                                     # Sequencer insufficient balance or service unavailable, use chain to submit proof
-SequencerUrl = "https://sequencer.swanchain.io"                            # Sequencer service's API address
+SequencerUrl = "https://sequencer.swanchain.io"                           # Sequencer service's API address
+EdgeUrl = "https://edge-api.swanchain.io/v1"                              # Edge service's API address
 
 [LOG]
 CrtFile = "/YOUR_DOMAIN_NAME_CRT_PATH/server.crt"                         # Your domain name SSL .crt file path
