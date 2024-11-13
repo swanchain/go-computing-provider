@@ -485,14 +485,9 @@ func (task *CronTask) checkJobReward() {
 			return
 		}
 
-		poolSize := 5
-		taskQueue, wg := startWorkerPool(poolSize)
 		for _, job := range jobList {
-			jobCopy := job
-			submitTask(taskQueue, NewTaskManagerContract(jobCopy))
+			NewTaskManagerContract(job).Scan()
 		}
-		close(taskQueue)
-		wg.Wait()
 	})
 	c.Start()
 }
