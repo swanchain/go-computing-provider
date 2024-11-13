@@ -422,7 +422,7 @@ computing-provider account create --ownerAddress <YOUR_OWNER_WALLET_ADDRESS> \
 	--beneficiaryAddress <YOUR_BENEFICIARY_WALLET_ADDRESS>  \
 	--task-types 3
 ```
-**Note:** `--task-types`: Supports 4 task types (`1`: Fil-C2, `2`: Mining, `3`: AI, `4`: Inference, `5`: NodePort), separated by commas. For FCP, it needs to be set to 3.
+**Note:** `--task-types`: Supports 5 task types (`1`: Fil-C2, `2`: Mining, `3`: AI, `4`: Inference, `5`: NodePort), separated by commas. For FCP, it needs to be set to 3.
 
 **Output:**
 ```
@@ -509,9 +509,9 @@ export CP_PATH=<YOUR_CP_PATH>
   **Note:** The nodes for deploying CP need to open ports in the range of `30000-32767`
 - Change the `tasktypes`
 ```bash
-computing-provider account changeTaskTypes --ownerAddress <YOUR_OWNER_WALLET_ADDRESS> 5
+computing-provider account changeTaskTypes --ownerAddress <YOUR_OWNER_WALLET_ADDRESS> 3,5
 ```
-> **Note:** `--task-types` Supports 4 task types:
+> **Note:** `--task-types` Supports 5 task types:
 >  - `1`: FIL-C2
 >  - `2`: Mining
 >  - `3`: AI
@@ -557,16 +557,16 @@ computing-provider collateral add --ecp --from <YOUR_WALLET_ADDRESS>  <amount>
 ### Step 3: Change the `tasktypes`
 
 ```bash
-computing-provider account changeTaskTypes --ownerAddress <YOUR_OWNER_WALLET_ADDRESS> 1,2,3
+computing-provider account changeTaskTypes --ownerAddress <YOUR_OWNER_WALLET_ADDRESS> 1,2,3,4
 ```
-> **Note:** `--task-types` Supports 4 task types:
+> **Note:** `--task-types` Supports 5 task types:
 >  - `1`: FIL-C2
 >  - `2`: Mining
 >  - `3`: AI
 >  - `4`: Inference
 >  - `5`: NodePort
 
-> If you need to run FCP and ECP at the same time, you need to set it to `1,2,3`
+> If you need to run FCP and ECP at the same time, you need to set it to `1,2,3,4`
 
 ### Step 4: Deposit `SwanETH` for Sequencer Account
 ```bash
