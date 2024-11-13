@@ -97,8 +97,8 @@ func (tps *TaskPaymentService) scanAndProcessEvents(cpAccountAddress string) err
 		lastProcessedBlock = int64(event.Raw.BlockNumber)
 		handleEdgeTask(event.TaskUUID, cpAccountAddress, lastProcessedBlock, event.TransferAmount)
 		saveLastProcessedBlock(lastProcessedBlock)
-		checkAgain(cpAccountAddress, lastProcessedBlock)
 	}
+	checkAgain(cpAccountAddress, lastProcessedBlock)
 
 	if iter.Error() != nil {
 		return fmt.Errorf("failed to iterator events, error: %v", iter.Error())
