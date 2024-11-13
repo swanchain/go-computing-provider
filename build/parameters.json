@@ -5,7 +5,7 @@
       "sequencer_url": "https://sequencer.swanchain.io",
       "zk_engine_pk": "0xB5aeb540B4895cd024c1625E146684940A849ED9",
       "orchestrator_pk": "0x4B98086A20f3C19530AF32D21F85Bc6399358e20",
-      "chain_rpc": "https://mainnet-rpc01.swanchain.io",
+      "chain_rpc": "https://mainnet-rpc.swanchain.org",
       "swan_token_contract": "0x39cBBeaF88a91404618d45a16e0977Adab4d1Af1",
       "orchestrator_collateral_contract": "0x643A820060c78D9122081aafF0C039b070937558",
       "job_manager_contract": "0x6e810C56d97d0cf64FB625d2Ed756379d0EDbC32",
@@ -14,8 +14,8 @@
       "zk_collateral_contract": "0x7A099B665e760BCCF3Aa0cBbb66C8da47F13C03d",
       "register_task_contract": "0x4Cd9b2450c3e412a1F0F0aE78C79271337241E31",
       "sequencer_contract": "0xE0a88F1fA56D8a8D73E9bb9Fc03506439cb386Bd",
-      "edge_task_payment": "0x3bf45c5dcc9b1b7c64e50c600d8e20cabba10fee",
-      "edge_task_payment_created": 2535002,
+      "edge_task_payment": "0x14d53e304c612efa08ce68dc40c7e9f5a4ef9bff",
+      "edge_task_payment_created": 2535473,
       "edge_url": "https://edge-api.swanchain.io/v1"
     }
   },
