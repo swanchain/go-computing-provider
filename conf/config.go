@@ -147,6 +147,8 @@ func InitConfig(cpRepoPath string, standalone bool) error {
 			config.CONTRACT.TaskRegister = ncCopy.Config.RegisterTaskContract
 			config.CONTRACT.EdgeTaskPayment = ncCopy.Config.EdgeTaskPayment
 			config.CONTRACT.EdgeTaskPaymentCreated = ncCopy.Config.EdgeTaskPaymentCreated
+			config.UBI.SequencerUrl = ncCopy.Config.SequencerUrl
+			config.UBI.EdgeUrl = ncCopy.Config.EdgeUrl
 		}
 	}
 	return nil
