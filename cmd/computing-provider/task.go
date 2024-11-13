@@ -35,7 +35,7 @@ var taskList = &cli.Command{
 		},
 		&cli.StringFlag{
 			Name:  "type",
-			Usage: "Task type. Support fcp and edge types",
+			Usage: "Task type. Support fcp and ecp types",
 		},
 		&cli.BoolFlag{
 			Name:    "verbose",
@@ -58,7 +58,7 @@ var taskList = &cli.Command{
 		switch strings.TrimSpace(taskType) {
 		case "fcp":
 			return fcpTaskList(showCompleted, fullFlag)
-		case "edge":
+		case "ecp":
 			return edgeTaskList(showCompleted, fullFlag)
 		default:
 			return fmt.Errorf("only support fcp and edge types")
