@@ -9,6 +9,7 @@ import (
 	"github.com/swanchain/go-computing-provider/internal/contract"
 	"github.com/swanchain/go-computing-provider/internal/contract/fcp"
 	"github.com/swanchain/go-computing-provider/internal/models"
+	"time"
 )
 
 type TaskManagerContract struct {
@@ -91,6 +92,7 @@ func (taskManager *TaskManagerContract) Scan() {
 			logs.GetLogger().Error(err)
 			return
 		}
+		time.Sleep(time.Second)
 	}
 }
 

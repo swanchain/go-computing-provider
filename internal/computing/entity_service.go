@@ -179,6 +179,17 @@ func (cpServ EcpJobService) UpdateEcpJobEntity(jobUuid, status string) (err erro
 	return cpServ.Model(&models.EcpJobEntity{}).Where("uuid =?", jobUuid).Update("status", status).Error
 }
 
+func (cpServ EcpJobService) UpdateEcpJobEntityContainerName(jobUuid string, containerName string) (err error) {
+	return cpServ.Model(&models.EcpJobEntity{}).Where("uuid =?", jobUuid).Update("container_name", containerName).Error
+}
+
+func (cpServ EcpJobService) UpdateEcpJobEntityRewardAndBlock(jobUuid string, blockNumber int64, reward float64) (err error) {
+	return cpServ.Model(&models.EcpJobEntity{}).Where("uuid =?", jobUuid).Updates(map[string]interface{}{
+		"reward":            reward,
+		"last_block_number": blockNumber,
+	}).Error
+}
+
 func (cpServ EcpJobService) SaveEcpJobEntity(job *models.EcpJobEntity) (err error) {
 	return cpServ.Save(job).Error
 }

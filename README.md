@@ -353,13 +353,14 @@ make install
        NodeName = ""                                  # The computing-provider node name
        WalletWhiteList = ""                           # CP only accepts user addresses from this whitelist for space deployment
        WalletBlackList = ""                           # CP reject user addresses from this blacklist for space deployment
-       Pricing = true                                 # default True, indicating acceptance of smart pricing orders, which may include orders priced lower than self-determined pricing.
+       Pricing = "true"                               # default True, indicating acceptance of smart pricing orders, which may include orders priced lower than self-determined pricing.
    
        [UBI]
        UbiEnginePk = "0xB5aeb540B4895cd024c1625E146684940A849ED9"              # UBI Engine's public key, CP only accept the task from this UBI engine
        EnableSequencer = true                                                  # Submit the proof to Sequencer service(default: true)
        AutoChainProof = true                                                   # When Sequencer doesn't have enough funds or the service is unavailable, automatically submit proof to the Swan chain 
-       SequencerUrl = "https://sequencer.swanchain.io"                          # Sequencer service's API address
+       SequencerUrl = "https://sequencer.swanchain.io"                         # Sequencer service's API address
+       EdgeUrl = "https://edge-api.swanchain.io/v1"                            # Edge service's API address
    
        [LOG]
        CrtFile = "/YOUR_DOMAIN_NAME_CRT_PATH/server.crt"                       # Your domain name SSL .crt file path
@@ -511,10 +512,10 @@ export CP_PATH=<YOUR_CP_PATH>
 computing-provider account changeTaskTypes --ownerAddress <YOUR_OWNER_WALLET_ADDRESS> 5
 ```
 > **Note:** `--task-types` Supports 4 task types:
->  - `1`: FIL-C2-512M
+>  - `1`: FIL-C2
 >  - `2`: Mining
 >  - `3`: AI
->  - `4`: FIL-C2-32G
+>  - `4`: Inference
 >  - `5`: NodePort
 
 ## [**OPTIONAL**] Config and Receive ZK Tasks
@@ -556,16 +557,16 @@ computing-provider collateral add --ecp --from <YOUR_WALLET_ADDRESS>  <amount>
 ### Step 3: Change the `tasktypes`
 
 ```bash
-computing-provider account changeTaskTypes --ownerAddress <YOUR_OWNER_WALLET_ADDRESS> 1,2,3,4
+computing-provider account changeTaskTypes --ownerAddress <YOUR_OWNER_WALLET_ADDRESS> 1,2,3
 ```
 > **Note:** `--task-types` Supports 4 task types:
->  - `1`: FIL-C2-512M
+>  - `1`: FIL-C2
 >  - `2`: Mining
 >  - `3`: AI
->  - `4`: FIL-C2-32G
+>  - `4`: Inference
 >  - `5`: NodePort
 
-> If you need to run FCP and ECP at the same time, you need to set it to `1,2,3,4`
+> If you need to run FCP and ECP at the same time, you need to set it to `1,2,3`
 
 ### Step 4: Deposit `SwanETH` for Sequencer Account
 ```bash
@@ -594,7 +595,7 @@ COMMANDS:
    changeOwnerAddress        Update OwnerAddress of CP
    changeWorkerAddress       Update workerAddress of CP
    changeBeneficiaryAddress  Update beneficiaryAddress of CP
-   changeTaskTypes           Update taskTypes of CP (1:Fil-C2-512M, 2:Mining, 3: AI, 4:Inference, 5:NodePort), separated by commas
+   changeTaskTypes           Update taskTypes of CP (1:Fil-C2, 2:Mining, 3: AI, 4:Inference, 5:NodePort), separated by commas
    help, h                   Show a list of commands or help for one command
 
 OPTIONS:
@@ -612,18 +613,23 @@ computing-provider ubi list --show-failed
 Example output:
 
 ```
-TASK ID	TASK CONTRACT                             	TASK TYPE	ZK TYPE    	STATUS   	REWARD	SEQUENCER	CREATE TIME
-40416  	0x3DB2568e8De50e767221117bB491cbe1e2CB4FF5	CPU      	fil-c2-512M	rewarded 	1.00  	YES      	2024-07-29 09:57:14
-40418  	                                          	CPU      	fil-c2-512M	verified 	0.00  	YES      	2024-07-29 10:07:12
-40425  	                                          	CPU      	fil-c2-512M	verified 	0.00  	YES      	2024-07-29 10:17:08
-40427  	                                          	CPU      	fil-c2-512M	verified 	0.00  	YES      	2024-07-29 10:27:08
-40436  	0x71c5C4eBEfD9349236a8244a1734fB1470CAAe1f	CPU      	fil-c2-512M	verified 	0.00  	NO       	2024-07-29 10:37:08
-40444  	                                          	CPU      	fil-c2-512M	verified 	0.00  	YES      	2024-07-29 10:47:08
-40450  	                                          	CPU      	fil-c2-512M	verified 	0.00  	YES      	2024-07-29 10:57:08
-40446  	0x13717662F88dc7fE629fA3B5DD78733FdDcdB970	CPU      	fil-c2-512M	verified 	0.00  	NO       	2024-07-29 11:07:12
-40462  	0x42183ab24a9Ac691bB8948E6cE60f506741811e4	CPU      	fil-c2-512M	verified 	0.00  	NO       	2024-07-29 11:17:08
-40468  	0xE09fDFBBD86650139C29A9818E3FF2612f48a740	CPU      	fil-c2-512M	verified 	0.00  	NO       	2024-07-29 11:27:08
-40467  	0x4C7003F3B794e806480eb5b9E1aeedF9AFc3b978	CPU      	fil-c2-512M	verified 	0.00  	NO       	2024-07-29 11:37:09
+TASK ID TASK CONTRACT                                   TASK TYPE       ZK TYPE STATUS          SEQUENCER       CREATE TIME         
+1114203 0x89580E512915cB33bB5Ac419196835fC19affaEe      GPU             fil-c2  verified        YES             2024-11-12 01:52:47
+1113642 0x89580E512915cB33bB5Ac419196835fC19affaEe      GPU             fil-c2  verified        YES             2024-11-12 02:22:30
+1132325 0x89580E512915cB33bB5Ac419196835fC19affaEe      GPU             fil-c2  verified        YES             2024-11-12 02:52:29
+1114228 0x89580E512915cB33bB5Ac419196835fC19affaEe      GPU             fil-c2  verified        YES             2024-11-12 03:22:10
+1113911 0xF222604e4628d0c15bFAfD1AABf23F7FF5756056      GPU             fil-c2  verified        YES             2024-11-12 04:22:43
+1114105 0xF222604e4628d0c15bFAfD1AABf23F7FF5756056      GPU             fil-c2  verified        YES             2024-11-12 04:52:46
+1113869 0xF222604e4628d0c15bFAfD1AABf23F7FF5756056      GPU             fil-c2  verified        YES             2024-11-12 05:22:29
+1114219 0xF222604e4628d0c15bFAfD1AABf23F7FF5756056      GPU             fil-c2  verified        YES             2024-11-12 05:52:44
+1113349 0xF222604e4628d0c15bFAfD1AABf23F7FF5756056      GPU             fil-c2  verified        YES             2024-11-12 06:22:50
+1114204 0xF222604e4628d0c15bFAfD1AABf23F7FF5756056      GPU             fil-c2  verified        YES             2024-11-12 06:52:40
+1113259 0xF222604e4628d0c15bFAfD1AABf23F7FF5756056      GPU             fil-c2  verified        YES             2024-11-12 07:22:29
+1113568 0xF222604e4628d0c15bFAfD1AABf23F7FF5756056      GPU             fil-c2  verified        YES             2024-11-12 07:52:37
+1132314 0xF222604e4628d0c15bFAfD1AABf23F7FF5756056      GPU             fil-c2  verified        YES             2024-11-12 08:22:39
+1132312 0xF222604e4628d0c15bFAfD1AABf23F7FF5756056      GPU             fil-c2  verified        YES             2024-11-12 08:52:39
+1113823 0xF222604e4628d0c15bFAfD1AABf23F7FF5756056      GPU             fil-c2  verified        YES             2024-11-12 09:22:28
+1132500 0xF222604e4628d0c15bFAfD1AABf23F7FF5756056      GPU             fil-c2  verified        YES             2024-11-12 09:52:37
 ```
 
 ## Restart the Computing Provider

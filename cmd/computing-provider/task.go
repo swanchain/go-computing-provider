@@ -273,14 +273,14 @@ func edgeTaskList(showCompleted, fullFlag bool) error {
 			computing.NewEcpJobService().UpdateEcpJobEntity(entity.Uuid, status)
 			statusStr = status
 		}
-		taskData = append(taskData, []string{entity.Uuid, entity.Name, entity.Image, entity.ContainerName, statusStr, createTime})
+		taskData = append(taskData, []string{entity.Uuid, entity.Name, entity.Image, entity.ContainerName, statusStr, fmt.Sprintf("%.4f", entity.Reward), createTime})
 		rowColorList = append(rowColorList, RowColor{
 			row:    i,
 			column: []int{4},
 			color:  getContainerStatusColor(statusStr),
 		})
 	}
-	header := []string{"TASK UUID", "TASK NAME", "IMAGE NAME", "CONTAINER NAME", "CONTAINER STATUS", "CREATE TIME"}
+	header := []string{"TASK UUID", "TASK NAME", "IMAGE NAME", "CONTAINER NAME", "CONTAINER STATUS", "REWARD", "CREATE TIME"}
 	NewVisualTable(header, taskData, rowColorList).Generate(true)
 	return nil
 }

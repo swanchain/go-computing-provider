@@ -485,14 +485,9 @@ func (task *CronTask) checkJobReward() {
 			return
 		}
 
-		poolSize := 5
-		taskQueue, wg := startWorkerPool(poolSize)
 		for _, job := range jobList {
-			jobCopy := job
-			submitTask(taskQueue, NewTaskManagerContract(jobCopy))
+			NewTaskManagerContract(job).Scan()
 		}
-		close(taskQueue)
-		wg.Wait()
 	})
 	c.Start()
 }
@@ -535,7 +530,7 @@ func addNodeLabel() {
 					continue
 				}
 			}
-			err := k8sService.AddNodeLabel(cpNode.Name, collectInfo.CpuName)
+			err := k8sService.AddNodeLabelForArchitecture(cpNode.Name, collectInfo.CpuName)
 			if err != nil {
 				logs.GetLogger().Errorf("nodeName: %s, error: %v", cpNode.Name, err)
 			}

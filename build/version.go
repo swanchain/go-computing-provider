@@ -10,7 +10,7 @@ var CurrentCommit string
 
 var NetWorkTag string
 
-const BuildVersion = "0.7.0"
+const BuildVersion = "0.7.1"
 
 const UBITaskImageIntelCpu = "filswan/ubi-worker-cpu-intel:latest"
 const UBITaskImageIntelGpu = "filswan/ubi-worker-gpu-intel:latest"
@@ -49,5 +49,8 @@ type NetworkConfig struct {
 		ZkCollateralContract           string `json:"zk_collateral_contract"`
 		RegisterTaskContract           string `json:"register_task_contract"`
 		SequencerContract              string `json:"sequencer_contract"`
+		EdgeUrl                        string `json:"edge_url"`
+		EdgeTaskPayment                string `json:"edge_task_payment"`
+		EdgeTaskPaymentCreated         int64  `json:"edge_task_payment_created"`
 	} `json:"config"`
 }

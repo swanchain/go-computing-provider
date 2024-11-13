@@ -1137,6 +1137,20 @@ func CronTaskForEcp() {
 			}
 		}
 	}()
+
+	go func() {
+		defer func() {
+			if err := recover(); err != nil {
+				logs.GetLogger().Errorf("Scanner task payment events, error: %+v", err)
+			}
+		}()
+
+		ticker := time.NewTicker(3 * time.Minute)
+		for range ticker.C {
+			NewTaskPaymentService().ScannerChainGetTaskPayment()
+		}
+	}()
+
 }
 
 func syncTaskStatusForSequencerService() error {

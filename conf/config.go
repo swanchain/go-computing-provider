@@ -35,13 +35,14 @@ type API struct {
 	NodeName        string
 	WalletWhiteList string
 	WalletBlackList string
-	Pricing         bool
+	Pricing         string
 }
 type UBI struct {
 	UbiEnginePk     string
 	EnableSequencer bool
 	AutoChainProof  bool
 	SequencerUrl    string
+	EdgeUrl         string
 }
 
 type LOG struct {
@@ -80,9 +81,11 @@ type CONTRACT struct {
 	JobManager        string `toml:"SWAN_JOB_CONTRACT"`
 	JobManagerCreated uint64 `toml:"JobManagerCreated"`
 
-	TaskRegister string `toml:"REGISTER_TASK_CONTRACT"`
-	ZkCollateral string `toml:"ZK_COLLATERAL_CONTRACT"`
-	Sequencer    string `toml:"SEQUENCER_CONTRACT"`
+	TaskRegister           string `toml:"REGISTER_TASK_CONTRACT"`
+	ZkCollateral           string `toml:"ZK_COLLATERAL_CONTRACT"`
+	Sequencer              string `toml:"SEQUENCER_CONTRACT"`
+	EdgeTaskPayment        string `toml:"EDGE_TASK_PAYMENT"`
+	EdgeTaskPaymentCreated int64  `toml:"EdgeTaskPaymentCreated"`
 }
 
 func GetRpcByNetWorkName() (string, error) {
@@ -142,6 +145,10 @@ func InitConfig(cpRepoPath string, standalone bool) error {
 			config.CONTRACT.ZkCollateral = ncCopy.Config.ZkCollateralContract
 			config.CONTRACT.Sequencer = ncCopy.Config.SequencerContract
 			config.CONTRACT.TaskRegister = ncCopy.Config.RegisterTaskContract
+			config.CONTRACT.EdgeTaskPayment = ncCopy.Config.EdgeTaskPayment
+			config.CONTRACT.EdgeTaskPaymentCreated = ncCopy.Config.EdgeTaskPaymentCreated
+			config.UBI.SequencerUrl = ncCopy.Config.SequencerUrl
+			config.UBI.EdgeUrl = ncCopy.Config.EdgeUrl
 		}
 	}
 	return nil
@@ -245,6 +252,7 @@ func GenerateAndUpdateConfigFile(cpRepoPath string, multiAddress, nodeName strin
 				defaultComputeNode.HUB.OrchestratorPk = ncCopy.Config.OrchestratorPk
 				defaultComputeNode.RPC.SwanChainRpc = ncCopy.Config.ChainRpc
 				defaultComputeNode.UBI.SequencerUrl = ncCopy.Config.SequencerUrl
+				defaultComputeNode.UBI.EdgeUrl = ncCopy.Config.EdgeUrl
 			}
 		}
 
@@ -314,7 +322,7 @@ func generateDefaultConfig() ComputeNode {
 			NodeName:        "<YOUR_CP_Node_Name>",
 			WalletWhiteList: "",
 			WalletBlackList: "",
-			Pricing:         true,
+			Pricing:         "true",
 		},
 		UBI: UBI{
 			UbiEnginePk:     "",
@@ -344,14 +352,16 @@ func generateDefaultConfig() ComputeNode {
 			SwanChainRpc: "",
 		},
 		CONTRACT: CONTRACT{
-			SwanToken:         "",
-			JobCollateral:     "",
-			JobManager:        "",
-			JobManagerCreated: 0,
-			CpAccountRegister: "",
-			TaskRegister:      "",
-			ZkCollateral:      "",
-			Sequencer:         "",
+			SwanToken:              "",
+			JobCollateral:          "",
+			JobManager:             "",
+			JobManagerCreated:      0,
+			CpAccountRegister:      "",
+			TaskRegister:           "",
+			ZkCollateral:           "",
+			Sequencer:              "",
+			EdgeTaskPayment:        "",
+			EdgeTaskPaymentCreated: 0,
 		},
 	}
 }

@@ -34,7 +34,7 @@ func (*ImageJobService) CheckJobCondition(c *gin.Context) {
 
 	var totalCost float64
 	var checkPriceFlag bool
-	if !conf.GetConfig().API.Pricing {
+	if conf.GetConfig().API.Pricing == "false" {
 		checkPriceFlag, totalCost, err = checkPriceForDocker(job.Price, job.Duration, job.Resource)
 		if err != nil {
 			logs.GetLogger().Errorf("failed to check price, error: %v", err)
@@ -87,7 +87,7 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 
 	var totalCost float64
 	var checkPriceFlag bool
-	if !conf.GetConfig().API.Pricing {
+	if conf.GetConfig().API.Pricing == "false" {
 		checkPriceFlag, totalCost, err = checkPriceForDocker(job.Price, job.Duration, job.Resource)
 		if err != nil {
 			logs.GetLogger().Errorf("failed to check price, job_uuid: %s, error: %v", job.UUID, err)
@@ -120,6 +120,18 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 
 	if !isReceive {
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError))
+		return
+	}
+
+	if err = NewEcpJobService().SaveEcpJobEntity(&models.EcpJobEntity{
+		Uuid:       job.UUID,
+		Name:       job.Name,
+		Image:      job.Image,
+		Env:        strings.Join(env, ","),
+		Status:     "created",
+		CreateTime: time.Now().Unix(),
+	}); err != nil {
+		logs.GetLogger().Errorf("failed to save job to db, error: %v", err)
 		return
 	}
 
@@ -184,15 +196,7 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 		}
 		logs.GetLogger().Warnf("job_uuid: %s, started container, container name: %s", job.UUID, containerName)
 
-		if err = NewEcpJobService().SaveEcpJobEntity(&models.EcpJobEntity{
-			Uuid:          job.UUID,
-			Name:          job.Name,
-			Image:         job.Image,
-			Env:           strings.Join(env, ","),
-			Status:        "created",
-			ContainerName: containerName,
-			CreateTime:    time.Now().Unix(),
-		}); err != nil {
+		if err = NewEcpJobService().UpdateEcpJobEntityContainerName(job.UUID, containerName); err != nil {
 			logs.GetLogger().Errorf("failed to save job to db, error: %v", err)
 			return
 		}
