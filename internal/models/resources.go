@@ -7,6 +7,7 @@ type ClusterResource struct {
 	ClusterInfo      []*NodeResource `json:"cluster_info"`
 	NodeName         string          `json:"node_name,omitempty"`
 	Runtime          string          `json:"runtime,omitempty"`
+	ClientType       string          `json:"client_type"`
 }
 
 type NodeResource struct {

@@ -421,7 +421,7 @@ computing-provider account create --ownerAddress <YOUR_OWNER_WALLET_ADDRESS> \
 	--beneficiaryAddress <YOUR_BENEFICIARY_WALLET_ADDRESS>  \
 	--task-types 3
 ```
-**Note:** `--task-types`: Supports 4 task types (`1`: Fil-C2-512M, `2`: Mining, `3`: AI, `4`: Fil-C2-32G, `5`: NodePort), separated by commas. For FCP, it needs to be set to 3.
+**Note:** `--task-types`: Supports 4 task types (`1`: Fil-C2, `2`: Mining, `3`: AI, `4`: Inference, `5`: NodePort), separated by commas. For FCP, it needs to be set to 3.
 
 **Output:**
 ```
@@ -594,7 +594,7 @@ COMMANDS:
    changeOwnerAddress        Update OwnerAddress of CP
    changeWorkerAddress       Update workerAddress of CP
    changeBeneficiaryAddress  Update beneficiaryAddress of CP
-   changeTaskTypes           Update taskTypes of CP (1:Fil-C2-512M, 2:Aleo, 3: AI, 4:Fil-C2-32G), separated by commas
+   changeTaskTypes           Update taskTypes of CP (1:Fil-C2-512M, 2:Mining, 3: AI, 4:Inference, 5:NodePort), separated by commas
    help, h                   Show a list of commands or help for one command
 
 OPTIONS:

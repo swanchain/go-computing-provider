@@ -79,6 +79,10 @@ const (
 	RESOURCE_TYPE_GPU = 1
 )
 
+const (
+	TaskSequencer = 1
+)
+
 func GetResourceTypeStr(resourceType int) string {
 	switch resourceType {
 	case RESOURCE_TYPE_CPU:
@@ -227,24 +231,24 @@ func (*JobEntity) TableName() string {
 }
 
 const (
-	Task_TYPE_FIL_C2_512 = iota + 1
+	Task_TYPE_FIL_C2 = iota + 1
 	Task_TYPE_MINING
 	Task_TYPE_AI
-	Task_TYPE_FIL_C2_32
+	Task_TYPE_INFERENCE
 	Task_TYPE_NODE_PORT
 )
 
 func TaskTypeStr(taskType int) string {
 	var typeStr string
 	switch taskType {
-	case Task_TYPE_FIL_C2_512:
-		typeStr = "Fil-C2-512M"
+	case Task_TYPE_FIL_C2:
+		typeStr = "Fil-C2"
 	case Task_TYPE_MINING:
 		typeStr = "Mining"
 	case Task_TYPE_AI:
 		typeStr = "AI"
-	case Task_TYPE_FIL_C2_32:
-		typeStr = "Fil-C2-32G"
+	case Task_TYPE_INFERENCE:
+		typeStr = "Inference"
 	case Task_TYPE_NODE_PORT:
 		typeStr = "NodePort"
 	}

@@ -151,6 +151,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 
 	c2GpuConfig := envVars["RUST_GPU_TOOLS_CUSTOM_GPU"]
 	c2GpuName := convertGpuName(strings.TrimSpace(c2GpuConfig))
+	c2GpuName = strings.ToUpper(c2GpuName)
 	nodeName, architecture, needCpu, needMemory, needStorage, err := checkResourceAvailableForUbi(ubiTask.ResourceType, c2GpuName, ubiTask.Resource)
 	if err != nil {
 		taskEntity.Status = models.TASK_FAILED_STATUS
@@ -835,6 +836,7 @@ func GetCpResource(c *gin.Context) {
 		NodeName:         conf.GetConfig().API.NodeName,
 		NodeId:           GetNodeId(cpRepo),
 		CpAccountAddress: cpAccountAddress,
+		ClientType:       "ECP",
 	})
 }
 
