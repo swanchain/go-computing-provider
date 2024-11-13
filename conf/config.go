@@ -35,7 +35,7 @@ type API struct {
 	NodeName        string
 	WalletWhiteList string
 	WalletBlackList string
-	Pricing         bool
+	Pricing         string
 }
 type UBI struct {
 	UbiEnginePk     string
@@ -320,7 +320,7 @@ func generateDefaultConfig() ComputeNode {
 			NodeName:        "<YOUR_CP_Node_Name>",
 			WalletWhiteList: "",
 			WalletBlackList: "",
-			Pricing:         true,
+			Pricing:         "true",
 		},
 		UBI: UBI{
 			UbiEnginePk:     "",

@@ -34,7 +34,7 @@ func (*ImageJobService) CheckJobCondition(c *gin.Context) {
 
 	var totalCost float64
 	var checkPriceFlag bool
-	if !conf.GetConfig().API.Pricing {
+	if conf.GetConfig().API.Pricing == "false" {
 		checkPriceFlag, totalCost, err = checkPriceForDocker(job.Price, job.Duration, job.Resource)
 		if err != nil {
 			logs.GetLogger().Errorf("failed to check price, error: %v", err)
@@ -87,7 +87,7 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 
 	var totalCost float64
 	var checkPriceFlag bool
-	if !conf.GetConfig().API.Pricing {
+	if conf.GetConfig().API.Pricing == "false" {
 		checkPriceFlag, totalCost, err = checkPriceForDocker(job.Price, job.Duration, job.Resource)
 		if err != nil {
 			logs.GetLogger().Errorf("failed to check price, job_uuid: %s, error: %v", job.UUID, err)
