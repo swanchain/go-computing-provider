@@ -145,7 +145,7 @@ func loadLastProcessedBlock() int64 {
 }
 
 func saveLastProcessedBlock(block int64) {
-	db.DB.Save(models.ScanChainEntity{
+	db.DB.Save(&models.ScanChainEntity{
 		Id:          models.ScannerTaskPaymentId,
 		BlockNumber: block,
 		UpdateTime:  time.Now().Format("2006-01-02 15:04:05"),
