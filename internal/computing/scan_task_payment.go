@@ -97,6 +97,7 @@ func (tps *TaskPaymentService) scanAndProcessEvents(cpAccountAddress string) err
 		lastProcessedBlock = int64(event.Raw.BlockNumber)
 		handleEdgeTask(event.TaskUUID, cpAccountAddress, lastProcessedBlock, event.TransferAmount)
 		saveLastProcessedBlock(lastProcessedBlock)
+		checkAgain(lastProcessedBlock)
 	}
 
 	if iter.Error() != nil {
@@ -114,18 +115,31 @@ func handleEdgeTask(taskUuid, cpAccountAddress string, blockNumber int64, amount
 	}
 
 	for _, job := range ecpJobs {
-		NewEcpJobService().UpdateEcpJobEntityReward(taskUuid, job.Reward+balanceToFloat(amount))
-		if job.LastBlockNumber == 0 {
-			NewEcpJobService().UpdateEcpJobEntityBlockNumber(job.Uuid, blockNumber)
-			continue
-		}
-
+		NewEcpJobService().UpdateEcpJobEntityRewardAndBlock(taskUuid, blockNumber, job.Reward+balanceToFloat(amount))
 		status, err := getTaskStatus(taskUuid, cpAccountAddress)
 		if err != nil {
 			logs.GetLogger().Errorf("%v", err)
 			continue
 		}
 		if status {
+			if err = NewDockerService().RemoveContainerByName(job.ContainerName); err != nil {
+				logs.GetLogger().Errorf("failed to remove container, job_uuid: %s, error: %v", job.Uuid, err)
+				return
+			}
+			NewEcpJobService().DeleteContainerByUuid(job.Uuid)
+		}
+	}
+}
+
+func checkAgain(blockNumber int64) {
+	ecpJobs, err := NewEcpJobService().GetEcpJobs("")
+	if err != nil {
+		logs.GetLogger().Errorf("failed to get edge task, error: %v", err)
+		return
+	}
+
+	for _, job := range ecpJobs {
+		if blockNumber-job.LastBlockNumber >= 5000 {
 			if err = NewDockerService().RemoveContainerByName(job.ContainerName); err != nil {
 				logs.GetLogger().Errorf("failed to remove container, job_uuid: %s, error: %v", job.Uuid, err)
 				return
