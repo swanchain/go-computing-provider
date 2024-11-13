@@ -64,9 +64,9 @@ Output:
                     --ownerAddress <YOUR_OWNER_ADDRESS> \
                     --workerAddress <YOUR_WORKER_ADDRESS> \
                     --beneficiaryAddress <YOUR_BENEFICIAERY_ADDRESS>  \
-                    --task-types 1,2
+                    --task-types 1,2,4
 ```
-**Note:** `--task-types`: Supports 4 task types (1: Fil-C2, 2: Mining, 3: AI, 4: Inference, 5: NodePort), separated by commas. For ECP, it needs to be set to 1,2.
+**Note:** `--task-types`: Supports 5 task types (1: Fil-C2, 2: Mining, 3: AI, 4: Inference, 5: NodePort), separated by commas. For ECP, it needs to be set to 1,2,4.
 - Collateral `SWANU` for ECP
 ```bash
 computing-provider collateral add --ecp --from <YOUR_WALLET_ADDRESS>  <AMOUNT>   
@@ -86,7 +86,7 @@ computing-provider collateral add --ecp --from <YOUR_WALLET_ADDRESS>  <AMOUNT>
 >    computing-provider sequencer withdraw --owner <YOUR_OWNER_WALLET_ADDRESS>  <amount>
 >    ```
     
->**Note:** Currently one zk-task requires 0.0000005 SwanETH, 
+>**Note:** the gas cost is decided by the **[Dynamic Pricing Strategy](https://docs.swanchain.io/bulders/market-provider/web3-zk-computing-market/sequencer)**
 
 
 ## Config resource price
