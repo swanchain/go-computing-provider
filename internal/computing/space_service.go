@@ -649,7 +649,7 @@ func GetPrice(c *gin.Context) {
 	if conf.GetConfig().API.Pricing == "false" {
 		resourcePriceResp.Pricing = false
 	} else {
-		resourcePriceResp.Pricing = false
+		resourcePriceResp.Pricing = true
 	}
 
 	c.JSON(http.StatusOK, util.CreateSuccessResponse(resourcePriceResp))
