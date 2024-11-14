@@ -339,6 +339,7 @@ type EcpJobEntity struct {
 	Image           string  `json:"image" gorm:"image"`
 	Env             string  `json:"env" gorm:"env"`
 	Status          string  `json:"status"` // created|restarting|running|removing|paused|exited|dead
+	Message         string  `json:"message"`
 	Reward          float64 `json:"reward"`
 	ContainerName   string  `json:"container_name" gorm:"container_name"`
 	LastBlockNumber int64   `json:"last_block_number" gorm:"last_block_number"`

@@ -16,6 +16,25 @@ import (
 
 var config *ComputeNode
 
+type Pricing bool
+
+func (p *Pricing) UnmarshalTOML(data interface{}) error {
+	if data == nil {
+		*p = true
+		return nil
+	}
+
+	switch v := data.(type) {
+	case bool:
+		*p = Pricing(v)
+	case string:
+		*p = strings.ToLower(v) == "true" || v == ""
+	default:
+		*p = false
+	}
+	return nil
+}
+
 // ComputeNode is a compute node config
 type ComputeNode struct {
 	API      API
@@ -35,7 +54,7 @@ type API struct {
 	NodeName        string
 	WalletWhiteList string
 	WalletBlackList string
-	Pricing         string
+	Pricing         Pricing `toml:"pricing"`
 }
 type UBI struct {
 	UbiEnginePk     string
@@ -322,7 +341,7 @@ func generateDefaultConfig() ComputeNode {
 			NodeName:        "<YOUR_CP_Node_Name>",
 			WalletWhiteList: "",
 			WalletBlackList: "",
-			Pricing:         "true",
+			Pricing:         true,
 		},
 		UBI: UBI{
 			UbiEnginePk:     "",

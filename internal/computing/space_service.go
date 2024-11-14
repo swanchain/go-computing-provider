@@ -107,7 +107,7 @@ func ReceiveJob(c *gin.Context) {
 	}
 
 	if jobData.JobType == 1 {
-		if conf.GetConfig().API.Pricing == "false" {
+		if !conf.GetConfig().API.Pricing {
 			checkPriceFlag, totalCost, err := checkPrice(jobData.BidPrice, jobData.Duration, spaceDetail.Data.Space.ActiveOrder.Config)
 			if err != nil {
 				logs.GetLogger().Errorf("failed to check price, job_uuid: %s, error: %v", jobData.UUID, err)
@@ -646,11 +646,7 @@ func GetPrice(c *gin.Context) {
 	resourcePriceResp.HdEphemeralPrice = readPriceConfig.TARGET_HD_EPHEMERAL
 	resourcePriceResp.GpuDefaultPrice = readPriceConfig.TARGET_GPU_DEFAULT
 	resourcePriceResp.GpusPrice = readPriceConfig.GpusPrice
-	if conf.GetConfig().API.Pricing == "false" {
-		resourcePriceResp.Pricing = false
-	} else {
-		resourcePriceResp.Pricing = true
-	}
+	resourcePriceResp.Pricing = bool(conf.GetConfig().API.Pricing)
 
 	c.JSON(http.StatusOK, util.CreateSuccessResponse(resourcePriceResp))
 }

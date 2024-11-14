@@ -19,6 +19,7 @@ type HardwareResource struct {
 }
 
 type EcpJobStatusResp struct {
-	Uuid   string `json:"uuid"`
-	Status string `json:"status"`
+	Uuid    string `json:"uuid"`
+	Status  string `json:"status"`
+	Message string `json:"message"`
 }
