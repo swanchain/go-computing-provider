@@ -100,10 +100,7 @@ func (tps *TaskPaymentService) scanAndProcessEvents(cpAccountAddress string) err
 	if iter.Error() != nil {
 		return fmt.Errorf("failed to iterator events, error: %v", iter.Error())
 	}
-
 	saveLastProcessedBlock(lastProcessedBlock)
-	checkAgain(cpAccountAddress, lastProcessedBlock)
-
 	return nil
 }
 
