@@ -154,10 +154,15 @@ func checkAgain(cpAccountAddress string, blockNumber int64) {
 
 func loadLastProcessedBlock() int64 {
 	var scan models.ScanChainEntity
-	err := db.DB.Model(models.ScanChainEntity{}).Where(&models.ScanChainEntity{Id: models.ScannerTaskPaymentId}).First(&scan).Error
+	err := db.DB.Model(models.ScanChainEntity{}).Where(&models.ScanChainEntity{Id: models.ScannerTaskPaymentId}).Limit(1).Find(&scan).Error
 	if err != nil {
+		logs.GetLogger().Errorf("failed to get scan chain, error: %v", err)
 		return conf.GetConfig().CONTRACT.EdgeTaskPaymentCreated
 	}
+	if scan.BlockNumber == 0 {
+		return conf.GetConfig().CONTRACT.EdgeTaskPaymentCreated
+	}
+
 	return scan.BlockNumber
 }
 
