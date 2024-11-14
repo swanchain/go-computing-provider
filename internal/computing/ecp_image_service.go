@@ -34,11 +34,11 @@ func (*ImageJobService) CheckJobCondition(c *gin.Context) {
 
 	var totalCost float64
 	var checkPriceFlag bool
-	if conf.GetConfig().API.Pricing == "false" {
+	if !conf.GetConfig().API.Pricing {
 		checkPriceFlag, totalCost, err = checkPriceForDocker(job.Price, job.Duration, job.Resource)
 		if err != nil {
 			logs.GetLogger().Errorf("failed to check price, error: %v", err)
-			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.CheckPriceError))
 			return
 		}
 
@@ -71,27 +71,27 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 	logs.GetLogger().Infof("Job received Data: %+v", job)
 
 	if strings.TrimSpace(job.UUID) == "" {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: uuid"))
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [uuid]"))
 		return
 	}
 
 	if strings.TrimSpace(job.Name) == "" {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: name"))
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [name]"))
 		return
 	}
 
 	if strings.TrimSpace(job.Image) == "" {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: image"))
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [image]"))
 		return
 	}
 
 	var totalCost float64
 	var checkPriceFlag bool
-	if conf.GetConfig().API.Pricing == "false" {
+	if !conf.GetConfig().API.Pricing {
 		checkPriceFlag, totalCost, err = checkPriceForDocker(job.Price, job.Duration, job.Resource)
 		if err != nil {
 			logs.GetLogger().Errorf("failed to check price, job_uuid: %s, error: %v", job.UUID, err)
-			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.CheckPriceError))
 			return
 		}
 
@@ -100,11 +100,6 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BelowPriceError))
 			return
 		}
-	}
-
-	if err := NewDockerService().PullImage(job.Image); err != nil {
-		logs.GetLogger().Errorf("failed to pull %s image, error: %v", job.Image, err)
-		return
 	}
 
 	var env []string
@@ -132,12 +127,14 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 		CreateTime: time.Now().Unix(),
 	}); err != nil {
 		logs.GetLogger().Errorf("failed to save job to db, error: %v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SaveTaskEntityError))
 		return
 	}
 
 	go func() {
 		if err := NewDockerService().PullImage(job.Image); err != nil {
 			logs.GetLogger().Errorf("failed to pull %s image, job_uuid: %s, error: %v", job.Image, job.UUID, err)
+			NewEcpJobService().UpdateEcpJobEntityMessage(job.UUID, fmt.Sprintf("failed to pull image: %s", job.Image))
 			return
 		}
 		var needResource container.Resources
@@ -185,6 +182,7 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 		dockerService := NewDockerService()
 		if err := dockerService.ContainerCreateAndStart(containerConfig, hostConfig, containerName); err != nil {
 			logs.GetLogger().Errorf("failed to create job container, job_uuid: %s, error: %v", job.UUID, err)
+			NewEcpJobService().UpdateEcpJobEntityMessage(job.UUID, "failed to create container")
 			return
 		}
 		logs.GetLogger().Warnf("job_uuid: %s, starting container, container name: %s", job.UUID, containerName)
@@ -192,6 +190,7 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 		time.Sleep(3 * time.Second)
 		if !dockerService.IsExistContainer(containerName) {
 			logs.GetLogger().Warnf("job_uuid: %s, not found container", job.UUID)
+			NewEcpJobService().UpdateEcpJobEntityMessage(job.UUID, "failed to start container")
 			return
 		}
 		logs.GetLogger().Warnf("job_uuid: %s, started container, container name: %s", job.UUID, containerName)
@@ -221,10 +220,12 @@ func (*ImageJobService) GetJobStatus(c *gin.Context) {
 
 	var result []models.EcpJobStatusResp
 	for _, entity := range ecpJobs {
+		var statusStr string
 		if status, ok := containerStatus[entity.ContainerName]; ok {
 			fmt.Printf("container name: %s, status: %s \n", entity.ContainerName, status)
-			result = append(result, models.EcpJobStatusResp{Uuid: entity.Uuid, Status: status})
+			statusStr = status
 		}
+		result = append(result, models.EcpJobStatusResp{Uuid: entity.Uuid, Status: statusStr, Message: entity.Message})
 	}
 	c.JSON(http.StatusOK, util.CreateSuccessResponse(result))
 }

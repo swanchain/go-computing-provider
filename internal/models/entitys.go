@@ -16,13 +16,13 @@ func UbiTaskTypeStr(typeInt int) string {
 	var typeStr string
 	switch typeInt {
 	case FIL_C2_CPU512:
-		typeStr = "fil-c2"
+		typeStr = "fil-c2-512M"
 	case FIL_C2_CPU32G:
-		typeStr = "fil-c2"
+		typeStr = "fil-c2-32G"
 	case FIL_C2_GPU512:
-		typeStr = "fil-c2"
+		typeStr = "fil-c2-512M"
 	case FIL_C2_GPU32G:
-		typeStr = "fil-c2"
+		typeStr = "fil-c2-32G"
 	}
 	return typeStr
 }
@@ -339,6 +339,7 @@ type EcpJobEntity struct {
 	Image           string  `json:"image" gorm:"image"`
 	Env             string  `json:"env" gorm:"env"`
 	Status          string  `json:"status"` // created|restarting|running|removing|paused|exited|dead
+	Message         string  `json:"message"`
 	Reward          float64 `json:"reward"`
 	ContainerName   string  `json:"container_name" gorm:"container_name"`
 	LastBlockNumber int64   `json:"last_block_number" gorm:"last_block_number"`

@@ -160,7 +160,7 @@ type EcpJobService struct {
 
 func (cpServ EcpJobService) GetEcpJobByUuid(uuid string) (*models.EcpJobEntity, error) {
 	var job models.EcpJobEntity
-	err := cpServ.Model(&models.EcpJobEntity{}).Where("uuid=? and delete_at=0", uuid).Find(&job).Error
+	err := cpServ.Model(&models.EcpJobEntity{}).Where("uuid=?", uuid).Limit(1).Find(&job).Error
 	return &job, err
 }
 
@@ -168,9 +168,9 @@ func (cpServ EcpJobService) GetEcpJobs(jobUuid string) ([]models.EcpJobEntity, e
 	var job []models.EcpJobEntity
 	var err error
 	if jobUuid != "" {
-		err = cpServ.Model(&models.EcpJobEntity{}).Where("uuid=? and delete_at=0", jobUuid).Find(&job).Error
+		err = cpServ.Model(&models.EcpJobEntity{}).Where("uuid=?", jobUuid).Find(&job).Error
 	} else {
-		err = cpServ.Model(&models.EcpJobEntity{}).Where("delete_at=0").Find(&job).Error
+		err = cpServ.Model(&models.EcpJobEntity{}).Find(&job).Error
 	}
 	return job, err
 }
@@ -181,6 +181,10 @@ func (cpServ EcpJobService) UpdateEcpJobEntity(jobUuid, status string) (err erro
 
 func (cpServ EcpJobService) UpdateEcpJobEntityContainerName(jobUuid string, containerName string) (err error) {
 	return cpServ.Model(&models.EcpJobEntity{}).Where("uuid =?", jobUuid).Update("container_name", containerName).Error
+}
+
+func (cpServ EcpJobService) UpdateEcpJobEntityMessage(jobUuid string, message string) (err error) {
+	return cpServ.Model(&models.EcpJobEntity{}).Where("uuid =?", jobUuid).Update("message", message).Error
 }
 
 func (cpServ EcpJobService) UpdateEcpJobEntityRewardAndBlock(jobUuid string, blockNumber int64, reward float64) (err error) {
@@ -196,8 +200,7 @@ func (cpServ EcpJobService) SaveEcpJobEntity(job *models.EcpJobEntity) (err erro
 
 func (cpServ EcpJobService) DeleteContainerByUuid(uuid string) (err error) {
 	return cpServ.Model(&models.EcpJobEntity{}).Where("uuid =?", uuid).Updates(map[string]string{
-		"delete_at": "1",
-		"status":    "terminated",
+		"status": "terminated",
 	}).Error
 }
 

@@ -270,7 +270,9 @@ func edgeTaskList(showCompleted, fullFlag bool) error {
 		createTime := time.Unix(entity.CreateTime, 0).Format("2006-01-02 15:04:05")
 		statusStr := "terminated"
 		if status, ok := containerStatus[entity.ContainerName]; ok {
-			computing.NewEcpJobService().UpdateEcpJobEntity(entity.Uuid, status)
+			if entity.Status != "terminated" {
+				computing.NewEcpJobService().UpdateEcpJobEntity(entity.Uuid, status)
+			}
 			statusStr = status
 		}
 		taskData = append(taskData, []string{entity.Uuid, entity.Name, entity.Image, entity.ContainerName, statusStr, fmt.Sprintf("%.4f", entity.Reward), createTime})
