@@ -897,20 +897,26 @@ func submitUBIProof(c2Proof models.UbiC2Proof, task *models.TaskEntity) {
 			return
 		}
 
-		sequencerStub, err := ecp.NewSequencerStub(client, ecp.WithSequencerCpAccountAddress(cpAccountAddress))
-		if err != nil {
-			logs.GetLogger().Errorf("failed to get cp sequencer contract, error: %v", err)
-			return
-		}
-		sequencerBalanceStr, err := sequencerStub.GetCPBalance()
-		if err != nil {
-			logs.GetLogger().Errorf("failed to get cp sequencer contract, error: %v", err)
-			return
-		}
+		err = RetryFn(func() error {
+			sequencerStub, err := ecp.NewSequencerStub(client, ecp.WithSequencerCpAccountAddress(cpAccountAddress))
+			if err != nil {
+				logs.GetLogger().Errorf("failed to get cp sequencer contract, error: %v", err)
+				return err
+			}
+			sequencerBalanceStr, err := sequencerStub.GetCPBalance()
+			if err != nil {
+				logs.GetLogger().Errorf("failed to get cp sequencer contract, error: %v", err)
+				return err
+			}
 
-		sequencerBalance, err = strconv.ParseFloat(sequencerBalanceStr, 64)
+			sequencerBalance, err = strconv.ParseFloat(sequencerBalanceStr, 64)
+			if err != nil {
+				logs.GetLogger().Errorf("failed to convert numbers for cp sequencer balance, sequencerBalance: %s, error: %v", sequencerBalanceStr, err)
+				return err
+			}
+			return nil
+		}, 3, 2*time.Second)
 		if err != nil {
-			logs.GetLogger().Errorf("failed to convert numbers for cp sequencer balance, sequencerBalance: %s, error: %v", sequencerBalanceStr, err)
 			return
 		}
 	}
@@ -1483,4 +1489,17 @@ func checkBalance(cpAccountAddress string) (bool, error) {
 	}
 
 	return false, fmt.Errorf("unknown error")
+}
+
+func RetryFn(fn func() error, maxRetries int, delay time.Duration) error {
+	var err error
+	for i := 0; i < maxRetries; i++ {
+		err = fn()
+		if err == nil {
+			return nil
+		}
+		fmt.Printf("Attempt %d failed: %v\n", i+1, err)
+		time.Sleep(delay)
+	}
+	return fmt.Errorf("after %d attempts, last error: %w", maxRetries, err)
 }

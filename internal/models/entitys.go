@@ -16,13 +16,13 @@ func UbiTaskTypeStr(typeInt int) string {
 	var typeStr string
 	switch typeInt {
 	case FIL_C2_CPU512:
-		typeStr = "fil-c2"
+		typeStr = "fil-c2-512M"
 	case FIL_C2_CPU32G:
-		typeStr = "fil-c2"
+		typeStr = "fil-c2-32G"
 	case FIL_C2_GPU512:
-		typeStr = "fil-c2"
+		typeStr = "fil-c2-512M"
 	case FIL_C2_GPU32G:
-		typeStr = "fil-c2"
+		typeStr = "fil-c2-32G"
 	}
 	return typeStr
 }

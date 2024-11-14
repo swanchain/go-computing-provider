@@ -71,17 +71,17 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 	logs.GetLogger().Infof("Job received Data: %+v", job)
 
 	if strings.TrimSpace(job.UUID) == "" {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: uuid"))
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [uuid]"))
 		return
 	}
 
 	if strings.TrimSpace(job.Name) == "" {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: name"))
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [name]"))
 		return
 	}
 
 	if strings.TrimSpace(job.Image) == "" {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: image"))
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [image]"))
 		return
 	}
 
