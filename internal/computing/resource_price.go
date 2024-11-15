@@ -2,9 +2,11 @@ package computing
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/BurntSushi/toml"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
+	"github.com/swanchain/go-computing-provider/internal/models"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -44,9 +46,20 @@ func GeneratePriceConfig() error {
 
 	file.WriteString(resourcePrice)
 
-	statisticalSources, err := NewK8sService().StatisticalSources(context.TODO())
+	var statisticalSources []*models.NodeResource
+	statisticalSources, err = NewK8sService().StatisticalSources(context.TODO())
 	if err != nil {
-		return fmt.Errorf("failed to get gpu resource, error: %v", err)
+		logs.GetLogger().Errorf("failed to get gpu resource, error: %v", err)
+		dockerService := NewDockerService()
+		containerLogStr, err := dockerService.ContainerLogs("resource-exporter")
+		if err != nil {
+			return err
+		}
+		var nodeResource models.NodeResource
+		if err = json.Unmarshal([]byte(containerLogStr), &nodeResource); err != nil {
+			return err
+		}
+		statisticalSources = append(statisticalSources, &nodeResource)
 	}
 
 	var gpuMap = make(map[string]string)
