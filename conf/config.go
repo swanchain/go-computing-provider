@@ -122,6 +122,10 @@ func InitConfig(cpRepoPath string, standalone bool) error {
 		return fmt.Errorf("failed load config file, path: %s, error: %w", configFile, err)
 	}
 
+	if !metaData.IsDefined("Pricing") {
+		config.API.Pricing = true
+	}
+
 	multiAddressSplit := strings.Split(config.API.MultiAddress, "/")
 	if len(multiAddressSplit) < 4 {
 		log.Fatalf("MultiAddress %s is invalid\n", multiAddressSplit[2])
