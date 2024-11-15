@@ -19,18 +19,13 @@ var config *ComputeNode
 type Pricing bool
 
 func (p *Pricing) UnmarshalTOML(data interface{}) error {
-	if data == nil {
-		*p = true
-		return nil
-	}
-
 	switch v := data.(type) {
 	case bool:
 		*p = Pricing(v)
 	case string:
 		*p = strings.ToLower(v) == "true" || v == ""
 	default:
-		*p = false
+		*p = true
 	}
 	return nil
 }
