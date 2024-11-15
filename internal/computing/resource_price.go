@@ -54,13 +54,11 @@ func GeneratePriceConfig() error {
 		if err != nil {
 			return err
 		}
-		logs.GetLogger().Infof("containerLogStr: %s", containerLogStr)
 		var nodeResource models.NodeResource
 		if err = json.Unmarshal([]byte(containerLogStr), &nodeResource); err != nil {
 			return err
 		}
 
-		logs.GetLogger().Infof("nodeResource: %+v", nodeResource)
 		statisticalSources = append(statisticalSources, &nodeResource)
 	}
 
