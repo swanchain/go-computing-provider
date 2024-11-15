@@ -17,8 +17,7 @@ import (
 
 const resourceConfigFile = "price.toml"
 
-var resourcePrice = `
-TARGET_CPU="0.2"          # SWAN/thread-hour
+var resourcePrice = `TARGET_CPU="0.2"          # SWAN/thread-hour
 TARGET_MEMORY="0.1"       # SWAN/GB-hour
 TARGET_HD_EPHEMERAL="0.005" # SWAN/GB-hour
 TARGET_GPU_DEFAULT="1.6"  # SWAN/Default GPU unit a hour
@@ -55,10 +54,13 @@ func GeneratePriceConfig() error {
 		if err != nil {
 			return err
 		}
+		logs.GetLogger().Infof("containerLogStr: %s", containerLogStr)
 		var nodeResource models.NodeResource
 		if err = json.Unmarshal([]byte(containerLogStr), &nodeResource); err != nil {
 			return err
 		}
+
+		logs.GetLogger().Infof("nodeResource: %+v", nodeResource)
 		statisticalSources = append(statisticalSources, &nodeResource)
 	}
 
