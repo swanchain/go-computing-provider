@@ -220,7 +220,7 @@ func (*ImageJobService) GetJobStatus(c *gin.Context) {
 
 	var result []models.EcpJobStatusResp
 	for _, entity := range ecpJobs {
-		var statusStr string
+		var statusStr = entity.Status
 		if status, ok := containerStatus[entity.ContainerName]; ok {
 			fmt.Printf("container name: %s, status: %s \n", entity.ContainerName, status)
 			statusStr = status

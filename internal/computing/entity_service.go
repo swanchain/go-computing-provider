@@ -184,7 +184,10 @@ func (cpServ EcpJobService) UpdateEcpJobEntityContainerName(jobUuid string, cont
 }
 
 func (cpServ EcpJobService) UpdateEcpJobEntityMessage(jobUuid string, message string) (err error) {
-	return cpServ.Model(&models.EcpJobEntity{}).Where("uuid =?", jobUuid).Update("message", message).Error
+	return cpServ.Model(&models.EcpJobEntity{}).Where("uuid =?", jobUuid).Updates(map[string]string{
+		"message": message,
+		"status":  "exited",
+	}).Error
 }
 
 func (cpServ EcpJobService) UpdateEcpJobEntityRewardAndBlock(jobUuid string, blockNumber int64, reward float64) (err error) {
