@@ -19,18 +19,13 @@ var config *ComputeNode
 type Pricing bool
 
 func (p *Pricing) UnmarshalTOML(data interface{}) error {
-	if data == nil {
-		*p = true
-		return nil
-	}
-
 	switch v := data.(type) {
 	case bool:
 		*p = Pricing(v)
 	case string:
 		*p = strings.ToLower(v) == "true" || v == ""
 	default:
-		*p = false
+		*p = true
 	}
 	return nil
 }
@@ -125,6 +120,10 @@ func InitConfig(cpRepoPath string, standalone bool) error {
 	metaData, err := toml.DecodeFile(configFile, &config)
 	if err != nil {
 		return fmt.Errorf("failed load config file, path: %s, error: %w", configFile, err)
+	}
+
+	if !metaData.IsDefined("Pricing") {
+		config.API.Pricing = true
 	}
 
 	multiAddressSplit := strings.Split(config.API.MultiAddress, "/")
