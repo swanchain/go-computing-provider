@@ -1103,18 +1103,18 @@ func reportClusterResourceForDocker() {
 	}
 
 	var freeGpuMap = make(map[string]int)
+	var useGpuMap = make(map[string]int)
 	if nodeResource.Gpu.AttachedGpus > 0 {
-		for i, g := range nodeResource.Gpu.Details {
-			logs.GetLogger().Infof("i: %d, gpus: %+v", i, g)
+		for _, g := range nodeResource.Gpu.Details {
 			if g.Status == models.Available {
 				freeGpuMap[g.ProductName] += 1
 			} else {
-				freeGpuMap[g.ProductName] = 0
+				useGpuMap[g.ProductName] += 1
 			}
 		}
 	}
-	logs.GetLogger().Infof("collect hardware resource, freeCpu:%s, freeMemory: %s, freeStorage: %s, freeGpu: %v",
-		nodeResource.Cpu.Free, nodeResource.Memory.Free, nodeResource.Storage.Free, freeGpuMap)
+	logs.GetLogger().Infof("collect hardware resource, freeCpu:%s, freeMemory: %s, freeStorage: %s, freeGpu: %v, useGpu: %v",
+		nodeResource.Cpu.Free, nodeResource.Memory.Free, nodeResource.Storage.Free, freeGpuMap, useGpuMap)
 }
 
 func CronTaskForEcp() {
