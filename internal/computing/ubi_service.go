@@ -662,6 +662,9 @@ func DoUbiTaskForDocker(c *gin.Context) {
 			if len(indexs) > 0 {
 				useIndexs = append(useIndexs, indexs[0])
 				env = append(env, fmt.Sprintf("CUDA_VISIBLE_DEVICES=%s", strings.Join(useIndexs, ",")))
+			} else {
+				logs.GetLogger().Warnf("not resources available, task_id: %d", ubiTask.ID)
+				return
 			}
 			needResource = container.Resources{
 				Memory: needMemory * 1024 * 1024 * 1024,
