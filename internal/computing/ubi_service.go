@@ -1531,7 +1531,7 @@ func RestartTraefikService() error {
 		Tty:          true,
 	}, &container.HostConfig{
 		PortBindings: map[nat.Port][]nat.PortBinding{
-			"80/tcp":   {{HostPort: "80"}},
+			"9000/tcp": {{HostPort: "9000"}},
 			"8080/tcp": {{HostPort: "8080"}},
 		},
 		Binds: []string{"/var/run/docker.sock:/var/run/docker.sock"},
