@@ -1523,16 +1523,24 @@ func RestartTraefikService() error {
 		Image: build.TraefikServerDockerImage,
 		Cmd: []string{
 			"--api.insecure=true",
+			"--log.level=INFO",
+			"--providers.docker.exposedbydefault=false",
 			"--providers.docker=true",
-			"--entrypoints.web.address=:9000",
+			"--entrypoints.web.address=:80",
 		},
 		AttachStdout: true,
 		AttachStderr: true,
 		Tty:          true,
 	}, &container.HostConfig{
 		PortBindings: map[nat.Port][]nat.PortBinding{
-			"9000/tcp": {{HostPort: "9000"}},
-			"8080/tcp": {{HostPort: "8080"}},
+			"80/tcp": {{
+				HostIP:   "0.0.0.0",
+				HostPort: "9000",
+			}},
+			"8080/tcp": {{
+				HostIP:   "0.0.0.0",
+				HostPort: "9080",
+			}},
 		},
 		Binds: []string{"/var/run/docker.sock:/var/run/docker.sock"},
 		RestartPolicy: container.RestartPolicy{
