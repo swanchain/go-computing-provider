@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/network"
 	"github.com/filswan/go-swan-lib/logs"
 	"github.com/gin-gonic/gin"
 	"github.com/swanchain/go-computing-provider/conf"
@@ -180,7 +181,7 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 
 		containerName := job.Name + "-" + generateString(5)
 		dockerService := NewDockerService()
-		if err := dockerService.ContainerCreateAndStart(containerConfig, hostConfig, containerName); err != nil {
+		if err := dockerService.ContainerCreateAndStart(containerConfig, hostConfig, nil, containerName); err != nil {
 			logs.GetLogger().Errorf("failed to create job container, job_uuid: %s, error: %v", job.UUID, err)
 			NewEcpJobService().UpdateEcpJobEntityMessage(job.UUID, "failed to create container")
 			return
@@ -250,6 +251,175 @@ func (*ImageJobService) DeleteJob(c *gin.Context) {
 	NewEcpJobService().DeleteContainerByUuid(jobUuId)
 
 	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
+}
+
+func (*ImageJobService) DeployInference(c *gin.Context) {
+	var job models.EcpInferenceReq
+	err := c.ShouldBindJSON(&job)
+	if err != nil {
+		logs.GetLogger().Errorf("failed to parse json, error: %v", err)
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
+		return
+	}
+	logs.GetLogger().Infof("Job received Data: %+v", job)
+
+	if strings.TrimSpace(job.UUID) == "" {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [uuid]"))
+		return
+	}
+
+	if strings.TrimSpace(job.Name) == "" {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [name]"))
+		return
+	}
+
+	if strings.TrimSpace(job.Image) == "" {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [image]"))
+		return
+	}
+
+	var containerName = job.Name + "-" + generateString(5)
+	var apiUrl string
+	prefixStr := generateString(10)
+	if strings.HasPrefix(conf.GetConfig().API.Domain, ".") {
+		apiUrl = prefixStr + conf.GetConfig().API.Domain
+	} else {
+		apiUrl = strings.Join([]string{prefixStr, conf.GetConfig().API.Domain}, ".")
+	}
+
+	var totalCost float64
+	var checkPriceFlag bool
+	if !conf.GetConfig().API.Pricing {
+		checkPriceFlag, totalCost, err = checkPriceForDocker(job.Price, job.Duration, job.Resource)
+		if err != nil {
+			logs.GetLogger().Errorf("failed to check price, job_uuid: %s, error: %v", job.UUID, err)
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.CheckPriceError))
+			return
+		}
+
+		if !checkPriceFlag {
+			logs.GetLogger().Errorf("bid below the set price, job_uuid: %s, pid: %s, need: %0.4f", job.UUID, job.Price, totalCost)
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BelowPriceError))
+			return
+		}
+	}
+
+	var env []string
+	for k, v := range job.Envs {
+		env = append(env, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	isReceive, _, needCpu, _, indexs, err := checkResourceForImage(job.Resource)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
+		return
+	}
+
+	if !isReceive {
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError))
+		return
+	}
+
+	if err = NewEcpJobService().SaveEcpJobEntity(&models.EcpJobEntity{
+		Uuid:       job.UUID,
+		Name:       job.Name,
+		Image:      job.Image,
+		Env:        strings.Join(env, ","),
+		Status:     "created",
+		CreateTime: time.Now().Unix(),
+	}); err != nil {
+		logs.GetLogger().Errorf("failed to save job to db, error: %v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SaveTaskEntityError))
+		return
+	}
+
+	var inferenceResp models.EcpInferenceResp
+	inferenceResp.UUID = job.UUID
+	inferenceResp.Url = apiUrl
+	inferenceResp.Price = totalCost
+
+	go func() {
+		if err := NewDockerService().PullImage(job.Image); err != nil {
+			logs.GetLogger().Errorf("failed to pull %s image, job_uuid: %s, error: %v", job.Image, job.UUID, err)
+			NewEcpJobService().UpdateEcpJobEntityMessage(job.UUID, fmt.Sprintf("failed to pull image: %s", job.Image))
+			return
+		}
+		var needResource container.Resources
+		if job.Resource.GPUModel != "" && job.Resource.GPU > 0 {
+			var useIndexs []string
+			for i := 0; i < int(job.Resource.GPU); i++ {
+				if i >= len(indexs) {
+					break
+				}
+				useIndexs = append(useIndexs, indexs[i])
+				env = append(env, fmt.Sprintf("CUDA_VISIBLE_DEVICES=%s", strings.Join(useIndexs, ",")))
+			}
+
+			needResource = container.Resources{
+				CPUQuota: needCpu * 100000,
+				Memory:   job.Resource.Memory,
+				DeviceRequests: []container.DeviceRequest{
+					{
+						Driver:       "nvidia",
+						DeviceIDs:    useIndexs,
+						Capabilities: [][]string{{"compute", "utility"}},
+					},
+				},
+			}
+		} else {
+			needResource = container.Resources{
+				CPUQuota: needCpu * 100000,
+				Memory:   job.Resource.Memory,
+			}
+		}
+
+		hostConfig := &container.HostConfig{
+			Resources:  needResource,
+			Privileged: true,
+		}
+
+		containerConfig := &container.Config{
+			Image:        job.Image,
+			Env:          env,
+			AttachStdout: true,
+			AttachStderr: true,
+			Tty:          true,
+			Labels: map[string]string{
+				"traefik.enable": "true",
+				fmt.Sprintf("traefik.http.routers.%s.entrypoints", containerName): "web",
+				fmt.Sprintf("traefik.http.routers.%s.rule", containerName):        fmt.Sprintf("Host(`%s`)", apiUrl),
+			},
+		}
+
+		networkConfig := &network.NetworkingConfig{
+			EndpointsConfig: map[string]*network.EndpointSettings{
+				"traefik-net": {},
+			},
+		}
+
+		dockerService := NewDockerService()
+		if err := dockerService.ContainerCreateAndStart(containerConfig, hostConfig, networkConfig, containerName); err != nil {
+			logs.GetLogger().Errorf("failed to create job container, job_uuid: %s, error: %v", job.UUID, err)
+			NewEcpJobService().UpdateEcpJobEntityMessage(job.UUID, "failed to create container")
+			return
+		}
+		logs.GetLogger().Warnf("job_uuid: %s, starting container, container name: %s", job.UUID, containerName)
+
+		time.Sleep(3 * time.Second)
+		if !dockerService.IsExistContainer(containerName) {
+			logs.GetLogger().Warnf("job_uuid: %s, not found container", job.UUID)
+			NewEcpJobService().UpdateEcpJobEntityMessage(job.UUID, "failed to start container")
+			return
+		}
+		logs.GetLogger().Warnf("job_uuid: %s, started container, container name: %s", job.UUID, containerName)
+
+		if err = NewEcpJobService().UpdateEcpJobEntityContainerName(job.UUID, containerName); err != nil {
+			logs.GetLogger().Errorf("failed to save job to db, error: %v", err)
+			return
+		}
+	}()
+
+	c.JSON(http.StatusOK, util.CreateSuccessResponse(inferenceResp))
 }
 
 func checkPriceForDocker(userPrice string, duration int, resource models.HardwareResource) (bool, float64, error) {

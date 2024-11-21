@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/go-connections/nat"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/filswan/go-swan-lib/logs"
@@ -698,7 +699,7 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		logs.GetLogger().Warnf("task_id: %d, starting container, container name: %s", ubiTask.ID, containerName)
 
 		dockerService := NewDockerService()
-		if err = dockerService.ContainerCreateAndStart(containerConfig, hostConfig, containerName); err != nil {
+		if err = dockerService.ContainerCreateAndStart(containerConfig, hostConfig, nil, containerName); err != nil {
 			logs.GetLogger().Errorf("failed to create ubi task container, task_id: %d, error: %v", ubiTask.ID, err)
 			return
 		}
@@ -1291,7 +1292,7 @@ func RestartResourceExporter() error {
 			MaximumRetryCount: 3,
 		},
 		Privileged: true,
-	}, resourceExporterContainerName)
+	}, nil, resourceExporterContainerName)
 	if err != nil {
 		return fmt.Errorf("create resource-exporter container failed, error: %v", err)
 	}
@@ -1502,4 +1503,50 @@ func RetryFn(fn func() error, maxRetries int, delay time.Duration) error {
 		time.Sleep(delay)
 	}
 	return fmt.Errorf("after %d attempts, last error: %w", maxRetries, err)
+}
+
+func RestartTraefikService() error {
+	dockerService := NewDockerService()
+	if err := dockerService.CreateNetwork("traefik-net"); err != nil {
+		return err
+	}
+
+	traefikServiceContainerName := "traefik-service"
+
+	dockerService.RemoveContainerByName(traefikServiceContainerName)
+	err := dockerService.PullImage(build.TraefikServerDockerImage)
+	if err != nil {
+		return fmt.Errorf("pull %s image failed, error: %v", build.UBIResourceExporterDockerImage, err)
+	}
+
+	err = dockerService.ContainerCreateAndStart(&container.Config{
+		Image: build.TraefikServerDockerImage,
+		Cmd: []string{
+			"--api.insecure=true",
+			"--providers.docker=true",
+			"--entrypoints.web.address=:80",
+		},
+		AttachStdout: true,
+		AttachStderr: true,
+		Tty:          true,
+	}, &container.HostConfig{
+		PortBindings: map[nat.Port][]nat.PortBinding{
+			"80/tcp":   {{HostPort: "80"}},
+			"8080/tcp": {{HostPort: "8080"}},
+		},
+		Binds: []string{"/var/run/docker.sock:/var/run/docker.sock"},
+		RestartPolicy: container.RestartPolicy{
+			Name:              container.RestartPolicyOnFailure,
+			MaximumRetryCount: 3,
+		},
+		Privileged: true,
+	}, &network.NetworkingConfig{
+		EndpointsConfig: map[string]*network.EndpointSettings{
+			"traefik-net": {},
+		},
+	}, traefikServiceContainerName)
+	if err != nil {
+		return fmt.Errorf("create traefik-service container failed, error: %v", err)
+	}
+	return nil
 }

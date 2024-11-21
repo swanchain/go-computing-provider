@@ -13,6 +13,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/registry"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/swanchain/go-computing-provider/build"
@@ -350,9 +351,9 @@ func (ds *DockerService) CheckRunningContainer(containerName string) (bool, erro
 	return false, nil
 }
 
-func (ds *DockerService) ContainerCreateAndStart(config *container.Config, hostConfig *container.HostConfig, containerName string) error {
+func (ds *DockerService) ContainerCreateAndStart(config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, containerName string) error {
 	ctx := context.Background()
-	resp, err := ds.c.ContainerCreate(ctx, config, hostConfig, nil, nil, containerName)
+	resp, err := ds.c.ContainerCreate(ctx, config, hostConfig, networkingConfig, nil, containerName)
 	if err != nil {
 		return err
 	}
@@ -471,6 +472,30 @@ func (ds *DockerService) GetContainerStatus() (map[string]string, error) {
 		}
 	}
 	return containerStatus, nil
+}
+
+func (ds *DockerService) CreateNetwork(networkName string) error {
+	ctx := context.Background()
+	networks, err := ds.c.NetworkList(ctx, network.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	var exist bool
+	for _, network := range networks {
+		if network.Name == networkName {
+			exist = true
+			break
+		}
+	}
+
+	if !exist {
+		_, err = ds.c.NetworkCreate(ctx, networkName, network.CreateOptions{
+			Driver: "bridge",
+		})
+		return err
+	}
+	return nil
 }
 
 func ImportImageToContainerd(tarFile string) error {

@@ -23,3 +23,20 @@ type EcpJobStatusResp struct {
 	Status  string `json:"status"`
 	Message string `json:"message"`
 }
+
+type EcpInferenceReq struct {
+	UUID       string            `json:"uuid,omitempty"`
+	Name       string            `json:"name,omitempty"`
+	Image      string            `json:"image,omitempty"`
+	HealthPath string            `json:"health_path"`
+	Envs       map[string]string `json:"envs,omitempty"`
+	Resource   HardwareResource  `json:"resource"`
+	Price      string            `json:"price"`
+	Duration   int               `json:"duration"`
+}
+
+type EcpInferenceResp struct {
+	UUID  string  `json:"uuid"`
+	Url   string  `json:"url"`
+	Price float64 `json:"price"`
+}

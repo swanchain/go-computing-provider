@@ -156,12 +156,23 @@ var daemonCmd = &cli.Command{
 		if err != nil {
 			return fmt.Errorf("check %s container failed, error: %v", resourceExporterContainerName, err)
 		}
-
 		if !rsExist {
 			if err = computing.RestartResourceExporter(); err != nil {
 				logs.GetLogger().Errorf("restartResourceExporter failed, error: %v", err)
 			}
 		}
+
+		traefikServiceContainerName := "traefik-service"
+		tsExist, err := computing.NewDockerService().CheckRunningContainer(traefikServiceContainerName)
+		if err != nil {
+			return fmt.Errorf("check %s container failed, error: %v", traefikServiceContainerName, err)
+		}
+		if !tsExist {
+			if err = computing.RestartTraefikService(); err != nil {
+				logs.GetLogger().Errorf("restartTraefikService failed, error: %v", err)
+			}
+		}
+
 		if err := conf.InitConfig(cpRepoPath, true); err != nil {
 			logs.GetLogger().Fatal(err)
 		}
@@ -193,6 +204,7 @@ var daemonCmd = &cli.Command{
 		router.POST("/cp/deploy", ecpImageService.DeployJob)
 		router.GET("/cp/job/status", ecpImageService.GetJobStatus)
 		router.DELETE("/cp/job/:job_uuid", ecpImageService.DeleteJob)
+		router.POST("/cp/inference", ecpImageService.DeployInference)
 
 		shutdownChan := make(chan struct{})
 		httpStopper, err := util.ServeHttp(r, "cp-api", ":"+strconv.Itoa(conf.GetConfig().API.Port), false)
