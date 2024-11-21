@@ -336,6 +336,10 @@ func (*ImageJobService) DeployInference(c *gin.Context) {
 	var inferenceResp models.EcpInferenceResp
 	inferenceResp.UUID = job.UUID
 	inferenceResp.Url = apiUrl
+	if job.HealthPath != "" {
+		inferenceResp.Url = apiUrl + job.HealthPath
+	}
+	inferenceResp.Url = apiUrl
 	inferenceResp.Price = totalCost
 
 	go func() {
