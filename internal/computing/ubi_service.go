@@ -1524,7 +1524,7 @@ func RestartTraefikService() error {
 		Cmd: []string{
 			"--api.insecure=true",
 			"--providers.docker=true",
-			"--entrypoints.web.address=:80",
+			"--entrypoints.web.address=:9000",
 		},
 		AttachStdout: true,
 		AttachStderr: true,
