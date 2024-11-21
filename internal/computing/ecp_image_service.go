@@ -10,6 +10,7 @@ import (
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"github.com/swanchain/go-computing-provider/util"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -77,6 +78,11 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 
 	if strings.TrimSpace(job.Name) == "" {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [name]"))
+		return
+	}
+
+	if err = ValidateName(job.Name); err != nil {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, err.Error()))
 		return
 	}
 
@@ -413,4 +419,13 @@ func BytesToHumanReadable(bytes int64) string {
 		return fmt.Sprintf("%.2f Ki", formatKiB(bytes))
 	}
 	return ""
+}
+
+func ValidateName(name string) error {
+	regex := `^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`
+	re := regexp.MustCompile(regex)
+	if !re.MatchString(name) {
+		return fmt.Errorf("invalid field value: %s, must match regex %s", name, regex)
+	}
+	return nil
 }

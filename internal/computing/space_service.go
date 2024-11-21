@@ -133,7 +133,11 @@ func ReceiveJob(c *gin.Context) {
 	saveGpuCache(gpuProductName)
 
 	if !available {
-		logs.GetLogger().Warnf("job_uuid: %s, name: %s, not found a resources available", jobData.UUID, jobData.Name)
+		if gpuProductName != "" {
+			logs.GetLogger().Warnf("job_uuid: %s, name: %s, gpu_name: %s, not found a resources available", jobData.UUID, jobData.Name, gpuProductName)
+		} else {
+			logs.GetLogger().Warnf("job_uuid: %s, name: %s, not found a resources available", jobData.UUID, jobData.Name)
+		}
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError))
 		return
 	}
@@ -1168,6 +1172,7 @@ func getSpaceDetail(jobSourceURI string) (models.SpaceJSON, error) {
 }
 
 func checkResourceAvailableForSpace(jobType int, resourceConfig models.SpaceHardware) (bool, string, error) {
+	var gpuName string
 	var taskType string
 	var hardwareDetail models.Resource
 	if jobType == 1 {
@@ -1180,7 +1185,7 @@ func checkResourceAvailableForSpace(jobType int, resourceConfig models.SpaceHard
 
 	activePods, err := k8sService.GetAllActivePod(context.TODO())
 	if err != nil {
-		return false, "", err
+		return false, gpuName, err
 	}
 
 	nodes, err := k8sService.k8sClient.CoreV1().Nodes().List(context.TODO(), metaV1.ListOptions{})
@@ -1191,7 +1196,7 @@ func checkResourceAvailableForSpace(jobType int, resourceConfig models.SpaceHard
 	nodeGpuSummary, err := k8sService.GetNodeGpuSummary(context.TODO())
 	if err != nil {
 		logs.GetLogger().Errorf("Failed collect k8s gpu, error: %+v", err)
-		return false, "", err
+		return false, gpuName, err
 	}
 
 	for _, node := range nodes.Items {
@@ -1204,13 +1209,13 @@ func checkResourceAvailableForSpace(jobType int, resourceConfig models.SpaceHard
 		needMemory := float64(hardwareDetail.Memory.Quantity)
 		needStorage := float64(hardwareDetail.Storage.Quantity)
 		logs.GetLogger().Infof("checkResourceAvailableForSpace: needCpu: %d, needMemory: %.2f, needStorage: %.2f", needCpu, needMemory, needStorage)
-		logs.GetLogger().Infof("checkResourceAvailableForSpace: remainingCpu: %d, remainingMemory: %.2f, remainingStorage: %.2f", remainderCpu, remainderMemory, remainderStorage)
+		logs.GetLogger().Infof("checkResourceAvailableForSpace: nodeName: %s,remainingCpu: %d, remainingMemory: %.2f, remainingStorage: %.2f, gpu: %v", node.Name, remainderCpu, remainderMemory, remainderStorage, nodeGpuSummary[node.Name])
 		if needCpu <= remainderCpu && needMemory <= remainderMemory && needStorage <= remainderStorage {
 			if taskType == "CPU" {
 				return true, "", nil
 			} else if taskType == "GPU" {
 				var usedCount int64 = 0
-				gpuName := strings.ToUpper(strings.ReplaceAll(hardwareDetail.Gpu.Unit, " ", "-"))
+				gpuName = strings.ToUpper(strings.ReplaceAll(hardwareDetail.Gpu.Unit, " ", "-"))
 				logs.GetLogger().Infof("gpuName: %s, nodeGpu: %+v, nodeGpuSummary: %+v", gpuName, nodeGpu, nodeGpuSummary)
 				var gpuProductName = ""
 				for name, count := range nodeGpu {
@@ -1233,7 +1238,7 @@ func checkResourceAvailableForSpace(jobType int, resourceConfig models.SpaceHard
 			}
 		}
 	}
-	return false, "", nil
+	return false, gpuName, nil
 }
 
 func checkResourceAvailableForUbi(taskType int, gpuName string, resource *models.TaskResource) (string, string, int64, int64, int64, error) {
