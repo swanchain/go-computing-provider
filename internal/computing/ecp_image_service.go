@@ -17,6 +17,8 @@ import (
 	"time"
 )
 
+const traefikListenPortMapHost = 9000
+
 type ImageJobService struct {
 }
 
@@ -335,6 +337,7 @@ func (*ImageJobService) DeployInference(c *gin.Context) {
 			fmt.Sprintf("traefik.http.routers.%s.entrypoints", containerName): "web",
 			fmt.Sprintf("traefik.http.routers.%s.rule", containerName):        fmt.Sprintf("Host(`%s`)", apiUrl),
 		}
+		apiUrl += fmt.Sprintf(":%d", traefikListenPortMapHost)
 	}
 
 	if err = NewEcpJobService().SaveEcpJobEntity(&models.EcpJobEntity{

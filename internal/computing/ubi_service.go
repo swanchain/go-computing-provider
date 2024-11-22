@@ -1537,7 +1537,7 @@ func RestartTraefikService() error {
 		PortBindings: map[nat.Port][]nat.PortBinding{
 			"80/tcp": {{
 				HostIP:   "0.0.0.0",
-				HostPort: "9000",
+				HostPort: strconv.Itoa(traefikListenPortMapHost),
 			}},
 			"8080/tcp": {{
 				HostIP:   "0.0.0.0",
