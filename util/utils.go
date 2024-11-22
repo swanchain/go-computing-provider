@@ -41,6 +41,19 @@ func CheckPortAvailability(usedPort map[int32]struct{}) bool {
 	return false
 }
 
+func CheckPortAvailable(port int) bool {
+	var flag bool
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		if startServer(&wg, port) {
+			flag = true
+		}
+	}()
+	wg.Wait()
+	return flag
+}
+
 func startServer(wg *sync.WaitGroup, port int) bool {
 	defer wg.Done()
 	srv := &http.Server{

@@ -29,7 +29,7 @@ type EcpInferenceReq struct {
 	Name       string            `json:"name,omitempty"`
 	Image      string            `json:"image,omitempty"`
 	Cmd        []string          `json:"cmd"`
-	Port       []int             `json:"port"`
+	Ports      []int             `json:"ports"`
 	HealthPath string            `json:"health_path"`
 	Envs       map[string]string `json:"envs,omitempty"`
 	Resource   HardwareResource  `json:"resource"`
@@ -38,8 +38,14 @@ type EcpInferenceReq struct {
 }
 
 type EcpInferenceResp struct {
-	UUID       string  `json:"uuid"`
-	ServiceUrl string  `json:"service_url"`
-	HealthPath string  `json:"health_path"`
-	Price      float64 `json:"price"`
+	UUID               string    `json:"uuid"`
+	ServiceUrl         string    `json:"service_url"`
+	HealthPath         string    `json:"health_path"`
+	Price              float64   `json:"price"`
+	ServicePortMapping []PortMap `json:"service_port_mapping"`
+}
+
+type PortMap struct {
+	ContainerPort int `json:"container_port"`
+	ExternalPort  int `json:"external_port"`
 }

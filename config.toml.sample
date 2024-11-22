@@ -6,6 +6,9 @@ NodeName = "<YOUR_CP_Node_Name>"                                         # The c
 WalletWhiteList = ""                                                     # CP accept user addresses from this whitelist for space deployment
 WalletBlackList = ""                                                     # CP reject user addresses from this blacklist for space deployment
 Pricing = "true"                                                         # Default True, indicating acceptance of smart pricing orders, which may include orders priced lower than self-determined pricing.
+AutoDeleteImage = false                                                  # Default false, automatically delete unused images
+PortRange = [40001,40002,40003,40004,40005,40006,40007,40008,40009,40010] # Externally exposed port number
+
 
 [UBI]
 UbiEnginePk = "0xB5aeb540B4895cd024c1625E146684940A849ED9"                # UBI Engine's public key, CP only accept the task from this UBI engine

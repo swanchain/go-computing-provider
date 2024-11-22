@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/go-connections/nat"
 	"github.com/filswan/go-swan-lib/logs"
 	"github.com/gin-gonic/gin"
 	"github.com/swanchain/go-computing-provider/conf"
@@ -278,15 +279,6 @@ func (*ImageJobService) DeployInference(c *gin.Context) {
 		return
 	}
 
-	var containerName = job.Name + "-" + generateString(5)
-	var apiUrl string
-	prefixStr := generateString(10)
-	if strings.HasPrefix(conf.GetConfig().API.Domain, ".") {
-		apiUrl = prefixStr + conf.GetConfig().API.Domain
-	} else {
-		apiUrl = strings.Join([]string{prefixStr, conf.GetConfig().API.Domain}, ".")
-	}
-
 	var totalCost float64
 	var checkPriceFlag bool
 	if !conf.GetConfig().API.Pricing {
@@ -320,6 +312,31 @@ func (*ImageJobService) DeployInference(c *gin.Context) {
 		return
 	}
 
+	var containerName = job.Name + "-" + generateString(5)
+	var apiUrl string
+	var portBinding map[nat.Port][]nat.PortBinding
+	var portMaps []models.PortMap
+	var labelMap map[string]string
+
+	if len(job.Ports) > 1 {
+		portBinding, portMaps, err = handleMultiPort(job.Ports)
+		multiAddressSplit := strings.Split(conf.GetConfig().API.MultiAddress, "/")
+		apiUrl = multiAddressSplit[2]
+	} else {
+		prefixStr := generateString(10)
+		if strings.HasPrefix(conf.GetConfig().API.Domain, ".") {
+			apiUrl = prefixStr + conf.GetConfig().API.Domain
+		} else {
+			apiUrl = strings.Join([]string{prefixStr, conf.GetConfig().API.Domain}, ".")
+		}
+
+		labelMap = map[string]string{
+			"traefik.enable": "true",
+			fmt.Sprintf("traefik.http.routers.%s.entrypoints", containerName): "web",
+			fmt.Sprintf("traefik.http.routers.%s.rule", containerName):        fmt.Sprintf("Host(`%s`)", apiUrl),
+		}
+	}
+
 	if err = NewEcpJobService().SaveEcpJobEntity(&models.EcpJobEntity{
 		Uuid:       job.UUID,
 		Name:       job.Name,
@@ -335,8 +352,9 @@ func (*ImageJobService) DeployInference(c *gin.Context) {
 
 	var inferenceResp models.EcpInferenceResp
 	inferenceResp.UUID = job.UUID
-	inferenceResp.ServiceUrl = apiUrl
+	inferenceResp.ServiceUrl = "http://" + apiUrl
 	inferenceResp.HealthPath = job.HealthPath
+	inferenceResp.ServicePortMapping = portMaps
 	inferenceResp.Price = totalCost
 
 	go func() {
@@ -378,7 +396,6 @@ func (*ImageJobService) DeployInference(c *gin.Context) {
 			Resources:  needResource,
 			Privileged: true,
 		}
-
 		containerConfig := &container.Config{
 			Image:        job.Image,
 			Env:          env,
@@ -386,17 +403,18 @@ func (*ImageJobService) DeployInference(c *gin.Context) {
 			AttachStdout: true,
 			AttachStderr: true,
 			Tty:          true,
-			Labels: map[string]string{
-				"traefik.enable": "true",
-				fmt.Sprintf("traefik.http.routers.%s.entrypoints", containerName): "web",
-				fmt.Sprintf("traefik.http.routers.%s.rule", containerName):        fmt.Sprintf("Host(`%s`)", apiUrl),
-			},
 		}
 
-		networkConfig := &network.NetworkingConfig{
-			EndpointsConfig: map[string]*network.EndpointSettings{
-				"traefik-net": {},
-			},
+		var networkConfig *network.NetworkingConfig
+		if len(job.Ports) > 1 {
+			hostConfig.PortBindings = portBinding
+		} else {
+			containerConfig.Labels = labelMap
+			networkConfig = &network.NetworkingConfig{
+				EndpointsConfig: map[string]*network.EndpointSettings{
+					"traefik-net": {},
+				},
+			}
 		}
 
 		dockerService := NewDockerService()
@@ -422,6 +440,43 @@ func (*ImageJobService) DeployInference(c *gin.Context) {
 	}()
 
 	c.JSON(http.StatusOK, util.CreateSuccessResponse(inferenceResp))
+}
+
+func handleMultiPort(ports []int) (map[nat.Port][]nat.PortBinding, []models.PortMap, error) {
+	var portRange = conf.GetConfig().API.PortRange
+	var usedPort = make(map[int]int)
+	var count int
+	for i := 0; i < len(ports); i++ {
+		for j := 0; i < len(portRange); j++ {
+			if _, ok := usedPort[portRange[j]]; !ok {
+				if util.CheckPortAvailable(portRange[j]) {
+					usedPort[portRange[j]] = ports[i]
+					count++
+					break
+				}
+			}
+		}
+	}
+	if len(ports) > count {
+		return nil, nil, fmt.Errorf("port number unavailable, need %d, available: %d", len(ports), count)
+	}
+
+	var mapPorts []models.PortMap
+	var portMap = make(map[nat.Port][]nat.PortBinding)
+	for hostP, containerP := range usedPort {
+		portMap[nat.Port(fmt.Sprintf("%d/tcp", containerP))] = []nat.PortBinding{
+			{
+				HostIP:   "0.0.0.0",
+				HostPort: strconv.Itoa(hostP),
+			},
+		}
+		mapPorts = append(mapPorts, models.PortMap{
+			ContainerPort: containerP,
+			ExternalPort:  hostP,
+		})
+	}
+
+	return portMap, mapPorts, nil
 }
 
 func checkPriceForDocker(userPrice string, duration int, resource models.HardwareResource) (bool, float64, error) {

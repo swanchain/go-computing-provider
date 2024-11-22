@@ -50,6 +50,8 @@ type API struct {
 	WalletWhiteList string
 	WalletBlackList string
 	Pricing         Pricing `toml:"pricing"`
+	AutoDeleteImage bool    `toml:"AutoDeleteImage"`
+	PortRange       []int   `toml:"PortRange"`
 }
 type UBI struct {
 	UbiEnginePk     string

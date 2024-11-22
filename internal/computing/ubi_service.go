@@ -1093,12 +1093,14 @@ func reportClusterResourceForDocker() {
 }
 
 func CronTaskForEcp() {
-	go func() {
-		ticker := time.NewTicker(2 * time.Hour)
-		for range ticker.C {
-			NewDockerService().CleanResourceForDocker()
-		}
-	}()
+	if conf.GetConfig().API.AutoDeleteImage {
+		go func() {
+			ticker := time.NewTicker(2 * time.Hour)
+			for range ticker.C {
+				NewDockerService().CleanResourceForDocker()
+			}
+		}()
+	}
 
 	go func() {
 		ticker := time.NewTicker(3 * time.Minute)
