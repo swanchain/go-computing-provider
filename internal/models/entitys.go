@@ -362,11 +362,6 @@ const (
 const (
 	CreatedStatus    = "created"
 	RunningStatus    = "running"
-	RestartingStatus = "restarting"
-	RemovingStatus   = "removing"
-	PausedStatus     = "paused"
-	ExitedStatus     = "exited"
-	DeadStatus       = "dead"
 	TerminatedStatus = "terminated"
 )
 

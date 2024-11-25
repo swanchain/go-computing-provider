@@ -1150,6 +1150,8 @@ func updateEcpTaskStatus() {
 		}
 		if status, ok := containerStatus[entity.ContainerName]; ok {
 			NewEcpJobService().UpdateEcpJobEntity(entity.Uuid, status)
+		} else {
+			NewEcpJobService().UpdateEcpJobEntity(entity.Uuid, models.TerminatedStatus)
 		}
 	}
 }
