@@ -832,8 +832,8 @@ func GetCpResource(c *gin.Context) {
 
 	var taskGpuMap = make(map[string][]string)
 	for _, g := range list {
-		if len(g.GpuIndex) > 0 {
-			taskGpuMap[g.GpuName] = append(taskGpuMap[g.GpuName], g.GpuIndex...)
+		if len(strings.TrimSpace(g.GpuIndex)) > 0 {
+			taskGpuMap[g.GpuName] = append(taskGpuMap[g.GpuName], strings.Split(strings.TrimSpace(g.GpuIndex), ",")...)
 		}
 	}
 
@@ -1109,8 +1109,8 @@ func reportClusterResourceForDocker() {
 
 	var taskGpuMap = make(map[string][]string)
 	for _, g := range list {
-		if len(g.GpuIndex) > 0 {
-			taskGpuMap[g.GpuName] = append(taskGpuMap[g.GpuName], g.GpuIndex...)
+		if len(strings.TrimSpace(g.GpuIndex)) > 0 {
+			taskGpuMap[g.GpuName] = append(taskGpuMap[g.GpuName], strings.Split(strings.TrimSpace(g.GpuIndex), ",")...)
 		}
 	}
 

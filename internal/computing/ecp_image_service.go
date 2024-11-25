@@ -166,12 +166,12 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		Image:      job.Image,
 		Env:        strings.Join(env, ","),
 		JobType:    job.JobType,
-		Cmd:        job.Cmd,
+		Cmd:        strings.Join(job.Cmd, ","),
 		Cpu:        job.Resource.CPU,
 		Memory:     job.Resource.Memory,
 		Storage:    job.Resource.Storage,
 		GpuName:    job.Resource.GPUModel,
-		GpuIndex:   useIndexs,
+		GpuIndex:   strings.Join(useIndexs, ","),
 		Status:     models.CreatedStatus,
 		CreateTime: time.Now().Unix(),
 	}); err != nil {
@@ -465,8 +465,8 @@ func checkResourceForImage(resource models.HardwareResource) (bool, string, int6
 
 	var taskGpuMap = make(map[string][]string)
 	for _, g := range list {
-		if len(g.GpuIndex) > 0 {
-			taskGpuMap[g.GpuName] = append(taskGpuMap[g.GpuName], g.GpuIndex...)
+		if len(strings.TrimSpace(g.GpuIndex)) > 0 {
+			taskGpuMap[g.GpuName] = append(taskGpuMap[g.GpuName], strings.Split(strings.TrimSpace(g.GpuIndex), ",")...)
 		}
 	}
 
