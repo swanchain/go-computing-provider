@@ -124,7 +124,7 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 			return
 		}
 
-		signature, err := verifySignature(conf.GetConfig().UBI.UbiEnginePk, fmt.Sprintf("%s%s", cpAccountAddress, job.UUID), job.Sign)
+		signature, err := verifySignature(job.WalletAddress, fmt.Sprintf("%s%s", cpAccountAddress, job.UUID), job.Sign)
 		if err != nil {
 			logs.GetLogger().Errorf("failed to verifySignature for ecp job, error: %+v", err)
 			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
