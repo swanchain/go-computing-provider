@@ -333,19 +333,42 @@ func ExistResource(name string) bool {
 }
 
 type EcpJobEntity struct {
-	Id              int64   `json:"id" gorm:"primaryKey;autoIncrement"`
-	Uuid            string  `json:"uuid" gorm:"uuid"`
-	Name            string  `json:"name" gorm:"name"`
-	Image           string  `json:"image" gorm:"image"`
-	Env             string  `json:"env" gorm:"env"`
-	Status          string  `json:"status"` // created|restarting|running|removing|paused|exited|dead
-	Message         string  `json:"message"`
-	Reward          float64 `json:"reward"`
-	ContainerName   string  `json:"container_name" gorm:"container_name"`
-	LastBlockNumber int64   `json:"last_block_number" gorm:"last_block_number"`
-	CreateTime      int64   `json:"create_time" gorm:"create_time"`
-	DeleteAt        int     `json:"delete_at" gorm:"delete_at; default:0"` // 1 deleted
+	Id              int64    `json:"id" gorm:"primaryKey;autoIncrement"`
+	Uuid            string   `json:"uuid" gorm:"uuid"`
+	Name            string   `json:"name" gorm:"name"`
+	Image           string   `json:"image" gorm:"image"`
+	Env             string   `json:"env" gorm:"env"`
+	Cmd             []string `json:"cmd"`
+	Status          string   `json:"status"` // created|restarting|running|removing|paused|exited|dead
+	Message         string   `json:"message"`
+	Reward          float64  `json:"reward"`
+	Cpu             int64    `json:"cpu"`
+	JobType         int      `json:"job_type"`
+	Memory          int64    `json:"memory"`
+	Storage         int64    `json:"storage"`
+	GpuName         string   `json:"gpu_name"`
+	GpuIndex        []string `json:"gpu_index"`
+	ContainerName   string   `json:"container_name" gorm:"container_name"`
+	LastBlockNumber int64    `json:"last_block_number" gorm:"last_block_number"`
+	CreateTime      int64    `json:"create_time" gorm:"create_time"`
+	DeleteAt        int      `json:"delete_at" gorm:"delete_at; default:0"` // 1 deleted
 }
+
+const (
+	MiningJobType    = 1
+	InferenceJobType = 2
+)
+
+const (
+	CreatedStatus    = "created"
+	RunningStatus    = "running"
+	RestartingStatus = "restarting"
+	RemovingStatus   = "removing"
+	PausedStatus     = "paused"
+	ExitedStatus     = "exited"
+	DeadStatus       = "dead"
+	TerminatedStatus = "terminated"
+)
 
 func (*EcpJobEntity) TableName() string {
 	return "t_ecp_job"

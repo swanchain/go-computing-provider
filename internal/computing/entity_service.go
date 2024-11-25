@@ -175,6 +175,12 @@ func (cpServ EcpJobService) GetEcpJobs(jobUuid string) ([]models.EcpJobEntity, e
 	return job, err
 }
 
+func (cpServ EcpJobService) GetEcpJobList(status []string) ([]models.EcpJobEntity, error) {
+	var jobs []models.EcpJobEntity
+	err := cpServ.Model(&models.EcpJobEntity{}).Where("status in ?", status).Find(&jobs).Error
+	return jobs, err
+}
+
 func (cpServ EcpJobService) UpdateEcpJobEntity(jobUuid, status string) (err error) {
 	return cpServ.Model(&models.EcpJobEntity{}).Where("uuid =?", jobUuid).Update("status", status).Error
 }
@@ -184,9 +190,10 @@ func (cpServ EcpJobService) UpdateEcpJobEntityContainerName(jobUuid string, cont
 }
 
 func (cpServ EcpJobService) UpdateEcpJobEntityMessage(jobUuid string, message string) (err error) {
-	return cpServ.Model(&models.EcpJobEntity{}).Where("uuid =?", jobUuid).Updates(map[string]string{
-		"message": message,
-		"status":  "exited",
+	return cpServ.Model(&models.EcpJobEntity{}).Where("uuid =?", jobUuid).Updates(map[string]interface{}{
+		"message":   message,
+		"status":    models.TerminatedStatus,
+		"delete_at": models.DELETED_FLAG,
 	}).Error
 }
 
@@ -202,8 +209,9 @@ func (cpServ EcpJobService) SaveEcpJobEntity(job *models.EcpJobEntity) (err erro
 }
 
 func (cpServ EcpJobService) DeleteContainerByUuid(uuid string) (err error) {
-	return cpServ.Model(&models.EcpJobEntity{}).Where("uuid =?", uuid).Updates(map[string]string{
-		"status": "terminated",
+	return cpServ.Model(&models.EcpJobEntity{}).Where("uuid =?", uuid).Updates(map[string]interface{}{
+		"status":    models.TerminatedStatus,
+		"delete_at": models.DELETED_FLAG,
 	}).Error
 }
 

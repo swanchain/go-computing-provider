@@ -204,7 +204,6 @@ var daemonCmd = &cli.Command{
 		router.POST("/cp/deploy", ecpImageService.DeployJob)
 		router.GET("/cp/job/status", ecpImageService.GetJobStatus)
 		router.DELETE("/cp/job/:job_uuid", ecpImageService.DeleteJob)
-		router.POST("/cp/inference", ecpImageService.DeployInference)
 
 		shutdownChan := make(chan struct{})
 		httpStopper, err := util.ServeHttp(r, "cp-api", ":"+strconv.Itoa(conf.GetConfig().API.Port), false)

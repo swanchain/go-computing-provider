@@ -824,6 +824,29 @@ func GetCpResource(c *gin.Context) {
 		return
 	}
 
+	list, err := NewEcpJobService().GetEcpJobList([]string{models.CreatedStatus, models.RunningStatus})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.JsonError))
+		return
+	}
+
+	var taskGpuMap = make(map[string][]string)
+	for _, g := range list {
+		if len(g.GpuIndex) > 0 {
+			taskGpuMap[g.GpuName] = append(taskGpuMap[g.GpuName], g.GpuIndex...)
+		}
+	}
+
+	if nodeResource.Gpu.AttachedGpus > 0 {
+		for i, detail := range nodeResource.Gpu.Details {
+			if detail.Status == models.Available {
+				if checkGpu(detail.ProductName, detail.Index, taskGpuMap) {
+					nodeResource.Gpu.Details[i].Status = models.Occupied
+				}
+			}
+		}
+	}
+
 	cpAccountAddress, err := contract.GetCpAccountAddress()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.GetCpAccountError))
@@ -1078,11 +1101,28 @@ func reportClusterResourceForDocker() {
 		return
 	}
 
+	list, err := NewEcpJobService().GetEcpJobList([]string{models.CreatedStatus, models.RunningStatus})
+	if err != nil {
+		logs.GetLogger().Errorf("failed to get ecp job task, error: %v", err)
+		return
+	}
+
+	var taskGpuMap = make(map[string][]string)
+	for _, g := range list {
+		if len(g.GpuIndex) > 0 {
+			taskGpuMap[g.GpuName] = append(taskGpuMap[g.GpuName], g.GpuIndex...)
+		}
+	}
+
 	var freeGpuMap = make(map[string]int)
 	if nodeResource.Gpu.AttachedGpus > 0 {
 		for _, g := range nodeResource.Gpu.Details {
 			if g.Status == models.Available {
-				freeGpuMap[g.ProductName] += 1
+				if checkGpu(g.ProductName, g.Index, taskGpuMap) {
+					freeGpuMap[g.ProductName] = 0
+				} else {
+					freeGpuMap[g.ProductName] += 1
+				}
 			} else {
 				freeGpuMap[g.ProductName] = 0
 			}

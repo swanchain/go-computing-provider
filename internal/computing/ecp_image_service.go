@@ -27,7 +27,7 @@ func NewImageJobService() *ImageJobService {
 }
 
 func (*ImageJobService) CheckJobCondition(c *gin.Context) {
-	var job models.EcpJobCreateReq
+	var job models.EcpImageJobReq
 	err := c.ShouldBindJSON(&job)
 	if err != nil {
 		logs.GetLogger().Errorf("failed to parse json, error: %v", err)
@@ -64,8 +64,8 @@ func (*ImageJobService) CheckJobCondition(c *gin.Context) {
 	return
 }
 
-func (*ImageJobService) DeployJob(c *gin.Context) {
-	var job models.EcpJobCreateReq
+func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
+	var job models.EcpImageJobReq
 	err := c.ShouldBindJSON(&job)
 	if err != nil {
 		logs.GetLogger().Errorf("failed to parse json, error: %v", err)
@@ -73,6 +73,10 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 		return
 	}
 	logs.GetLogger().Infof("Job received Data: %+v", job)
+
+	if job.JobType == 0 {
+		job.JobType = 1
+	}
 
 	if strings.TrimSpace(job.UUID) == "" {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [uuid]"))
@@ -86,6 +90,11 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 
 	if strings.TrimSpace(job.Image) == "" {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [image]"))
+		return
+	}
+
+	if job.JobType != models.MiningJobType && job.JobType != models.InferenceJobType {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "invalidate value: [job_type], support: 1 or 2"))
 		return
 	}
 
@@ -122,12 +131,48 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 		return
 	}
 
+	var needResource container.Resources
+	var useIndexs []string
+	if job.Resource.GPUModel != "" && job.Resource.GPU > 0 {
+		for i := 0; i < job.Resource.GPU; i++ {
+			if i >= len(indexs) {
+				break
+			}
+			useIndexs = append(useIndexs, indexs[i])
+			env = append(env, fmt.Sprintf("CUDA_VISIBLE_DEVICES=%s", strings.Join(useIndexs, ",")))
+		}
+
+		needResource = container.Resources{
+			CPUQuota: needCpu * 100000,
+			Memory:   job.Resource.Memory,
+			DeviceRequests: []container.DeviceRequest{
+				{
+					Driver:       "nvidia",
+					DeviceIDs:    useIndexs,
+					Capabilities: [][]string{{"compute", "utility"}},
+				},
+			},
+		}
+	} else {
+		needResource = container.Resources{
+			CPUQuota: needCpu * 100000,
+			Memory:   job.Resource.Memory,
+		}
+	}
+
 	if err = NewEcpJobService().SaveEcpJobEntity(&models.EcpJobEntity{
 		Uuid:       job.UUID,
 		Name:       job.Name,
 		Image:      job.Image,
 		Env:        strings.Join(env, ","),
-		Status:     "created",
+		JobType:    job.JobType,
+		Cmd:        job.Cmd,
+		Cpu:        job.Resource.CPU,
+		Memory:     job.Resource.Memory,
+		Storage:    job.Resource.Storage,
+		GpuName:    job.Resource.GPUModel,
+		GpuIndex:   useIndexs,
+		Status:     models.CreatedStatus,
 		CreateTime: time.Now().Unix(),
 	}); err != nil {
 		logs.GetLogger().Errorf("failed to save job to db, error: %v", err)
@@ -135,79 +180,13 @@ func (*ImageJobService) DeployJob(c *gin.Context) {
 		return
 	}
 
-	go func() {
-		if err := NewDockerService().PullImage(job.Image); err != nil {
-			logs.GetLogger().Errorf("failed to pull %s image, job_uuid: %s, error: %v", job.Image, job.UUID, err)
-			NewEcpJobService().UpdateEcpJobEntityMessage(job.UUID, fmt.Sprintf("failed to pull image: %s", job.Image))
-			return
-		}
-		var needResource container.Resources
-		if job.Resource.GPUModel != "" && job.Resource.GPU > 0 {
-			var useIndexs []string
-			for i := 0; i < int(job.Resource.GPU); i++ {
-				if i >= len(indexs) {
-					break
-				}
-				useIndexs = append(useIndexs, indexs[i])
-				env = append(env, fmt.Sprintf("CUDA_VISIBLE_DEVICES=%s", strings.Join(useIndexs, ",")))
-			}
-
-			needResource = container.Resources{
-				CPUQuota: needCpu * 100000,
-				Memory:   job.Resource.Memory,
-				DeviceRequests: []container.DeviceRequest{
-					{
-						Driver:       "nvidia",
-						DeviceIDs:    useIndexs,
-						Capabilities: [][]string{{"compute", "utility"}},
-					},
-				},
-			}
-		} else {
-			needResource = container.Resources{
-				CPUQuota: needCpu * 100000,
-				Memory:   job.Resource.Memory,
-			}
-		}
-
-		hostConfig := &container.HostConfig{
-			Resources:  needResource,
-			Privileged: true,
-		}
-		containerConfig := &container.Config{
-			Image:        job.Image,
-			Env:          env,
-			AttachStdout: true,
-			AttachStderr: true,
-			Tty:          true,
-		}
-
-		containerName := job.Name + "-" + generateString(5)
-		dockerService := NewDockerService()
-		if err := dockerService.ContainerCreateAndStart(containerConfig, hostConfig, nil, containerName); err != nil {
-			logs.GetLogger().Errorf("failed to create job container, job_uuid: %s, error: %v", job.UUID, err)
-			NewEcpJobService().UpdateEcpJobEntityMessage(job.UUID, "failed to create container")
-			return
-		}
-		logs.GetLogger().Warnf("job_uuid: %s, starting container, container name: %s", job.UUID, containerName)
-
-		time.Sleep(3 * time.Second)
-		if !dockerService.IsExistContainer(containerName) {
-			logs.GetLogger().Warnf("job_uuid: %s, not found container", job.UUID)
-			NewEcpJobService().UpdateEcpJobEntityMessage(job.UUID, "failed to start container")
-			return
-		}
-		logs.GetLogger().Warnf("job_uuid: %s, started container, container name: %s", job.UUID, containerName)
-
-		if err = NewEcpJobService().UpdateEcpJobEntityContainerName(job.UUID, containerName); err != nil {
-			logs.GetLogger().Errorf("failed to save job to db, error: %v", err)
-			return
-		}
-	}()
-
-	c.JSON(http.StatusOK, util.CreateSuccessResponse(map[string]interface{}{
-		"price": totalCost,
-	}))
+	if job.JobType == models.MiningJobType {
+		imageJob.DeployMining(c, job, needResource, env, totalCost)
+		return
+	} else if job.JobType == models.InferenceJobType {
+		imageJob.DeployInference(c, job, needResource, env, totalCost)
+		return
+	}
 }
 
 func (*ImageJobService) GetJobStatus(c *gin.Context) {
@@ -256,69 +235,61 @@ func (*ImageJobService) DeleteJob(c *gin.Context) {
 	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
 }
 
-func (*ImageJobService) DeployInference(c *gin.Context) {
-	var job models.EcpInferenceReq
-	err := c.ShouldBindJSON(&job)
-	if err != nil {
-		logs.GetLogger().Errorf("failed to parse json, error: %v", err)
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
-		return
-	}
-	logs.GetLogger().Infof("Job received Data: %+v", job)
-
-	if strings.TrimSpace(job.UUID) == "" {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [uuid]"))
-		return
-	}
-
-	if strings.TrimSpace(job.Name) == "" {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [name]"))
-		return
-	}
-
-	if strings.TrimSpace(job.Image) == "" {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [image]"))
-		return
-	}
-
-	var totalCost float64
-	var checkPriceFlag bool
-	if !conf.GetConfig().API.Pricing {
-		checkPriceFlag, totalCost, err = checkPriceForDocker(job.Price, job.Duration, job.Resource)
+func (*ImageJobService) DeployMining(c *gin.Context, job models.EcpImageJobReq, needResource container.Resources, env []string, totalCost float64) {
+	containerName := job.Name + "-" + generateString(5)
+	go func() {
+		err := NewDockerService().PullImage(job.Image)
 		if err != nil {
-			logs.GetLogger().Errorf("failed to check price, job_uuid: %s, error: %v", job.UUID, err)
-			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.CheckPriceError))
+			logs.GetLogger().Errorf("failed to pull %s image, job_uuid: %s, error: %v", job.Image, job.UUID, err)
+			NewEcpJobService().UpdateEcpJobEntityMessage(job.UUID, fmt.Sprintf("failed to pull image: %s", job.Image))
 			return
 		}
 
-		if !checkPriceFlag {
-			logs.GetLogger().Errorf("bid below the set price, job_uuid: %s, pid: %s, need: %0.4f", job.UUID, job.Price, totalCost)
-			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BelowPriceError))
+		hostConfig := &container.HostConfig{
+			Resources:  needResource,
+			Privileged: true,
+		}
+		containerConfig := &container.Config{
+			Image:        job.Image,
+			Env:          env,
+			AttachStdout: true,
+			AttachStderr: true,
+			Tty:          true,
+		}
+		dockerService := NewDockerService()
+		if err := dockerService.ContainerCreateAndStart(containerConfig, hostConfig, nil, containerName); err != nil {
+			logs.GetLogger().Errorf("failed to create job container, job_uuid: %s, error: %v", job.UUID, err)
+			NewEcpJobService().UpdateEcpJobEntityMessage(job.UUID, "failed to create container")
 			return
 		}
-	}
+		logs.GetLogger().Warnf("job_uuid: %s, starting container, container name: %s", job.UUID, containerName)
 
-	var env []string
-	for k, v := range job.Envs {
-		env = append(env, fmt.Sprintf("%s=%s", k, v))
-	}
+		time.Sleep(3 * time.Second)
+		if !dockerService.IsExistContainer(containerName) {
+			logs.GetLogger().Warnf("job_uuid: %s, not found container", job.UUID)
+			NewEcpJobService().UpdateEcpJobEntityMessage(job.UUID, "failed to start container")
+			return
+		}
+		logs.GetLogger().Warnf("job_uuid: %s, started container, container name: %s", job.UUID, containerName)
 
-	isReceive, _, needCpu, _, indexs, err := checkResourceForImage(job.Resource)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
-		return
-	}
+		if err = NewEcpJobService().UpdateEcpJobEntityContainerName(job.UUID, containerName); err != nil {
+			logs.GetLogger().Errorf("failed to save job to db, error: %v", err)
+			return
+		}
+	}()
 
-	if !isReceive {
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError))
-		return
-	}
+	c.JSON(http.StatusOK, util.CreateSuccessResponse(map[string]interface{}{
+		"price": totalCost,
+	}))
+}
 
+func (*ImageJobService) DeployInference(c *gin.Context, job models.EcpImageJobReq, needResource container.Resources, env []string, totalCost float64) {
 	var containerName = job.Name + "-" + generateString(5)
 	var apiUrl string
 	var portBinding map[nat.Port][]nat.PortBinding
 	var portMaps []models.PortMap
 	var labelMap map[string]string
+	var err error
 
 	if len(job.Ports) > 1 {
 		portBinding, portMaps, err = handleMultiPort(job.Ports)
@@ -340,59 +311,11 @@ func (*ImageJobService) DeployInference(c *gin.Context) {
 		apiUrl += fmt.Sprintf(":%d", traefikListenPortMapHost)
 	}
 
-	if err = NewEcpJobService().SaveEcpJobEntity(&models.EcpJobEntity{
-		Uuid:       job.UUID,
-		Name:       job.Name,
-		Image:      job.Image,
-		Env:        strings.Join(env, ","),
-		Status:     "created",
-		CreateTime: time.Now().Unix(),
-	}); err != nil {
-		logs.GetLogger().Errorf("failed to save job to db, error: %v", err)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SaveTaskEntityError))
-		return
-	}
-
-	var inferenceResp models.EcpInferenceResp
-	inferenceResp.UUID = job.UUID
-	inferenceResp.ServiceUrl = "http://" + apiUrl
-	inferenceResp.HealthPath = job.HealthPath
-	inferenceResp.ServicePortMapping = portMaps
-	inferenceResp.Price = totalCost
-
 	go func() {
 		if err := NewDockerService().PullImage(job.Image); err != nil {
 			logs.GetLogger().Errorf("failed to pull %s image, job_uuid: %s, error: %v", job.Image, job.UUID, err)
 			NewEcpJobService().UpdateEcpJobEntityMessage(job.UUID, fmt.Sprintf("failed to pull image: %s", job.Image))
 			return
-		}
-		var needResource container.Resources
-		if job.Resource.GPUModel != "" && job.Resource.GPU > 0 {
-			var useIndexs []string
-			for i := 0; i < int(job.Resource.GPU); i++ {
-				if i >= len(indexs) {
-					break
-				}
-				useIndexs = append(useIndexs, indexs[i])
-				env = append(env, fmt.Sprintf("CUDA_VISIBLE_DEVICES=%s", strings.Join(useIndexs, ",")))
-			}
-
-			needResource = container.Resources{
-				CPUQuota: needCpu * 100000,
-				Memory:   job.Resource.Memory,
-				DeviceRequests: []container.DeviceRequest{
-					{
-						Driver:       "nvidia",
-						DeviceIDs:    useIndexs,
-						Capabilities: [][]string{{"compute", "utility"}},
-					},
-				},
-			}
-		} else {
-			needResource = container.Resources{
-				CPUQuota: needCpu * 100000,
-				Memory:   job.Resource.Memory,
-			}
 		}
 
 		hostConfig := &container.HostConfig{
@@ -442,6 +365,12 @@ func (*ImageJobService) DeployInference(c *gin.Context) {
 		}
 	}()
 
+	var inferenceResp models.EcpImageResp
+	inferenceResp.UUID = job.UUID
+	inferenceResp.ServiceUrl = "http://" + apiUrl
+	inferenceResp.HealthPath = job.HealthPath
+	inferenceResp.ServicePortMapping = portMaps
+	inferenceResp.Price = totalCost
 	c.JSON(http.StatusOK, util.CreateSuccessResponse(inferenceResp))
 }
 
@@ -529,6 +458,18 @@ func checkPriceForDocker(userPrice string, duration int, resource models.Hardwar
 }
 
 func checkResourceForImage(resource models.HardwareResource) (bool, string, int64, int64, []string, error) {
+	list, err := NewEcpJobService().GetEcpJobList([]string{models.CreatedStatus, models.RunningStatus})
+	if err != nil {
+		return false, "", 0, 0, nil, err
+	}
+
+	var taskGpuMap = make(map[string][]string)
+	for _, g := range list {
+		if len(g.GpuIndex) > 0 {
+			taskGpuMap[g.GpuName] = append(taskGpuMap[g.GpuName], g.GpuIndex...)
+		}
+	}
+
 	dockerService := NewDockerService()
 	containerLogStr, err := dockerService.ContainerLogs("resource-exporter")
 	if err != nil {
@@ -570,6 +511,10 @@ func checkResourceForImage(resource models.HardwareResource) (bool, string, int6
 	if nodeResource.Gpu.AttachedGpus > 0 {
 		for _, detail := range nodeResource.Gpu.Details {
 			if detail.Status == models.Available {
+				if checkGpu(detail.ProductName, detail.Index, taskGpuMap) {
+					continue
+				}
+
 				data, ok := gpuMap[detail.ProductName]
 				if ok {
 					data.num += 1
@@ -643,4 +588,16 @@ func BytesToHumanReadable(bytes int64) string {
 		return fmt.Sprintf("%.2f Ki", formatKiB(bytes))
 	}
 	return ""
+}
+
+func checkGpu(gpuName, index string, taskUseGpu map[string][]string) bool {
+	taskUseIndex, ok := taskUseGpu[gpuName]
+	if ok {
+		for _, taskU := range taskUseIndex {
+			if taskU == index {
+				return true
+			}
+		}
+	}
+	return false
 }
