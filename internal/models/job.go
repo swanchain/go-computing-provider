@@ -12,6 +12,7 @@ type EcpImageJobReq struct {
 	Price      string            `json:"price"`
 	Duration   int               `json:"duration"`
 	JobType    int               `json:"job_type"` // 1 mining; 2: inference
+	Sign       string            `json:"sign"`
 }
 
 type EcpImageResp struct {

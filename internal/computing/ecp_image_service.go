@@ -74,6 +74,18 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 	}
 	logs.GetLogger().Infof("Job received Data: %+v", job)
 
+	//if !CheckWalletWhiteListForEcp("") {
+	//	logs.GetLogger().Errorf("This cp does not accept tasks from wallet addresses outside the whitelist")
+	//	c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SpaceCheckWhiteListError))
+	//	return
+	//}
+	//
+	//if CheckWalletBlackListForEcp("") {
+	//	logs.GetLogger().Errorf("This cp does not accept tasks from wallet addresses inside the blacklist")
+	//	c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SpaceCheckBlackListError))
+	//	return
+	//}
+
 	if job.JobType == 0 {
 		job.JobType = 1
 	}
@@ -97,6 +109,31 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "invalidate value: [job_type], support: 1 or 2"))
 		return
 	}
+
+	if len(job.Sign) == 0 {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BadParamError, "missing required field: [sign]"))
+		return
+	}
+
+	//cpAccountAddress, err := contract.GetCpAccountAddress()
+	//if err != nil {
+	//	logs.GetLogger().Errorf("get cp account contract address failed, error: %v", err)
+	//	c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.GetCpAccountError))
+	//	return
+	//}
+	//
+	//signature, err := verifySignature(conf.GetConfig().UBI.UbiEnginePk, fmt.Sprintf("%s%s", cpAccountAddress, job.UUID), job.Sign)
+	//if err != nil {
+	//	logs.GetLogger().Errorf("failed to verifySignature for ecp job, error: %+v", err)
+	//	c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
+	//	return
+	//}
+	//
+	//logs.GetLogger().Infof("ubi task sign verifing, task_id: %s, verify: %v", job.UUID, signature)
+	//if !signature {
+	//	c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "signature verify failed"))
+	//	return
+	//}
 
 	var totalCost float64
 	var checkPriceFlag bool
@@ -597,6 +634,44 @@ func checkGpu(gpuName, index string, taskUseGpu map[string][]string) bool {
 			if taskU == index {
 				return true
 			}
+		}
+	}
+	return false
+}
+
+func CheckWalletWhiteListForEcp(walletAddress string) bool {
+	walletWhiteListUrl := conf.GetConfig().API.WalletWhiteList
+	if walletWhiteListUrl == "" {
+		return true
+	}
+	whiteList, err := getWalletList(walletWhiteListUrl)
+	if err != nil {
+		logs.GetLogger().Errorf("get whiteList By url failed, url: %s, error: %v", err)
+		return true
+	}
+
+	for _, address := range whiteList {
+		if walletAddress == address {
+			return true
+		}
+	}
+	return false
+}
+
+func CheckWalletBlackListForEcp(walletAddress string) bool {
+	walletBlackListUrl := conf.GetConfig().API.WalletBlackList
+	if walletBlackListUrl == "" {
+		return false
+	}
+	blackList, err := getWalletList(walletBlackListUrl)
+	if err != nil {
+		logs.GetLogger().Errorf("get blacklist By url failed, url: %s, error: %v", err)
+		return true
+	}
+
+	for _, address := range blackList {
+		if walletAddress == address {
+			return true
 		}
 	}
 	return false
