@@ -1132,6 +1132,28 @@ func reportClusterResourceForDocker() {
 		nodeResource.Cpu.Free, nodeResource.Memory.Free, nodeResource.Storage.Free, freeGpuMap)
 }
 
+func updateEcpTaskStatus() {
+	list, err := NewEcpJobService().GetEcpJobList([]string{models.CreatedStatus, models.RunningStatus})
+	if err != nil {
+		logs.GetLogger().Errorf("failed to get ecp job task, error: %v", err)
+		return
+	}
+
+	containerStatus, err := NewDockerService().GetContainerStatus()
+	if err != nil {
+		return
+	}
+
+	for _, entity := range list {
+		if time.Now().Unix()-entity.CreateTime < 3600 {
+			continue
+		}
+		if status, ok := containerStatus[entity.ContainerName]; ok {
+			NewEcpJobService().UpdateEcpJobEntity(entity.Uuid, status)
+		}
+	}
+}
+
 func CronTaskForEcp() {
 	if conf.GetConfig().API.AutoDeleteImage {
 		go func() {
@@ -1146,6 +1168,7 @@ func CronTaskForEcp() {
 		ticker := time.NewTicker(3 * time.Minute)
 		for range ticker.C {
 			reportClusterResourceForDocker()
+			updateEcpTaskStatus()
 		}
 	}()
 

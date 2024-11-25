@@ -317,6 +317,7 @@ func (*ImageJobService) DeployMining(c *gin.Context, job models.EcpImageJobReq, 
 	}()
 
 	c.JSON(http.StatusOK, util.CreateSuccessResponse(map[string]interface{}{
+		"uuid":  job.UUID,
 		"price": totalCost,
 	}))
 }
