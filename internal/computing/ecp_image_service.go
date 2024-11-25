@@ -9,6 +9,7 @@ import (
 	"github.com/filswan/go-swan-lib/logs"
 	"github.com/gin-gonic/gin"
 	"github.com/swanchain/go-computing-provider/conf"
+	"github.com/swanchain/go-computing-provider/internal/contract"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"github.com/swanchain/go-computing-provider/util"
 	"net/http"
@@ -115,25 +116,25 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		return
 	}
 
-	//cpAccountAddress, err := contract.GetCpAccountAddress()
-	//if err != nil {
-	//	logs.GetLogger().Errorf("get cp account contract address failed, error: %v", err)
-	//	c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.GetCpAccountError))
-	//	return
-	//}
-	//
-	//signature, err := verifySignature(conf.GetConfig().UBI.UbiEnginePk, fmt.Sprintf("%s%s", cpAccountAddress, job.UUID), job.Sign)
-	//if err != nil {
-	//	logs.GetLogger().Errorf("failed to verifySignature for ecp job, error: %+v", err)
-	//	c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
-	//	return
-	//}
-	//
-	//logs.GetLogger().Infof("ubi task sign verifing, task_id: %s, verify: %v", job.UUID, signature)
-	//if !signature {
-	//	c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "signature verify failed"))
-	//	return
-	//}
+	cpAccountAddress, err := contract.GetCpAccountAddress()
+	if err != nil {
+		logs.GetLogger().Errorf("get cp account contract address failed, error: %v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.GetCpAccountError))
+		return
+	}
+
+	signature, err := verifySignature(conf.GetConfig().UBI.UbiEnginePk, fmt.Sprintf("%s%s", cpAccountAddress, job.UUID), job.Sign)
+	if err != nil {
+		logs.GetLogger().Errorf("failed to verifySignature for ecp job, error: %+v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
+		return
+	}
+
+	logs.GetLogger().Infof("ubi task sign verifing, task_id: %s, verify: %v", job.UUID, signature)
+	if !signature {
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "signature verify failed"))
+		return
+	}
 
 	var totalCost float64
 	var checkPriceFlag bool
