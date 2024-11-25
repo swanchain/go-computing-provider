@@ -338,7 +338,7 @@ type EcpJobEntity struct {
 	Name            string   `json:"name" gorm:"name"`
 	Image           string   `json:"image" gorm:"image"`
 	Env             string   `json:"env" gorm:"env"`
-	Cmd             []string `json:"cmd"`
+	Cmd             []string `json:"cmd" gorm:"type:json"`
 	Status          string   `json:"status"` // created|restarting|running|removing|paused|exited|dead
 	Message         string   `json:"message"`
 	Reward          float64  `json:"reward"`
@@ -347,7 +347,7 @@ type EcpJobEntity struct {
 	Memory          int64    `json:"memory"`
 	Storage         int64    `json:"storage"`
 	GpuName         string   `json:"gpu_name"`
-	GpuIndex        []string `json:"gpu_index"`
+	GpuIndex        []string `json:"gpu_index"  gorm:"type:json"`
 	ContainerName   string   `json:"container_name" gorm:"container_name"`
 	LastBlockNumber int64    `json:"last_block_number" gorm:"last_block_number"`
 	CreateTime      int64    `json:"create_time" gorm:"create_time"`
