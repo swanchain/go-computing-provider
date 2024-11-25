@@ -59,6 +59,7 @@ type UBI struct {
 	AutoChainProof  bool
 	SequencerUrl    string
 	EdgeUrl         string
+	VerifySign      bool
 }
 
 type LOG struct {
@@ -348,6 +349,7 @@ func generateDefaultConfig() ComputeNode {
 			UbiEnginePk:     "",
 			EnableSequencer: true,
 			AutoChainProof:  true,
+			VerifySign:      true,
 		},
 		LOG: LOG{
 			CrtFile: "",

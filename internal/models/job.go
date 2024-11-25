@@ -1,18 +1,19 @@
 package models
 
 type EcpImageJobReq struct {
-	UUID       string            `json:"uuid,omitempty"`
-	Name       string            `json:"name,omitempty"`
-	Image      string            `json:"image,omitempty"`
-	Cmd        []string          `json:"cmd"`
-	Ports      []int             `json:"ports"`
-	HealthPath string            `json:"health_path"`
-	Envs       map[string]string `json:"envs,omitempty"`
-	Resource   HardwareResource  `json:"resource"`
-	Price      string            `json:"price"`
-	Duration   int               `json:"duration"`
-	JobType    int               `json:"job_type"` // 1 mining; 2: inference
-	Sign       string            `json:"sign"`
+	UUID          string            `json:"uuid,omitempty"`
+	Name          string            `json:"name,omitempty"`
+	Image         string            `json:"image,omitempty"`
+	Cmd           []string          `json:"cmd"`
+	Ports         []int             `json:"ports"`
+	HealthPath    string            `json:"health_path"`
+	Envs          map[string]string `json:"envs,omitempty"`
+	Resource      HardwareResource  `json:"resource"`
+	Price         string            `json:"price"`
+	Duration      int               `json:"duration"`
+	JobType       int               `json:"job_type"` // 1 mining; 2: inference
+	Sign          string            `json:"sign"`
+	WalletAddress string            `json:"wallet_address"`
 }
 
 type EcpImageResp struct {

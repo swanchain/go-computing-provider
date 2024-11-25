@@ -75,17 +75,17 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 	}
 	logs.GetLogger().Infof("Job received Data: %+v", job)
 
-	//if !CheckWalletWhiteListForEcp("") {
-	//	logs.GetLogger().Errorf("This cp does not accept tasks from wallet addresses outside the whitelist")
-	//	c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SpaceCheckWhiteListError))
-	//	return
-	//}
-	//
-	//if CheckWalletBlackListForEcp("") {
-	//	logs.GetLogger().Errorf("This cp does not accept tasks from wallet addresses inside the blacklist")
-	//	c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SpaceCheckBlackListError))
-	//	return
-	//}
+	if !CheckWalletWhiteListForEcp(job.WalletAddress) {
+		logs.GetLogger().Errorf("This cp does not accept tasks from wallet addresses outside the whitelist")
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SpaceCheckWhiteListError))
+		return
+	}
+
+	if CheckWalletBlackListForEcp(job.WalletAddress) {
+		logs.GetLogger().Errorf("This cp does not accept tasks from wallet addresses inside the blacklist")
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SpaceCheckBlackListError))
+		return
+	}
 
 	if job.JobType == 0 {
 		job.JobType = 1
@@ -116,24 +116,26 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		return
 	}
 
-	cpAccountAddress, err := contract.GetCpAccountAddress()
-	if err != nil {
-		logs.GetLogger().Errorf("get cp account contract address failed, error: %v", err)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.GetCpAccountError))
-		return
-	}
+	if conf.GetConfig().UBI.VerifySign {
+		cpAccountAddress, err := contract.GetCpAccountAddress()
+		if err != nil {
+			logs.GetLogger().Errorf("get cp account contract address failed, error: %v", err)
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.GetCpAccountError))
+			return
+		}
 
-	signature, err := verifySignature(conf.GetConfig().UBI.UbiEnginePk, fmt.Sprintf("%s%s", cpAccountAddress, job.UUID), job.Sign)
-	if err != nil {
-		logs.GetLogger().Errorf("failed to verifySignature for ecp job, error: %+v", err)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
-		return
-	}
+		signature, err := verifySignature(conf.GetConfig().UBI.UbiEnginePk, fmt.Sprintf("%s%s", cpAccountAddress, job.UUID), job.Sign)
+		if err != nil {
+			logs.GetLogger().Errorf("failed to verifySignature for ecp job, error: %+v", err)
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
+			return
+		}
 
-	logs.GetLogger().Infof("ubi task sign verifing, task_id: %s, verify: %v", job.UUID, signature)
-	if !signature {
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "signature verify failed"))
-		return
+		logs.GetLogger().Infof("ubi task sign verifing, task_id: %s, verify: %v", job.UUID, signature)
+		if !signature {
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "signature verify failed"))
+			return
+		}
 	}
 
 	var totalCost float64

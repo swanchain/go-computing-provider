@@ -16,6 +16,7 @@ EnableSequencer = true                                                    # Enab
 AutoChainProof = true                                                     # Sequencer insufficient balance or service unavailable, use chain to submit proof
 SequencerUrl = "https://sequencer.swanchain.io"                           # Sequencer service's API address
 EdgeUrl = "https://edge-api.swanchain.io/v1"                              # Edge service's API address
+VerifySign = true                                                         # Verify that the task signature is from Engine
 
 [LOG]
 CrtFile = "/YOUR_DOMAIN_NAME_CRT_PATH/server.crt"                         # Your domain name SSL .crt file path
