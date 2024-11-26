@@ -192,7 +192,7 @@ func getTaskStatus(taskUuid, cpAccount string) (bool, error) {
 		return false, fmt.Errorf("failed to read response: %v", err)
 	}
 
-	logs.GetLogger().Infof("task_status_response: %s", string(body))
+	logs.GetLogger().Infof("task_status: http_status: %d, response: %s", resp.StatusCode, string(body))
 	if resp.StatusCode != http.StatusOK {
 		return false, fmt.Errorf("failed to parse resp body: %v", string(body))
 	}
