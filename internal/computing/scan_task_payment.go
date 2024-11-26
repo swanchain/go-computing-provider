@@ -197,7 +197,7 @@ func getTaskStatus(taskUuid, cpAccount string) (bool, error) {
 		return false, fmt.Errorf("failed to parse resp body: %v", string(body))
 	}
 
-	if resp.StatusCode != http.StatusBadRequest {
+	if resp.StatusCode == http.StatusBadRequest {
 		return true, nil
 	}
 
@@ -206,7 +206,6 @@ func getTaskStatus(taskUuid, cpAccount string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("failed to response convert to json, error: %v", err)
 	}
-	logs.GetLogger().Infof("task_status: %+v", ts)
 	return ts.Data.Ended, nil
 }
 
