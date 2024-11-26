@@ -1,5 +1,6 @@
 package computing
 
+import "C"
 import (
 	"encoding/json"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"github.com/swanchain/go-computing-provider/internal/contract"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"github.com/swanchain/go-computing-provider/util"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -273,6 +275,36 @@ func (*ImageJobService) DeleteJob(c *gin.Context) {
 	NewEcpJobService().DeleteContainerByUuid(jobUuId)
 
 	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
+}
+
+func (*ImageJobService) DockerLogsHandler(c *gin.Context) {
+	jobUuId := c.Param("job_uuid")
+	if strings.TrimSpace(jobUuId) == "" {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BadParamError, "missing required field: job_uuid"))
+		return
+	}
+
+	ecpJobEntity, err := NewEcpJobService().GetEcpJobByUuid(jobUuId)
+	if err != nil {
+		logs.GetLogger().Errorf("failed to get job, job_uuid: %s, error: %v", jobUuId, err)
+		return
+	}
+	containerName := ecpJobEntity.ContainerName
+	c.Writer.Header().Set("Content-Type", "text/plain")
+	c.Writer.Header().Set("Transfer-Encoding", "chunked")
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+
+	containerLogStream, err := NewDockerService().GetContainerLogStream(containerName)
+	if err != nil {
+		logs.GetLogger().Errorf("get docker container log stream failed, error: %v", err)
+		return
+	}
+	defer containerLogStream.Close()
+	_, err = io.Copy(c.Writer, containerLogStream)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ReadLogError))
+		return
+	}
 }
 
 func (*ImageJobService) DeployMining(c *gin.Context, job models.EcpImageJobReq, needResource container.Resources, env []string, totalCost float64) {

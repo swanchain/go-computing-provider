@@ -42,12 +42,17 @@ var taskList = &cli.Command{
 			Usage:   "--verbose",
 			Aliases: []string{"v"},
 		},
+		&cli.IntFlag{
+			Name:  "tail",
+			Usage: "Show the last number of lines. If not specified, all are displayed by default",
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		showCompleted := cctx.Bool("show-completed")
 		fullFlag := cctx.Bool("verbose")
 		taskType := cctx.String("type")
 		cpRepoPath, ok := os.LookupEnv("CP_PATH")
+		tailNum := cctx.Int("tail")
 		if !ok {
 			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
 		}
@@ -57,9 +62,9 @@ var taskList = &cli.Command{
 
 		switch strings.TrimSpace(taskType) {
 		case "fcp":
-			return fcpTaskList(showCompleted, fullFlag)
+			return fcpTaskList(showCompleted, fullFlag, tailNum)
 		case "ecp":
-			return edgeTaskList(showCompleted, fullFlag)
+			return edgeTaskList(showCompleted, fullFlag, tailNum)
 		default:
 			return fmt.Errorf("only support fcp and edge types")
 		}
@@ -177,7 +182,7 @@ func getColor(status int) []tablewriter.Colors {
 	return rowColor
 }
 
-func fcpTaskList(showCompleted, fullFlag bool) error {
+func fcpTaskList(showCompleted, fullFlag bool, tailNum int) error {
 	var taskData [][]string
 	var rowColorList []RowColor
 
@@ -252,7 +257,7 @@ func fcpTaskList(showCompleted, fullFlag bool) error {
 	return nil
 }
 
-func edgeTaskList(showCompleted, fullFlag bool) error {
+func edgeTaskList(showCompleted, fullFlag bool, tailNum int) error {
 	var taskData [][]string
 	var rowColorList []RowColor
 

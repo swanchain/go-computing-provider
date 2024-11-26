@@ -203,6 +203,7 @@ var daemonCmd = &cli.Command{
 		router.GET("/cp/price", computing.GetPrice)
 		router.POST("/cp/deploy", ecpImageService.DeployJob)
 		router.GET("/cp/job/status", ecpImageService.GetJobStatus)
+		router.GET("/cp/job/log/:job_uuid", ecpImageService.DockerLogsHandler)
 		router.DELETE("/cp/job/:job_uuid", ecpImageService.DeleteJob)
 
 		shutdownChan := make(chan struct{})
