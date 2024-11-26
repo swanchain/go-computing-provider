@@ -122,6 +122,7 @@ func handleEdgeTask(taskUuid, cpAccountAddress string, blockNumber int64, amount
 			logs.GetLogger().Errorf("failed to remove container, job_uuid: %s, error: %v", ecpJob.Uuid, err)
 			return
 		}
+		logs.GetLogger().Infof("scanner_deleted, task_uuid: %s", taskUuid)
 		NewEcpJobService().DeleteContainerByUuid(ecpJob.Uuid)
 	}
 }
@@ -204,6 +205,7 @@ func getTaskStatus(taskUuid, cpAccount string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("failed to response convert to json, error: %v", err)
 	}
+	logs.GetLogger().Infof("task_status: %+v", ts)
 	return ts.Data.Ended, nil
 }
 
