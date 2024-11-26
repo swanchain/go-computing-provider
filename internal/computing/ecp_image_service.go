@@ -60,7 +60,7 @@ func (*ImageJobService) CheckJobCondition(c *gin.Context) {
 			"price": totalCost,
 		}))
 	} else {
-		c.JSON(http.StatusOK, util.CreateSuccessResponse(util.NoAvailableResourcesError))
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError))
 	}
 	return
 }
