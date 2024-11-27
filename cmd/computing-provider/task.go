@@ -64,7 +64,7 @@ var taskList = &cli.Command{
 		case "fcp":
 			return fcpTaskList(showCompleted, fullFlag, tailNum)
 		case "ecp":
-			return edgeTaskList(showCompleted, fullFlag, tailNum)
+			return ecpTaskList(tailNum)
 		default:
 			return fmt.Errorf("only support fcp and edge types")
 		}
@@ -193,7 +193,7 @@ func fcpTaskList(showCompleted, fullFlag bool, tailNum int) error {
 		jobStatus = models.UN_DELETEED_FLAG
 	}
 
-	list, err := computing.NewJobService().GetJobList(jobStatus)
+	list, err := computing.NewJobService().GetJobList(jobStatus, tailNum)
 	if err != nil {
 		return fmt.Errorf("get jobs failed, error: %+v", err)
 	}
@@ -257,11 +257,11 @@ func fcpTaskList(showCompleted, fullFlag bool, tailNum int) error {
 	return nil
 }
 
-func edgeTaskList(showCompleted, fullFlag bool, tailNum int) error {
+func ecpTaskList(tailNum int) error {
 	var taskData [][]string
 	var rowColorList []RowColor
 
-	ecpJobs, err := computing.NewEcpJobService().GetEcpJobs("")
+	ecpJobs, err := computing.NewEcpJobService().GetEcpJobsByLimit(tailNum)
 	if err != nil {
 		return err
 	}

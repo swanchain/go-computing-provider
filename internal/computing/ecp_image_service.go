@@ -2,7 +2,9 @@ package computing
 
 import "C"
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
@@ -113,12 +115,12 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		return
 	}
 
-	if len(job.Sign) == 0 {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BadParamError, "missing required field: [sign]"))
-		return
-	}
-
 	if conf.GetConfig().UBI.VerifySign {
+		if len(job.Sign) == 0 {
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BadParamError, "missing required field: [sign]"))
+			return
+		}
+
 		cpAccountAddress, err := contract.GetCpAccountAddress()
 		if err != nil {
 			logs.GetLogger().Errorf("get cp account contract address failed, error: %v", err)
@@ -202,24 +204,53 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		}
 	}
 
-	if err = NewEcpJobService().SaveEcpJobEntity(&models.EcpJobEntity{
-		Uuid:       job.UUID,
-		Name:       job.Name,
-		Image:      job.Image,
-		Env:        strings.Join(env, ","),
-		JobType:    job.JobType,
-		Cmd:        strings.Join(job.Cmd, ","),
-		Cpu:        job.Resource.CPU,
-		Memory:     job.Resource.Memory,
-		Storage:    job.Resource.Storage,
-		GpuName:    job.Resource.GPUModel,
-		GpuIndex:   strings.Join(useIndexs, ","),
-		Status:     models.CreatedStatus,
-		CreateTime: time.Now().Unix(),
-	}); err != nil {
-		logs.GetLogger().Errorf("failed to save job to db, error: %v", err)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SaveTaskEntityError))
-		return
+	if job.Price == "-1" {
+		if job.JobType == models.MiningJobType {
+			var maxID int64
+			result := NewTaskService().Model(&models.TaskEntity{}).Select("MAX(id)").Scan(&maxID)
+			if result.Error != nil {
+				logs.GetLogger().Errorf("failed to fetch max task id, error: %v", err)
+				c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SaveTaskEntityError))
+				return
+			}
+
+			var taskEntity = new(models.TaskEntity)
+			taskEntity.Id = maxID + 1
+			taskEntity.Uuid = job.UUID
+			taskEntity.Type = models.Mining
+			taskEntity.Name = job.Name
+			taskEntity.ResourceType = models.RESOURCE_TYPE_GPU
+			taskEntity.Status = models.TASK_RECEIVED_STATUS
+			taskEntity.CreateTime = time.Now().Unix()
+			taskEntity.Sequencer = 0
+			err = NewTaskService().SaveTaskEntity(taskEntity)
+			if err != nil {
+				logs.GetLogger().Errorf("save task entity failed, error: %v", err)
+				c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SaveTaskEntityError))
+				return
+			}
+		}
+	} else {
+		if err = NewEcpJobService().SaveEcpJobEntity(&models.EcpJobEntity{
+			Uuid:          job.UUID,
+			Name:          job.Name,
+			Image:         job.Image,
+			Env:           strings.Join(env, ","),
+			JobType:       job.JobType,
+			Cmd:           strings.Join(job.Cmd, ","),
+			Cpu:           job.Resource.CPU,
+			Memory:        job.Resource.Memory,
+			Storage:       job.Resource.Storage,
+			GpuName:       job.Resource.GPUModel,
+			GpuIndex:      strings.Join(useIndexs, ","),
+			Status:        models.CreatedStatus,
+			HealthUrlPath: job.HealthPath,
+			CreateTime:    time.Now().Unix(),
+		}); err != nil {
+			logs.GetLogger().Errorf("failed to save job to db, error: %v", err)
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SaveTaskEntityError))
+			return
+		}
 	}
 
 	if job.JobType == models.MiningJobType {
@@ -252,13 +283,14 @@ func (*ImageJobService) GetJobStatus(c *gin.Context) {
 		}
 		result = append(result, models.EcpJobStatusResp{Uuid: entity.Uuid, Status: statusStr, Message: entity.Message})
 	}
+
 	c.JSON(http.StatusOK, util.CreateSuccessResponse(result))
 }
 
 func (*ImageJobService) DeleteJob(c *gin.Context) {
 	jobUuId := c.Param("job_uuid")
 	if strings.TrimSpace(jobUuId) == "" {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BadParamError, "missing required field: job_uuid"))
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BadParamError, "missing required field: [job_uuid]"))
 		return
 	}
 
@@ -278,10 +310,23 @@ func (*ImageJobService) DeleteJob(c *gin.Context) {
 }
 
 func (*ImageJobService) DockerLogsHandler(c *gin.Context) {
-	jobUuId := c.Param("job_uuid")
+	jobUuId := c.Query("job_uuid")
+	expireTimeStr := c.Query("expire_time")
 	if strings.TrimSpace(jobUuId) == "" {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BadParamError, "missing required field: job_uuid"))
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BadParamError, "missing required field: [job_uuid]"))
 		return
+	}
+
+	var expireTime int64
+	var err error
+	if expireTimeStr != "" {
+		expireTime, err = strconv.ParseInt(expireTimeStr, 10, 64)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BadParamError, "invalidate field: [expire_time]"))
+			return
+		}
+	} else {
+		expireTime = 60
 	}
 
 	ecpJobEntity, err := NewEcpJobService().GetEcpJobByUuid(jobUuId)
@@ -294,14 +339,18 @@ func (*ImageJobService) DockerLogsHandler(c *gin.Context) {
 	c.Writer.Header().Set("Transfer-Encoding", "chunked")
 	c.Writer.Header().Set("Cache-Control", "no-cache")
 
-	containerLogStream, err := NewDockerService().GetContainerLogStream(containerName)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(expireTime)*time.Second)
+	defer cancel()
+
+	containerLogStream, err := NewDockerService().GetContainerLogStream(ctx, containerName)
 	if err != nil {
 		logs.GetLogger().Errorf("get docker container log stream failed, error: %v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ServerError, "failed to get logs: "+err.Error()))
 		return
 	}
 	defer containerLogStream.Close()
 	_, err = io.Copy(c.Writer, containerLogStream)
-	if err != nil {
+	if err != nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ReadLogError))
 		return
 	}
@@ -444,6 +493,14 @@ func (*ImageJobService) DeployInference(c *gin.Context, job models.EcpImageJobRe
 	inferenceResp.HealthPath = job.HealthPath
 	inferenceResp.ServicePortMapping = portMaps
 	inferenceResp.Price = totalCost
+
+	if len(job.Ports) > 1 {
+		var portMap []string
+		for _, pm := range portMaps {
+			portMap = append(portMap, fmt.Sprintf("%d:%d", pm.ContainerPort, pm.ExternalPort))
+		}
+		NewEcpJobService().UpdateEcpJobEntityPortsAndServiceUrl(job.UUID, strings.Join(portMap, ","), inferenceResp.ServiceUrl)
+	}
 	c.JSON(http.StatusOK, util.CreateSuccessResponse(inferenceResp))
 }
 

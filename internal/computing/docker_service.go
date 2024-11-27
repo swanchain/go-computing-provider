@@ -382,8 +382,7 @@ func (ds *DockerService) ContainerLogs(containerName string) (string, error) {
 	}
 }
 
-func (ds *DockerService) GetContainerLogStream(containerName string) (io.ReadCloser, error) {
-	ctx := context.Background()
+func (ds *DockerService) GetContainerLogStream(ctx context.Context, containerName string) (io.ReadCloser, error) {
 	return ds.c.ContainerLogs(ctx, containerName, container.LogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,

@@ -711,7 +711,7 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		}
 		logs.GetLogger().Warnf("task_id: %d, started container, container name: %s", ubiTask.ID, containerName)
 
-		containerLogStream, err := dockerService.GetContainerLogStream(containerName)
+		containerLogStream, err := dockerService.GetContainerLogStream(context.TODO(), containerName)
 		if err != nil {
 			logs.GetLogger().Errorf("get docker container log stream failed, error: %v", err)
 			return
@@ -1170,6 +1170,12 @@ func CronTaskForEcp() {
 		ticker := time.NewTicker(3 * time.Minute)
 		for range ticker.C {
 			reportClusterResourceForDocker()
+		}
+	}()
+
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		for range ticker.C {
 			updateEcpTaskStatus()
 		}
 	}()

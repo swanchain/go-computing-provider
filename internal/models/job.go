@@ -38,9 +38,13 @@ type HardwareResource struct {
 }
 
 type EcpJobStatusResp struct {
-	Uuid    string `json:"uuid"`
-	Status  string `json:"status"`
-	Message string `json:"message"`
+	Uuid               string    `json:"uuid"`
+	Status             string    `json:"status"`
+	ServiceUrl         string    `json:"service_url,omitempty"`
+	HealthPath         string    `json:"health_path,omitempty"`
+	Price              float64   `json:"price"`
+	ServicePortMapping []PortMap `json:"service_port_mapping,omitempty"`
+	Message            string    `json:"message,omitempty"`
 }
 
 type EcpInferenceReq struct {
