@@ -123,7 +123,7 @@ func ReceiveJob(c *gin.Context) {
 		}
 	}
 
-	available, gpuProductName, err := checkResourceAvailableForSpace(jobData.JobType, spaceDetail.Data.Space.ActiveOrder.Config)
+	available, gpuProductName, gpuIndex, err := checkResourceAvailableForSpace(jobData.JobType, spaceDetail.Data.Space.ActiveOrder.Config)
 	if err != nil {
 		logs.GetLogger().Errorf("failed to check job resource, error: %+v", err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
@@ -278,7 +278,7 @@ func ReceiveJob(c *gin.Context) {
 			logs.GetLogger().Infof("successfully uploaded to MCS, jobuuid: %s", jobData.UUID)
 		}()
 
-		DeploySpaceTask(jobData, deployParam, hostName, gpuProductName, serviceNodePort, jobData.JobType, jobData.IpWhiteList)
+		DeploySpaceTask(jobData, deployParam, hostName, gpuProductName, serviceNodePort, jobData.JobType, jobData.IpWhiteList, gpuIndex)
 	}()
 
 	c.JSON(http.StatusOK, util.CreateSuccessResponse(jobData))
@@ -928,7 +928,7 @@ func handleConnection(conn *websocket.Conn, jobDetail models.JobEntity, logType 
 	}
 }
 
-func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName string, gpuProductName string, nodePort int32, jobType int, ipWhiteList []string) {
+func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName string, gpuProductName string, nodePort int32, jobType int, ipWhiteList, gpuIndex []string) {
 	updateJobStatus(jobData.UUID, models.DEPLOY_UPLOAD_RESULT)
 	var success bool
 	var jobUuid string
@@ -972,6 +972,7 @@ func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName s
 	deploy.WithIpWhiteList(ipWhiteList)
 	deploy.WithSpaceName(spaceName)
 	deploy.WithGpuProductName(gpuProductName)
+	deploy.WithGpuIndex(gpuIndex)
 	deploy.WithSpacePath(deployParam.BuildImagePath)
 	if len(deployParam.ModelsSettingFilePath) > 0 {
 		err := deploy.WithModelSettingFile(deployParam.ModelsSettingFilePath).ModelInferenceToK8s()
@@ -1167,7 +1168,7 @@ func getSpaceDetail(jobSourceURI string) (models.SpaceJSON, error) {
 	return spaceJson, nil
 }
 
-func checkResourceAvailableForSpace(jobType int, resourceConfig models.SpaceHardware) (bool, string, error) {
+func checkResourceAvailableForSpace(jobType int, resourceConfig models.SpaceHardware) (bool, string, []string, error) {
 	var taskType string
 	var hardwareDetail models.Resource
 	if jobType == 1 {
@@ -1180,78 +1181,68 @@ func checkResourceAvailableForSpace(jobType int, resourceConfig models.SpaceHard
 
 	activePods, err := k8sService.GetAllActivePod(context.TODO())
 	if err != nil {
-		return false, "", err
+		return false, "", nil, err
 	}
 
 	nodes, err := k8sService.k8sClient.CoreV1().Nodes().List(context.TODO(), metaV1.ListOptions{})
 	if err != nil {
-		return false, "", err
+		return false, "", nil, err
 	}
 
 	nodeGpuSummary, err := k8sService.GetNodeGpuSummary(context.TODO())
 	if err != nil {
 		logs.GetLogger().Errorf("Failed collect k8s gpu, error: %+v", err)
-		return false, "", err
+		return false, "", nil, err
 	}
 
+	gpuName := strings.ToUpper(strings.ReplaceAll(hardwareDetail.Gpu.Unit, " ", "-"))
+	gpuNum := hardwareDetail.Gpu.Quantity
+	needCpu := hardwareDetail.Cpu.Quantity
+	needMemory := float64(hardwareDetail.Memory.Quantity)
+	needStorage := float64(hardwareDetail.Storage.Quantity)
+	logs.GetLogger().Infof("checkResourceForSpace: needCpu: %d, needMemory: %.2f, needStorage: %.2f, needGpu: %s, gpuNum: %d", needCpu, needMemory, needStorage, gpuName, gpuNum)
+
 	for _, node := range nodes.Items {
+		var nodeName = node.Name
+		var nodeGpuInfo = nodeGpuSummary[nodeName]
 		nodeGpu, remainderResource, _ := GetNodeResource(activePods, &node)
 		remainderCpu := remainderResource[ResourceCpu]
 		remainderMemory := float64(remainderResource[ResourceMem] / 1024 / 1024 / 1024)
 		remainderStorage := float64(remainderResource[ResourceStorage] / 1024 / 1024 / 1024)
-
-		needCpu := hardwareDetail.Cpu.Quantity
-		needMemory := float64(hardwareDetail.Memory.Quantity)
-		needStorage := float64(hardwareDetail.Storage.Quantity)
-		logs.GetLogger().Infof("checkResourceAvailableForSpace: needCpu: %d, needMemory: %.2f, needStorage: %.2f", needCpu, needMemory, needStorage)
-		logs.GetLogger().Infof("checkResourceAvailableForSpace: remainingCpu: %d, remainingMemory: %.2f, remainingStorage: %.2f", remainderCpu, remainderMemory, remainderStorage)
+		logs.GetLogger().Infof("checkResourceForSpace: remainingCpu: %d, remainingMemory: %.2f, remainingStorage: %.2f, remainingGpu: %+v", remainderCpu, remainderMemory, remainderStorage, nodeGpuInfo)
 		if needCpu <= remainderCpu && needMemory <= remainderMemory && needStorage <= remainderStorage {
 			if taskType == "CPU" {
-				return true, "", nil
+				return true, "", nil, nil
 			} else if taskType == "GPU" {
-				var usedCount int64 = 0
-				gpuName := strings.ToUpper(strings.ReplaceAll(hardwareDetail.Gpu.Unit, " ", "-"))
-				logs.GetLogger().Infof("gpuName: %s, nodeGpu: %+v, nodeGpuSummary: %+v", gpuName, nodeGpu, nodeGpuSummary)
-				var gpuProductName = ""
-				for name, count := range nodeGpu {
-					if strings.Contains(strings.ToUpper(name), gpuName) {
-						usedCount = count
-						gpuProductName = strings.ReplaceAll(strings.ToUpper(name), " ", "-")
-						break
-					}
-				}
-
-				for gName, gCount := range nodeGpuSummary[node.Name] {
-					if strings.Contains(strings.ToUpper(gName), gpuName) {
-						gpuProductName = strings.ReplaceAll(strings.ToUpper(gName), " ", "-")
-						if usedCount+hardwareDetail.Gpu.Quantity <= gCount {
-							return true, gpuProductName, nil
-						}
+				if gData, ok := nodeGpuInfo[gpuName]; ok {
+					remainingGpu := difference(gData.FreeIndex, nodeGpu[gpuName].UsedIndex)
+					if gpuNum <= int64(len(remainingGpu)) {
+						return true, gpuName, remainingGpu, nil
 					}
 				}
 				continue
 			}
 		}
 	}
-	return false, "", nil
+	return false, "", nil, nil
 }
 
-func checkResourceAvailableForUbi(taskType int, gpuName string, resource *models.TaskResource) (string, string, int64, int64, int64, error) {
+func checkResourceAvailableForUbi(taskType int, gpuName string, resource *models.TaskResource) (string, string, int64, int64, int64, []string, error) {
 	k8sService := NewK8sService()
 	activePods, err := k8sService.GetAllActivePod(context.TODO())
 	if err != nil {
-		return "", "", 0, 0, 0, err
+		return "", "", 0, 0, 0, nil, err
 	}
 
 	nodes, err := k8sService.k8sClient.CoreV1().Nodes().List(context.TODO(), metaV1.ListOptions{})
 	if err != nil {
-		return "", "", 0, 0, 0, err
+		return "", "", 0, 0, 0, nil, err
 	}
 
 	nodeGpuSummary, err := k8sService.GetNodeGpuSummary(context.TODO())
 	if err != nil {
 		logs.GetLogger().Errorf("Failed collect k8s gpu, error: %+v", err)
-		return "", "", 0, 0, 0, err
+		return "", "", 0, 0, 0, nil, err
 	}
 
 	needCpu, _ := strconv.ParseInt(resource.CPU, 10, 64)
@@ -1283,7 +1274,7 @@ func checkResourceAvailableForUbi(taskType int, gpuName string, resource *models
 		if needCpu <= remainderCpu && needMemory <= remainderMemory && needStorage <= remainderStorage {
 			nodeName = node.Name
 			if taskType == 0 {
-				return nodeName, architecture, needCpu, int64(needMemory), int64(needStorage), nil
+				return nodeName, architecture, needCpu, int64(needMemory), int64(needStorage), nil, nil
 			} else if taskType == 1 {
 				if gpuName == "" {
 					nodeName = ""
@@ -1291,20 +1282,19 @@ func checkResourceAvailableForUbi(taskType int, gpuName string, resource *models
 				}
 				gpuName = strings.ReplaceAll(gpuName, " ", "-")
 				logs.GetLogger().Infof("needGpuName: %s, nodeGpu: %+v, nodeGpuSummary: %+v", gpuName, nodeGpu, nodeGpuSummary)
-				usedCount, ok := nodeGpu[gpuName]
-				if !ok {
-					usedCount = 0
-				}
 
-				if usedCount+1 <= nodeGpuSummary[node.Name][gpuName] {
-					return nodeName, architecture, needCpu, int64(needMemory), int64(needStorage), nil
+				if gData, ok := nodeGpuSummary[node.Name][gpuName]; ok {
+					remainingGpu := difference(gData.FreeIndex, nodeGpu[gpuName].UsedIndex)
+					if len(remainingGpu) > 0 {
+						return nodeName, architecture, needCpu, int64(needMemory), int64(needStorage), remainingGpu, nil
+					}
 				}
 				nodeName = ""
 				continue
 			}
 		}
 	}
-	return nodeName, architecture, needCpu, int64(needMemory), int64(needStorage), nil
+	return nodeName, architecture, needCpu, int64(needMemory), int64(needStorage), nil, nil
 }
 
 func generateString(length int) string {

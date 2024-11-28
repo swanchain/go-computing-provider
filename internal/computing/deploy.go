@@ -42,6 +42,7 @@ type Deploy struct {
 	hardwareDesc      string
 	taskUuid          string
 	gpuProductName    string
+	gpuIndex          []string
 
 	// ===
 	spaceType   string
@@ -109,6 +110,11 @@ func (d *Deploy) WithIpWhiteList(ipWhiteList []string) *Deploy {
 
 func (d *Deploy) WithGpuProductName(gpuProductName string) *Deploy {
 	d.gpuProductName = gpuProductName
+	return d
+}
+
+func (d *Deploy) WithGpuIndex(index []string) *Deploy {
+	d.gpuIndex = index
 	return d
 }
 
@@ -305,20 +311,7 @@ func (d *Deploy) YamlToK8s(nodePort int32) error {
 			})
 		}
 
-		cr.Env = append(cr.Env, []coreV1.EnvVar{
-			{
-				Name:  "wallet_address",
-				Value: d.walletAddress,
-			},
-			{
-				Name:  "result_url",
-				Value: d.hostName,
-			},
-			{
-				Name:  "job_uuid",
-				Value: d.jobUuid,
-			},
-		}...)
+		cr.Env = append(cr.Env, d.createEnv()...)
 
 		var ports []coreV1.ContainerPort
 		for _, port := range cr.Ports {
@@ -515,6 +508,7 @@ func (d *Deploy) DeploySshTaskToK8s(containerResource yaml.ContainerResource, no
 			exclude22Port = append(exclude22Port, port.ContainerPort)
 		}
 	}
+	containerResource.Env = append(containerResource.Env, d.createEnv()...)
 
 	deployment := &appV1.Deployment{
 		TypeMeta: metaV1.TypeMeta{
@@ -549,6 +543,7 @@ func (d *Deploy) DeploySshTaskToK8s(containerResource yaml.ContainerResource, no
 							ImagePullPolicy: coreV1.PullIfNotPresent,
 							Ports:           containerResource.Ports,
 							Resources:       d.createResources(),
+							Env:             containerResource.Env,
 							VolumeMounts:    volumeMounts,
 						},
 					},
@@ -634,13 +629,30 @@ func (d *Deploy) createEnv(envs ...coreV1.EnvVar) []coreV1.EnvVar {
 			Value: d.spaceName,
 		},
 		{
-			Name:  "result_url",
-			Value: d.hostName,
-		},
-		{
 			Name:  "job_uuid",
 			Value: d.jobUuid,
 		},
+	}
+
+	if d.hostName != "" {
+		defaultEnv = append(defaultEnv, coreV1.EnvVar{
+			Name:  "result_url",
+			Value: d.hostName,
+		})
+	}
+
+	if d.gpuProductName != "" && len(d.gpuIndex) > 0 {
+		var useIndexs []string
+		for i := 0; i < int(d.hardwareResource.Gpu.Quantity); i++ {
+			if i >= len(d.gpuIndex) {
+				break
+			}
+			useIndexs = append(useIndexs, d.gpuIndex[i])
+		}
+		defaultEnv = append(defaultEnv, coreV1.EnvVar{
+			Name:  "CUDA_VISIBLE_DEVICES",
+			Value: strings.Join(useIndexs, ","),
+		})
 	}
 
 	defaultEnv = append(defaultEnv, envs...)
