@@ -707,7 +707,7 @@ func (s *K8sService) GetNodeGpuSummary(ctx context.Context) (map[string]map[stri
 						v.FreeIndex = append(v.FreeIndex, g.Index)
 						v.Free += 1
 					} else {
-						v.UsedIndex = append(v.FreeIndex, g.Index)
+						v.UsedIndex = append(v.UsedIndex, g.Index)
 						v.Used += 1
 					}
 					v.Total += 1
@@ -718,7 +718,7 @@ func (s *K8sService) GetNodeGpuSummary(ctx context.Context) (map[string]map[stri
 						v.FreeIndex = append(v.FreeIndex, g.Index)
 						v.Free = 1
 					} else {
-						v.UsedIndex = append(v.FreeIndex, g.Index)
+						v.UsedIndex = append(v.UsedIndex, g.Index)
 						v.Used = 1
 					}
 					nodeGpu[gName] = gd
