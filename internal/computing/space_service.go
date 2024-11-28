@@ -1202,6 +1202,12 @@ func checkResourceAvailableForSpace(jobType int, resourceConfig models.SpaceHard
 	needStorage := float64(hardwareDetail.Storage.Quantity)
 	logs.GetLogger().Infof("checkResourceForSpace: needCpu: %d, needMemory: %.2f, needStorage: %.2f, needGpu: %s, gpuNum: %d", needCpu, needMemory, needStorage, gpuName, gpuNum)
 
+	type gpuData struct {
+		Total     int
+		Free      int
+		FreeIndex []string
+	}
+
 	for _, node := range nodes.Items {
 		var nodeName = node.Name
 		var nodeGpuInfo = nodeGpuSummary[nodeName]
@@ -1209,7 +1215,17 @@ func checkResourceAvailableForSpace(jobType int, resourceConfig models.SpaceHard
 		remainderCpu := remainderResource[ResourceCpu]
 		remainderMemory := float64(remainderResource[ResourceMem] / 1024 / 1024 / 1024)
 		remainderStorage := float64(remainderResource[ResourceStorage] / 1024 / 1024 / 1024)
-		logs.GetLogger().Infof("checkResourceForSpace: remainingCpu: %d, remainingMemory: %.2f, remainingStorage: %.2f, remainingGpu: %+v", remainderCpu, remainderMemory, remainderStorage, nodeGpuInfo)
+
+		freeGpuMap := make(map[string]gpuData)
+		for gn, gd := range nodeGpuInfo {
+			freeGpuMap[gn] = gpuData{
+				Total:     gd.Total,
+				Free:      gd.Free,
+				FreeIndex: gd.FreeIndex,
+			}
+		}
+
+		logs.GetLogger().Infof("checkResourceForSpace: remainingCpu: %d, remainingMemory: %.2f, remainingStorage: %.2f, remainingGpu: %+v", remainderCpu, remainderMemory, remainderStorage, freeGpuMap)
 		if needCpu <= remainderCpu && needMemory <= remainderMemory && needStorage <= remainderStorage {
 			if taskType == "CPU" {
 				return true, "", nil, nil
