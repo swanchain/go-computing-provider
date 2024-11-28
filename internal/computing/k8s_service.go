@@ -711,6 +711,7 @@ func (s *K8sService) GetNodeGpuSummary(ctx context.Context) (map[string]map[stri
 						v.Used += 1
 					}
 					v.Total += 1
+					nodeGpu[gName] = v
 				} else {
 					var gd GpuData
 					gd.Total = 1
