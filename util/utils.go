@@ -48,7 +48,12 @@ func CheckPortAvailability(usedPort map[int32]struct{}) bool {
 func IsPortAvailable(port int) bool {
 	address := fmt.Sprintf(":%d", port)
 	ln, err := net.Listen("tcp", address)
-	defer ln.Close()
+	defer func() {
+		if ln != nil {
+			defer ln.Close()
+		}
+	}()
+
 	if err != nil {
 		logs.GetLogger().Errorf("Port %d is not available: %v", port, err)
 		return false
