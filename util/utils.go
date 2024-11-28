@@ -2,6 +2,7 @@ package util
 
 import (
 	"fmt"
+	"github.com/filswan/go-swan-lib/logs"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -49,6 +50,7 @@ func IsPortAvailable(port int) bool {
 	ln, err := net.Listen("tcp", address)
 	defer ln.Close()
 	if err != nil {
+		logs.GetLogger().Errorf("Port %d is not available: %v", port, err)
 		return false
 	}
 	return true
