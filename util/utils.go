@@ -39,7 +39,7 @@ func CheckPortAvailability(usedPort map[int32]struct{}) bool {
 	if len(usedPort) > 0 {
 		num = num - 1
 	}
-	if num == int(portCounter.Load()) {
+	if num-int(portCounter.Load()) < 20 {
 		return true
 	}
 	return false
