@@ -511,7 +511,7 @@ func handleMultiPort(ports []int) (map[nat.Port][]nat.PortBinding, []models.Port
 	for i := 0; i < len(ports); i++ {
 		for j := 0; i < len(portRange); j++ {
 			if _, ok := usedPort[portRange[j]]; !ok {
-				if util.CheckPortAvailable(portRange[j]) {
+				if util.IsPortAvailable(portRange[j]) {
 					usedPort[portRange[j]] = ports[i]
 					count++
 					break

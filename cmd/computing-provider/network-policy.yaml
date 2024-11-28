@@ -5,7 +5,7 @@ $NETWORK_SET
 apiVersion: projectcalico.org/v3
 kind: GlobalNetworkPolicy
 metadata:
-  name: $G_SUBNET_NAME
+  name: $G_NETWORK_NAME
 spec:
   order: 201
   namespaceSelector: has(projectcalico.org/name) && projectcalico.org/name not in {"kube-system", "calico-system", "calico-apiserver","ingress-nginx"}
