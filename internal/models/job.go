@@ -1,19 +1,31 @@
 package models
 
 type EcpImageJobReq struct {
-	UUID          string            `json:"uuid,omitempty"`
-	Name          string            `json:"name,omitempty"`
-	Image         string            `json:"image,omitempty"`
-	Cmd           []string          `json:"cmd"`
-	Ports         []int             `json:"ports"`
-	HealthPath    string            `json:"health_path"`
-	Envs          map[string]string `json:"envs,omitempty"`
-	Resource      HardwareResource  `json:"resource"`
-	Price         string            `json:"price"`
-	Duration      int               `json:"duration"`
-	JobType       int               `json:"job_type"` // 1 mining; 2: inference
-	Sign          string            `json:"sign"`
-	WalletAddress string            `json:"wallet_address"`
+	UUID             string            `json:"uuid,omitempty"`
+	Name             string            `json:"name,omitempty"`
+	Image            string            `json:"image,omitempty"`
+	Cmd              []string          `json:"cmd"`
+	Ports            []int             `json:"ports"`
+	HealthPath       string            `json:"health_path"`
+	Envs             map[string]string `json:"envs,omitempty"`
+	Resource         HardwareResource  `json:"resource"`
+	Price            string            `json:"price"`
+	Duration         int               `json:"duration"`
+	JobType          int               `json:"job_type"` // 1 mining; 2: inference
+	Sign             string            `json:"sign"`
+	WalletAddress    string            `json:"wallet_address"`
+	DockerfileConfig *DockerfileConfig `json:"dockerfile_config"`
+}
+
+type DockerfileConfig struct {
+	BaseImage  string `json:"base_image"`
+	Maintainer string `json:"maintainer"`
+	WorkDir    string `json:"work_dir"`
+	//CopyFiles   []string `json:"copy_files"`
+	EnvVars     map[string]string `json:"env_vars"`
+	RunCommands []string          `json:"run_commands"`
+	ExposePorts []int             `json:"expose_ports"`
+	Cmd         []string          `json:"cmd"`
 }
 
 type EcpImageResp struct {

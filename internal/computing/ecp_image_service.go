@@ -17,6 +17,8 @@ import (
 	"github.com/swanchain/go-computing-provider/util"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -357,6 +359,36 @@ func (*ImageJobService) DockerLogsHandler(c *gin.Context) {
 }
 
 func (*ImageJobService) DeployMining(c *gin.Context, job models.EcpImageJobReq, needResource container.Resources, env []string, totalCost float64) {
+	if job.DockerfileConfig != nil {
+		dockerfile := GenerateDockerfile(job.DockerfileConfig)
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
+		buildFolder := filepath.Join(cpRepoPath, "build/ecp", job.UUID)
+		dockerfileFile := filepath.Join(buildFolder, "Dockerfile")
+		err := os.WriteFile(dockerfileFile, []byte(dockerfile), 0644)
+		if err != nil {
+			logs.GetLogger().Errorf("failed to save Dockerfile: %v", err)
+			return
+		}
+
+		imageName := fmt.Sprintf("ecp-image/%s:%d", job.UUID, time.Now().Unix())
+		if conf.GetConfig().Registry.ServerAddress != "" {
+			imageName = fmt.Sprintf("%s/%s:%d",
+				strings.TrimSpace(conf.GetConfig().Registry.ServerAddress), job.UUID, time.Now().Unix())
+		}
+		imageName = strings.ToLower(imageName)
+
+		if _, err := os.Stat(dockerfileFile); err != nil {
+			logs.GetLogger().Errorf("not found Dockerfile, path: %s", dockerfileFile)
+			return
+		}
+
+		if err := NewDockerService().BuildImage(buildFolder, imageName); err != nil {
+			logs.GetLogger().Errorf("Error building Docker image: %v", err)
+			return
+		}
+		job.Image = imageName
+	}
+
 	containerName := job.Name + "-" + generateString(5)
 	go func() {
 		err := NewDockerService().PullImage(job.Image)
@@ -406,6 +438,36 @@ func (*ImageJobService) DeployMining(c *gin.Context, job models.EcpImageJobReq, 
 }
 
 func (*ImageJobService) DeployInference(c *gin.Context, job models.EcpImageJobReq, needResource container.Resources, env []string, totalCost float64) {
+	if job.DockerfileConfig != nil {
+		dockerfile := GenerateDockerfile(job.DockerfileConfig)
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
+		buildFolder := filepath.Join(cpRepoPath, "build/ecp", job.UUID)
+		dockerfileFile := filepath.Join(buildFolder, "Dockerfile")
+		err := os.WriteFile(dockerfileFile, []byte(dockerfile), 0644)
+		if err != nil {
+			logs.GetLogger().Errorf("failed to save Dockerfile: %v", err)
+			return
+		}
+
+		imageName := fmt.Sprintf("ecp-image/%s:%d", job.UUID, time.Now().Unix())
+		if conf.GetConfig().Registry.ServerAddress != "" {
+			imageName = fmt.Sprintf("%s/%s:%d",
+				strings.TrimSpace(conf.GetConfig().Registry.ServerAddress), job.UUID, time.Now().Unix())
+		}
+		imageName = strings.ToLower(imageName)
+
+		if _, err := os.Stat(dockerfileFile); err != nil {
+			logs.GetLogger().Errorf("not found Dockerfile, path: %s", dockerfileFile)
+			return
+		}
+
+		if err := NewDockerService().BuildImage(buildFolder, imageName); err != nil {
+			logs.GetLogger().Errorf("Error building Docker image: %v", err)
+			return
+		}
+		job.Image = imageName
+	}
+
 	var containerName = job.Name + "-" + generateString(5)
 	var apiUrl string
 	var portBinding map[nat.Port][]nat.PortBinding
@@ -768,4 +830,36 @@ func CheckWalletBlackListForEcp(walletAddress string) bool {
 		}
 	}
 	return false
+}
+
+func GenerateDockerfile(config *models.DockerfileConfig) string {
+	var builder strings.Builder
+	builder.WriteString(fmt.Sprintf("FROM %s\n", config.BaseImage))
+
+	if config.Maintainer != "" {
+		builder.WriteString(fmt.Sprintf("LABEL maintainer=\"%s\"\n", config.Maintainer))
+	}
+
+	if config.WorkDir != "" {
+		builder.WriteString(fmt.Sprintf("WORKDIR %s\n", config.WorkDir))
+	}
+
+	for key, value := range config.EnvVars {
+		builder.WriteString(fmt.Sprintf("ENV %s=%s\n", key, value))
+	}
+
+	for _, cmd := range config.RunCommands {
+		builder.WriteString(fmt.Sprintf("RUN %s\n", cmd))
+	}
+
+	for _, port := range config.ExposePorts {
+		builder.WriteString(fmt.Sprintf("EXPOSE %d\n", port))
+	}
+
+	if len(config.Cmd) > 0 {
+		cmdStr := strings.Join(config.Cmd, " ")
+		builder.WriteString(fmt.Sprintf("CMD [%s]\n", cmdStr))
+	}
+
+	return builder.String()
 }
