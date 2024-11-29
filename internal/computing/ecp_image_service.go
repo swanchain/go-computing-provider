@@ -534,13 +534,14 @@ func (*ImageJobService) DeployInference(c *gin.Context, deployJob models.DeployJ
 	inferenceResp.ServicePortMapping = portMaps
 	inferenceResp.Price = totalCost
 
+	var portMap []string
 	if len(deployJob.Ports) > 1 {
-		var portMap []string
 		for _, pm := range portMaps {
 			portMap = append(portMap, fmt.Sprintf("%d:%d", pm.ContainerPort, pm.ExternalPort))
 		}
-		NewEcpJobService().UpdateEcpJobEntityPortsAndServiceUrl(deployJob.Uuid, strings.Join(portMap, ","), inferenceResp.ServiceUrl)
 	}
+	NewEcpJobService().UpdateEcpJobEntityPortsAndServiceUrl(deployJob.Uuid, strings.Join(portMap, ","), inferenceResp.ServiceUrl)
+
 	c.JSON(http.StatusOK, util.CreateSuccessResponse(inferenceResp))
 }
 
