@@ -33,9 +33,13 @@ var taskList = &cli.Command{
 			Name:  "show-completed",
 			Usage: "Display completed jobs",
 		},
-		&cli.StringFlag{
-			Name:  "type",
-			Usage: "Task type. Support fcp and ecp types",
+		&cli.BoolFlag{
+			Name:  "fcp",
+			Usage: "Specify the fcp task",
+		},
+		&cli.BoolFlag{
+			Name:  "ecp",
+			Usage: "Specify the ecp task",
 		},
 		&cli.BoolFlag{
 			Name:    "verbose",
@@ -50,7 +54,18 @@ var taskList = &cli.Command{
 	Action: func(cctx *cli.Context) error {
 		showCompleted := cctx.Bool("show-completed")
 		fullFlag := cctx.Bool("verbose")
-		taskType := cctx.String("type")
+		fcpFlag := cctx.Bool("fcp")
+		ecpFlag := cctx.Bool("ecp")
+		if !fcpFlag && !ecpFlag {
+			return fmt.Errorf("must specify one of fcp or ecp")
+		}
+		var taskType string
+		if fcpFlag {
+			taskType = "fcp"
+		}
+		if ecpFlag {
+			taskType = "ecp"
+		}
 		cpRepoPath, ok := os.LookupEnv("CP_PATH")
 		tailNum := cctx.Int("tail")
 		if !ok {
@@ -60,7 +75,7 @@ var taskList = &cli.Command{
 			return fmt.Errorf("load config file failed, error: %+v", err)
 		}
 
-		switch strings.TrimSpace(taskType) {
+		switch taskType {
 		case "fcp":
 			return fcpTaskList(showCompleted, fullFlag, tailNum)
 		case "ecp":
@@ -76,16 +91,31 @@ var taskDetail = &cli.Command{
 	Usage:     "Get job detail info",
 	ArgsUsage: "[job_uuid]",
 	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:  "type",
-			Usage: "Task type. Support fcp and ecp types",
+		&cli.BoolFlag{
+			Name:  "fcp",
+			Usage: "Specify the fcp task",
+		},
+		&cli.BoolFlag{
+			Name:  "ecp",
+			Usage: "Specify the ecp task",
 		},
 	},
 	Action: func(cctx *cli.Context) error {
 		if cctx.NArg() != 1 {
 			return fmt.Errorf("incorrect number of arguments, got %d, missing args: job_uuid", cctx.NArg())
 		}
-		taskType := cctx.String("type")
+		fcpFlag := cctx.Bool("fcp")
+		ecpFlag := cctx.Bool("ecp")
+		if !fcpFlag && !ecpFlag {
+			return fmt.Errorf("must specify one of fcp or ecp")
+		}
+		var taskType string
+		if fcpFlag {
+			taskType = "fcp"
+		}
+		if ecpFlag {
+			taskType = "ecp"
+		}
 
 		cpRepoPath, ok := os.LookupEnv("CP_PATH")
 		if !ok {
@@ -160,9 +190,13 @@ var taskDelete = &cli.Command{
 	Usage:     "Delete an task from the k8s",
 	ArgsUsage: "[job_uuid]",
 	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:  "type",
-			Usage: "Task type. Support fcp and ecp types",
+		&cli.BoolFlag{
+			Name:  "fcp",
+			Usage: "Specify the fcp task",
+		},
+		&cli.BoolFlag{
+			Name:  "ecp",
+			Usage: "Specify the ecp task",
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -170,7 +204,19 @@ var taskDelete = &cli.Command{
 			return fmt.Errorf("incorrect number of arguments, got %d, missing args: task_uuid", cctx.NArg())
 		}
 		jobUuid := strings.ToLower(cctx.Args().First())
-		taskType := cctx.String("type")
+
+		fcpFlag := cctx.Bool("fcp")
+		ecpFlag := cctx.Bool("ecp")
+		if !fcpFlag && !ecpFlag {
+			return fmt.Errorf("must specify one of fcp or ecp")
+		}
+		var taskType string
+		if fcpFlag {
+			taskType = "fcp"
+		}
+		if ecpFlag {
+			taskType = "ecp"
+		}
 
 		cpRepoPath, ok := os.LookupEnv("CP_PATH")
 		if !ok {
