@@ -884,6 +884,7 @@ func handleConnection(conn *websocket.Conn, jobDetail models.JobEntity, logType 
 		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 		buildLogPath := filepath.Join(cpRepoPath, "build", jobDetail.WalletAddress, "spaces", jobDetail.Name, BuildFileName)
 		if _, err := os.Stat(buildLogPath); err != nil {
+			logs.GetLogger().Errorf("failed to not found build log, path: %s, error: %v", buildLogPath, err)
 			client.HandleLogs(strings.NewReader("This space is deployed starting from a image."))
 		} else {
 			logFile, _ := os.Open(buildLogPath)
