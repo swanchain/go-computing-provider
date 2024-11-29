@@ -224,7 +224,7 @@ func (cpServ EcpJobService) UpdateEcpJobEntityContainerName(jobUuid string, cont
 }
 
 func (cpServ EcpJobService) UpdateEcpJobEntityPortsAndServiceUrl(jobUuid, portMap, serviceUrl string) (err error) {
-	return cpServ.Debug().Model(&models.EcpJobEntity{}).Where("uuid =?", jobUuid).Updates(map[string]string{
+	return cpServ.Model(&models.EcpJobEntity{}).Debug().Where("uuid =?", jobUuid).Updates(map[string]string{
 		"service_url": serviceUrl,
 		"port_map":    portMap,
 	}).Error

@@ -540,6 +540,7 @@ func (*ImageJobService) DeployInference(c *gin.Context, deployJob models.DeployJ
 			portMap = append(portMap, fmt.Sprintf("%d:%d", pm.ContainerPort, pm.ExternalPort))
 		}
 	}
+	logs.GetLogger().Infof("uuid: %s, portMap: %v, url: %s", deployJob.Uuid, portMap, inferenceResp.ServiceUrl)
 	NewEcpJobService().UpdateEcpJobEntityPortsAndServiceUrl(deployJob.Uuid, strings.Join(portMap, ","), inferenceResp.ServiceUrl)
 
 	c.JSON(http.StatusOK, util.CreateSuccessResponse(inferenceResp))
