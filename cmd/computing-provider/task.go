@@ -75,10 +75,17 @@ var taskDetail = &cli.Command{
 	Name:      "get",
 	Usage:     "Get job detail info",
 	ArgsUsage: "[job_uuid]",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "type",
+			Usage: "Task type. Support fcp and ecp types",
+		},
+	},
 	Action: func(cctx *cli.Context) error {
 		if cctx.NArg() != 1 {
 			return fmt.Errorf("incorrect number of arguments, got %d, missing args: job_uuid", cctx.NArg())
 		}
+		taskType := cctx.String("type")
 
 		cpRepoPath, ok := os.LookupEnv("CP_PATH")
 		if !ok {
@@ -89,33 +96,61 @@ var taskDetail = &cli.Command{
 		}
 
 		jobUuid := cctx.Args().First()
-		job, err := computing.NewJobService().GetJobEntityByJobUuid(jobUuid)
-		if err != nil {
-			return fmt.Errorf("job_uuid: %s, get job detail failed, error: %+v", jobUuid, err)
+
+		if taskType == "fcp" {
+			job, err := computing.NewJobService().GetJobEntityByJobUuid(jobUuid)
+			if err != nil {
+				return fmt.Errorf("job_uuid: %s, get job detail failed, error: %+v", jobUuid, err)
+			}
+
+			var taskData [][]string
+			taskData = append(taskData, []string{"TASK UUID:", job.TaskUuid})
+			taskData = append(taskData, []string{"TASK TYPE:", job.ResourceType})
+			taskData = append(taskData, []string{"WALLET ADDRESS:", job.WalletAddress})
+			taskData = append(taskData, []string{"SPACE NAME:", job.Name})
+			taskData = append(taskData, []string{"SPACE URL:", job.RealUrl})
+			taskData = append(taskData, []string{"HARDWARE:", job.Hardware})
+			taskData = append(taskData, []string{"STATUS:", models.GetJobStatus(job.Status)})
+			taskData = append(taskData, []string{"RESULT URL:", job.ResultUrl})
+			taskData = append(taskData, []string{"CREATE TIME:", time.Unix(job.CreateTime, 0).Format("2006-01-02 15:04:05")})
+			taskData = append(taskData, []string{"EXPIRE TIME:", time.Unix(job.ExpireTime, 0).Format("2006-01-02 15:04:05")})
+
+			rowColor := getColor(job.Status)
+			header := []string{"JOB UUID:", job.JobUuid}
+
+			var rowColorList []RowColor
+			rowColorList = append(rowColorList, RowColor{
+				row:    6,
+				column: []int{1},
+				color:  rowColor,
+			})
+			NewVisualTable(header, taskData, rowColorList).SetAutoWrapText(false).Generate(false)
+		} else {
+			job, err := computing.NewEcpJobService().GetEcpJobByUuid(jobUuid)
+			if err != nil {
+				return fmt.Errorf("failed to get job, job_uuid: %s, error: %v", jobUuid, err)
+			}
+
+			var jobType = "Mining"
+			if job.JobType == models.InferenceJobType {
+				jobType = "Inference"
+			}
+
+			var taskData [][]string
+			taskData = append(taskData, []string{"TASK NAME:", job.Name})
+			taskData = append(taskData, []string{"TASK TYPE:", jobType})
+			taskData = append(taskData, []string{"CONTAINER NAME:", job.ContainerName})
+			taskData = append(taskData, []string{"GPU NAME:", job.GpuName})
+			taskData = append(taskData, []string{"GPU INDEX:", job.GpuIndex})
+			taskData = append(taskData, []string{"SERVICE URL:", job.ServiceUrl})
+			taskData = append(taskData, []string{"PORTS:", job.PortMap})
+			taskData = append(taskData, []string{"STATUS:", job.Status})
+			taskData = append(taskData, []string{"CREATE TIME:", time.Unix(job.CreateTime, 0).Format("2006-01-02 15:04:05")})
+
+			header := []string{"TASK UUID:", job.Uuid}
+			NewVisualTable(header, taskData, []RowColor{}).SetAutoWrapText(false).Generate(false)
 		}
 
-		var taskData [][]string
-		taskData = append(taskData, []string{"TASK UUID:", job.TaskUuid})
-		taskData = append(taskData, []string{"TASK TYPE:", job.ResourceType})
-		taskData = append(taskData, []string{"WALLET ADDRESS:", job.WalletAddress})
-		taskData = append(taskData, []string{"SPACE NAME:", job.Name})
-		taskData = append(taskData, []string{"SPACE URL:", job.RealUrl})
-		taskData = append(taskData, []string{"HARDWARE:", job.Hardware})
-		taskData = append(taskData, []string{"STATUS:", models.GetJobStatus(job.Status)})
-		taskData = append(taskData, []string{"RESULT URL:", job.ResultUrl})
-		taskData = append(taskData, []string{"CREATE TIME:", time.Unix(job.CreateTime, 0).Format("2006-01-02 15:04:05")})
-		taskData = append(taskData, []string{"EXPIRE TIME:", time.Unix(job.ExpireTime, 0).Format("2006-01-02 15:04:05")})
-
-		rowColor := getColor(job.Status)
-		header := []string{"JOB UUID:", job.JobUuid}
-
-		var rowColorList []RowColor
-		rowColorList = append(rowColorList, RowColor{
-			row:    6,
-			column: []int{1},
-			color:  rowColor,
-		})
-		NewVisualTable(header, taskData, rowColorList).SetAutoWrapText(false).Generate(false)
 		return nil
 	},
 }
@@ -124,10 +159,18 @@ var taskDelete = &cli.Command{
 	Name:      "delete",
 	Usage:     "Delete an task from the k8s",
 	ArgsUsage: "[job_uuid]",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "type",
+			Usage: "Task type. Support fcp and ecp types",
+		},
+	},
 	Action: func(cctx *cli.Context) error {
 		if cctx.NArg() != 1 {
 			return fmt.Errorf("incorrect number of arguments, got %d, missing args: task_uuid", cctx.NArg())
 		}
+		jobUuid := strings.ToLower(cctx.Args().First())
+		taskType := cctx.String("type")
 
 		cpRepoPath, ok := os.LookupEnv("CP_PATH")
 		if !ok {
@@ -137,28 +180,40 @@ var taskDelete = &cli.Command{
 			return fmt.Errorf("failed to load config file, error: %+v", err)
 		}
 
-		jobUuid := strings.ToLower(cctx.Args().First())
-		job, err := computing.NewJobService().GetJobEntityByJobUuid(jobUuid)
-		if err != nil {
-			return fmt.Errorf("failed to get job detail, job_uuid: %s, error: %+v", jobUuid, err)
+		if taskType == "fcp" {
+			job, err := computing.NewJobService().GetJobEntityByJobUuid(jobUuid)
+			if err != nil {
+				return fmt.Errorf("failed to get job detail, job_uuid: %s, error: %+v", jobUuid, err)
+			}
+
+			if job.JobUuid == "" {
+				return fmt.Errorf("not found the job_uuid='%s' job detail", jobUuid)
+			}
+
+			serviceName := constants.K8S_SERVICE_NAME_PREFIX + jobUuid
+			ingressName := constants.K8S_INGRESS_NAME_PREFIX + jobUuid
+
+			k8sService := computing.NewK8sService()
+			k8sService.DeleteIngress(context.TODO(), job.NameSpace, ingressName)
+			k8sService.DeleteService(context.TODO(), job.NameSpace, serviceName)
+			k8sService.DeleteDeployment(context.TODO(), job.NameSpace, job.K8sDeployName)
+			time.Sleep(3 * time.Second)
+			k8sService.DeleteDeployRs(context.TODO(), job.NameSpace, job.JobUuid)
+
+			computing.NewJobService().DeleteJobEntityByJobUuId(job.JobUuid, models.JOB_TERMINATED_STATUS)
+			fmt.Printf("job_uuid: %s space serivce successfully deleted \n", jobUuid)
+		} else {
+			ecpJobEntity, err := computing.NewEcpJobService().GetEcpJobByUuid(jobUuid)
+			if err != nil {
+				return fmt.Errorf("failed to get job, job_uuid: %s, error: %v", jobUuid, err)
+			}
+			containerName := ecpJobEntity.ContainerName
+			if err = computing.NewDockerService().RemoveContainerByName(containerName); err != nil {
+				return fmt.Errorf("failed to remove container, job_uuid: %s, error: %v", jobUuid, err)
+			}
+			computing.NewEcpJobService().DeleteContainerByUuid(jobUuid)
+			fmt.Printf("job_uuid: %s serivce successfully deleted \n", jobUuid)
 		}
-
-		if job.JobUuid == "" {
-			return fmt.Errorf("not found the job_uuid='%s' job detail", jobUuid)
-		}
-
-		serviceName := constants.K8S_SERVICE_NAME_PREFIX + jobUuid
-		ingressName := constants.K8S_INGRESS_NAME_PREFIX + jobUuid
-
-		k8sService := computing.NewK8sService()
-		k8sService.DeleteIngress(context.TODO(), job.NameSpace, ingressName)
-		k8sService.DeleteService(context.TODO(), job.NameSpace, serviceName)
-		k8sService.DeleteDeployment(context.TODO(), job.NameSpace, job.K8sDeployName)
-		time.Sleep(3 * time.Second)
-		k8sService.DeleteDeployRs(context.TODO(), job.NameSpace, job.JobUuid)
-
-		computing.NewJobService().DeleteJobEntityByJobUuId(job.JobUuid, models.JOB_TERMINATED_STATUS)
-		fmt.Printf("job_uuid: %s space serivce successfully deleted \n", jobUuid)
 		return nil
 	},
 }

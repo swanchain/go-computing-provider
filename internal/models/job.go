@@ -3,18 +3,22 @@ package models
 import "github.com/docker/docker/api/types/container"
 
 type EcpImageJobReq struct {
-	Uuid             string            `json:"uuid"`
-	Name             string            `json:"name"`
-	Price            string            `json:"price"`
-	Duration         int               `json:"duration"`
-	JobType          int               `json:"job_type"`
-	HealthPath       string            `json:"health_path"`
-	Sign             string            `json:"sign"`
-	WalletAddress    string            `json:"wallet_address"`
-	Resource         *HardwareResource `json:"resource"`
-	YamlConfig       *YamlConfig       `json:"yaml_config"`
-	DockerfileConfig *DockerfileConfig `json:"dockerfile_config"`
-	EnvsForDb        []string
+	Uuid          string            `json:"uuid,omitempty"`
+	Name          string            `json:"name,omitempty"`
+	Price         string            `json:"price,omitempty"`
+	Duration      int               `json:"duration,omitempty"`
+	JobType       int               `json:"job_type,omitempty"`
+	HealthPath    string            `json:"health_path,omitempty"`
+	Sign          string            `json:"sign,omitempty"`
+	WalletAddress string            `json:"wallet_address,omitempty"`
+	Resource      *HardwareResource `json:"resource,omitempty"`
+	Image         string            `json:"image,omitempty"`
+	Cmd           []string          `json:"cmd,omitempty"`
+	Ports         []int             `json:"ports,omitempty"`
+	Envs          map[string]string `json:"envs,omitempty"`
+	RunCommands   []string          `json:"run_commands,omitempty"`
+	ResourceUrl   string            `json:"resource_url,omitempty"`
+	WorkDir       string            `json:"work_dir,omitempty"`
 }
 
 type HardwareResource struct {
@@ -23,22 +27,6 @@ type HardwareResource struct {
 	Storage  int64  `json:"storage"`
 	GPU      int    `json:"gpu"`
 	GPUModel string `json:"gpu_model"`
-}
-
-type YamlConfig struct {
-	Image string            `json:"image"`
-	Cmd   []string          `json:"cmd"`
-	Ports []int             `json:"ports"`
-	Envs  map[string]string `json:"envs"`
-}
-
-type DockerfileConfig struct {
-	BaseImage   string            `json:"base_image"`
-	WorkDir     string            `json:"work_dir"`
-	EnvVars     map[string]string `json:"env_vars"`
-	RunCommands []string          `json:"run_commands"`
-	ExposePorts []int             `json:"expose_ports"`
-	StartCmd    []string          `json:"start_cmd"`
 }
 
 type DeployJobParam struct {

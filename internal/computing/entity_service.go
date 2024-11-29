@@ -196,7 +196,7 @@ func (cpServ EcpJobService) GetEcpJobsByLimit(tailNum int) ([]models.EcpJobEntit
 	if tailNum > 0 {
 		err = cpServ.Model(&models.EcpJobEntity{}).Order("create_time desc").Limit(tailNum).Find(&jobList).Error
 	} else {
-		err = cpServ.Model(&models.EcpJobEntity{}).Find(&jobList).Error
+		err = cpServ.Model(&models.EcpJobEntity{}).Order("create_time desc").Find(&jobList).Error
 	}
 	if err != nil {
 		return nil, err

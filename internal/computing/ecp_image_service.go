@@ -113,25 +113,8 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "invalidate value: [job_type], support: 1 or 2"))
 		return
 	}
-
-	if job.YamlConfig == nil && job.DockerfileConfig == nil {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [dockerfile_config or yaml_config]"))
-		return
-	}
-
-	if job.YamlConfig != nil {
-		if job.YamlConfig.Image == "" {
-			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [image]"))
-		}
-	}
-
-	if job.DockerfileConfig != nil {
-		if job.DockerfileConfig.BaseImage == "" {
-			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [base_image]"))
-		}
-		if len(job.DockerfileConfig.StartCmd) == 0 {
-			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [start_cmd]"))
-		}
+	if job.Image == "" {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [image]"))
 	}
 
 	if conf.GetConfig().UBI.VerifySign {
@@ -227,16 +210,17 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 	deployJob.JobType = job.JobType
 	deployJob.HealthPath = job.HealthPath
 	deployJob.NeedResource = needResource
-	if job.YamlConfig != nil {
-		deployJob.Image = job.YamlConfig.Image
-		deployJob.Cmd = job.YamlConfig.Cmd
-		deployJob.Ports = job.YamlConfig.Ports
-		for k, v := range job.YamlConfig.Envs {
+
+	if job.RunCommands != nil || len(job.RunCommands) == 0 {
+		deployJob.Image = job.Image
+		deployJob.Cmd = job.Cmd
+		deployJob.Ports = job.Ports
+		for k, v := range job.Envs {
 			envs = append(envs, fmt.Sprintf("%s=%s", k, v))
 		}
 		deployJob.Envs = envs
 	} else {
-		buildParams, err := parseDockerfileConfig(job.Uuid, job.DockerfileConfig)
+		buildParams, err := parseDockerfileConfig(job)
 		if err != nil {
 			logs.GetLogger().Errorln(err)
 			return
@@ -826,12 +810,12 @@ func CheckWalletBlackListForEcp(walletAddress string) bool {
 	return false
 }
 
-func parseDockerfileConfig(jobUuid string, dockerfileConfig *models.DockerfileConfig) (*models.DeployJobParam, error) {
+func parseDockerfileConfig(job models.EcpImageJobReq) (*models.DeployJobParam, error) {
 	var deployParam *models.DeployJobParam
-	if dockerfileConfig != nil {
-		content, envs, ports := generateDockerfile(dockerfileConfig)
+	if job.RunCommands != nil && len(job.RunCommands) != 0 {
+		content, envs, ports := generateDockerfile(job)
 		cpRepoPath, _ := os.LookupEnv("CP_PATH")
-		buildFolder := filepath.Join(cpRepoPath, "build/ecp", jobUuid)
+		buildFolder := filepath.Join(cpRepoPath, "build/ecp", job.Uuid)
 		if err := os.MkdirAll(buildFolder, os.ModePerm); err != nil {
 			return nil, fmt.Errorf("failed to create dir, error: %v", err)
 		}
@@ -841,10 +825,10 @@ func parseDockerfileConfig(jobUuid string, dockerfileConfig *models.DockerfileCo
 			return nil, fmt.Errorf("failed to save Dockerfile: %v", err)
 		}
 
-		imageName := fmt.Sprintf("ecp-image/%s:%d", jobUuid, time.Now().Unix())
+		imageName := fmt.Sprintf("ecp-image/%s:%d", job.Uuid, time.Now().Unix())
 		if conf.GetConfig().Registry.ServerAddress != "" {
 			imageName = fmt.Sprintf("%s/%s:%d",
-				strings.TrimSpace(conf.GetConfig().Registry.ServerAddress), jobUuid, time.Now().Unix())
+				strings.TrimSpace(conf.GetConfig().Registry.ServerAddress), job.Uuid, time.Now().Unix())
 		}
 		imageName = strings.ToLower(imageName)
 
@@ -859,9 +843,9 @@ func parseDockerfileConfig(jobUuid string, dockerfileConfig *models.DockerfileCo
 	return deployParam, nil
 }
 
-func generateDockerfile(config *models.DockerfileConfig) (string, []string, []int) {
+func generateDockerfile(config models.EcpImageJobReq) (string, []string, []int) {
 	var builder strings.Builder
-	builder.WriteString(fmt.Sprintf("FROM %s\n", config.BaseImage))
+	builder.WriteString(fmt.Sprintf("FROM %s\n", config.Image))
 
 	var envs []string
 	var ports []int
@@ -869,7 +853,7 @@ func generateDockerfile(config *models.DockerfileConfig) (string, []string, []in
 		builder.WriteString(fmt.Sprintf("WORKDIR %s\n", config.WorkDir))
 	}
 
-	for key, value := range config.EnvVars {
+	for key, value := range config.Envs {
 		builder.WriteString(fmt.Sprintf("ENV %s=%s\n", key, value))
 		envs = append(envs, fmt.Sprintf("%s=%s", key, value))
 	}
@@ -878,13 +862,13 @@ func generateDockerfile(config *models.DockerfileConfig) (string, []string, []in
 		builder.WriteString(fmt.Sprintf("RUN %s\n", cmd))
 	}
 
-	for _, port := range config.ExposePorts {
+	for _, port := range config.Ports {
 		builder.WriteString(fmt.Sprintf("EXPOSE %d\n", port))
 		ports = append(ports, port)
 	}
 
-	if len(config.StartCmd) > 0 {
-		cmdStr := strings.Join(config.StartCmd, " ")
+	if len(config.Cmd) > 0 {
+		cmdStr := strings.Join(config.Cmd, " ")
 		builder.WriteString(fmt.Sprintf("CMD [%s]\n", cmdStr))
 	}
 
