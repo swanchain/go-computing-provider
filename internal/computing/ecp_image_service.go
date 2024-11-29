@@ -542,7 +542,7 @@ func (*ImageJobService) DeployInference(c *gin.Context, deployJob models.DeployJ
 	}
 	err = NewEcpJobService().UpdateEcpJobEntityPortsAndServiceUrl(deployJob.Uuid, strings.Join(portMap, ","), inferenceResp.ServiceUrl)
 	if err != nil {
-		logs.GetLogger().Errorf("failed to update job service urk to db, error: %v", err)
+		logs.GetLogger().Errorf("failed to update job service url to db, error: %v", err)
 		return
 	}
 
