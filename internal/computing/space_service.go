@@ -1230,10 +1230,12 @@ func checkResourceAvailableForSpace(jobType int, resourceConfig models.SpaceHard
 			if taskType == "CPU" {
 				return true, "", nil, nil
 			} else if taskType == "GPU" {
-				if gData, ok := nodeGpuInfo[gpuName]; ok {
-					remainingGpu := difference(gData.FreeIndex, nodeGpu[gpuName].UsedIndex)
-					if gpuNum <= int64(len(remainingGpu)) {
-						return true, gpuName, remainingGpu, nil
+				for gname, gData := range nodeGpuInfo {
+					if strings.Contains(gname, gpuName) {
+						remainingGpu := difference(gData.FreeIndex, nodeGpu[gpuName].UsedIndex)
+						if gpuNum <= int64(len(remainingGpu)) {
+							return true, gpuName, remainingGpu, nil
+						}
 					}
 				}
 				continue
