@@ -540,8 +540,11 @@ func (*ImageJobService) DeployInference(c *gin.Context, deployJob models.DeployJ
 			portMap = append(portMap, fmt.Sprintf("%d:%d", pm.ContainerPort, pm.ExternalPort))
 		}
 	}
-	logs.GetLogger().Infof("uuid: %s, portMap: %v, url: %s", deployJob.Uuid, portMap, inferenceResp.ServiceUrl)
-	NewEcpJobService().UpdateEcpJobEntityPortsAndServiceUrl(deployJob.Uuid, strings.Join(portMap, ","), inferenceResp.ServiceUrl)
+	err = NewEcpJobService().UpdateEcpJobEntityPortsAndServiceUrl(deployJob.Uuid, strings.Join(portMap, ","), inferenceResp.ServiceUrl)
+	if err != nil {
+		logs.GetLogger().Errorf("failed to update job service urk to db, error: %v", err)
+		return
+	}
 
 	c.JSON(http.StatusOK, util.CreateSuccessResponse(inferenceResp))
 }

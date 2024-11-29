@@ -354,8 +354,8 @@ type EcpJobEntity struct {
 	GpuIndex        string  `json:"gpu_index"  gorm:"type:json"`
 	ContainerName   string  `json:"container_name" gorm:"container_name"`
 	HealthUrlPath   string  `json:"health_url_path"`
-	ServiceUrl      string  `json:"service_url"`
-	PortMap         string  `json:"port_map"`
+	ServiceUrl      string  `json:"service_url" gorm:"service_url"`
+	PortMap         string  `json:"port_map" gorm:"port_map"`
 	LastBlockNumber int64   `json:"last_block_number" gorm:"last_block_number"`
 	CreateTime      int64   `json:"create_time" gorm:"create_time"`
 	DeleteAt        int     `json:"delete_at" gorm:"delete_at; default:0"` // 1 deleted
