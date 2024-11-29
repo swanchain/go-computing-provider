@@ -378,7 +378,7 @@ func (*ImageJobService) DockerLogsHandler(c *gin.Context) {
 	defer containerLogStream.Close()
 	_, err = io.Copy(c.Writer, containerLogStream)
 	if err != nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ReadLogError))
+		c.Writer.Write([]byte("Log streaming stopped: timeout reached.\n"))
 		return
 	}
 }
