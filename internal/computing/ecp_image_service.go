@@ -97,29 +97,50 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		job.JobType = 1
 	}
 
-	if strings.TrimSpace(job.UUID) == "" {
+	if strings.TrimSpace(job.Uuid) == "" {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [uuid]"))
 		return
 	}
-
 	if strings.TrimSpace(job.Name) == "" {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [name]"))
 		return
 	}
-
-	if strings.TrimSpace(job.Image) == "" {
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [image]"))
+	if job.Resource == nil {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [resource]"))
 		return
 	}
-
 	if job.JobType != models.MiningJobType && job.JobType != models.InferenceJobType {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "invalidate value: [job_type], support: 1 or 2"))
 		return
 	}
 
+	if job.YamlConfig == nil && job.DockerfileConfig == nil {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [dockerfile_config or yaml_config]"))
+		return
+	}
+
+	if job.YamlConfig != nil {
+		if job.YamlConfig.Image == "" {
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [image]"))
+		}
+	}
+
+	if job.DockerfileConfig != nil {
+		if job.DockerfileConfig.BaseImage == "" {
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [base_image]"))
+		}
+		if len(job.DockerfileConfig.StartCmd) == 0 {
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [start_cmd]"))
+		}
+	}
+
 	if conf.GetConfig().UBI.VerifySign {
 		if len(job.Sign) == 0 {
 			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BadParamError, "missing required field: [sign]"))
+			return
+		}
+		if len(job.WalletAddress) == 0 {
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BadParamError, "missing required field: [wallet_address]"))
 			return
 		}
 
@@ -130,14 +151,14 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 			return
 		}
 
-		signature, err := verifySignature(job.WalletAddress, fmt.Sprintf("%s%s", cpAccountAddress, job.UUID), job.Sign)
+		signature, err := verifySignature(job.WalletAddress, fmt.Sprintf("%s%s", cpAccountAddress, job.Uuid), job.Sign)
 		if err != nil {
 			logs.GetLogger().Errorf("failed to verifySignature for ecp job, error: %+v", err)
 			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
 			return
 		}
 
-		logs.GetLogger().Infof("ubi task sign verifing, task_id: %s, verify: %v", job.UUID, signature)
+		logs.GetLogger().Infof("ubi task sign verifing, task_id: %s, verify: %v", job.Uuid, signature)
 		if !signature {
 			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "signature verify failed"))
 			return
@@ -149,21 +170,16 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 	if !conf.GetConfig().API.Pricing {
 		checkPriceFlag, totalCost, err = checkPriceForDocker(job.Price, job.Duration, job.Resource)
 		if err != nil {
-			logs.GetLogger().Errorf("failed to check price, job_uuid: %s, error: %v", job.UUID, err)
+			logs.GetLogger().Errorf("failed to check price, job_uuid: %s, error: %v", job.Uuid, err)
 			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.CheckPriceError))
 			return
 		}
 
 		if !checkPriceFlag {
-			logs.GetLogger().Errorf("bid below the set price, job_uuid: %s, pid: %s, need: %0.4f", job.UUID, job.Price, totalCost)
+			logs.GetLogger().Errorf("bid below the set price, job_uuid: %s, pid: %s, need: %0.4f", job.Uuid, job.Price, totalCost)
 			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BelowPriceError))
 			return
 		}
-	}
-
-	var env []string
-	for k, v := range job.Envs {
-		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
 
 	isReceive, _, needCpu, _, indexs, err := checkResourceForImage(job.Resource)
@@ -171,12 +187,12 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
 		return
 	}
-
 	if !isReceive {
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError))
 		return
 	}
 
+	var envs []string
 	var needResource container.Resources
 	var useIndexs []string
 	if job.Resource.GPUModel != "" && job.Resource.GPU > 0 {
@@ -186,8 +202,7 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 			}
 			useIndexs = append(useIndexs, indexs[i])
 		}
-		env = append(env, fmt.Sprintf("CUDA_VISIBLE_DEVICES=%s", strings.Join(useIndexs, ",")))
-
+		envs = append(envs, fmt.Sprintf("CUDA_VISIBLE_DEVICES=%s", strings.Join(useIndexs, ",")))
 		needResource = container.Resources{
 			CPUQuota: needCpu * 100000,
 			Memory:   job.Resource.Memory,
@@ -206,6 +221,32 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		}
 	}
 
+	var deployJob models.DeployJobParam
+	deployJob.Uuid = job.Uuid
+	deployJob.Name = job.Name
+	deployJob.JobType = job.JobType
+	deployJob.HealthPath = job.HealthPath
+	deployJob.NeedResource = needResource
+	if job.YamlConfig != nil {
+		deployJob.Image = job.YamlConfig.Image
+		deployJob.Cmd = job.YamlConfig.Cmd
+		deployJob.Ports = job.YamlConfig.Ports
+		for k, v := range job.YamlConfig.Envs {
+			envs = append(envs, fmt.Sprintf("%s=%s", k, v))
+		}
+		deployJob.Envs = envs
+	} else {
+		buildParams, err := parseDockerfileConfig(job.Uuid, job.DockerfileConfig)
+		if err != nil {
+			logs.GetLogger().Errorln(err)
+			return
+		}
+		deployJob.Image = buildParams.Image
+		deployJob.Cmd = buildParams.Cmd
+		deployJob.Ports = buildParams.Ports
+		deployJob.Envs = buildParams.Envs
+	}
+
 	if job.Price == "-1" {
 		if job.JobType == models.MiningJobType {
 			var maxID int64
@@ -218,7 +259,7 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 
 			var taskEntity = new(models.TaskEntity)
 			taskEntity.Id = maxID + 1
-			taskEntity.Uuid = job.UUID
+			taskEntity.Uuid = job.Uuid
 			taskEntity.Type = models.Mining
 			taskEntity.Name = job.Name
 			taskEntity.ResourceType = models.RESOURCE_TYPE_GPU
@@ -234,12 +275,12 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		}
 	} else {
 		if err = NewEcpJobService().SaveEcpJobEntity(&models.EcpJobEntity{
-			Uuid:          job.UUID,
+			Uuid:          job.Uuid,
 			Name:          job.Name,
-			Image:         job.Image,
-			Env:           strings.Join(env, ","),
+			Image:         deployJob.Image,
+			Env:           strings.Join(deployJob.Envs, ","),
 			JobType:       job.JobType,
-			Cmd:           strings.Join(job.Cmd, ","),
+			Cmd:           strings.Join(deployJob.Cmd, ","),
 			Cpu:           job.Resource.CPU,
 			Memory:        job.Resource.Memory,
 			Storage:       job.Resource.Storage,
@@ -256,10 +297,10 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 	}
 
 	if job.JobType == models.MiningJobType {
-		imageJob.DeployMining(c, job, needResource, env, totalCost)
+		imageJob.DeployMining(c, deployJob, totalCost)
 		return
 	} else if job.JobType == models.InferenceJobType {
-		imageJob.DeployInference(c, job, needResource, env, totalCost)
+		imageJob.DeployInference(c, deployJob, totalCost)
 		return
 	}
 }
@@ -358,125 +399,71 @@ func (*ImageJobService) DockerLogsHandler(c *gin.Context) {
 	}
 }
 
-func (*ImageJobService) DeployMining(c *gin.Context, job models.EcpImageJobReq, needResource container.Resources, env []string, totalCost float64) {
-	if job.DockerfileConfig != nil {
-		dockerfile := GenerateDockerfile(job.DockerfileConfig)
-		cpRepoPath, _ := os.LookupEnv("CP_PATH")
-		buildFolder := filepath.Join(cpRepoPath, "build/ecp", job.UUID)
-		dockerfileFile := filepath.Join(buildFolder, "Dockerfile")
-		err := os.WriteFile(dockerfileFile, []byte(dockerfile), 0644)
-		if err != nil {
-			logs.GetLogger().Errorf("failed to save Dockerfile: %v", err)
-			return
-		}
-
-		imageName := fmt.Sprintf("ecp-image/%s:%d", job.UUID, time.Now().Unix())
-		if conf.GetConfig().Registry.ServerAddress != "" {
-			imageName = fmt.Sprintf("%s/%s:%d",
-				strings.TrimSpace(conf.GetConfig().Registry.ServerAddress), job.UUID, time.Now().Unix())
-		}
-		imageName = strings.ToLower(imageName)
-
-		if _, err := os.Stat(dockerfileFile); err != nil {
-			logs.GetLogger().Errorf("not found Dockerfile, path: %s", dockerfileFile)
-			return
-		}
-
-		if err := NewDockerService().BuildImage(buildFolder, imageName); err != nil {
-			logs.GetLogger().Errorf("Error building Docker image: %v", err)
-			return
-		}
-		job.Image = imageName
-	}
-
-	containerName := job.Name + "-" + generateString(5)
+func (*ImageJobService) DeployMining(c *gin.Context, deployJob models.DeployJobParam, totalCost float64) {
+	var err error
+	containerName := deployJob.Name + "-" + generateString(5)
 	go func() {
-		err := NewDockerService().PullImage(job.Image)
-		if err != nil {
-			logs.GetLogger().Errorf("failed to pull %s image, job_uuid: %s, error: %v", job.Image, job.UUID, err)
-			NewEcpJobService().UpdateEcpJobEntityMessage(job.UUID, fmt.Sprintf("failed to pull image: %s", job.Image))
-			return
+		if deployJob.BuildImagePath != "" && deployJob.BuildImageName != "" {
+			if err := NewDockerService().BuildImage(deployJob.BuildImagePath, deployJob.BuildImageName); err != nil {
+				logs.GetLogger().Errorf("failed to building %s image, job_uuid: %s, error: %v", deployJob.Image, deployJob.Uuid, err)
+				NewEcpJobService().UpdateEcpJobEntityMessage(deployJob.Uuid, fmt.Sprintf("failed to build image: %s", deployJob.Image))
+			}
+		} else {
+			if err := NewDockerService().PullImage(deployJob.Image); err != nil {
+				logs.GetLogger().Errorf("failed to pull %s image, job_uuid: %s, error: %v", deployJob.Image, deployJob.Uuid, err)
+				NewEcpJobService().UpdateEcpJobEntityMessage(deployJob.Uuid, fmt.Sprintf("failed to pull image: %s", deployJob.Image))
+				return
+			}
 		}
 
 		hostConfig := &container.HostConfig{
-			Resources:  needResource,
+			Resources:  deployJob.NeedResource,
 			Privileged: true,
 		}
 		containerConfig := &container.Config{
-			Image:        job.Image,
-			Env:          env,
+			Image:        deployJob.Image,
+			Env:          deployJob.Envs,
 			AttachStdout: true,
 			AttachStderr: true,
 			Tty:          true,
 		}
 		dockerService := NewDockerService()
 		if err := dockerService.ContainerCreateAndStart(containerConfig, hostConfig, nil, containerName); err != nil {
-			logs.GetLogger().Errorf("failed to create job container, job_uuid: %s, error: %v", job.UUID, err)
-			NewEcpJobService().UpdateEcpJobEntityMessage(job.UUID, "failed to create container")
+			logs.GetLogger().Errorf("failed to create job container, job_uuid: %s, error: %v", deployJob.Uuid, err)
+			NewEcpJobService().UpdateEcpJobEntityMessage(deployJob.Uuid, "failed to create container")
 			return
 		}
-		logs.GetLogger().Warnf("job_uuid: %s, starting container, container name: %s", job.UUID, containerName)
+		logs.GetLogger().Warnf("job_uuid: %s, starting container, container name: %s", deployJob.Uuid, containerName)
 
 		time.Sleep(3 * time.Second)
 		if !dockerService.IsExistContainer(containerName) {
-			logs.GetLogger().Warnf("job_uuid: %s, not found container", job.UUID)
-			NewEcpJobService().UpdateEcpJobEntityMessage(job.UUID, "failed to start container")
+			logs.GetLogger().Warnf("job_uuid: %s, not found container", deployJob.Uuid)
+			NewEcpJobService().UpdateEcpJobEntityMessage(deployJob.Uuid, "failed to start container")
 			return
 		}
-		logs.GetLogger().Warnf("job_uuid: %s, started container, container name: %s", job.UUID, containerName)
+		logs.GetLogger().Warnf("job_uuid: %s, started container, container name: %s", deployJob.Uuid, containerName)
 
-		if err = NewEcpJobService().UpdateEcpJobEntityContainerName(job.UUID, containerName); err != nil {
+		if err = NewEcpJobService().UpdateEcpJobEntityContainerName(deployJob.Uuid, containerName); err != nil {
 			logs.GetLogger().Errorf("failed to save job to db, error: %v", err)
 			return
 		}
 	}()
 
 	c.JSON(http.StatusOK, util.CreateSuccessResponse(map[string]interface{}{
-		"uuid":  job.UUID,
+		"uuid":  deployJob.Uuid,
 		"price": totalCost,
 	}))
 }
 
-func (*ImageJobService) DeployInference(c *gin.Context, job models.EcpImageJobReq, needResource container.Resources, env []string, totalCost float64) {
-	if job.DockerfileConfig != nil {
-		dockerfile := GenerateDockerfile(job.DockerfileConfig)
-		cpRepoPath, _ := os.LookupEnv("CP_PATH")
-		buildFolder := filepath.Join(cpRepoPath, "build/ecp", job.UUID)
-		dockerfileFile := filepath.Join(buildFolder, "Dockerfile")
-		err := os.WriteFile(dockerfileFile, []byte(dockerfile), 0644)
-		if err != nil {
-			logs.GetLogger().Errorf("failed to save Dockerfile: %v", err)
-			return
-		}
-
-		imageName := fmt.Sprintf("ecp-image/%s:%d", job.UUID, time.Now().Unix())
-		if conf.GetConfig().Registry.ServerAddress != "" {
-			imageName = fmt.Sprintf("%s/%s:%d",
-				strings.TrimSpace(conf.GetConfig().Registry.ServerAddress), job.UUID, time.Now().Unix())
-		}
-		imageName = strings.ToLower(imageName)
-
-		if _, err := os.Stat(dockerfileFile); err != nil {
-			logs.GetLogger().Errorf("not found Dockerfile, path: %s", dockerfileFile)
-			return
-		}
-
-		if err := NewDockerService().BuildImage(buildFolder, imageName); err != nil {
-			logs.GetLogger().Errorf("Error building Docker image: %v", err)
-			return
-		}
-		job.Image = imageName
-	}
-
-	var containerName = job.Name + "-" + generateString(5)
+func (*ImageJobService) DeployInference(c *gin.Context, deployJob models.DeployJobParam, totalCost float64) {
+	var containerName = deployJob.Name + "-" + generateString(5)
+	var err error
 	var apiUrl string
 	var portBinding map[nat.Port][]nat.PortBinding
 	var portMaps []models.PortMap
 	var labelMap map[string]string
-	var err error
-
-	if len(job.Ports) > 1 {
-		portBinding, portMaps, err = handleMultiPort(job.Ports)
+	if len(deployJob.Ports) > 1 {
+		portBinding, portMaps, err = handleMultiPort(deployJob.Ports)
 		multiAddressSplit := strings.Split(conf.GetConfig().API.MultiAddress, "/")
 		apiUrl = multiAddressSplit[2]
 	} else {
@@ -496,27 +483,34 @@ func (*ImageJobService) DeployInference(c *gin.Context, job models.EcpImageJobRe
 	}
 
 	go func() {
-		if err := NewDockerService().PullImage(job.Image); err != nil {
-			logs.GetLogger().Errorf("failed to pull %s image, job_uuid: %s, error: %v", job.Image, job.UUID, err)
-			NewEcpJobService().UpdateEcpJobEntityMessage(job.UUID, fmt.Sprintf("failed to pull image: %s", job.Image))
-			return
+		if deployJob.BuildImagePath != "" && deployJob.BuildImageName != "" {
+			if err := NewDockerService().BuildImage(deployJob.BuildImagePath, deployJob.BuildImageName); err != nil {
+				logs.GetLogger().Errorf("failed to building %s image, job_uuid: %s, error: %v", deployJob.Image, deployJob.Uuid, err)
+				NewEcpJobService().UpdateEcpJobEntityMessage(deployJob.Uuid, fmt.Sprintf("failed to build image: %s", deployJob.Image))
+			}
+		} else {
+			if err := NewDockerService().PullImage(deployJob.Image); err != nil {
+				logs.GetLogger().Errorf("failed to pull %s image, job_uuid: %s, error: %v", deployJob.Image, deployJob.Uuid, err)
+				NewEcpJobService().UpdateEcpJobEntityMessage(deployJob.Uuid, fmt.Sprintf("failed to pull image: %s", deployJob.Image))
+				return
+			}
 		}
 
 		hostConfig := &container.HostConfig{
-			Resources:  needResource,
+			Resources:  deployJob.NeedResource,
 			Privileged: true,
 		}
 		containerConfig := &container.Config{
-			Image:        job.Image,
-			Env:          env,
-			Cmd:          job.Cmd,
+			Image:        deployJob.Image,
+			Env:          deployJob.Envs,
+			Cmd:          deployJob.Cmd,
 			AttachStdout: true,
 			AttachStderr: true,
 			Tty:          true,
 		}
 
 		var networkConfig *network.NetworkingConfig
-		if len(job.Ports) > 1 {
+		if len(deployJob.Ports) > 1 {
 			hostConfig.PortBindings = portBinding
 		} else {
 			containerConfig.Labels = labelMap
@@ -529,39 +523,39 @@ func (*ImageJobService) DeployInference(c *gin.Context, job models.EcpImageJobRe
 
 		dockerService := NewDockerService()
 		if err := dockerService.ContainerCreateAndStart(containerConfig, hostConfig, networkConfig, containerName); err != nil {
-			logs.GetLogger().Errorf("failed to create job container, job_uuid: %s, error: %v", job.UUID, err)
-			NewEcpJobService().UpdateEcpJobEntityMessage(job.UUID, "failed to create container")
+			logs.GetLogger().Errorf("failed to create job container, job_uuid: %s, error: %v", deployJob.Uuid, err)
+			NewEcpJobService().UpdateEcpJobEntityMessage(deployJob.Uuid, "failed to create container")
 			return
 		}
-		logs.GetLogger().Warnf("job_uuid: %s, starting container, container name: %s", job.UUID, containerName)
+		logs.GetLogger().Warnf("job_uuid: %s, starting container, container name: %s", deployJob.Uuid, containerName)
 
 		time.Sleep(3 * time.Second)
 		if !dockerService.IsExistContainer(containerName) {
-			logs.GetLogger().Warnf("job_uuid: %s, not found container", job.UUID)
-			NewEcpJobService().UpdateEcpJobEntityMessage(job.UUID, "failed to start container")
+			logs.GetLogger().Warnf("job_uuid: %s, not found container", deployJob.Uuid)
+			NewEcpJobService().UpdateEcpJobEntityMessage(deployJob.Uuid, "failed to start container")
 			return
 		}
-		logs.GetLogger().Warnf("job_uuid: %s, started container, container name: %s", job.UUID, containerName)
+		logs.GetLogger().Warnf("job_uuid: %s, started container, container name: %s", deployJob.Uuid, containerName)
 
-		if err = NewEcpJobService().UpdateEcpJobEntityContainerName(job.UUID, containerName); err != nil {
+		if err = NewEcpJobService().UpdateEcpJobEntityContainerName(deployJob.Uuid, containerName); err != nil {
 			logs.GetLogger().Errorf("failed to save job to db, error: %v", err)
 			return
 		}
 	}()
 
 	var inferenceResp models.EcpImageResp
-	inferenceResp.UUID = job.UUID
+	inferenceResp.UUID = deployJob.Uuid
 	inferenceResp.ServiceUrl = "http://" + apiUrl
-	inferenceResp.HealthPath = job.HealthPath
+	inferenceResp.HealthPath = deployJob.HealthPath
 	inferenceResp.ServicePortMapping = portMaps
 	inferenceResp.Price = totalCost
 
-	if len(job.Ports) > 1 {
+	if len(deployJob.Ports) > 1 {
 		var portMap []string
 		for _, pm := range portMaps {
 			portMap = append(portMap, fmt.Sprintf("%d:%d", pm.ContainerPort, pm.ExternalPort))
 		}
-		NewEcpJobService().UpdateEcpJobEntityPortsAndServiceUrl(job.UUID, strings.Join(portMap, ","), inferenceResp.ServiceUrl)
+		NewEcpJobService().UpdateEcpJobEntityPortsAndServiceUrl(deployJob.Uuid, strings.Join(portMap, ","), inferenceResp.ServiceUrl)
 	}
 	c.JSON(http.StatusOK, util.CreateSuccessResponse(inferenceResp))
 }
@@ -603,7 +597,7 @@ func handleMultiPort(ports []int) (map[nat.Port][]nat.PortBinding, []models.Port
 	return portMap, mapPorts, nil
 }
 
-func checkPriceForDocker(userPrice string, duration int, resource models.HardwareResource) (bool, float64, error) {
+func checkPriceForDocker(userPrice string, duration int, resource *models.HardwareResource) (bool, float64, error) {
 	priceConfig, err := ReadPriceConfig()
 	if err != nil {
 		return false, 0, err
@@ -649,7 +643,7 @@ func checkPriceForDocker(userPrice string, duration int, resource models.Hardwar
 	return userPayPrice >= totalCost, totalCost, nil
 }
 
-func checkResourceForImage(resource models.HardwareResource) (bool, string, int64, int64, []string, error) {
+func checkResourceForImage(resource *models.HardwareResource) (bool, string, int64, int64, []string, error) {
 	list, err := NewEcpJobService().GetEcpJobList([]string{models.CreatedStatus, models.RunningStatus})
 	if err != nil {
 		return false, "", 0, 0, nil, err
@@ -832,20 +826,52 @@ func CheckWalletBlackListForEcp(walletAddress string) bool {
 	return false
 }
 
-func GenerateDockerfile(config *models.DockerfileConfig) string {
+func parseDockerfileConfig(jobUuid string, dockerfileConfig *models.DockerfileConfig) (*models.DeployJobParam, error) {
+	var deployParam *models.DeployJobParam
+	if dockerfileConfig != nil {
+		content, envs, ports := generateDockerfile(dockerfileConfig)
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
+		buildFolder := filepath.Join(cpRepoPath, "build/ecp", jobUuid)
+		if err := os.MkdirAll(buildFolder, os.ModePerm); err != nil {
+			return nil, fmt.Errorf("failed to create dir, error: %v", err)
+		}
+		dockerfileFile := filepath.Join(buildFolder, "Dockerfile")
+		err := os.WriteFile(dockerfileFile, []byte(content), 0644)
+		if err != nil {
+			return nil, fmt.Errorf("failed to save Dockerfile: %v", err)
+		}
+
+		imageName := fmt.Sprintf("ecp-image/%s:%d", jobUuid, time.Now().Unix())
+		if conf.GetConfig().Registry.ServerAddress != "" {
+			imageName = fmt.Sprintf("%s/%s:%d",
+				strings.TrimSpace(conf.GetConfig().Registry.ServerAddress), jobUuid, time.Now().Unix())
+		}
+		imageName = strings.ToLower(imageName)
+
+		if _, err := os.Stat(dockerfileFile); err != nil {
+			return nil, fmt.Errorf("failed not found Dockerfile, path: %s", dockerfileFile)
+		}
+		deployParam.BuildImagePath = buildFolder
+		deployParam.BuildImageName = imageName
+		deployParam.Envs = envs
+		deployParam.Ports = ports
+	}
+	return deployParam, nil
+}
+
+func generateDockerfile(config *models.DockerfileConfig) (string, []string, []int) {
 	var builder strings.Builder
 	builder.WriteString(fmt.Sprintf("FROM %s\n", config.BaseImage))
 
-	if config.Maintainer != "" {
-		builder.WriteString(fmt.Sprintf("LABEL maintainer=\"%s\"\n", config.Maintainer))
-	}
-
+	var envs []string
+	var ports []int
 	if config.WorkDir != "" {
 		builder.WriteString(fmt.Sprintf("WORKDIR %s\n", config.WorkDir))
 	}
 
 	for key, value := range config.EnvVars {
 		builder.WriteString(fmt.Sprintf("ENV %s=%s\n", key, value))
+		envs = append(envs, fmt.Sprintf("%s=%s", key, value))
 	}
 
 	for _, cmd := range config.RunCommands {
@@ -854,12 +880,13 @@ func GenerateDockerfile(config *models.DockerfileConfig) string {
 
 	for _, port := range config.ExposePorts {
 		builder.WriteString(fmt.Sprintf("EXPOSE %d\n", port))
+		ports = append(ports, port)
 	}
 
-	if len(config.Cmd) > 0 {
-		cmdStr := strings.Join(config.Cmd, " ")
+	if len(config.StartCmd) > 0 {
+		cmdStr := strings.Join(config.StartCmd, " ")
 		builder.WriteString(fmt.Sprintf("CMD [%s]\n", cmdStr))
 	}
 
-	return builder.String()
+	return builder.String(), envs, ports
 }
