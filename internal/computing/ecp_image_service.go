@@ -280,11 +280,17 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		}
 	}
 
+	var logUrl string
+	multiAddressSplit := strings.Split(conf.GetConfig().API.MultiAddress, "/")
+	if len(multiAddressSplit) >= 4 {
+		logUrl = fmt.Sprintf("http://%s:%s/v1/computing/cp/job/log?job_uuid=%s&expire_time=60", multiAddressSplit[2], multiAddressSplit[4], job.Uuid)
+	}
+
 	if job.JobType == models.MiningJobType {
-		imageJob.DeployMining(c, deployJob, totalCost)
+		imageJob.DeployMining(c, deployJob, totalCost, logUrl)
 		return
 	} else if job.JobType == models.InferenceJobType {
-		imageJob.DeployInference(c, deployJob, totalCost)
+		imageJob.DeployInference(c, deployJob, totalCost, logUrl)
 		return
 	}
 }
@@ -383,7 +389,7 @@ func (*ImageJobService) DockerLogsHandler(c *gin.Context) {
 	}
 }
 
-func (*ImageJobService) DeployMining(c *gin.Context, deployJob models.DeployJobParam, totalCost float64) {
+func (*ImageJobService) DeployMining(c *gin.Context, deployJob models.DeployJobParam, totalCost float64, logUrl string) {
 	var err error
 	containerName := deployJob.Name + "-" + generateString(5)
 	go func() {
@@ -434,12 +440,13 @@ func (*ImageJobService) DeployMining(c *gin.Context, deployJob models.DeployJobP
 	}()
 
 	c.JSON(http.StatusOK, util.CreateSuccessResponse(map[string]interface{}{
-		"uuid":  deployJob.Uuid,
-		"price": totalCost,
+		"uuid":    deployJob.Uuid,
+		"price":   totalCost,
+		"log_url": logUrl,
 	}))
 }
 
-func (*ImageJobService) DeployInference(c *gin.Context, deployJob models.DeployJobParam, totalCost float64) {
+func (*ImageJobService) DeployInference(c *gin.Context, deployJob models.DeployJobParam, totalCost float64, logUrl string) {
 	var containerName = deployJob.Name + "-" + generateString(5)
 	var err error
 	var apiUrl string
@@ -533,6 +540,7 @@ func (*ImageJobService) DeployInference(c *gin.Context, deployJob models.DeployJ
 	inferenceResp.HealthPath = deployJob.HealthPath
 	inferenceResp.ServicePortMapping = portMaps
 	inferenceResp.Price = totalCost
+	inferenceResp.LogUrl = logUrl
 
 	var portMap []string
 	if len(deployJob.Ports) > 1 {

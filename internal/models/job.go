@@ -50,6 +50,7 @@ type EcpImageResp struct {
 	HealthPath         string    `json:"health_path,omitempty"`
 	Price              float64   `json:"price"`
 	ServicePortMapping []PortMap `json:"service_port_mapping,omitempty"`
+	LogUrl             string    `json:"log_url"`
 }
 
 type PortMap struct {
