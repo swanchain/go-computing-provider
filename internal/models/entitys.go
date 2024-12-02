@@ -216,6 +216,7 @@ type JobEntity struct {
 	NameSpace       string `json:"name_space" gorm:"name_space"`
 	ImageName       string `json:"image_name" gorm:"image_name"`
 	BuildLog        string `json:"build_log" gorm:"build_log"`
+	BuildLogPath    string `json:"build_log_path"`
 	ContainerLog    string `json:"container_log" gorm:"container_log"`
 	Reward          string `json:"reward" gorm:"reward"`
 	ExpireTime      int64  `json:"expire_time" gorm:"expire_time"`

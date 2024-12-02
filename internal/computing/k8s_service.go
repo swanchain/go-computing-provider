@@ -417,14 +417,24 @@ func (s *K8sService) StatisticalSources(ctx context.Context) ([]*models.NodeReso
 	}
 
 	for _, node := range nodes.Items {
-		_, _, nodeResource := GetNodeResource(activePods, &node)
+		nodeUsedGpu, _, nodeResource := GetNodeResource(activePods, &node)
 		if nodeGpuInfoMap != nil {
 			if gpu, ok := nodeGpuInfoMap[node.Name]; ok {
+				var newDetails []models.GpuDetail
+				for _, detail := range gpu.Gpu.Details {
+					gName := strings.ReplaceAll(detail.ProductName, " ", "-")
+					if useData, ok := nodeUsedGpu[gName]; ok {
+						if existValue(detail.Index, useData.UsedIndex) {
+							detail.Status = models.Occupied
+						}
+					}
+					newDetails = append(newDetails, detail)
+				}
 				nodeResource.Gpu = models.Gpu{
 					DriverVersion: gpu.Gpu.DriverVersion,
 					CudaVersion:   gpu.Gpu.CudaVersion,
 					AttachedGpus:  gpu.Gpu.AttachedGpus,
-					Details:       gpu.Gpu.Details,
+					Details:       newDetails,
 				}
 				nodeList = append(nodeList, nodeResource)
 			}
@@ -451,6 +461,15 @@ func (s *K8sService) StatisticalSources(ctx context.Context) ([]*models.NodeReso
 	})
 
 	return nodeList, nil
+}
+
+func existValue(index string, indexs []string) bool {
+	for _, s := range indexs {
+		if index == s {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *K8sService) GetResourceExporterPodLog(ctx context.Context) (map[string]models.CollectNodeInfo, error) {

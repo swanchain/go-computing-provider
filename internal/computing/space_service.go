@@ -247,6 +247,7 @@ func ReceiveJob(c *gin.Context) {
 		jobEntity.SourceUrl = jobSourceUri
 		jobEntity.RealUrl = jobData.JobRealUri
 		jobEntity.BuildLog = jobData.BuildLog
+		jobEntity.BuildLogPath = filepath.Join(deployParam.BuildImagePath, BuildFileName)
 		jobEntity.ContainerLog = jobData.ContainerLog
 		jobEntity.Duration = jobData.Duration
 		jobEntity.JobUuid = jobData.UUID
@@ -881,9 +882,8 @@ func handleConnection(conn *websocket.Conn, jobDetail models.JobEntity, logType 
 	client := NewWsClient(conn)
 
 	if logType == "build" {
-		cpRepoPath, _ := os.LookupEnv("CP_PATH")
-		buildLogPath := filepath.Join(cpRepoPath, "build", jobDetail.WalletAddress, "spaces", jobDetail.Name, BuildFileName)
-		if _, err := os.Stat(buildLogPath); err != nil {
+		buildLogPath := jobDetail.BuildLogPath
+		if _, err := os.Stat(jobDetail.BuildLogPath); err != nil {
 			logs.GetLogger().Errorf("failed to not found build log, path: %s, error: %v", buildLogPath, err)
 			client.HandleLogs(strings.NewReader("This space is deployed starting from a image."))
 		} else {
