@@ -459,11 +459,61 @@ func (w *LocalWallet) CollateralWithdraw(ctx context.Context, address string, am
 		}
 		return zkCollateral.Withdraw(withDrawAmount)
 	} else {
-		sequencerStub, err := ecp.NewSequencerStub(client, ecp.WithSequencerPrivateKey(ki.PrivateKey), ecp.WithSequencerCpAccountAddress(cpAccountAddress))
+		return "", fmt.Errorf("not support withdraw type")
+	}
+}
+
+func (w *LocalWallet) CollateralWithdrawWithUbiZero(ctx context.Context, address string, amount string, cpAccountAddress string, collateralType string) (string, error) {
+	withDrawAmount, err := convertToWei(amount)
+	if err != nil {
+		return "", err
+	}
+
+	chainUrl, err := conf.GetRpcByNetWorkName()
+	if err != nil {
+		return "", err
+	}
+
+	ki, err := w.FindKey(address)
+	if err != nil {
+		return "", err
+	}
+	if ki == nil {
+		return "", xerrors.Errorf("the address: %s, private key %w,", address, ErrKeyInfoNotFound)
+	}
+
+	client, err := contract.GetEthClient(chainUrl)
+	if err != nil {
+		return "", err
+	}
+	defer client.Close()
+
+	if len(cpAccountAddress) > 0 {
+		cpAccount := common.HexToAddress(cpAccountAddress)
+		bytecode, err := client.CodeAt(context.Background(), cpAccount, nil)
+		if err != nil {
+			return "", fmt.Errorf("check cp account contract address failed, error: %v", err)
+		}
+
+		if len(bytecode) <= 0 {
+			return "", fmt.Errorf("the account parameter must be a cpAccount contract address")
+		}
+	}
+
+	if collateralType == "fcp" {
+		collateralStub, err := fcp.NewCollateralWithUbiZeroStub(client, fcp.WithPrivateKey(ki.PrivateKey), fcp.WithCpAccountAddress(cpAccountAddress))
 		if err != nil {
 			return "", err
 		}
-		return sequencerStub.Withdraw(withDrawAmount)
+		return collateralStub.Withdraw(withDrawAmount)
+	} else if collateralType == "ecp" {
+		zkCollateral, err := ecp.NewCollateralWithUbiZeroStub(client, ecp.WithPrivateKey(ki.PrivateKey), ecp.WithCpAccountAddress(cpAccountAddress))
+		if err != nil {
+			return "", err
+		}
+		return zkCollateral.Withdraw(withDrawAmount)
+	} else {
+		return "", fmt.Errorf("not support withdraw type")
 	}
 }
 

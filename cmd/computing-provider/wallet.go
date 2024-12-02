@@ -360,6 +360,9 @@ var collateralAddCmd = &cli.Command{
 		if ecpCollateral {
 			collateralType = "ecp"
 		}
+		if collateralType == "" {
+			return fmt.Errorf("not suport collateral type")
+		}
 
 		fromAddress := cctx.String("from")
 		if strings.TrimSpace(fromAddress) == "" {
@@ -382,11 +385,7 @@ var collateralAddCmd = &cli.Command{
 			return err
 		}
 
-		if collateralType == "sequencer" {
-			fmt.Printf("Transfer to Sequencer Account Tx Hash: %s \n", txHash)
-		} else {
-			fmt.Printf("collateral TX Hash: %s \n", txHash)
-		}
+		fmt.Printf("collateral TX Hash: %s \n", txHash)
 		return nil
 	},
 }
@@ -428,6 +427,10 @@ var collateralWithdrawCmd = &cli.Command{
 		}
 		if ecpCollateral {
 			collateralType = "ecp"
+		}
+
+		if collateralType == "" {
+			return fmt.Errorf("not suport withdraw type")
 		}
 
 		ownerAddress := cctx.String("owner")

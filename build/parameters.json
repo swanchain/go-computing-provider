@@ -16,7 +16,9 @@
       "sequencer_contract": "0xE0a88F1fA56D8a8D73E9bb9Fc03506439cb386Bd",
       "edge_task_payment": "0xa07829335024918c0626968c5e93910f90de1dd7",
       "edge_task_payment_created": 2569302,
-      "edge_url": "https://edge-api.swanchain.io/v1"
+      "edge_url": "https://edge-api.swanchain.io/v1",
+      "orchestrator_collateral_ubi_zero_contract": "0x643A820060c78D9122081aafF0C039b070937558",
+      "zk_collateral_ubi_zero_contract": "0x7A099B665e760BCCF3Aa0cBbb66C8da47F13C03d"
     }
   },
   {
@@ -36,7 +38,10 @@
       "sequencer_contract": "0x3ec53c3db17a9b7a50967100f9e0b9e1c910c7d4",
       "edge_task_payment": "0x114fd9a28fbbf687e4232e54d73e5449628d3219",
       "edge_task_payment_created": 9084245,
-      "edge_url": "https://edge-testnet.swanchain.io/v1"
+      "edge_url": "https://edge-testnet.swanchain.io/v1",
+      "orchestrator_collateral_ubi_zero_contract": "0xd5716082058871755ca9202838e35f51dFa816D2",
+      "zk_collateral_ubi_zero_contract": "0x9584eC8C86A32963Cb36B135c2e58837e2e46d4b"
+
     }
   }
 

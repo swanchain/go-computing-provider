@@ -45,6 +45,7 @@ func main() {
 			contractCmd,
 			priceCmd,
 			networkCmd,
+			ubiZeroCmd,
 		},
 		Before: func(c *cli.Context) error {
 			cpRepoPath, err := homedir.Expand(c.String(FlagRepo.Name))

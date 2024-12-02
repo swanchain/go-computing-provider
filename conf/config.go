@@ -94,12 +94,14 @@ type CONTRACT struct {
 	SwanToken         string `toml:"SWAN_CONTRACT"`
 	CpAccountRegister string `toml:"REGISTER_CP_CONTRACT"`
 
-	JobCollateral     string `toml:"SWAN_COLLATERAL_CONTRACT"`
-	JobManager        string `toml:"SWAN_JOB_CONTRACT"`
-	JobManagerCreated uint64 `toml:"JobManagerCreated"`
+	JobCollateral        string `toml:"SWAN_COLLATERAL_CONTRACT"`
+	JobCollateralUbiZero string `toml:"SWAN_COLLATERAL_UBI_ZERO_CONTRACT"`
+	JobManager           string `toml:"SWAN_JOB_CONTRACT"`
+	JobManagerCreated    uint64 `toml:"JobManagerCreated"`
 
 	TaskRegister           string `toml:"REGISTER_TASK_CONTRACT"`
 	ZkCollateral           string `toml:"ZK_COLLATERAL_CONTRACT"`
+	ZkCollateralUbiZero    string `toml:"ZK_COLLATERAL_UBI_ZERO_CONTRACT"`
 	Sequencer              string `toml:"SEQUENCER_CONTRACT"`
 	EdgeTaskPayment        string `toml:"EDGE_TASK_PAYMENT"`
 	EdgeTaskPaymentCreated int64  `toml:"EdgeTaskPaymentCreated"`
@@ -164,6 +166,8 @@ func InitConfig(cpRepoPath string, standalone bool) error {
 			config.CONTRACT.JobManagerCreated = ncCopy.Config.JobManagerContractCreated
 			config.CONTRACT.CpAccountRegister = ncCopy.Config.RegisterCpContract
 			config.CONTRACT.ZkCollateral = ncCopy.Config.ZkCollateralContract
+			config.CONTRACT.ZkCollateralUbiZero = ncCopy.Config.ZkCollateralUbiZeroContract
+			config.CONTRACT.JobCollateralUbiZero = ncCopy.Config.OrchestratorCollateralUbiZeroContract
 			config.CONTRACT.Sequencer = ncCopy.Config.SequencerContract
 			config.CONTRACT.TaskRegister = ncCopy.Config.RegisterTaskContract
 			config.CONTRACT.EdgeTaskPayment = ncCopy.Config.EdgeTaskPayment
@@ -376,11 +380,13 @@ func generateDefaultConfig() ComputeNode {
 		CONTRACT: CONTRACT{
 			SwanToken:              "",
 			JobCollateral:          "",
+			JobCollateralUbiZero:   "",
 			JobManager:             "",
 			JobManagerCreated:      0,
 			CpAccountRegister:      "",
 			TaskRegister:           "",
 			ZkCollateral:           "",
+			ZkCollateralUbiZero:    "",
 			Sequencer:              "",
 			EdgeTaskPayment:        "",
 			EdgeTaskPaymentCreated: 0,
