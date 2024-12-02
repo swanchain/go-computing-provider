@@ -195,8 +195,15 @@ var withdrawFromCollateralCmd = &cli.Command{
 	},
 	ArgsUsage: "[amount]",
 	Action: func(cctx *cli.Context) error {
-		ctx := reqContext(cctx)
+		cpRepoPath, ok := os.LookupEnv("CP_PATH")
+		if !ok {
+			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
+		}
+		if err := conf.InitConfig(cpRepoPath, true); err != nil {
+			return fmt.Errorf("load config file failed, error: %+v", err)
+		}
 
+		ctx := reqContext(cctx)
 		fcpWithdraw := cctx.Bool("fcp")
 		ecpWithDraw := cctx.Bool("ecp")
 
