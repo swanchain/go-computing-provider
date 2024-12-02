@@ -283,7 +283,7 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 	var logUrl string
 	multiAddressSplit := strings.Split(conf.GetConfig().API.MultiAddress, "/")
 	if len(multiAddressSplit) >= 4 {
-		logUrl = fmt.Sprintf("http://%s:%s/v1/computing/cp/job/log?job_uuid=%s&expire_time=60", multiAddressSplit[2], multiAddressSplit[4], job.Uuid)
+		logUrl = fmt.Sprintf("http://%s:%s/api/v1/computing/cp/job/log?job_uuid=%s&expire_time=60", multiAddressSplit[2], multiAddressSplit[4], job.Uuid)
 	}
 
 	if job.JobType == models.MiningJobType {
