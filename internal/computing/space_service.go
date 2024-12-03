@@ -1231,6 +1231,7 @@ func checkResourceAvailableForSpace(jobType int, resourceConfig models.SpaceHard
 			if taskType == "CPU" {
 				return true, "", nil, nil
 			} else if taskType == "GPU" {
+				logs.GetLogger().Infof("nodeGpuInfo: %+v, used gpu: %+v", nodeGpuInfo, nodeGpu)
 				for gname, gData := range nodeGpuInfo {
 					if strings.Contains(gname, gpuName) {
 						gpuName = gname

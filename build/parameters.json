@@ -17,6 +17,8 @@
       "edge_task_payment": "0xa07829335024918c0626968c5e93910f90de1dd7",
       "edge_task_payment_created": 2569302,
       "edge_url": "https://edge-api.swanchain.io/v1",
+
+
       "orchestrator_collateral_ubi_zero_contract": "0x643A820060c78D9122081aafF0C039b070937558",
       "zk_collateral_ubi_zero_contract": "0x7A099B665e760BCCF3Aa0cBbb66C8da47F13C03d"
     }
