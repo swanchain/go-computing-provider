@@ -14,7 +14,7 @@ type EcpImageJobReq struct {
 	Resource      *HardwareResource `json:"resource,omitempty"`
 	Image         string            `json:"image,omitempty"`
 	Cmd           []string          `json:"cmd,omitempty"`
-	Ports         []int             `json:"ports,omitempty"`
+	Ports         map[string][]int  `json:"ports,omitempty"`
 	Envs          map[string]string `json:"envs,omitempty"`
 	RunCommands   []string          `json:"run_commands,omitempty"`
 	ResourceUrl   string            `json:"resource_url,omitempty"`

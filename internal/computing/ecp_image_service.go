@@ -150,7 +150,7 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 
 	var totalCost float64
 	var checkPriceFlag bool
-	if !conf.GetConfig().API.Pricing {
+	if !conf.GetConfig().API.Pricing && job.Price != "-1" {
 		checkPriceFlag, totalCost, err = checkPriceForDocker(job.Price, job.Duration, job.Resource)
 		if err != nil {
 			logs.GetLogger().Errorf("failed to check price, job_uuid: %s, error: %v", job.Uuid, err)
@@ -214,7 +214,12 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 	if job.RunCommands != nil || len(job.RunCommands) == 0 {
 		deployJob.Image = job.Image
 		deployJob.Cmd = job.Cmd
-		deployJob.Ports = job.Ports
+		var ports []int
+		for _, p := range job.Ports {
+			ports = append(ports, p...)
+		}
+		deployJob.Ports = ports
+
 		for k, v := range job.Envs {
 			envs = append(envs, fmt.Sprintf("%s=%s", k, v))
 		}
@@ -877,7 +882,7 @@ func generateDockerfile(config models.EcpImageJobReq) (string, []string, []int) 
 
 	for _, port := range config.Ports {
 		builder.WriteString(fmt.Sprintf("EXPOSE %d\n", port))
-		ports = append(ports, port)
+		ports = append(ports, port...)
 	}
 
 	if len(config.Cmd) > 0 {
