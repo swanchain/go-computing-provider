@@ -204,6 +204,12 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		}
 	}
 
+	var handleCmd []string
+	for _, cmd := range job.Cmd {
+		handleCmd = append(handleCmd, strings.TrimSpace(cmd))
+	}
+	job.Cmd = handleCmd
+
 	var deployJob models.DeployJobParam
 	deployJob.Uuid = job.Uuid
 	deployJob.Name = job.Name
