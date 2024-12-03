@@ -763,7 +763,7 @@ func getHardwareDetail(description string) (string, models.Resource) {
 
 func getHardwareDetailByByte(spaceHardware models.SpaceHardware) (string, models.Resource) {
 	var hardwareResource models.Resource
-
+	var taskType = "CPU"
 	hardwareResource.Cpu.Unit = "vCPU"
 	hardwareResource.Cpu.Quantity = spaceHardware.Vcpu
 	hardwareResource.Memory.Unit = "Gi"
@@ -776,6 +776,7 @@ func getHardwareDetailByByte(spaceHardware models.SpaceHardware) (string, models
 	}
 
 	if strings.Contains(spaceHardware.HardwareType, "GPU") {
+		taskType = "GPU"
 		hardwareResource.Gpu.Quantity = 1
 		if spaceHardware.Gpu != 0 {
 			hardwareResource.Gpu.Quantity = spaceHardware.Gpu
@@ -785,7 +786,7 @@ func getHardwareDetailByByte(spaceHardware models.SpaceHardware) (string, models
 			hardwareResource.Storage.Quantity = 50
 		}
 	}
-	return spaceHardware.HardwareType, hardwareResource
+	return taskType, hardwareResource
 }
 
 func getHardwareDetailForPrivate(cpu, memory, storage int, gpuModel string, gpuNum int) (string, models.Resource) {
