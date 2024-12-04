@@ -91,8 +91,9 @@ type RPC struct {
 }
 
 type CONTRACT struct {
-	SwanToken         string `toml:"SWAN_CONTRACT"`
-	CpAccountRegister string `toml:"REGISTER_CP_CONTRACT"`
+	SwanToken                string `toml:"SWAN_CONTRACT"`
+	SwanTokenUbiZeroContract string `toml:"SWAN_UBI_ZERO_CONTRACT"`
+	CpAccountRegister        string `toml:"REGISTER_CP_CONTRACT"`
 
 	JobCollateral        string `toml:"SWAN_COLLATERAL_CONTRACT"`
 	JobCollateralUbiZero string `toml:"SWAN_COLLATERAL_UBI_ZERO_CONTRACT"`
@@ -168,6 +169,7 @@ func InitConfig(cpRepoPath string, standalone bool) error {
 			config.CONTRACT.ZkCollateral = ncCopy.Config.ZkCollateralContract
 			config.CONTRACT.ZkCollateralUbiZero = ncCopy.Config.ZkCollateralUbiZeroContract
 			config.CONTRACT.JobCollateralUbiZero = ncCopy.Config.OrchestratorCollateralUbiZeroContract
+			config.CONTRACT.SwanTokenUbiZeroContract = ncCopy.Config.SwanTokenUbiZeroContract
 			config.CONTRACT.Sequencer = ncCopy.Config.SequencerContract
 			config.CONTRACT.TaskRegister = ncCopy.Config.RegisterTaskContract
 			config.CONTRACT.EdgeTaskPayment = ncCopy.Config.EdgeTaskPayment
@@ -378,18 +380,19 @@ func generateDefaultConfig() ComputeNode {
 			SwanChainRpc: "",
 		},
 		CONTRACT: CONTRACT{
-			SwanToken:              "",
-			JobCollateral:          "",
-			JobCollateralUbiZero:   "",
-			JobManager:             "",
-			JobManagerCreated:      0,
-			CpAccountRegister:      "",
-			TaskRegister:           "",
-			ZkCollateral:           "",
-			ZkCollateralUbiZero:    "",
-			Sequencer:              "",
-			EdgeTaskPayment:        "",
-			EdgeTaskPaymentCreated: 0,
+			SwanToken:                "",
+			SwanTokenUbiZeroContract: "",
+			JobCollateral:            "",
+			JobCollateralUbiZero:     "",
+			JobManager:               "",
+			JobManagerCreated:        0,
+			CpAccountRegister:        "",
+			TaskRegister:             "",
+			ZkCollateral:             "",
+			ZkCollateralUbiZero:      "",
+			Sequencer:                "",
+			EdgeTaskPayment:          "",
+			EdgeTaskPaymentCreated:   0,
 		},
 	}
 }

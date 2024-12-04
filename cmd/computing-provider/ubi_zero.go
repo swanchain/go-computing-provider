@@ -93,7 +93,7 @@ var collateralInfoCmd = &cli.Command{
 
 		ownerBalance, err = wallet.Balance(context.TODO(), client, ownerAddress)
 		workerBalance, err = wallet.Balance(context.TODO(), client, workerAddress)
-		fcpCollateralStub, err := fcp.NewCollateralStub(client)
+		fcpCollateralStub, err := fcp.NewCollateralWithUbiZeroStub(client)
 		if err == nil {
 			fcpCollateralInfo, err := fcpCollateralStub.CollateralInfo()
 			if err == nil {
@@ -102,7 +102,7 @@ var collateralInfoCmd = &cli.Command{
 			}
 		}
 
-		ecpCollateral, err := ecp.NewCollateralStub(client, ecp.WithPublicKey(ownerAddress))
+		ecpCollateral, err := ecp.NewCollateralWithUbiZeroStub(client, ecp.WithPublicKey(ownerAddress))
 		if err == nil {
 			cpCollateralInfo, err := ecpCollateral.CpInfo()
 			if err == nil {

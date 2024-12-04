@@ -43,6 +43,7 @@ type NetworkConfig struct {
 		OrchestratorPk                        string `json:"orchestrator_pk"`
 		ChainRpc                              string `json:"chain_rpc"`
 		SwanTokenContract                     string `json:"swan_token_contract"`
+		SwanTokenUbiZeroContract              string `json:"swan_token_ubi_zero_contract"`
 		OrchestratorCollateralContract        string `json:"orchestrator_collateral_contract"`
 		OrchestratorCollateralUbiZeroContract string `json:"orchestrator_collateral_ubi_zero_contract"`
 		JobManagerContract                    string `json:"job_manager_contract"`
