@@ -1,72 +1,60 @@
 package util
 
 import (
-	"context"
-	"errors"
 	"fmt"
-	"github.com/filswan/go-swan-lib/logs"
-	"net/http"
+	"net"
 	"sync"
 	"sync/atomic"
-	"time"
 )
 
 func CheckPortAvailability(usedPort map[int32]struct{}) bool {
 	startPort := 30000
 	endPort := 32767
-
-	var wg sync.WaitGroup
-	var num int64
-	var portCounter atomic.Int64
+	var waitCheckPorts []int
 	for port := startPort; port <= endPort; port++ {
 		if _, ok := usedPort[int32(port)]; ok {
 			continue
 		}
+		waitCheckPorts = append(waitCheckPorts, port)
+	}
+
+	var num = len(waitCheckPorts)
+	var portCounter atomic.Int64
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 50)
+	for _, port := range waitCheckPorts {
 		wg.Add(1)
-		go func() {
-			if startServer(&wg, port) {
+		go func(p int) {
+			defer wg.Done()
+			sem <- struct{}{}
+			if IsPortAvailable(p) {
 				portCounter.Add(1)
 			}
-		}()
-		num++
+			<-sem
+		}(port)
 	}
 	wg.Wait()
 
 	if len(usedPort) > 0 {
 		num = num - 1
 	}
-	if num == portCounter.Load() {
+	if num-int(portCounter.Load()) < 20 {
 		return true
 	}
 	return false
 }
 
-func startServer(wg *sync.WaitGroup, port int) bool {
-	defer wg.Done()
-	srv := &http.Server{
-		Addr: fmt.Sprintf(":%d", port),
-		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		}),
-	}
-	defer srv.Shutdown(context.TODO())
-
-	var isListen bool
-	go func() {
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			isListen = true
+func IsPortAvailable(port int) bool {
+	address := fmt.Sprintf(":%d", port)
+	ln, err := net.Listen("tcp", address)
+	defer func() {
+		if ln != nil {
+			defer ln.Close()
 		}
 	}()
-	time.Sleep(2 * time.Second)
-	if isListen {
-		return false
-	}
 
-	resp, err := http.Get(fmt.Sprintf("http://localhost:%d", port))
 	if err != nil {
-		logs.GetLogger().Errorf("Port %d is not accessible: %v", port, err)
 		return false
 	}
-	defer resp.Body.Close()
 	return true
-
 }
