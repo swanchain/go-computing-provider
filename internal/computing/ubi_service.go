@@ -152,7 +152,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 	c2GpuConfig := envVars["RUST_GPU_TOOLS_CUSTOM_GPU"]
 	c2GpuName := convertGpuName(strings.TrimSpace(c2GpuConfig))
 	c2GpuName = strings.ToUpper(c2GpuName)
-	nodeName, architecture, needCpu, needMemory, needStorage, err := checkResourceAvailableForUbi(ubiTask.ResourceType, c2GpuName, ubiTask.Resource)
+	nodeName, architecture, needCpu, needMemory, needStorage, gpuIndex, err := checkResourceAvailableForUbi(ubiTask.ResourceType, c2GpuName, ubiTask.Resource)
 	if err != nil {
 		taskEntity.Status = models.TASK_FAILED_STATUS
 		NewTaskService().SaveTaskEntity(taskEntity)
@@ -293,6 +293,10 @@ func DoUbiTaskForK8s(c *gin.Context) {
 		if gpuFlag == "0" {
 			delete(envVars, "RUST_GPU_TOOLS_CUSTOM_GPU")
 			envVars["BELLMAN_NO_GPU"] = "1"
+		} else {
+			if len(gpuIndex) > 0 {
+				envVars["CUDA_VISIBLE_DEVICES"] = gpuIndex[0]
+			}
 		}
 
 		delete(envVars, "FIL_PROOFS_PARAMETER_CACHE")
@@ -1180,7 +1184,7 @@ func CronTaskForEcp() {
 			}
 		}()
 
-		ticker := time.NewTicker(10 * time.Minute)
+		ticker := time.NewTicker(30 * time.Minute)
 		for range ticker.C {
 			NewTaskPaymentService().ScannerChainGetTaskPayment()
 		}

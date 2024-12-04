@@ -92,7 +92,7 @@ func (taskManager *TaskManagerContract) Scan() {
 			logs.GetLogger().Error(err)
 			return
 		}
-		time.Sleep(time.Second)
+		time.Sleep(3 * time.Second)
 	}
 }
 
