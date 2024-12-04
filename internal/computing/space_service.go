@@ -860,6 +860,73 @@ func DoProof(c *gin.Context) {
 	c.JSON(http.StatusOK, util.CreateSuccessResponse(string(bytes)))
 }
 
+func DeployImage(c *gin.Context) {
+	var deployJob models.FcpDeployImageReq
+	if err := c.ShouldBindJSON(&deployJob); err != nil {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
+		return
+	}
+	logs.GetLogger().Infof("Image Job received Data: %+v", deployJob)
+
+	if !CheckWalletWhiteList(deployJob.WalletAddress) {
+		logs.GetLogger().Errorf("This cp does not accept tasks from wallet addresses outside the whitelist")
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SpaceCheckWhiteListError))
+		return
+	}
+
+	if CheckWalletBlackList(deployJob.WalletAddress) {
+		logs.GetLogger().Errorf("This cp does not accept tasks from wallet addresses inside the blacklist")
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SpaceCheckBlackListError))
+		return
+	}
+
+	if conf.GetConfig().HUB.VerifySign {
+		if len(deployJob.Sign) == 0 {
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BadParamError, "missing node_id_job_source_uri_signature field"))
+			return
+		}
+		cpAccountAddress, err := contract.GetCpAccountAddress()
+		if err != nil {
+			logs.GetLogger().Errorf("failed to get cp account contract address, error: %v", err)
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.GetCpAccountError))
+			return
+		}
+
+		signature, err := verifySignatureForHub(deployJob.WalletAddress, fmt.Sprintf("%s%s", cpAccountAddress, deployJob.Uuid), deployJob.Sign)
+		if err != nil {
+			logs.GetLogger().Errorf("failed to verify signature for space job, error: %+v", err)
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
+			return
+		}
+
+		if !signature {
+			logs.GetLogger().Errorf("space job sign verifing, job_uuid: %s, verify: %v", deployJob.Uuid, signature)
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "signature verify failed"))
+			return
+		}
+	}
+	//
+	//var resourceType = 0
+	//if deployJob.Resource.Gpu > 0 && deployJob.Resource.GpuModel != "" {
+	//	resourceType = 1
+	//}
+	//
+	//var resource models.TaskResource
+	//resource.CPU = strconv.Itoa(deployJob.Resource.Cpu)
+	//resource.Memory = strconv.Itoa(deployJob.Resource.Memory)
+	//resource.Storage = strconv.Itoa(deployJob.Resource.Storage)
+	//
+	//nodeName, _, needCpu, needMemory, needStorage, gpuIndex, err := checkResourceAvailableForUbi(resourceType, deployJob.Resource.GpuModel, &resource)
+	//if err != nil {
+	//	taskEntity.Status = models.TASK_FAILED_STATUS
+	//	NewTaskService().SaveTaskEntity(taskEntity)
+	//	logs.GetLogger().Errorf("check resource failed, error: %v", err)
+	//	c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
+	//	return
+	//}
+
+}
+
 func handlePodEvent(conn *websocket.Conn, jobUuid string, walletAddress string) {
 	client := NewWsClient(conn)
 
@@ -887,7 +954,7 @@ func handleConnection(conn *websocket.Conn, jobDetail models.JobEntity, logType 
 
 	if logType == "build" {
 		buildLogPath := jobDetail.BuildLogPath
-		if _, err := os.Stat(jobDetail.BuildLogPath); err != nil {
+		if _, err := os.Stat(buildLogPath); err != nil {
 			logs.GetLogger().Errorf("failed to not found build log, path: %s, error: %v", buildLogPath, err)
 			client.HandleLogs(strings.NewReader("This space is deployed starting from a image."))
 		} else {
