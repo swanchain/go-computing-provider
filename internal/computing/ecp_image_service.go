@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -897,4 +898,13 @@ func generateDockerfile(config models.EcpImageJobReq) (string, []string, []int) 
 	}
 
 	return builder.String(), envs, ports
+}
+
+func ValidateName(name string) error {
+	regex := `^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`
+	re := regexp.MustCompile(regex)
+	if !re.MatchString(name) {
+		return fmt.Errorf("invalid field value: %s, must match regex %s", name, regex)
+	}
+	return nil
 }

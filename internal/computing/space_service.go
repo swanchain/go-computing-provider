@@ -133,7 +133,11 @@ func ReceiveJob(c *gin.Context) {
 	saveGpuCache(gpuProductName)
 
 	if !available {
-		logs.GetLogger().Warnf("job_uuid: %s, name: %s, not found a resources available", jobData.UUID, jobData.Name)
+		if gpuProductName != "" {
+			logs.GetLogger().Warnf("job_uuid: %s, name: %s, gpu_name: %s, not found a resources available", jobData.UUID, jobData.Name, gpuProductName)
+		} else {
+			logs.GetLogger().Warnf("job_uuid: %s, name: %s, not found a resources available", jobData.UUID, jobData.Name)
+		}
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError))
 		return
 	}

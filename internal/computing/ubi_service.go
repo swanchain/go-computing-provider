@@ -604,7 +604,7 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		gpuName = convertGpuName(strings.TrimSpace(gpuConfig))
 	}
 
-	_, architecture, _, needMemory, err := checkResourceForUbi(ubiTask.Resource, gpuName, ubiTask.ResourceType)
+	_, architecture, _, needMemory, indexs, err := checkResourceForUbi(ubiTask.Resource, gpuName, ubiTask.ResourceType)
 	if err != nil {
 		taskEntity.Status = models.TASK_FAILED_STATUS
 		NewTaskService().SaveTaskEntity(taskEntity)
@@ -662,14 +662,22 @@ func DoUbiTaskForDocker(c *gin.Context) {
 			if ok {
 				env = append(env, "RUST_GPU_TOOLS_CUSTOM_GPU="+gpuEnv)
 			}
+
+			var useIndexs []string
+			if len(indexs) > 0 {
+				useIndexs = append(useIndexs, indexs[0])
+				env = append(env, fmt.Sprintf("CUDA_VISIBLE_DEVICES=%s", strings.Join(useIndexs, ",")))
+			} else {
+				logs.GetLogger().Warnf("not resources available, task_id: %d", ubiTask.ID)
+				return
+			}
 			needResource = container.Resources{
 				Memory: needMemory * 1024 * 1024 * 1024,
 				DeviceRequests: []container.DeviceRequest{
 					{
 						Driver:       "nvidia",
-						Count:        -1,
-						Capabilities: [][]string{{"gpu"}},
-						Options:      nil,
+						DeviceIDs:    useIndexs,
+						Capabilities: [][]string{{"gpu", "compute", "utility"}},
 					},
 				},
 			}
@@ -739,16 +747,16 @@ func DoUbiTaskForDocker(c *gin.Context) {
 	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
 }
 
-func checkResourceForUbi(resource *models.TaskResource, gpuName string, resourceType int) (bool, string, int64, int64, error) {
+func checkResourceForUbi(resource *models.TaskResource, gpuName string, resourceType int) (bool, string, int64, int64, []string, error) {
 	dockerService := NewDockerService()
 	containerLogStr, err := dockerService.ContainerLogs("resource-exporter")
 	if err != nil {
-		return false, "", 0, 0, err
+		return false, "", 0, 0, nil, err
 	}
 
 	var nodeResource models.NodeResource
 	if err := json.Unmarshal([]byte(containerLogStr), &nodeResource); err != nil {
-		return false, "", 0, 0, err
+		return false, "", 0, 0, nil, err
 	}
 
 	needCpu, _ := strconv.ParseInt(resource.CPU, 10, 64)
@@ -771,11 +779,30 @@ func checkResourceForUbi(resource *models.TaskResource, gpuName string, resource
 		remainderStorage, err = strconv.ParseFloat(strings.Split(strings.TrimSpace(nodeResource.Storage.Free), " ")[0], 64)
 	}
 
-	var gpuMap = make(map[string]int)
+	type gpuData struct {
+		num    int
+		indexs []string
+	}
+
+	var indexs []string
+	var gpuMap = make(map[string]gpuData)
 	if nodeResource.Gpu.AttachedGpus > 0 {
 		for _, detail := range nodeResource.Gpu.Details {
 			if detail.Status == models.Available {
-				gpuMap[detail.ProductName] += 1
+				data, ok := gpuMap[detail.ProductName]
+				if ok {
+					data.num += 1
+					data.indexs = append(data.indexs, detail.Index)
+					gpuMap[detail.ProductName] = data
+				} else {
+					indexs = make([]string, 0)
+					indexs = append(indexs, detail.Index)
+					var dataNew = gpuData{
+						num:    1,
+						indexs: indexs,
+					}
+					gpuMap[detail.ProductName] = dataNew
+				}
 			}
 		}
 	}
@@ -786,22 +813,23 @@ func checkResourceForUbi(resource *models.TaskResource, gpuName string, resource
 		if resourceType == 1 {
 			if gpuName != "" {
 				var flag bool
-				for k, num := range gpuMap {
-					if strings.ToUpper(k) == gpuName && num > 0 {
+				for k, gm := range gpuMap {
+					if strings.ToUpper(k) == gpuName && gm.num > 0 {
+						indexs = gm.indexs
 						flag = true
 						break
 					}
 				}
 				if flag {
-					return true, nodeResource.CpuName, needCpu, int64(needMemory), nil
+					return true, nodeResource.CpuName, needCpu, int64(needMemory), indexs, nil
 				} else {
-					return false, nodeResource.CpuName, needCpu, int64(needMemory), nil
+					return false, nodeResource.CpuName, needCpu, int64(needMemory), indexs, nil
 				}
 			}
 		}
-		return true, nodeResource.CpuName, needCpu, int64(needMemory), nil
+		return true, nodeResource.CpuName, needCpu, int64(needMemory), indexs, nil
 	}
-	return false, nodeResource.CpuName, needCpu, int64(needMemory), nil
+	return false, nodeResource.CpuName, needCpu, int64(needMemory), indexs, nil
 }
 
 func GetCpResource(c *gin.Context) {
@@ -1119,6 +1147,7 @@ func reportClusterResourceForDocker() {
 	}
 
 	var freeGpuMap = make(map[string]int)
+	var useGpuMap = make(map[string]int)
 	if nodeResource.Gpu.AttachedGpus > 0 {
 		for _, g := range nodeResource.Gpu.Details {
 			if g.Status == models.Available {
@@ -1128,12 +1157,12 @@ func reportClusterResourceForDocker() {
 					freeGpuMap[g.ProductName] += 1
 				}
 			} else {
-				freeGpuMap[g.ProductName] = 0
+				useGpuMap[g.ProductName] += 1
 			}
 		}
 	}
-	logs.GetLogger().Infof("collect hardware resource, freeCpu:%s, freeMemory: %s, freeStorage: %s, freeGpu: %v",
-		nodeResource.Cpu.Free, nodeResource.Memory.Free, nodeResource.Storage.Free, freeGpuMap)
+	logs.GetLogger().Infof("collect hardware resource, freeCpu:%s, freeMemory: %s, freeStorage: %s, freeGpu: %v, useGpu: %v",
+		nodeResource.Cpu.Free, nodeResource.Memory.Free, nodeResource.Storage.Free, freeGpuMap, useGpuMap)
 }
 
 func updateEcpTaskStatus() {
