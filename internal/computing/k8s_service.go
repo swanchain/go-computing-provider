@@ -682,6 +682,7 @@ func (s *K8sService) GetNodeGpuSummary(ctx context.Context) (map[string]map[stri
 			for _, g := range gpu.Gpu.Details {
 				gName := strings.ReplaceAll(strings.ToUpper(g.ProductName), " ", "-")
 				if v, ok := nodeGpu[gName]; ok {
+					fmt.Printf("gpu: %+v", v)
 					if g.Status == models.Available {
 						v.FreeIndex = append(v.FreeIndex, g.Index)
 						v.Free += 1
