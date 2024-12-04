@@ -133,7 +133,7 @@ func gpuInPod(pod *corev1.Pod) (gpuName string, gpuCount int, indexs []string) {
 	for _, container := range containers {
 		var gIndex string
 		for _, envVaule := range container.Env {
-			if envVaule.Name == "CUDA_VISIBLE_DEVICES" || envVaule.Name == "NVIDIA_VISIBLE_DEVICES" {
+			if envVaule.Name == "NVIDIA_VISIBLE_DEVICES" {
 				gIndex = envVaule.Value
 				indexs = append(indexs, strings.Split(gIndex, ",")...)
 				break
