@@ -1234,7 +1234,7 @@ func checkResourceAvailableForSpace(jobType int, resourceConfig models.SpaceHard
 				return true, "", nil, nil
 			} else if taskType == "GPU" {
 				for gname, gData := range nodeGpuInfo {
-					logs.GetLogger().Infof("gpuSummaryOnNode: %+v, gpuSummaryInK8SOn: %+v", nodeGpuInfo, nodeGpu[gname].UsedIndex)
+					logs.GetLogger().Infof("useGpuSummaryOnNode: %+v, useGpuSummaryInK8SOn: %+v", gData.UsedIndex, nodeGpu[gname].UsedIndex)
 					if strings.Contains(gname, gpuName) {
 						gpuName = gname
 						remainingGpu := difference(gData.FreeIndex, nodeGpu[gpuName].UsedIndex)
