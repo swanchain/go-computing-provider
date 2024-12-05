@@ -629,6 +629,10 @@ func (d *Deploy) createEnv(envs ...coreV1.EnvVar) []coreV1.EnvVar {
 			Value: d.spaceName,
 		},
 		{
+			Name:  "result_url",
+			Value: d.hostName,
+		},
+		{
 			Name:  "job_uuid",
 			Value: d.jobUuid,
 		},

@@ -695,11 +695,11 @@ func (s *K8sService) GetNodeGpuSummary(ctx context.Context) (map[string]map[stri
 					var gd GpuData
 					gd.Total = 1
 					if g.Status == models.Available {
-						v.FreeIndex = append(v.FreeIndex, g.Index)
-						v.Free = 1
+						gd.FreeIndex = append(v.FreeIndex, g.Index)
+						gd.Free = 1
 					} else {
-						v.UsedIndex = append(v.UsedIndex, g.Index)
-						v.Used = 1
+						gd.UsedIndex = append(v.UsedIndex, g.Index)
+						gd.Used = 1
 					}
 					nodeGpu[gName] = gd
 				}

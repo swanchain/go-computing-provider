@@ -130,8 +130,6 @@ func ReceiveJob(c *gin.Context) {
 		return
 	}
 
-	saveGpuCache(gpuProductName)
-
 	if !available {
 		if gpuProductName != "" {
 			logs.GetLogger().Warnf("job_uuid: %s, name: %s, gpu_name: %s, not found a resources available", jobData.UUID, jobData.Name, gpuProductName)
@@ -955,7 +953,6 @@ func handleConnection(conn *websocket.Conn, jobDetail models.JobEntity, logType 
 	if logType == "build" {
 		buildLogPath := jobDetail.BuildLogPath
 		if _, err := os.Stat(buildLogPath); err != nil {
-			logs.GetLogger().Errorf("failed to not found build log, path: %s, error: %v", buildLogPath, err)
 			client.HandleLogs(strings.NewReader("This space is deployed starting from a image."))
 		} else {
 			logFile, _ := os.Open(buildLogPath)
@@ -1000,7 +997,8 @@ func handleConnection(conn *websocket.Conn, jobDetail models.JobEntity, logType 
 	}
 }
 
-func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName string, gpuProductName string, nodePort int32, jobType int, ipWhiteList, gpuIndex []string) {
+func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName string, gpuProductName string, nodePort int32, jobType int, ipWhiteList []string, gpuIndex []string) {
+	saveGpuCache(gpuProductName)
 	updateJobStatus(jobData.UUID, models.DEPLOY_UPLOAD_RESULT)
 	var success bool
 	var jobUuid string
@@ -1297,13 +1295,13 @@ func checkResourceAvailableForSpace(jobType int, resourceConfig models.SpaceHard
 			}
 		}
 
-		logs.GetLogger().Infof("checkResourceForSpace: remainingCpu: %d, remainingMemory: %.2f, remainingStorage: %.2f, remainingGpu: %+v", remainderCpu, remainderMemory, remainderStorage, freeGpuMap)
+		logs.GetLogger().Infof("checkResourceAvailableForSpace: nodeName: %s,remainingCpu: %d, remainingMemory: %.2f, remainingStorage: %.2f, remainingGpu: %+v", node.Name, remainderCpu, remainderMemory, remainderStorage, freeGpuMap)
 		if needCpu <= remainderCpu && needMemory <= remainderMemory && needStorage <= remainderStorage {
 			if taskType == "CPU" {
 				return true, "", nil, nil
 			} else if taskType == "GPU" {
 				for gname, gData := range nodeGpuInfo {
-					logs.GetLogger().Infof("nodeGpuInfo: %+v, used gpu: %+v; gname: %s, gpuName: %s", nodeGpuInfo, nodeGpu, gname, gpuName)
+					logs.GetLogger().Infof("useGpuSummaryOnNode: %+v, useGpuSummaryInK8SOn: %+v", gData.UsedIndex, nodeGpu[gname].UsedIndex)
 					if strings.Contains(gname, gpuName) {
 						gpuName = gname
 						remainingGpu := difference(gData.FreeIndex, nodeGpu[gpuName].UsedIndex)
@@ -1777,4 +1775,18 @@ func checkPrice(userPrice string, duration int, resource models.SpaceHardware) (
 
 	// Compare user's price with total cost
 	return userPayPrice >= totalCost, totalCost, nil
+}
+
+func difference(arr1, arr2 []string) []string {
+	set := make(map[string]struct{})
+	for _, v := range arr2 {
+		set[v] = struct{}{}
+	}
+	var result []string
+	for _, v := range arr1 {
+		if _, found := set[v]; !found {
+			result = append(result, v)
+		}
+	}
+	return result
 }

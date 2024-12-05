@@ -22,13 +22,13 @@ type CpResourceSummary struct {
 	ClusterInfo []*models.NodeResource
 }
 
-func GetNodeResource(allPods []corev1.Pod, node *corev1.Node) (map[string]GpuData, map[string]int64, *models.NodeResource) {
+func GetNodeResource(allPods []corev1.Pod, node *corev1.Node) (map[string]int64, map[string]int64, *models.NodeResource) {
 	var (
 		usedCpu     int64
 		usedMem     int64
 		usedStorage int64
 	)
-	nodeGpu := make(map[string]GpuData)
+	nodeGpu := make(map[string]int64)
 	remainderResource := make(map[string]int64)
 
 	var nodeResource = new(models.NodeResource)
@@ -41,15 +41,13 @@ func GetNodeResource(allPods []corev1.Pod, node *corev1.Node) (map[string]GpuDat
 
 		// used gpu info
 		gpuName, usedCount, usedIndexs := gpuInPod(&pod)
+		if gpuName == "kubernetes.io/os" || gpuName == "" {
+			continue
+		}
 		if v, ok := nodeGpu[gpuName]; ok {
-			v.UsedIndex = append(v.UsedIndex, usedIndexs...)
-			v.Used += usedCount
-			nodeGpu[gpuName] = v
+			nodeGpu[gpuName] = v + count
 		} else {
-			nodeGpu[gpuName] = GpuData{
-				Used:      usedCount,
-				UsedIndex: usedIndexs,
-			}
+			nodeGpu[gpuName] = count
 		}
 	}
 
@@ -130,7 +128,7 @@ func gpuInPod(pod *corev1.Pod) (gpuName string, gpuCount int, indexs []string) {
 	for _, container := range containers {
 		var gIndex string
 		for _, envVaule := range container.Env {
-			if envVaule.Name == "CUDA_VISIBLE_DEVICES" {
+			if envVaule.Name == "NVIDIA_VISIBLE_DEVICES" {
 				gIndex = envVaule.Value
 				indexs = append(indexs, strings.Split(gIndex, ",")...)
 				break

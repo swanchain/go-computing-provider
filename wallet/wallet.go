@@ -612,7 +612,7 @@ func (w *LocalWallet) SequencerWithdraw(ctx context.Context, address string, amo
 	return sequencerStub.Withdraw(withDrawAmount)
 }
 
-func (w *LocalWallet) CollateralWithdrawRequest(ctx context.Context, address string, amount string, cpAccountAddress string) (string, error) {
+func (w *LocalWallet) CollateralWithdrawRequest(ctx context.Context, address string, amount string, cpAccountAddress string, withdrawType string) (string, error) {
 	withDrawAmount, err := convertToWei(amount)
 	if err != nil {
 		return "", err
@@ -649,14 +649,20 @@ func (w *LocalWallet) CollateralWithdrawRequest(ctx context.Context, address str
 		}
 	}
 
-	zkCollateral, err := ecp.NewCollateralStub(client, ecp.WithPrivateKey(ki.PrivateKey), ecp.WithCpAccountAddress(cpAccountAddress))
-	if err != nil {
-		return "", err
+	if withdrawType == "fcp" {
+		return "", fmt.Errorf("not support withdraw type")
+	} else if withdrawType == "ecp" {
+		zkCollateral, err := ecp.NewCollateralStub(client, ecp.WithPrivateKey(ki.PrivateKey), ecp.WithCpAccountAddress(cpAccountAddress))
+		if err != nil {
+			return "", err
+		}
+		return zkCollateral.WithdrawRequest(withDrawAmount)
+	} else {
+		return "", fmt.Errorf("not support withdraw type")
 	}
-	return zkCollateral.WithdrawRequest(withDrawAmount)
 }
 
-func (w *LocalWallet) CollateralWithdrawConfirm(ctx context.Context, address string, cpAccountAddress string) (string, error) {
+func (w *LocalWallet) CollateralWithdrawConfirm(ctx context.Context, address string, cpAccountAddress string, withdrawType string) (string, error) {
 	chainUrl, err := conf.GetRpcByNetWorkName()
 	if err != nil {
 		return "", err
@@ -688,14 +694,20 @@ func (w *LocalWallet) CollateralWithdrawConfirm(ctx context.Context, address str
 		}
 	}
 
-	zkCollateral, err := ecp.NewCollateralStub(client, ecp.WithPrivateKey(ki.PrivateKey), ecp.WithCpAccountAddress(cpAccountAddress))
-	if err != nil {
-		return "", err
+	if withdrawType == "fcp" {
+		return "", fmt.Errorf("not support withdraw type")
+	} else if withdrawType == "ecp" {
+		zkCollateral, err := ecp.NewCollateralStub(client, ecp.WithPrivateKey(ki.PrivateKey), ecp.WithCpAccountAddress(cpAccountAddress))
+		if err != nil {
+			return "", err
+		}
+		return zkCollateral.WithdrawConfirm()
+	} else {
+		return "", fmt.Errorf("not support withdraw type")
 	}
-	return zkCollateral.WithdrawConfirm()
 }
 
-func (w *LocalWallet) CollateralWithdrawView(ctx context.Context, cpAccountAddress string) (models.WithdrawRequest, error) {
+func (w *LocalWallet) CollateralWithdrawView(ctx context.Context, cpAccountAddress string, withdrawType string) (models.WithdrawRequest, error) {
 	var withdrawRequest models.WithdrawRequest
 	chainUrl, err := conf.GetRpcByNetWorkName()
 	if err != nil {
@@ -720,22 +732,28 @@ func (w *LocalWallet) CollateralWithdrawView(ctx context.Context, cpAccountAddre
 		}
 	}
 
-	zkCollateral, err := ecp.NewCollateralStub(client, ecp.WithCpAccountAddress(cpAccountAddress))
-	if err != nil {
-		return withdrawRequest, err
-	}
+	if withdrawType == "fcp" {
+		return models.WithdrawRequest{}, fmt.Errorf("not support withdraw type")
+	} else if withdrawType == "ecp" {
+		zkCollateral, err := ecp.NewCollateralStub(client, ecp.WithCpAccountAddress(cpAccountAddress))
+		if err != nil {
+			return withdrawRequest, err
+		}
 
-	contractInfo, err := zkCollateral.ContractInfo()
-	if err != nil {
-		return withdrawRequest, err
-	}
+		contractInfo, err := zkCollateral.ContractInfo()
+		if err != nil {
+			return withdrawRequest, err
+		}
 
-	withdrawRequest, err = zkCollateral.WithdrawView()
-	if err != nil {
-		return withdrawRequest, err
+		withdrawRequest, err = zkCollateral.WithdrawView()
+		if err != nil {
+			return withdrawRequest, err
+		}
+		withdrawRequest.WithdrawDelay = contractInfo.WithdrawDelay
+		return withdrawRequest, nil
+	} else {
+		return models.WithdrawRequest{}, fmt.Errorf("not support withdraw type")
 	}
-	withdrawRequest.WithdrawDelay = contractInfo.WithdrawDelay
-	return withdrawRequest, nil
 }
 
 func (w *LocalWallet) CollateralSend(ctx context.Context, from, to string, amount string) (string, error) {

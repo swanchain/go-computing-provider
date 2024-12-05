@@ -415,18 +415,17 @@ var collateralWithdrawCmd = &cli.Command{
 	Action: func(cctx *cli.Context) error {
 		ctx := reqContext(cctx)
 
-		fcpCollateral := cctx.Bool("fcp")
-		ecpCollateral := cctx.Bool("ecp")
-
-		if !fcpCollateral && !ecpCollateral {
+		fcpWithdraw := cctx.Bool("fcp")
+		ecpWithdraw := cctx.Bool("ecp")
+		if !fcpWithdraw && !ecpWithdraw {
 			return fmt.Errorf("must specify one of fcp or ecp")
 		}
-		var collateralType string
-		if fcpCollateral {
-			collateralType = "fcp"
+		var withdrawType string
+		if fcpWithdraw {
+			withdrawType = "fcp"
 		}
-		if ecpCollateral {
-			collateralType = "ecp"
+		if ecpWithdraw {
+			withdrawType = "ecp"
 		}
 
 		if collateralType == "" {
@@ -448,7 +447,7 @@ var collateralWithdrawCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		txHash, err := localWallet.CollateralWithdraw(ctx, ownerAddress, amount, cpAccountAddress, collateralType)
+		txHash, err := localWallet.CollateralWithdraw(ctx, ownerAddress, amount, cpAccountAddress, withdrawType)
 		if err != nil {
 			return err
 		}
@@ -461,6 +460,14 @@ var collateralWithDrawRequestCmd = &cli.Command{
 	Name:  "withdraw-request",
 	Usage: "Send a request to withdraw tokens from the collateral escrow account from the collateral contract",
 	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:  "fcp",
+			Usage: "Specify the fcp withdraw",
+		},
+		&cli.BoolFlag{
+			Name:  "ecp",
+			Usage: "Specify the ecp withdraw",
+		},
 		&cli.StringFlag{
 			Name:  "owner",
 			Usage: "Specify the owner address",
@@ -473,6 +480,18 @@ var collateralWithDrawRequestCmd = &cli.Command{
 	ArgsUsage: "[amount]",
 	Action: func(cctx *cli.Context) error {
 		ctx := reqContext(cctx)
+		fcpWithdraw := cctx.Bool("fcp")
+		ecpWithdraw := cctx.Bool("ecp")
+		if !fcpWithdraw && !ecpWithdraw {
+			return fmt.Errorf("must specify one of fcp or ecp")
+		}
+		var withdrawType string
+		if fcpWithdraw {
+			withdrawType = "fcp"
+		}
+		if ecpWithdraw {
+			withdrawType = "ecp"
+		}
 
 		ownerAddress := cctx.String("owner")
 		if strings.TrimSpace(ownerAddress) == "" {
@@ -489,7 +508,7 @@ var collateralWithDrawRequestCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		txHash, err := localWallet.CollateralWithdrawRequest(ctx, ownerAddress, amount, cpAccountAddress)
+		txHash, err := localWallet.CollateralWithdrawRequest(ctx, ownerAddress, amount, cpAccountAddress, withdrawType)
 		if err != nil {
 			return err
 		}
@@ -502,6 +521,14 @@ var collateralWithDrawConfirmCmd = &cli.Command{
 	Name:  "withdraw-confirm",
 	Usage: "Confirm a request to withdraw tokens from the collateral escrow account from the collateral contract",
 	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:  "fcp",
+			Usage: "Specify the fcp withdraw",
+		},
+		&cli.BoolFlag{
+			Name:  "ecp",
+			Usage: "Specify the ecp withdraw",
+		},
 		&cli.StringFlag{
 			Name:  "owner",
 			Usage: "Specify the owner address",
@@ -513,6 +540,18 @@ var collateralWithDrawConfirmCmd = &cli.Command{
 	},
 	Action: func(cctx *cli.Context) error {
 		ctx := reqContext(cctx)
+		fcpWithdraw := cctx.Bool("fcp")
+		ecpWithdraw := cctx.Bool("ecp")
+		if !fcpWithdraw && !ecpWithdraw {
+			return fmt.Errorf("must specify one of fcp or ecp")
+		}
+		var withdrawType string
+		if fcpWithdraw {
+			withdrawType = "fcp"
+		}
+		if ecpWithdraw {
+			withdrawType = "ecp"
+		}
 
 		ownerAddress := cctx.String("owner")
 		if strings.TrimSpace(ownerAddress) == "" {
@@ -525,7 +564,7 @@ var collateralWithDrawConfirmCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		txHash, err := localWallet.CollateralWithdrawConfirm(ctx, ownerAddress, cpAccountAddress)
+		txHash, err := localWallet.CollateralWithdrawConfirm(ctx, ownerAddress, cpAccountAddress, withdrawType)
 		if err != nil {
 			return err
 		}
@@ -538,6 +577,14 @@ var collateralWithDrawViewCmd = &cli.Command{
 	Name:  "withdraw-view",
 	Usage: "View a request to withdraw tokens from the collateral escrow account from the collateral contract",
 	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:  "fcp",
+			Usage: "Specify the fcp withdraw",
+		},
+		&cli.BoolFlag{
+			Name:  "ecp",
+			Usage: "Specify the ecp withdraw",
+		},
 		&cli.StringFlag{
 			Name:  "account",
 			Usage: "Specify the cp account address, if not specified, cp account is the content of the account file under the CP_PATH variable",
@@ -545,13 +592,25 @@ var collateralWithDrawViewCmd = &cli.Command{
 	},
 	Action: func(cctx *cli.Context) error {
 		ctx := reqContext(cctx)
+		fcpWithdraw := cctx.Bool("fcp")
+		ecpWithdraw := cctx.Bool("ecp")
+		if !fcpWithdraw && !ecpWithdraw {
+			return fmt.Errorf("must specify one of fcp or ecp")
+		}
+		var withdrawType string
+		if fcpWithdraw {
+			withdrawType = "fcp"
+		}
+		if ecpWithdraw {
+			withdrawType = "ecp"
+		}
 		cpAccountAddress := cctx.String("account")
 
 		localWallet, err := wallet.SetupWallet(wallet.WalletRepo)
 		if err != nil {
 			return err
 		}
-		withdrawView, err := localWallet.CollateralWithdrawView(ctx, cpAccountAddress)
+		withdrawView, err := localWallet.CollateralWithdrawView(ctx, cpAccountAddress, withdrawType)
 		if err != nil {
 			return err
 		}

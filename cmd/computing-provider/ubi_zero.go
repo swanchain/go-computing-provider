@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/olekukonko/tablewriter"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/computing"
 	"github.com/swanchain/go-computing-provider/internal/contract"
@@ -19,7 +18,7 @@ import (
 
 var ubiZeroCmd = &cli.Command{
 	Name:  "ubi-0",
-	Usage: "Manage ubi tasks",
+	Usage: "Manage ubi-0 account collateral info",
 	Subcommands: []*cli.Command{
 		collateralInfoCmd,
 		withdrawFromCollateralCmd,
@@ -66,7 +65,7 @@ var collateralInfoCmd = &cli.Command{
 		var ecpEscrowBalance = "0.0000"
 		var ownerBalance = "0.0000"
 		var workerBalance = "0.0000"
-		var contractAddress, ownerAddress, workerAddress, beneficiaryAddress, taskTypes, chainNodeId, version string
+		var contractAddress, ownerAddress, workerAddress, beneficiaryAddress, chainNodeId, version string
 		var cpAccount models.Account
 
 		cpStub, err := account.NewAccountStub(client)
@@ -75,14 +74,6 @@ var collateralInfoCmd = &cli.Command{
 			if err != nil {
 				err = fmt.Errorf("get cpAccount info on the chain failed, error: %v", err)
 			}
-
-			for _, taskType := range cpAccount.TaskTypes {
-				taskTypes += models.TaskTypeStr(int(taskType)) + ", "
-			}
-			if taskTypes != "" {
-				taskTypes = taskTypes[:len(taskTypes)-2]
-			}
-
 			contractAddress = cpStub.ContractAddress
 			ownerAddress = cpAccount.OwnerAddress
 			workerAddress = cpAccount.WorkerAddress
@@ -126,12 +117,8 @@ var collateralInfoCmd = &cli.Command{
 		taskData = append(taskData, []string{"   Multi-Address:", conf.GetConfig().API.MultiAddress})
 		taskData = append(taskData, []string{"   Worker Address:", workerAddress})
 		taskData = append(taskData, []string{"   Beneficiary Address:", beneficiaryAddress})
-		taskData = append(taskData, []string{""})
-		taskData = append(taskData, []string{"Capabilities:"})
-		taskData = append(taskData, []string{"   Task Types:", taskTypes})
-		taskData = append(taskData, []string{""})
-		taskData = append(taskData, []string{"Owner Balance(ETH):", ownerBalance})
-		taskData = append(taskData, []string{"Worker Balance(ETH):", workerBalance})
+		taskData = append(taskData, []string{"	 Owner Balance(ETH):", ownerBalance})
+		taskData = append(taskData, []string{"   Worker Balance(ETH):", workerBalance})
 		taskData = append(taskData, []string{""})
 		taskData = append(taskData, []string{"ECP Balance(SWAN):"})
 		taskData = append(taskData, []string{"   Collateral:", ecpCollateralBalance})
@@ -140,22 +127,8 @@ var collateralInfoCmd = &cli.Command{
 		taskData = append(taskData, []string{"   Collateral:", fcpCollateralBalance})
 		taskData = append(taskData, []string{"   Escrow:", fcpEscrowBalance})
 
-		var rowColorList []RowColor
-		if taskTypes != "" {
-			rowColorList = append(rowColorList,
-				RowColor{
-					row:    0,
-					column: []int{1},
-					color:  []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgBlueColor}},
-				},
-				RowColor{
-					row:    11,
-					column: []int{1},
-					color:  []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgGreenColor}},
-				})
-		}
 		header := []string{"CP Account Info:"}
-		NewVisualTable(header, taskData, rowColorList).SetAutoWrapText(false).Generate(false)
+		NewVisualTable(header, taskData, []RowColor{}).SetAutoWrapText(false).Generate(false)
 		if err != nil {
 			return err
 		}
