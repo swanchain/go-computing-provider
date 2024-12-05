@@ -648,13 +648,19 @@ func (d *Deploy) createEnv(envs ...coreV1.EnvVar) []coreV1.EnvVar {
 			}
 			useIndexs = append(useIndexs, d.gpuIndex[i])
 		}
-		defaultEnv = append(defaultEnv, coreV1.EnvVar{
-			Name:  "NVIDIA_VISIBLE_DEVICES",
-			Value: strings.Join(useIndexs, ","),
-		}, coreV1.EnvVar{
-			Name:  "NCCL_DEBUG",
-			Value: "INFO",
-		})
+		defaultEnv = append(defaultEnv,
+			coreV1.EnvVar{
+				Name:  "NVIDIA_VISIBLE_DEVICES",
+				Value: strings.Join(useIndexs, ","),
+			}, coreV1.EnvVar{
+				Name:  "NCCL_P2P_DISABLE",
+				Value: "1",
+			},
+			coreV1.EnvVar{
+				Name:  "NCCL_SHM_DISABLE",
+				Value: "1",
+			},
+		)
 	}
 
 	defaultEnv = append(defaultEnv, envs...)
