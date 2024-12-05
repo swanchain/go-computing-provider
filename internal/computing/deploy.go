@@ -651,6 +651,9 @@ func (d *Deploy) createEnv(envs ...coreV1.EnvVar) []coreV1.EnvVar {
 		defaultEnv = append(defaultEnv, coreV1.EnvVar{
 			Name:  "NVIDIA_VISIBLE_DEVICES",
 			Value: strings.Join(useIndexs, ","),
+		}, coreV1.EnvVar{
+			Name:  "NCCL_DEBUG",
+			Value: "INFO",
 		})
 	}
 
