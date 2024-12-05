@@ -35,22 +35,39 @@ func LoadParam() []NetworkConfig {
 }
 
 type NetworkConfig struct {
-	Network string `json:"network"`
-	Config  struct {
-		SequencerUrl                   string `json:"sequencer_url"`
-		ZkEnginePk                     string `json:"zk_engine_pk"`
-		OrchestratorPk                 string `json:"orchestrator_pk"`
-		ChainRpc                       string `json:"chain_rpc"`
-		SwanTokenContract              string `json:"swan_token_contract"`
-		OrchestratorCollateralContract string `json:"orchestrator_collateral_contract"`
-		JobManagerContract             string `json:"job_manager_contract"`
-		JobManagerContractCreated      uint64 `json:"job_manager_contract_created"`
-		RegisterCpContract             string `json:"register_cp_contract"`
-		ZkCollateralContract           string `json:"zk_collateral_contract"`
-		RegisterTaskContract           string `json:"register_task_contract"`
-		SequencerContract              string `json:"sequencer_contract"`
-		EdgeUrl                        string `json:"edge_url"`
-		EdgeTaskPayment                string `json:"edge_task_payment"`
-		EdgeTaskPaymentCreated         int64  `json:"edge_task_payment_created"`
+	Network        string `json:"network"`
+	BoundaryHeight uint64 `json:"boundary_height"`
+	Config         struct {
+		SequencerUrl   string `json:"sequencer_url"`
+		ZkEnginePk     string `json:"zk_engine_pk"`
+		OrchestratorPk string `json:"orchestrator_pk"`
+		ChainRpc       string `json:"chain_rpc"`
+		EdgeUrl        string `json:"edge_url"`
+		LegacyContract struct {
+			SwanTokenContract              string `json:"swan_token_contract"`
+			OrchestratorCollateralContract string `json:"orchestrator_collateral_contract"`
+			JobManagerContract             string `json:"job_manager_contract"`
+			JobManagerContractCreated      uint64 `json:"job_manager_contract_created"`
+			RegisterCpContract             string `json:"register_cp_contract"`
+			ZkCollateralContract           string `json:"zk_collateral_contract"`
+			RegisterTaskContract           string `json:"register_task_contract"`
+			SequencerContract              string `json:"sequencer_contract"`
+			EdgeTaskPayment                string `json:"edge_task_payment"`
+			EdgeTaskPaymentCreated         int64  `json:"edge_task_payment_created"`
+		} `json:"legacy_contract"`
+		UpgradeContract struct {
+			SwanTokenContract              string `json:"swan_token_contract"`
+			OrchestratorCollateralContract string `json:"orchestrator_collateral_contract"`
+			JobManagerContract             string `json:"job_manager_contract"`
+			JobManagerContractCreated      uint64 `json:"job_manager_contract_created"`
+			RegisterCpContract             string `json:"register_cp_contract"`
+			ZkCollateralContract           string `json:"zk_collateral_contract"`
+			RegisterTaskContract           string `json:"register_task_contract"`
+			SequencerContract              string `json:"sequencer_contract"`
+			EdgeTaskPayment                string `json:"edge_task_payment"`
+			EdgeTaskPaymentCreated         int64  `json:"edge_task_payment_created"`
+		} `json:"upgrade_contract"`
+		OrchestratorCollateralUbiZeroContract string `json:"orchestrator_collateral_ubi_zero_contract"`
+		ZkCollateralUbiZeroContract           string `json:"zk_collateral_ubi_zero_contract"`
 	} `json:"config"`
 }

@@ -416,18 +416,17 @@ var collateralWithdrawCmd = &cli.Command{
 	Action: func(cctx *cli.Context) error {
 		ctx := reqContext(cctx)
 
-		fcpCollateral := cctx.Bool("fcp")
-		ecpCollateral := cctx.Bool("ecp")
-
-		if !fcpCollateral && !ecpCollateral {
+		fcpWithdraw := cctx.Bool("fcp")
+		ecpWithdraw := cctx.Bool("ecp")
+		if !fcpWithdraw && !ecpWithdraw {
 			return fmt.Errorf("must specify one of fcp or ecp")
 		}
-		var collateralType string
-		if fcpCollateral {
-			collateralType = "fcp"
+		var withdrawType string
+		if fcpWithdraw {
+			withdrawType = "fcp"
 		}
-		if ecpCollateral {
-			collateralType = "ecp"
+		if ecpWithdraw {
+			withdrawType = "ecp"
 		}
 
 		ownerAddress := cctx.String("owner")
@@ -445,7 +444,7 @@ var collateralWithdrawCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		txHash, err := localWallet.CollateralWithdraw(ctx, ownerAddress, amount, cpAccountAddress, collateralType)
+		txHash, err := localWallet.CollateralWithdraw(ctx, ownerAddress, amount, cpAccountAddress, withdrawType)
 		if err != nil {
 			return err
 		}
@@ -458,6 +457,14 @@ var collateralWithDrawRequestCmd = &cli.Command{
 	Name:  "withdraw-request",
 	Usage: "Send a request to withdraw tokens from the collateral escrow account from the collateral contract",
 	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:  "fcp",
+			Usage: "Specify the fcp withdraw",
+		},
+		&cli.BoolFlag{
+			Name:  "ecp",
+			Usage: "Specify the ecp withdraw",
+		},
 		&cli.StringFlag{
 			Name:  "owner",
 			Usage: "Specify the owner address",
@@ -470,6 +477,18 @@ var collateralWithDrawRequestCmd = &cli.Command{
 	ArgsUsage: "[amount]",
 	Action: func(cctx *cli.Context) error {
 		ctx := reqContext(cctx)
+		fcpWithdraw := cctx.Bool("fcp")
+		ecpWithdraw := cctx.Bool("ecp")
+		if !fcpWithdraw && !ecpWithdraw {
+			return fmt.Errorf("must specify one of fcp or ecp")
+		}
+		var withdrawType string
+		if fcpWithdraw {
+			withdrawType = "fcp"
+		}
+		if ecpWithdraw {
+			withdrawType = "ecp"
+		}
 
 		ownerAddress := cctx.String("owner")
 		if strings.TrimSpace(ownerAddress) == "" {
@@ -486,7 +505,7 @@ var collateralWithDrawRequestCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		txHash, err := localWallet.CollateralWithdrawRequest(ctx, ownerAddress, amount, cpAccountAddress)
+		txHash, err := localWallet.CollateralWithdrawRequest(ctx, ownerAddress, amount, cpAccountAddress, withdrawType)
 		if err != nil {
 			return err
 		}

@@ -37,6 +37,23 @@ func WithCpAccountAddress(cpAccountAddress string) Option {
 	}
 }
 
+func NewCollateralWithUbiZeroStub(client *ethclient.Client, options ...Option) (*Stub, error) {
+	stub := &Stub{}
+	for _, option := range options {
+		option(stub)
+	}
+
+	collateralAddress := common.HexToAddress(conf.GetConfig().CONTRACT.JobCollateralUbiZero)
+	collateralClient, err := NewSwanCreditCollateral(collateralAddress, client)
+	if err != nil {
+		return nil, fmt.Errorf("create fcp collateral contract client, error: %+v", err)
+	}
+
+	stub.collateral = collateralClient
+	stub.client = client
+	return stub, nil
+}
+
 func NewCollateralStub(client *ethclient.Client, options ...Option) (*Stub, error) {
 	stub := &Stub{}
 	for _, option := range options {
