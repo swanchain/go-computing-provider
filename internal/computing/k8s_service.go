@@ -155,12 +155,14 @@ func (s *K8sService) CreateService(ctx context.Context, nameSpace, spaceUuid str
 
 func (s *K8sService) CreateServiceByNodePort(ctx context.Context, nameSpace, taskUuid string, containerPort int32, nodePort int32, exclude22Port []int32) (result *coreV1.Service, err error) {
 	var servicePort []coreV1.ServicePort
+	if containerPort == 22 {
+		servicePort = append(servicePort, coreV1.ServicePort{
+			Name:     fmt.Sprintf("tcp-%d", containerPort),
+			Port:     containerPort,
+			NodePort: nodePort,
+		})
+	}
 
-	servicePort = append(servicePort, coreV1.ServicePort{
-		Name:     fmt.Sprintf("tcp-%d", containerPort),
-		Port:     containerPort,
-		NodePort: nodePort,
-	})
 	for _, port := range exclude22Port {
 		servicePort = append(servicePort, coreV1.ServicePort{
 			Name: fmt.Sprintf("tcp-%d", port),

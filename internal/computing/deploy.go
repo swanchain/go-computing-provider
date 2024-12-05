@@ -593,6 +593,98 @@ func (d *Deploy) DeploySshTaskToK8s(containerResource yaml.ContainerResource, no
 	return nil
 }
 
+func (d *Deploy) DeployImageToK8s(containerResource models.FcpDeployImageReq) error {
+	k8sService := NewK8sService()
+	volumeMounts, volumes := generateVolume()
+
+	var portArray []int32
+	var ports []coreV1.ContainerPort
+	for _, ps := range containerResource.DeployConfig.Ports {
+		for _, p := range ps {
+			ports = append(ports, coreV1.ContainerPort{
+				ContainerPort: int32(p),
+				Protocol:      coreV1.ProtocolTCP,
+			})
+			portArray = append(portArray, int32(p))
+		}
+	}
+
+	var envs = d.createEnv()
+	for k, v := range containerResource.DeployConfig.Envs {
+		envs = append(envs, coreV1.EnvVar{
+			Name:  k,
+			Value: v,
+		})
+	}
+
+	deployment := &appV1.Deployment{
+		TypeMeta: metaV1.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: "apps/v1",
+		},
+		ObjectMeta: metaV1.ObjectMeta{
+			Name:      constants.K8S_DEPLOY_NAME_PREFIX + d.jobUuid,
+			Namespace: d.k8sNameSpace,
+			Annotations: map[string]string{
+				"initializer.kubernetes.io/lxcfs": "true",
+			},
+		},
+		Spec: appV1.DeploymentSpec{
+			Selector: &metaV1.LabelSelector{
+				MatchLabels: map[string]string{"hub-image": d.jobUuid},
+			},
+
+			Template: coreV1.PodTemplateSpec{
+				ObjectMeta: metaV1.ObjectMeta{
+					Labels:    map[string]string{"hub-image": d.jobUuid},
+					Namespace: d.k8sNameSpace,
+				},
+
+				Spec: coreV1.PodSpec{
+					Hostname:     d.spaceName + "-" + generateString(4),
+					NodeSelector: generateLabel(d.gpuProductName),
+					Containers: []coreV1.Container{
+						{
+							Name:            constants.K8S_PRIVATE_CONTAINER_PREFIX + d.jobUuid,
+							Image:           d.image,
+							ImagePullPolicy: coreV1.PullIfNotPresent,
+							Ports:           ports,
+							Resources:       d.createResources(),
+							Env:             envs,
+							VolumeMounts:    volumeMounts,
+						},
+					},
+					Volumes: volumes,
+				},
+			},
+		}}
+	if _, err := k8sService.CreateDeployment(context.TODO(), d.k8sNameSpace, deployment); err != nil {
+		return fmt.Errorf("failed to create deployment, job_uuid: %s error: %v", d.jobUuid, err)
+	}
+	updateJobStatus(d.originalJobUuid, models.DEPLOY_PULL_IMAGE)
+
+	if len(portArray) > 1 {
+		createService, err := k8sService.CreateServiceByNodePort(context.TODO(), d.k8sNameSpace, d.jobUuid, portArray[0], 0, portArray)
+		if err != nil {
+			return fmt.Errorf("failed to create service, job_uuid: %s error: %v", d.jobUuid, err)
+		}
+		var portMap string
+		for _, port := range createService.Spec.Ports {
+			portMap += fmt.Sprintf("%s:%d, ", port.TargetPort.String(), port.NodePort)
+		}
+		d.nodePortUrl = fmt.Sprintf("%s; %s",
+			strings.Split(conf.GetConfig().API.MultiAddress, "/")[2], portMap)
+	} else {
+		if _, err := d.deployK8sResource(portArray[0]); err != nil {
+			logs.GetLogger().Error(err)
+			return fmt.Errorf("failed to create service, job_uuid: %s error: %v", d.jobUuid, err)
+		}
+		updateJobStatus(d.originalJobUuid, models.DEPLOY_TO_K8S, "https://"+d.hostName)
+	}
+	d.watchContainerRunningTime()
+	return nil
+}
+
 func (d *Deploy) deployNamespace() error {
 	k8sService := NewK8sService()
 	if _, err := k8sService.GetNameSpace(context.TODO(), d.k8sNameSpace, metaV1.GetOptions{}); err != nil {
@@ -625,17 +717,16 @@ func (d *Deploy) deployNamespace() error {
 func (d *Deploy) createEnv(envs ...coreV1.EnvVar) []coreV1.EnvVar {
 	defaultEnv := []coreV1.EnvVar{
 		{
-			Name:  "space_name",
-			Value: d.spaceName,
-		},
-		{
-			Name:  "result_url",
-			Value: d.hostName,
-		},
-		{
 			Name:  "job_uuid",
 			Value: d.jobUuid,
 		},
+	}
+
+	if d.spaceName != "" {
+		defaultEnv = append(defaultEnv, coreV1.EnvVar{
+			Name:  "space_name",
+			Value: d.spaceName,
+		})
 	}
 
 	if d.hostName != "" {

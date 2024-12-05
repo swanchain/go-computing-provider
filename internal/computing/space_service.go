@@ -903,25 +903,103 @@ func DeployImage(c *gin.Context) {
 			return
 		}
 	}
-	//
-	//var resourceType = 0
-	//if deployJob.Resource.Gpu > 0 && deployJob.Resource.GpuModel != "" {
-	//	resourceType = 1
-	//}
-	//
-	//var resource models.TaskResource
-	//resource.CPU = strconv.Itoa(deployJob.Resource.Cpu)
-	//resource.Memory = strconv.Itoa(deployJob.Resource.Memory)
-	//resource.Storage = strconv.Itoa(deployJob.Resource.Storage)
-	//
-	//nodeName, _, needCpu, needMemory, needStorage, gpuIndex, err := checkResourceAvailableForUbi(resourceType, deployJob.Resource.GpuModel, &resource)
-	//if err != nil {
-	//	taskEntity.Status = models.TASK_FAILED_STATUS
-	//	NewTaskService().SaveTaskEntity(taskEntity)
-	//	logs.GetLogger().Errorf("check resource failed, error: %v", err)
-	//	c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
-	//	return
-	//}
+
+	var resource models.SpaceHardware
+	resource.Vcpu = int64(deployJob.Resource.Cpu)
+	resource.Memory = int64(deployJob.Resource.Memory)
+	resource.Storage = int64(deployJob.Resource.Storage)
+
+	if deployJob.Resource.Gpu > 0 && deployJob.Resource.GpuModel != "" {
+		resource.HardwareType = "GPU"
+		resource.Hardware = deployJob.Resource.GpuModel
+		resource.Gpu = int64(deployJob.Resource.Gpu)
+	} else {
+		resource.HardwareType = "CPU"
+	}
+
+	available, gpuProductName, gpuIndex, err := checkResourceAvailableForSpace(1, resource)
+	if err != nil {
+		logs.GetLogger().Errorf("failed to check job resource, error: %+v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
+		return
+	}
+
+	if !available {
+		if gpuProductName != "" {
+			logs.GetLogger().Warnf("job_uuid: %s, name: %s, gpu_name: %s, not found a resources available", deployJob.Uuid, deployJob.Name, gpuProductName)
+		} else {
+			logs.GetLogger().Warnf("job_uuid: %s, name: %s, not found a resources available", deployJob.Uuid, deployJob.Name)
+		}
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError))
+		return
+	}
+
+	var hostName string
+	var logHost string
+	prefixStr := generateString(10)
+	if strings.HasPrefix(conf.GetConfig().API.Domain, ".") {
+		hostName = prefixStr + conf.GetConfig().API.Domain
+		logHost = "log" + conf.GetConfig().API.Domain
+	} else {
+		hostName = strings.Join([]string{prefixStr, conf.GetConfig().API.Domain}, ".")
+		logHost = "log." + conf.GetConfig().API.Domain
+	}
+
+	multiAddressSplit := strings.Split(conf.GetConfig().API.MultiAddress, "/")
+	wsUrl := fmt.Sprintf("wss://%s:%s/api/v1/computing/lagrange/spaces/log?job_uuid=%s", logHost, multiAddressSplit[4], deployJob.Uuid)
+
+	var inferenceResp models.FcpDeployImageResp
+	inferenceResp.UUID = deployJob.Uuid
+	inferenceResp.ServiceUrl = fmt.Sprintf("https://%s", hostName)
+	inferenceResp.HealthPath = deployJob.DeployConfig.HealthPath
+	inferenceResp.ServicePortMapping = nil
+	inferenceResp.ContainerLog = wsUrl + "&type=container"
+	inferenceResp.BuildLog = wsUrl + "&type=build"
+
+	go func() {
+		var currentBlockNumber uint64
+		for i := 0; i < 5; i++ {
+			currentBlockNumber, err = getChainBlockNumber()
+			if err != nil {
+				logs.GetLogger().Errorf("failed to get blockNumber, error: %v", err)
+				time.Sleep(time.Second)
+				continue
+			}
+		}
+
+		var jobEntity = new(models.JobEntity)
+		jobEntity.SpaceUuid = deployJob.Uuid
+		jobEntity.RealUrl = inferenceResp.ServiceUrl
+		jobEntity.BuildLog = ""
+		jobEntity.BuildLogPath = filepath.Join("", BuildFileName)
+		jobEntity.ContainerLog = inferenceResp.ContainerLog
+		jobEntity.Duration = deployJob.Duration
+		jobEntity.JobUuid = deployJob.Uuid
+		jobEntity.DeployStatus = models.DEPLOY_RECEIVE_JOB
+		jobEntity.CreateTime = time.Now().Unix()
+		jobEntity.ExpireTime = time.Now().Unix() + int64(deployJob.Duration)
+		jobEntity.StartedBlock = conf.GetConfig().CONTRACT.JobManagerCreated
+		jobEntity.ScannedBlock = currentBlockNumber
+		jobEntity.WalletAddress = deployJob.WalletAddress
+		jobEntity.Name = deployJob.Name
+		jobEntity.Hardware = ""
+		jobEntity.SpaceType = 0
+		jobEntity.ResourceType = resource.HardwareType
+		jobEntity.NameSpace = constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(deployJob.WalletAddress)
+		jobEntity.K8sDeployName = constants.K8S_DEPLOY_NAME_PREFIX + strings.ToLower(deployJob.Uuid)
+		jobEntity.Status = models.JOB_RECEIVED_STATUS
+		jobEntity.K8sResourceType = "deployment"
+		jobEntity.IpWhiteList = strings.Join(deployJob.IpWhiteList, ",")
+		err = NewJobService().SaveJobEntity(jobEntity)
+		if err != nil {
+			logs.GetLogger().Errorf("failed to save job to db, job_uuid: %s, error: %+v", deployJob.Uuid, err)
+		}
+
+		DeployImageSpaceTask(deployJob, gpuProductName, gpuIndex)
+
+	}()
+
+	c.JSON(http.StatusOK, util.CreateSuccessResponse(inferenceResp))
 
 }
 
@@ -1093,6 +1171,38 @@ func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName s
 		}
 	}
 	return
+}
+
+func DeployImageSpaceTask(job models.FcpDeployImageReq, gpuProductName string, gpuIndex []string) {
+	saveGpuCache(gpuProductName)
+	updateJobStatus(job.Uuid, models.DEPLOY_UPLOAD_RESULT)
+
+	//if len(job.DeployConfig.RunCommands) == 0 { // build images
+	//	deployJob.Image = job.Image
+	//	deployJob.Cmd = job.Cmd
+	//	var ports []int
+	//	for _, p := range job.Ports {
+	//		ports = append(ports, p...)
+	//	}
+	//	deployJob.Ports = ports
+	//
+	//	for k, v := range job.Envs {
+	//		envs = append(envs, fmt.Sprintf("%s=%s", k, v))
+	//	}
+	//	deployJob.Envs = envs
+	//} else {
+	//	buildParams, err := parseDockerfileConfig(job)
+	//	if err != nil {
+	//		logs.GetLogger().Errorln(err)
+	//		return
+	//	}
+	//	deployJob.Image = buildParams.Image
+	//	deployJob.Cmd = buildParams.Cmd
+	//	deployJob.Ports = buildParams.Ports
+	//	deployJob.Envs = buildParams.Envs
+	//}
+	//
+	//DeployImageToK8s
 }
 
 func DeleteJob(namespace, jobUuid string, msg string) error {

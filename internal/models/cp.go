@@ -221,6 +221,7 @@ type FcpDeployImageReq struct {
 	Resource      DeployResource `json:"resource"`
 	JobType       int            `json:"job_type"`
 	ResourceUrl   string         `json:"resource_url"`
+	IpWhiteList   []string       `json:"ip_white_list"`
 }
 
 type DeployConfig struct {
@@ -238,4 +239,14 @@ type DeployResource struct {
 	GpuModel string `json:"gpu_model"`
 	Memory   int    `json:"memory"`
 	Storage  int    `json:"storage"`
+}
+
+type FcpDeployImageResp struct {
+	UUID               string    `json:"uuid,omitempty"`
+	ServiceUrl         string    `json:"service_url,omitempty"`
+	HealthPath         string    `json:"health_path,omitempty"`
+	Price              float64   `json:"price"`
+	ServicePortMapping []PortMap `json:"service_port_mapping,omitempty"`
+	ContainerLog       string    `json:"container_log"`
+	BuildLog           string    `json:"build_log"`
 }

@@ -218,7 +218,7 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 	deployJob.HealthPath = job.HealthPath
 	deployJob.NeedResource = needResource
 
-	if job.RunCommands != nil || len(job.RunCommands) == 0 {
+	if len(job.RunCommands) == 0 {
 		deployJob.Image = job.Image
 		deployJob.Cmd = job.Cmd
 		var ports []int
