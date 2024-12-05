@@ -22,13 +22,13 @@ type CpResourceSummary struct {
 	ClusterInfo []*models.NodeResource
 }
 
-func GetNodeResource(allPods []corev1.Pod, node *corev1.Node) (map[string]int64, map[string]int64, *models.NodeResource) {
+func GetNodeResource(allPods []corev1.Pod, node *corev1.Node) (map[string]GpuData, map[string]int64, *models.NodeResource) {
 	var (
 		usedCpu     int64
 		usedMem     int64
 		usedStorage int64
 	)
-	nodeGpu := make(map[string]int64)
+	nodeGpu := make(map[string]GpuData)
 	remainderResource := make(map[string]int64)
 
 	var nodeResource = new(models.NodeResource)
@@ -45,9 +45,14 @@ func GetNodeResource(allPods []corev1.Pod, node *corev1.Node) (map[string]int64,
 			continue
 		}
 		if v, ok := nodeGpu[gpuName]; ok {
-			nodeGpu[gpuName] = v + count
+			v.UsedIndex = append(v.UsedIndex, usedIndexs...)
+			v.Used += usedCount
+			nodeGpu[gpuName] = v
 		} else {
-			nodeGpu[gpuName] = count
+			nodeGpu[gpuName] = GpuData{
+				Used:      usedCount,
+				UsedIndex: usedIndexs,
+			}
 		}
 	}
 

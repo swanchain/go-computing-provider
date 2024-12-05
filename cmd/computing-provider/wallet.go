@@ -428,7 +428,7 @@ var collateralWithdrawCmd = &cli.Command{
 			withdrawType = "ecp"
 		}
 
-		if collateralType == "" {
+		if withdrawType == "" {
 			return fmt.Errorf("not suport withdraw type")
 		}
 

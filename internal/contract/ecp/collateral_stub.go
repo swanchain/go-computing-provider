@@ -82,25 +82,6 @@ func NewCollateralStub(client *ethclient.Client, options ...CollateralOption) (*
 	return stub, nil
 }
 
-func NewCollateralWithUbiZeroStub(client *ethclient.Client, options ...CollateralOption) (*CollateralStub, error) {
-	stub := &CollateralStub{}
-	for _, option := range options {
-		option(stub)
-	}
-
-	contractAddr := conf.GetConfig().CONTRACT.ZkCollateralUbiZero
-	collateralAddress := common.HexToAddress(contractAddr)
-	collateralClient, err := NewEcpCollateral(collateralAddress, client)
-	if err != nil {
-		return nil, fmt.Errorf("ECP create collateral contract client, error: %+v", err)
-	}
-
-	stub.contract = contractAddr
-	stub.collateral = collateralClient
-	stub.client = client
-	return stub, nil
-}
-
 func (s *CollateralStub) Deposit(amount *big.Int) (string, error) {
 	publicAddress, err := s.privateKeyToPublicKey()
 	if err != nil {
