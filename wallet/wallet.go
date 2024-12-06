@@ -650,7 +650,11 @@ func (w *LocalWallet) CollateralWithdrawRequest(ctx context.Context, address str
 	}
 
 	if withdrawType == "fcp" {
-		return "", fmt.Errorf("not support withdraw type")
+		collateralStub, err := fcp.NewCollateralStub(client, fcp.WithPrivateKey(ki.PrivateKey), fcp.WithCpAccountAddress(cpAccountAddress))
+		if err != nil {
+			return "", err
+		}
+		return collateralStub.WithdrawRequest(withDrawAmount)
 	} else if withdrawType == "ecp" {
 		zkCollateral, err := ecp.NewCollateralStub(client, ecp.WithPrivateKey(ki.PrivateKey), ecp.WithCpAccountAddress(cpAccountAddress))
 		if err != nil {
@@ -695,7 +699,11 @@ func (w *LocalWallet) CollateralWithdrawConfirm(ctx context.Context, address str
 	}
 
 	if withdrawType == "fcp" {
-		return "", fmt.Errorf("not support withdraw type")
+		collateralStub, err := fcp.NewCollateralStub(client, fcp.WithPrivateKey(ki.PrivateKey), fcp.WithCpAccountAddress(cpAccountAddress))
+		if err != nil {
+			return "", err
+		}
+		return collateralStub.WithdrawConfirm()
 	} else if withdrawType == "ecp" {
 		zkCollateral, err := ecp.NewCollateralStub(client, ecp.WithPrivateKey(ki.PrivateKey), ecp.WithCpAccountAddress(cpAccountAddress))
 		if err != nil {
@@ -733,7 +741,11 @@ func (w *LocalWallet) CollateralWithdrawView(ctx context.Context, cpAccountAddre
 	}
 
 	if withdrawType == "fcp" {
-		return models.WithdrawRequest{}, fmt.Errorf("not support withdraw type")
+		collateralStub, err := fcp.NewCollateralStub(client, fcp.WithCpAccountAddress(cpAccountAddress))
+		if err != nil {
+			return withdrawRequest, err
+		}
+		return collateralStub.WithdrawView()
 	} else if withdrawType == "ecp" {
 		zkCollateral, err := ecp.NewCollateralStub(client, ecp.WithCpAccountAddress(cpAccountAddress))
 		if err != nil {
