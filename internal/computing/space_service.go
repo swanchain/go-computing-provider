@@ -53,6 +53,7 @@ func GetServiceProviderInfo(c *gin.Context) {
 func ReceiveJob(c *gin.Context) {
 	var jobData models.JobData
 	if err := c.ShouldBindJSON(&jobData); err != nil {
+		logs.GetLogger().Errorf("failed to parse request to json, error: %v", err)
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
 		return
 	}
