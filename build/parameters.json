@@ -1,7 +1,7 @@
 [
   {
     "network": "mainnet",
-    "boundary_height": 3145040,
+    "boundary_height": 3144229,
     "config": {
       "sequencer_url": "https://sequencer.swanchain.io",
       "zk_engine_pk": "0xB5aeb540B4895cd024c1625E146684940A849ED9",

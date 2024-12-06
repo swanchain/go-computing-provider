@@ -14,6 +14,7 @@ import (
 	"io"
 	"math/big"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -74,6 +75,10 @@ func (tps *TaskPaymentService) scanAndProcessEvents(cpAccountAddress string) err
 	lastProcessedBlock := loadLastProcessedBlock()
 	header, err := tps.client.HeaderByNumber(context.Background(), nil)
 	if err != nil {
+		time.Sleep(10 * time.Second)
+		if strings.Contains(err.Error(), "Too Many Requests") {
+			return fmt.Errorf("failed to get chain header, error: Too Many Requests")
+		}
 		return fmt.Errorf("failed to get chain header, error: %v", err)
 	}
 	currentBlock := header.Number.Uint64()

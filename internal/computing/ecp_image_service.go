@@ -232,7 +232,7 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		}
 		deployJob.Envs = envs
 	} else {
-		buildParams, err := parseDockerfileConfig(job)
+		buildParams, err := parseDockerfileConfigForEcp(job)
 		if err != nil {
 			logs.GetLogger().Errorln(err)
 			return
@@ -835,7 +835,7 @@ func CheckWalletBlackListForEcp(walletAddress string) bool {
 	return false
 }
 
-func parseDockerfileConfig(job models.EcpImageJobReq) (*models.DeployJobParam, error) {
+func parseDockerfileConfigForEcp(job models.EcpImageJobReq) (*models.DeployJobParam, error) {
 	var deployParam *models.DeployJobParam
 	if job.RunCommands != nil && len(job.RunCommands) != 0 {
 		content, envs, ports := generateDockerfile(job)

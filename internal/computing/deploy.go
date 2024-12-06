@@ -593,27 +593,26 @@ func (d *Deploy) DeploySshTaskToK8s(containerResource yaml.ContainerResource, no
 	return nil
 }
 
-func (d *Deploy) DeployImageToK8s(containerResource models.FcpDeployImageReq) error {
+func (d *Deploy) DeployImageToK8s(containerResource models.DeployJobParam) error {
 	k8sService := NewK8sService()
 	volumeMounts, volumes := generateVolume()
 
 	var portArray []int32
 	var ports []coreV1.ContainerPort
-	for _, ps := range containerResource.DeployConfig.Ports {
-		for _, p := range ps {
-			ports = append(ports, coreV1.ContainerPort{
-				ContainerPort: int32(p),
-				Protocol:      coreV1.ProtocolTCP,
-			})
-			portArray = append(portArray, int32(p))
-		}
+	for _, p := range containerResource.Ports {
+		ports = append(ports, coreV1.ContainerPort{
+			ContainerPort: int32(p),
+			Protocol:      coreV1.ProtocolTCP,
+		})
+		portArray = append(portArray, int32(p))
 	}
 
 	var envs = d.createEnv()
-	for k, v := range containerResource.DeployConfig.Envs {
+	for _, v := range containerResource.Envs {
+		splits := strings.Split(v, "=")
 		envs = append(envs, coreV1.EnvVar{
-			Name:  k,
-			Value: v,
+			Name:  splits[0],
+			Value: splits[1],
 		})
 	}
 

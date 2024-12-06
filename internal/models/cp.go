@@ -222,6 +222,7 @@ type FcpDeployImageReq struct {
 	JobType       int            `json:"job_type"`
 	ResourceUrl   string         `json:"resource_url"`
 	IpWhiteList   []string       `json:"ip_white_list"`
+	BidPrice      string         `json:"bid_price"` // Amount users are willing to pay
 }
 
 type DeployConfig struct {
@@ -231,6 +232,7 @@ type DeployConfig struct {
 	Cmd         []string          `json:"cmd"`
 	RunCommands []string          `json:"run_commands"`
 	Ports       map[string][]int  `json:"ports"`
+	WorkDir     string            `json:"work_dir"`
 }
 
 type DeployResource struct {

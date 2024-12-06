@@ -917,6 +917,21 @@ func DeployImage(c *gin.Context) {
 		resource.HardwareType = "CPU"
 	}
 
+	if !conf.GetConfig().API.Pricing {
+		checkPriceFlag, totalCost, err := checkPrice(deployJob.BidPrice, deployJob.Duration, resource)
+		if err != nil {
+			logs.GetLogger().Errorf("failed to check price, job_uuid: %s, error: %v", deployJob.Uuid, err)
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
+			return
+		}
+
+		if !checkPriceFlag {
+			logs.GetLogger().Warnf("the price is too low, job_uuid: %s, paid: %s, required: %0.4f", deployJob.Uuid, deployJob.BidPrice, totalCost)
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BelowPriceError))
+			return
+		}
+	}
+
 	available, gpuProductName, gpuIndex, err := checkResourceAvailableForSpace(1, resource)
 	if err != nil {
 		logs.GetLogger().Errorf("failed to check job resource, error: %+v", err)
@@ -948,13 +963,16 @@ func DeployImage(c *gin.Context) {
 	multiAddressSplit := strings.Split(conf.GetConfig().API.MultiAddress, "/")
 	wsUrl := fmt.Sprintf("wss://%s:%s/api/v1/computing/lagrange/spaces/log?job_uuid=%s", logHost, multiAddressSplit[4], deployJob.Uuid)
 
-	var inferenceResp models.FcpDeployImageResp
-	inferenceResp.UUID = deployJob.Uuid
-	inferenceResp.ServiceUrl = fmt.Sprintf("https://%s", hostName)
-	inferenceResp.HealthPath = deployJob.DeployConfig.HealthPath
-	inferenceResp.ServicePortMapping = nil
-	inferenceResp.ContainerLog = wsUrl + "&type=container"
-	inferenceResp.BuildLog = wsUrl + "&type=build"
+	var jobData models.JobData
+	jobData.UUID = deployJob.Uuid
+	jobData.Name = deployJob.Name
+	jobData.Duration = deployJob.Duration
+	jobData.TaskUUID = deployJob.Uuid
+	jobData.BidPrice = deployJob.BidPrice
+	jobData.IpWhiteList = deployJob.IpWhiteList
+	jobData.BuildLog = wsUrl + "&type=build"
+	jobData.ContainerLog = wsUrl + "&type=container"
+	jobData.JobRealUri = fmt.Sprintf("https://%s", hostName)
 
 	go func() {
 		var currentBlockNumber uint64
@@ -967,12 +985,13 @@ func DeployImage(c *gin.Context) {
 			}
 		}
 
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 		var jobEntity = new(models.JobEntity)
 		jobEntity.SpaceUuid = deployJob.Uuid
-		jobEntity.RealUrl = inferenceResp.ServiceUrl
-		jobEntity.BuildLog = ""
-		jobEntity.BuildLogPath = filepath.Join("", BuildFileName)
-		jobEntity.ContainerLog = inferenceResp.ContainerLog
+		jobEntity.RealUrl = jobData.JobRealUri
+		jobEntity.BuildLog = jobData.BuildLog
+		jobEntity.BuildLogPath = filepath.Join(cpRepoPath, "build/fcp", deployJob.Uuid, BuildFileName)
+		jobEntity.ContainerLog = jobData.ContainerLog
 		jobEntity.Duration = deployJob.Duration
 		jobEntity.JobUuid = deployJob.Uuid
 		jobEntity.DeployStatus = models.DEPLOY_RECEIVE_JOB
@@ -982,7 +1001,6 @@ func DeployImage(c *gin.Context) {
 		jobEntity.ScannedBlock = currentBlockNumber
 		jobEntity.WalletAddress = deployJob.WalletAddress
 		jobEntity.Name = deployJob.Name
-		jobEntity.Hardware = ""
 		jobEntity.SpaceType = 0
 		jobEntity.ResourceType = resource.HardwareType
 		jobEntity.NameSpace = constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(deployJob.WalletAddress)
@@ -995,11 +1013,19 @@ func DeployImage(c *gin.Context) {
 			logs.GetLogger().Errorf("failed to save job to db, job_uuid: %s, error: %+v", deployJob.Uuid, err)
 		}
 
-		DeployImageSpaceTask(deployJob, gpuProductName, gpuIndex)
+		go func() {
+			if err = submitJob(&jobData); err != nil {
+				logs.GetLogger().Errorf("failed to upload job data to MCS, job_uuid: %s, error: %v", jobData.UUID, err)
+				return
+			}
+			logs.GetLogger().Infof("successfully uploaded to MCS, jobuuid: %s", jobData.UUID)
+		}()
+
+		DeployImageSpaceTask(jobData, deployJob, hostName, resource, gpuProductName, gpuIndex)
 
 	}()
 
-	c.JSON(http.StatusOK, util.CreateSuccessResponse(inferenceResp))
+	c.JSON(http.StatusOK, util.CreateSuccessResponse(jobData))
 
 }
 
@@ -1173,36 +1199,164 @@ func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName s
 	return
 }
 
-func DeployImageSpaceTask(job models.FcpDeployImageReq, gpuProductName string, gpuIndex []string) {
+func DeployImageSpaceTask(jobData models.JobData, job models.FcpDeployImageReq, hostName string, resource models.SpaceHardware, gpuProductName string, gpuIndex []string) {
 	saveGpuCache(gpuProductName)
 	updateJobStatus(job.Uuid, models.DEPLOY_UPLOAD_RESULT)
 
-	//if len(job.DeployConfig.RunCommands) == 0 { // build images
-	//	deployJob.Image = job.Image
-	//	deployJob.Cmd = job.Cmd
-	//	var ports []int
-	//	for _, p := range job.Ports {
-	//		ports = append(ports, p...)
-	//	}
-	//	deployJob.Ports = ports
-	//
-	//	for k, v := range job.Envs {
-	//		envs = append(envs, fmt.Sprintf("%s=%s", k, v))
-	//	}
-	//	deployJob.Envs = envs
-	//} else {
-	//	buildParams, err := parseDockerfileConfig(job)
-	//	if err != nil {
-	//		logs.GetLogger().Errorln(err)
-	//		return
-	//	}
-	//	deployJob.Image = buildParams.Image
-	//	deployJob.Cmd = buildParams.Cmd
-	//	deployJob.Ports = buildParams.Ports
-	//	deployJob.Envs = buildParams.Envs
-	//}
-	//
-	//DeployImageToK8s
+	var success bool
+	var jobUuid string
+	var walletAddress string
+	defer func() {
+		deleteGpuCache(gpuProductName)
+		if !success {
+			k8sNameSpace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(walletAddress)
+			DeleteJob(k8sNameSpace, jobUuid, "failed to deploy space")
+			NewJobService().DeleteJobEntityByJobUuId(job.Uuid, models.JOB_TERMINATED_STATUS)
+		}
+
+		if err := recover(); err != nil {
+			logs.GetLogger().Errorf("deploy space task painc, error: %+v", err)
+			return
+		}
+	}()
+
+	var deployJob models.DeployJobParam
+	deployJob.Uuid = job.Uuid
+	deployJob.Name = job.Name
+	deployJob.JobType = job.JobType
+	deployJob.HealthPath = job.DeployConfig.HealthPath
+
+	var envs []string
+	if len(job.DeployConfig.RunCommands) == 0 { // build images
+		deployJob.Image = job.DeployConfig.Image
+		deployJob.Cmd = job.DeployConfig.Cmd
+		var ports []int
+		for _, p := range job.DeployConfig.Ports {
+			ports = append(ports, p...)
+		}
+		deployJob.Ports = ports
+
+		for k, v := range job.DeployConfig.Envs {
+			envs = append(envs, fmt.Sprintf("%s=%s", k, v))
+		}
+		deployJob.Envs = envs
+	} else {
+		buildParams, err := parseDockerfileConfigForFcp(job)
+		if err != nil {
+			logs.GetLogger().Errorln(err)
+			return
+		}
+		deployJob.Image = buildParams.Image
+		deployJob.Cmd = buildParams.Cmd
+		deployJob.Ports = buildParams.Ports
+		deployJob.Envs = buildParams.Envs
+
+		clusterRuntime, err := NewK8sService().GetClusterRuntime()
+		if err != nil {
+			logs.GetLogger().Errorf("failed to get cluster runtime, error: %v", err)
+		} else {
+			logs.GetLogger().Infof("cluster runtime: %s", clusterRuntime)
+			if strings.Contains(strings.ToLower(clusterRuntime), "containerd") {
+				imageTar, err := NewDockerService().SaveDockerImage(deployJob.Image)
+				if err != nil {
+					logs.GetLogger().Errorf("failed to save image, imageName: %s error: %v", deployJob.Image, err)
+					return
+				}
+				if err = ImportImageToContainerd(imageTar); err != nil {
+					logs.GetLogger().Errorf("failed to load image into containerd, imageName: %s error: %v", deployJob.Image, err)
+					return
+				}
+			}
+
+		}
+	}
+
+	jobUuid = strings.ToLower(job.Uuid)
+	deploy := NewDeploy(job.Uuid, jobUuid, hostName, job.WalletAddress, "", int64(job.Duration), constants.SPACE_TYPE_PUBLIC, resource, 1)
+	deploy.WithIpWhiteList(job.IpWhiteList)
+	deploy.WithSpaceName(job.Name)
+	deploy.WithGpuProductName(gpuProductName)
+	deploy.WithGpuIndex(gpuIndex)
+
+	err := deploy.DeployImageToK8s(deployJob)
+	if err != nil {
+		logs.GetLogger().Errorf("failed to use yaml to deploy job, error: %v", err)
+		return
+	}
+	if deploy.nodePortUrl != "" {
+		jobData.JobRealUri = deploy.nodePortUrl[:len(deploy.nodePortUrl)-2]
+		if err = submitJob(&jobData); err != nil {
+			logs.GetLogger().Errorf("failed to upload job result to MCS, jobUuid: %s, error: %v", jobData.UUID, err)
+			return
+		}
+		updateJobStatus(job.Uuid, models.DEPLOY_TO_K8S)
+	}
+	success = true
+}
+
+func parseDockerfileConfigForFcp(job models.FcpDeployImageReq) (*models.DeployJobParam, error) {
+	var deployParam *models.DeployJobParam
+	if len(job.DeployConfig.RunCommands) != 0 {
+		content, envs, ports := generateDockerfileForFcp(job)
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
+		buildFolder := filepath.Join(cpRepoPath, "build/fcp", job.Uuid)
+		if err := os.MkdirAll(buildFolder, os.ModePerm); err != nil {
+			return nil, fmt.Errorf("failed to create dir, error: %v", err)
+		}
+		dockerfileFile := filepath.Join(buildFolder, "Dockerfile")
+		err := os.WriteFile(dockerfileFile, []byte(content), 0644)
+		if err != nil {
+			return nil, fmt.Errorf("failed to save Dockerfile: %v", err)
+		}
+
+		imageName := fmt.Sprintf("ecp-image/%s:%d", job.Uuid, time.Now().Unix())
+		if conf.GetConfig().Registry.ServerAddress != "" {
+			imageName = fmt.Sprintf("%s/%s:%d",
+				strings.TrimSpace(conf.GetConfig().Registry.ServerAddress), job.Uuid, time.Now().Unix())
+		}
+		imageName = strings.ToLower(imageName)
+
+		if _, err := os.Stat(dockerfileFile); err != nil {
+			return nil, fmt.Errorf("failed not found Dockerfile, path: %s", dockerfileFile)
+		}
+		deployParam.BuildImagePath = buildFolder
+		deployParam.BuildImageName = imageName
+		deployParam.Envs = envs
+		deployParam.Ports = ports
+	}
+	return deployParam, nil
+}
+
+func generateDockerfileForFcp(config models.FcpDeployImageReq) (string, []string, []int) {
+	var builder strings.Builder
+	builder.WriteString(fmt.Sprintf("FROM %s\n", config.DeployConfig.Image))
+
+	var envs []string
+	var ports []int
+	if config.DeployConfig.WorkDir != "" {
+		builder.WriteString(fmt.Sprintf("WORKDIR %s\n", config.DeployConfig.WorkDir))
+	}
+
+	for key, value := range config.DeployConfig.Envs {
+		builder.WriteString(fmt.Sprintf("ENV %s=%s\n", key, value))
+		envs = append(envs, fmt.Sprintf("%s=%s", key, value))
+	}
+
+	for _, cmd := range config.DeployConfig.RunCommands {
+		builder.WriteString(fmt.Sprintf("RUN %s\n", cmd))
+	}
+
+	for _, port := range config.DeployConfig.Ports {
+		builder.WriteString(fmt.Sprintf("EXPOSE %d\n", port))
+		ports = append(ports, port...)
+	}
+
+	if len(config.DeployConfig.Cmd) > 0 {
+		cmdStr := strings.Join(config.DeployConfig.Cmd, " ")
+		builder.WriteString(fmt.Sprintf("CMD [%s]\n", cmdStr))
+	}
+
+	return builder.String(), envs, ports
 }
 
 func DeleteJob(namespace, jobUuid string, msg string) error {
