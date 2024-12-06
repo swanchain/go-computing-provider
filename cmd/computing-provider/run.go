@@ -87,7 +87,7 @@ func cpManager(router *gin.RouterGroup) {
 	router.GET("/lagrange/cp/public_key", computing.GetPublicKey)
 	router.GET("/lagrange/cp/price", computing.GetPrice)
 	router.GET("/lagrange/cp/check_node_port", computing.CheckNodeportServiceEnv)
-	router.GET("/lagrange/cp/deploy", computing.DeployImage)
+	router.POST("/lagrange/cp/deploy", computing.DeployImage)
 
 	router.POST("/cp/ubi", computing.DoUbiTaskForK8s)
 	router.POST("/cp/receive/ubi", computing.ReceiveUbiProof)
