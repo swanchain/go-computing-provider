@@ -597,6 +597,11 @@ func (d *Deploy) DeployImageToK8s(containerResource models.DeployJobParam) error
 	k8sService := NewK8sService()
 	volumeMounts, volumes := generateVolume()
 
+	if err := d.deployNamespace(); err != nil {
+		logs.GetLogger().Error(err)
+		return err
+	}
+
 	var portArray []int32
 	var ports []coreV1.ContainerPort
 	for _, p := range containerResource.Ports {
