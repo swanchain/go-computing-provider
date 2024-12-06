@@ -974,7 +974,15 @@ func DeployImage(c *gin.Context) {
 	jobData.IpWhiteList = deployJob.IpWhiteList
 	jobData.BuildLog = wsUrl + "&type=build"
 	jobData.ContainerLog = wsUrl + "&type=container"
-	jobData.JobRealUri = fmt.Sprintf("https://%s", hostName)
+	var ports []int
+	for _, p := range deployJob.DeployConfig.Ports {
+		ports = append(ports, p...)
+	}
+	if len(ports) == 1 {
+		jobData.JobRealUri = fmt.Sprintf("https://%s", hostName)
+	} else {
+		jobData.JobRealUri = ""
+	}
 
 	go func() {
 		var currentBlockNumber uint64
