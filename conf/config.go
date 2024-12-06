@@ -171,8 +171,14 @@ func getConfigByHeight() {
 		if ncCopy.Network == build.NetWorkTag {
 			var blockNumber uint64
 			var err error
+			var rpc string
+			if config.RPC.SwanChainRpc != "" {
+				rpc = config.RPC.SwanChainRpc
+			} else {
+				rpc = ncCopy.Config.ChainRpc
+			}
 			for {
-				blockNumber, err = getChainHeight(ncCopy.Config.ChainRpc)
+				blockNumber, err = getChainHeight(rpc)
 				if err != nil {
 					fmt.Printf("failed to get chain height, error: %v", err)
 					time.Sleep(2 * time.Second)
