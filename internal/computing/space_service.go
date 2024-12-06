@@ -862,6 +862,7 @@ func DoProof(c *gin.Context) {
 func DeployImage(c *gin.Context) {
 	var deployJob models.FcpDeployImageReq
 	if err := c.ShouldBindJSON(&deployJob); err != nil {
+		logs.GetLogger().Errorf("failed to parse request to json, error: %v", err)
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
 		return
 	}
