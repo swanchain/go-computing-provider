@@ -1277,6 +1277,7 @@ func DeployImageSpaceTask(jobData models.JobData, job models.FcpDeployImageReq, 
 	deploy.WithSpaceName(job.Name)
 	deploy.WithGpuProductName(gpuProductName)
 	deploy.WithGpuIndex(gpuIndex)
+	deploy.WithImage(deployJob.Image)
 
 	err := deploy.DeployImageToK8s(deployJob)
 	if err != nil {
