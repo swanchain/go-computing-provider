@@ -635,12 +635,12 @@ func (d *Deploy) DeployImageToK8s(containerResource models.DeployJobParam) error
 		},
 		Spec: appV1.DeploymentSpec{
 			Selector: &metaV1.LabelSelector{
-				MatchLabels: map[string]string{"hub-image": d.jobUuid},
+				MatchLabels: map[string]string{"lad_app": d.jobUuid},
 			},
 
 			Template: coreV1.PodTemplateSpec{
 				ObjectMeta: metaV1.ObjectMeta{
-					Labels:    map[string]string{"hub-image": d.jobUuid},
+					Labels:    map[string]string{"lad_app": d.jobUuid},
 					Namespace: d.k8sNameSpace,
 				},
 
