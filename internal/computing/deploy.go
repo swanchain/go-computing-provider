@@ -578,7 +578,7 @@ func (d *Deploy) DeploySshTaskToK8s(containerResource yaml.ContainerResource, no
 		return fmt.Errorf("failed to create user directory, job_uuid: %s error: %v", d.jobUuid, err)
 	}
 
-	createService, err := k8sService.CreateServiceByNodePort(context.TODO(), d.k8sNameSpace, d.jobUuid, 22, nodePort, exclude22Port)
+	createService, err := k8sService.CreateServiceByNodePort(context.TODO(), d.k8sNameSpace, d.jobUuid, 22, nodePort, exclude22Port, "hub-private")
 	if err != nil {
 		return fmt.Errorf("failed to create service, job_uuid: %s error: %v", d.jobUuid, err)
 	}
@@ -668,7 +668,7 @@ func (d *Deploy) DeployImageToK8s(containerResource models.DeployJobParam) error
 	updateJobStatus(d.originalJobUuid, models.DEPLOY_PULL_IMAGE)
 
 	if len(portArray) > 1 {
-		createService, err := k8sService.CreateServiceByNodePort(context.TODO(), d.k8sNameSpace, d.jobUuid, portArray[0], 0, portArray)
+		createService, err := k8sService.CreateServiceByNodePort(context.TODO(), d.k8sNameSpace, d.jobUuid, portArray[0], 0, portArray, "lad_app")
 		if err != nil {
 			return fmt.Errorf("failed to create service, job_uuid: %s error: %v", d.jobUuid, err)
 		}
@@ -676,7 +676,7 @@ func (d *Deploy) DeployImageToK8s(containerResource models.DeployJobParam) error
 		for _, port := range createService.Spec.Ports {
 			portMap += fmt.Sprintf("%s:%d, ", port.TargetPort.String(), port.NodePort)
 		}
-		d.nodePortUrl = fmt.Sprintf("%s; %s",
+		d.nodePortUrl = fmt.Sprintf("http://%s; %s",
 			strings.Split(conf.GetConfig().API.MultiAddress, "/")[2], portMap)
 	} else {
 		if _, err := d.deployK8sResource(portArray[0]); err != nil {

@@ -153,7 +153,7 @@ func (s *K8sService) CreateService(ctx context.Context, nameSpace, spaceUuid str
 	return s.k8sClient.CoreV1().Services(nameSpace).Create(ctx, service, metaV1.CreateOptions{})
 }
 
-func (s *K8sService) CreateServiceByNodePort(ctx context.Context, nameSpace, taskUuid string, containerPort int32, nodePort int32, exclude22Port []int32) (result *coreV1.Service, err error) {
+func (s *K8sService) CreateServiceByNodePort(ctx context.Context, nameSpace, taskUuid string, containerPort int32, nodePort int32, exclude22Port []int32, labelName string) (result *coreV1.Service, err error) {
 	var servicePort []coreV1.ServicePort
 	if containerPort == 22 {
 		servicePort = append(servicePort, coreV1.ServicePort{
@@ -183,7 +183,7 @@ func (s *K8sService) CreateServiceByNodePort(ctx context.Context, nameSpace, tas
 			Type:  coreV1.ServiceTypeNodePort,
 			Ports: servicePort,
 			Selector: map[string]string{
-				"hub-private": taskUuid,
+				labelName: taskUuid,
 			},
 		},
 	}
