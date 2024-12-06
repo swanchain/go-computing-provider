@@ -570,7 +570,10 @@ func (*ImageJobService) DeployInference(c *gin.Context, deployJob models.DeployJ
 }
 
 func handleMultiPort(ports []int) (map[nat.Port][]nat.PortBinding, []models.PortMap, error) {
-	var portRange = conf.GetConfig().API.PortRange
+	portRange, err := parsePortRanges(conf.GetConfig().API.PortRange)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to parse ports in config, error:%v", err)
+	}
 	var usedPort = make(map[int]int)
 	var count int
 	for i := 0; i < len(ports); i++ {
@@ -604,6 +607,42 @@ func handleMultiPort(ports []int) (map[nat.Port][]nat.PortBinding, []models.Port
 	}
 
 	return portMap, mapPorts, nil
+}
+
+func parsePortRanges(portRanges []string) ([]int, error) {
+	var ports []int
+	for _, rangeStr := range portRanges {
+		// Check if the range contains a dash (indicating a range like 40000-40050)
+		if strings.Contains(rangeStr, "-") {
+			parts := strings.Split(rangeStr, "-")
+			if len(parts) != 2 {
+				return nil, fmt.Errorf("invalid range format: %s", rangeStr)
+			}
+
+			start, err := strconv.Atoi(parts[0])
+			if err != nil {
+				return nil, fmt.Errorf("invalid start port: %s", parts[0])
+			}
+
+			end, err := strconv.Atoi(parts[1])
+			if err != nil {
+				return nil, fmt.Errorf("invalid end port: %s", parts[1])
+			}
+
+			// Add all ports in the range to the slice
+			for i := start; i <= end; i++ {
+				ports = append(ports, i)
+			}
+		} else {
+			// Parse a single port
+			port, err := strconv.Atoi(rangeStr)
+			if err != nil {
+				return nil, fmt.Errorf("invalid port: %s", rangeStr)
+			}
+			ports = append(ports, port)
+		}
+	}
+	return ports, nil
 }
 
 func checkPriceForDocker(userPrice string, duration int, resource *models.HardwareResource) (bool, float64, error) {

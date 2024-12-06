@@ -354,7 +354,9 @@ make install
        WalletWhiteList = ""                           # CP only accepts user addresses from this whitelist for space deployment
        WalletBlackList = ""                           # CP reject user addresses from this blacklist for space deployment
        Pricing = "true"                               # default True, indicating acceptance of smart pricing orders, which may include orders priced lower than self-determined pricing.
-   
+       AutoDeleteImage = false                        # Default false, automatically delete unused images
+       PortRange= ["40000-40050","40070"]             # Externally exposed port number for deploying ECP image tasks
+      
        [UBI]
        UbiEnginePk = "0xB5aeb540B4895cd024c1625E146684940A849ED9"              # UBI Engine's public key, CP only accept the task from this UBI engine
        EnableSequencer = true                                                  # Submit the proof to Sequencer service(default: true)
