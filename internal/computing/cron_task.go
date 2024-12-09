@@ -486,7 +486,9 @@ func (task *CronTask) checkJobReward() {
 		}
 
 		for _, job := range jobList {
-			NewTaskManagerContract(job).Scan()
+			if NewTaskManagerContract(job).Scan() {
+				break
+			}
 		}
 	})
 	c.Start()
