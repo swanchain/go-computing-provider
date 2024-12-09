@@ -472,8 +472,7 @@ func (task *CronTask) setFailedUbiTaskStatus() {
 
 func (task *CronTask) checkJobReward() {
 	c := cron.New(cron.WithSeconds())
-	//c.AddFunc("* * 0/20 * * ?", func() {
-	c.AddFunc("0 */10 * * * ?", func() {
+	c.AddFunc("* * 0/20 * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("task job: [checkJobReward], error: %+v", err)
