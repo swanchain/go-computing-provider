@@ -98,7 +98,7 @@ func (taskManager *TaskManagerContract) Scan() error {
 			logs.GetLogger().Errorf("debug_rpc_chain: count: %d, start: %d, end: %d, error: %s", count, i, end, ecp.ParseTooManyError(err))
 			return err
 		}
-		logs.GetLogger().Errorf("debug_rpc_chain:count: %d, start: %d, end: %d", count, i, end)
+		logs.GetLogger().Infof("debug_rpc_chain:count: %d, start: %d, end: %d", count, i, end)
 		saveLastProcessedBlock(int64(end), models.ScannerFcpTaskManagerId)
 	}
 	return nil

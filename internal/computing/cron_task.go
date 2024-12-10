@@ -434,7 +434,7 @@ func (task *CronTask) cleanAbnormalDeployment() {
 
 func (task *CronTask) setFailedUbiTaskStatus() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("0 0/8 * * * ?", func() {
+	c.AddFunc("0 0 */10 * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("task job: [setFailedUbiTaskStatus], error: %+v", err)
@@ -475,7 +475,7 @@ func (task *CronTask) checkJobReward() {
 	var num int
 
 	c := cron.New(cron.WithSeconds(), cron.WithChain(cron.DelayIfStillRunning(cron.DefaultLogger)))
-	c.AddFunc("0 */5 * * * ?", func() {
+	c.AddFunc("@every 10h", func() {
 		num++
 		defer func() {
 			if err := recover(); err != nil {
