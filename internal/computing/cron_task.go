@@ -489,10 +489,19 @@ func (task *CronTask) checkJobReward() {
 			logs.GetLogger().Errorf("failed to create task manager, error: %v", err)
 			return
 		}
-		if err = taskManager.Scan(); err != nil {
-			logs.GetLogger().Errorf("failed to scanner task, error: %v", ecp.ParseTooManyError(err))
+
+		for i := 0; i < 3; i++ {
+			err = taskManager.Scan()
+			if err != nil {
+				time.Sleep(time.Second)
+				continue
+			}
 		}
-		logs.GetLogger().Infof("debug_rpc_chain: num: %d, total rpc: %d", num, taskManager.count)
+		if err != nil {
+			logs.GetLogger().Errorf("failed to scanner task, error: %v", ecp.ParseTooManyError(err))
+		} else {
+			logs.GetLogger().Infof("debug_rpc_chain: num: %d, total rpc: %d", num, taskManager.count)
+		}
 		return
 	})
 	c.Start()

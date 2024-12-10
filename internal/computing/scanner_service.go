@@ -65,25 +65,6 @@ func NewTaskManagerContract() (*TaskManagerContract, error) {
 }
 
 func (taskManager *TaskManagerContract) Scan() error {
-	var end uint64
-	var err error
-	defer func() {
-		if end > 0 {
-			saveLastProcessedBlock(int64(end), models.ScannerFcpTaskManagerId)
-		}
-	}()
-
-	for i := 0; i < 3; i++ {
-		end, err = taskManager.retryScan()
-		if err != nil {
-			time.Sleep(time.Second)
-			continue
-		}
-	}
-	return err
-}
-
-func (taskManager *TaskManagerContract) retryScan() (uint64, error) {
 	var endBlockNumber uint64
 	var end uint64
 	var err error
@@ -96,7 +77,7 @@ func (taskManager *TaskManagerContract) retryScan() (uint64, error) {
 
 	endBlockNumber, err = taskManager.ethClient.BlockNumber(context.Background())
 	if err != nil {
-		return 0, err
+		return err
 	}
 
 	var step uint64 = 1000
@@ -115,11 +96,12 @@ func (taskManager *TaskManagerContract) retryScan() (uint64, error) {
 		time.Sleep(3 * time.Second)
 		if err := taskManager.scanTaskRewards(filterOps); err != nil {
 			logs.GetLogger().Errorf("debug_rpc_chain: count: %d, start: %d, end: %d, error: %s", count, i, end, ecp.ParseTooManyError(err))
-			return end, err
+			return err
 		}
 		logs.GetLogger().Errorf("debug_rpc_chain:count: %d, start: %d, end: %d", count, i, end)
+		saveLastProcessedBlock(int64(end), models.ScannerFcpTaskManagerId)
 	}
-	return end, nil
+	return nil
 }
 
 func (taskManager *TaskManagerContract) scanTaskRewards(opts *bind.FilterOpts) (err error) {
