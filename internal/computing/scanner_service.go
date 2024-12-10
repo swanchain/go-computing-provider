@@ -7,6 +7,7 @@ import (
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/contract"
+	"github.com/swanchain/go-computing-provider/internal/contract/ecp"
 	"github.com/swanchain/go-computing-provider/internal/contract/fcp"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"time"
@@ -16,6 +17,7 @@ type TaskManagerContract struct {
 	cpAccount         string
 	taskManagerClient *fcp.FcpTaskManager
 	job               *models.JobEntity
+	count             int64
 }
 
 func NewTaskManagerContract(job *models.JobEntity) *TaskManagerContract {
@@ -92,6 +94,7 @@ func (taskManager *TaskManagerContract) retryScan(job *models.JobEntity) (uint64
 
 	var step uint64 = 1000
 	for i := start; i <= endBlockNumber; i = i + step {
+		taskManager.count += 1
 		end = i + step - 1
 		if end > endBlockNumber {
 			end = endBlockNumber
@@ -102,7 +105,7 @@ func (taskManager *TaskManagerContract) retryScan(job *models.JobEntity) (uint64
 		}
 		time.Sleep(3 * time.Second)
 		if err := taskManager.scanTaskRewards(job, filterOps); err != nil {
-			logs.GetLogger().Error(err)
+			logs.GetLogger().Error("job_uuid: %s, start: %d, end: %d, error: %s", job.JobUuid, i, end, ecp.ParseTooManyError(err))
 			return 0, err
 		}
 	}
