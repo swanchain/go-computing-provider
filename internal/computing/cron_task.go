@@ -224,7 +224,7 @@ func (task *CronTask) watchExpiredTask() {
 			}
 		}()
 
-		jobList, err := NewJobService().GetJobList(models.All_FLAG)
+		jobList, err := NewJobService().GetJobList(models.UN_DELETEED_FLAG)
 		if err != nil {
 			logs.GetLogger().Errorf("failed to get job data, error: %+v", err)
 			return
