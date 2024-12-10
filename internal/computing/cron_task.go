@@ -484,7 +484,6 @@ func (task *CronTask) checkJobReward() {
 		}()
 
 		logs.GetLogger().Infof("debug_rpc_chain: num: %d, fcp start scanner chain", num)
-		var count int64
 		taskManager, err := NewTaskManagerContract()
 		if err != nil {
 			logs.GetLogger().Errorf("failed to create task manager, error: %v", err)
@@ -493,7 +492,7 @@ func (task *CronTask) checkJobReward() {
 		if err = taskManager.Scan(); err != nil {
 			logs.GetLogger().Errorf("failed to scanner task, error: %v", ecp.ParseTooManyError(err))
 		}
-		logs.GetLogger().Infof("debug_rpc_chain: num: %d, total rpc: %d", num, count)
+		logs.GetLogger().Infof("debug_rpc_chain: num: %d, total rpc: %d", num, taskManager.count)
 		return
 	})
 	c.Start()
