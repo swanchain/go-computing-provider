@@ -474,7 +474,7 @@ func (task *CronTask) setFailedUbiTaskStatus() {
 func (task *CronTask) checkJobReward() {
 	var num int
 
-	c := cron.New(cron.WithSeconds())
+	c := cron.New(cron.WithSeconds(), cron.WithChain(cron.DelayIfStillRunning(cron.DefaultLogger)))
 	c.AddFunc("0 */5 * * * ?", func() {
 		num++
 		defer func() {
@@ -496,6 +496,7 @@ func (task *CronTask) checkJobReward() {
 				time.Sleep(time.Second)
 				continue
 			}
+			break
 		}
 		if err != nil {
 			logs.GetLogger().Errorf("failed to scanner task, error: %v", ecp.ParseTooManyError(err))
@@ -670,4 +671,18 @@ func handleTasksToGroup(list []*models.TaskEntity) []TaskGroup {
 		groups = append(groups, group1)
 	}
 	return groups
+}
+
+func tryLock(m *sync.Mutex) bool {
+	locked := make(chan bool, 1)
+	go func() {
+		m.Lock()
+		locked <- true
+	}()
+	select {
+	case <-locked:
+		return true
+	case <-time.After(0): // 立即返回，不阻塞
+		return false
+	}
 }
