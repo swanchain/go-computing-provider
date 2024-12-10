@@ -30,7 +30,7 @@ type TaskManagerContract struct {
 }
 
 func NewTaskManagerContract() (*TaskManagerContract, error) {
-	var tmc *TaskManagerContract
+	var tmc TaskManagerContract
 	cpAccountAddress, err := contract.GetCpAccountAddress()
 	if err != nil {
 		logs.GetLogger().Errorf("get cp account contract address failed, error: %v", err)
@@ -61,7 +61,7 @@ func NewTaskManagerContract() (*TaskManagerContract, error) {
 	if err != nil {
 		return nil, err
 	}
-	return tmc, nil
+	return &tmc, nil
 }
 
 func (taskManager *TaskManagerContract) Scan() error {
