@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/swanchain/go-computing-provider/internal/contract"
+	"github.com/swanchain/go-computing-provider/internal/contract/ecp"
 	"strconv"
 	"strings"
 	"sync"
@@ -490,7 +491,7 @@ func (task *CronTask) checkJobReward() {
 			return
 		}
 		if err = taskManager.Scan(); err != nil {
-			logs.GetLogger().Errorf("failed to scanner task, error: %v", err)
+			logs.GetLogger().Errorf("failed to scanner task, error: %v", ecp.ParseTooManyError(err))
 		}
 		logs.GetLogger().Infof("debug_rpc_chain: num: %d, total rpc: %d", num, count)
 		return
