@@ -488,7 +488,7 @@ func (task *CronTask) checkJobReward() {
 			return
 		}
 
-		logs.GetLogger().Infof("fcp start scanner chain")
+		logs.GetLogger().Infof("debug_rpc_chain: num: %d, fcp start scanner chain", num)
 		var count int64
 		for _, job := range jobList {
 			var taskManager = NewTaskManagerContract(job)
