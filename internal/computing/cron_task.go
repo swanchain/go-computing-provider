@@ -482,24 +482,18 @@ func (task *CronTask) checkJobReward() {
 			}
 		}()
 
-		jobList, err := NewJobService().GetJobListByNoReward()
-		if err != nil {
-			logs.GetLogger().Errorf("failed to get job data, error: %+v", err)
-			return
-		}
-
 		logs.GetLogger().Infof("debug_rpc_chain: num: %d, fcp start scanner chain", num)
 		var count int64
-		for _, job := range jobList {
-			var taskManager = NewTaskManagerContract(job)
-			if taskManager.Scan() {
-				count += taskManager.count
-				break
-			} else {
-				count += taskManager.count
-			}
+		taskManager, err := NewTaskManagerContract()
+		if err != nil {
+			logs.GetLogger().Errorf("failed to create task manager, error: %v", err)
+			return
+		}
+		if err = taskManager.Scan(); err != nil {
+			logs.GetLogger().Errorf("failed to scanner task, error: %v", err)
 		}
 		logs.GetLogger().Infof("debug_rpc_chain: num: %d, total rpc: %d", num, count)
+		return
 	})
 	c.Start()
 }
