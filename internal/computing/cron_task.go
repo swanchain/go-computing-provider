@@ -499,7 +499,7 @@ func (task *CronTask) checkJobReward() {
 				count += taskManager.count
 			}
 		}
-		logs.GetLogger().Infof("num: %d, total rpc: %d", num, count)
+		logs.GetLogger().Infof("debug_rpc_chain: num: %d, total rpc: %d", num, count)
 	})
 	c.Start()
 }
