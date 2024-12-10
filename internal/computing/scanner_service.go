@@ -113,7 +113,9 @@ func (taskManager *TaskManagerContract) scanTaskRewards(opts *bind.FilterOpts) (
 	for iterator.Next() {
 		event := iterator.Event
 		if event != nil {
-			return taskManager.parseRewardReleased(event)
+			if err = taskManager.parseRewardReleased(event); err != nil {
+				logs.GetLogger().Error(err)
+			}
 		}
 	}
 	return nil
@@ -173,14 +175,12 @@ func (taskManager *TaskManagerContract) parseRewardReleased(event *fcp.FcpTaskMa
 	taskUUIDHash := event.TaskUid.Hex()
 	for _, taskUUID = range taskUUIDs {
 		if crypto.Keccak256Hash([]byte(taskUUID)).Hex() == taskUUIDHash {
-			logs.GetLogger().Infof("tx %s get task uuid %s hash equal to log task uuid hash %s", raw.TxHash.Hex(), taskUUID, taskUUIDHash)
 			break
 		}
 	}
 
 	if taskUUID == "" {
-		logs.GetLogger().Errorf("tx %s not found task equal to log task uuid hash %s", raw.TxHash.Hex(), taskUUIDHash)
-		return errors.New("tx not found task equal to log task uuid hash")
+		return fmt.Errorf("tx not found task equal to log task uuid hash, taskuuid_event: %s, taskuuid_raw: %s", taskUUIDHash, raw.TxHash.Hex())
 	}
 	return NewJobService().UpdateJobReward(taskUUID, amount)
 }

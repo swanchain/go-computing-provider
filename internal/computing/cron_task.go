@@ -489,15 +489,7 @@ func (task *CronTask) checkJobReward() {
 			logs.GetLogger().Errorf("failed to create task manager, error: %v", err)
 			return
 		}
-
-		for i := 0; i < 3; i++ {
-			err = taskManager.Scan()
-			if err != nil {
-				time.Sleep(time.Second)
-				continue
-			}
-			break
-		}
+		err = taskManager.Scan()
 		if err != nil {
 			logs.GetLogger().Errorf("failed to scanner task, error: %v", ecp.ParseTooManyError(err))
 		} else {
