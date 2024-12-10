@@ -104,10 +104,12 @@ func (taskManager *TaskManagerContract) retryScan(job *models.JobEntity) (uint64
 			End:   &end,
 		}
 		time.Sleep(3 * time.Second)
+
 		if err := taskManager.scanTaskRewards(job, filterOps); err != nil {
-			logs.GetLogger().Error("job_uuid: %s, start: %d, end: %d, error: %s", job.JobUuid, i, end, ecp.ParseTooManyError(err))
+			logs.GetLogger().Errorf("job_uuid: %s, start: %d, end: %d, error: %s", job.JobUuid, i, end, ecp.ParseTooManyError(err))
 			return 0, err
 		}
+		logs.GetLogger().Errorf("job_uuid: %s, start: %d, end: %d", job.JobUuid, i, end)
 	}
 	return end, nil
 }

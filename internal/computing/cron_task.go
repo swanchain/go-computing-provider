@@ -472,7 +472,7 @@ func (task *CronTask) setFailedUbiTaskStatus() {
 
 func (task *CronTask) checkJobReward() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("* */5 * * * ?", func() {
+	c.AddFunc("* */3 * * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("task job: [checkJobReward], error: %+v", err)
@@ -485,6 +485,7 @@ func (task *CronTask) checkJobReward() {
 			return
 		}
 
+		logs.GetLogger().Infof("fcp start scanner chain")
 		var count int64
 		for _, job := range jobList {
 			var taskManager = NewTaskManagerContract(job)
