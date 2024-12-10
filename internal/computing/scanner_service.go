@@ -69,7 +69,7 @@ func (taskManager *TaskManagerContract) Scan() error {
 	var end uint64
 	var err error
 
-	scannedBlock := loadLastProcessedBlock(models.ScannerTaskPaymentId)
+	scannedBlock := loadLastProcessedBlock(models.ScannerFcpTaskManagerId)
 	start := uint64(scannedBlock)
 	if scannedBlock != 0 {
 		start = uint64(scannedBlock) + 1
