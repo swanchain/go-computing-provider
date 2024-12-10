@@ -93,7 +93,9 @@ func (taskManager *TaskManagerContract) retryScan(job *models.JobEntity) (uint64
 	}
 
 	var step uint64 = 1000
+	var count int
 	for i := start; i <= endBlockNumber; i = i + step {
+		count++
 		taskManager.count += 1
 		end = i + step - 1
 		if end > endBlockNumber {
@@ -106,10 +108,10 @@ func (taskManager *TaskManagerContract) retryScan(job *models.JobEntity) (uint64
 		time.Sleep(3 * time.Second)
 
 		if err := taskManager.scanTaskRewards(job, filterOps); err != nil {
-			logs.GetLogger().Errorf("job_uuid: %s, start: %d, end: %d, error: %s", job.JobUuid, i, end, ecp.ParseTooManyError(err))
+			logs.GetLogger().Errorf("job_uuid: %s, count: %d, start: %d, end: %d, error: %s", job.JobUuid, count, i, end, ecp.ParseTooManyError(err))
 			return 0, err
 		}
-		logs.GetLogger().Errorf("job_uuid: %s, start: %d, end: %d", job.JobUuid, i, end)
+		logs.GetLogger().Errorf("job_uuid: %s, count: %d, start: %d, end: %d", job.JobUuid, count, i, end)
 	}
 	return end, nil
 }
