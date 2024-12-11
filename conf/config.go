@@ -100,13 +100,13 @@ type CONTRACT struct {
 
 	JobCollateral     string `toml:"SWAN_COLLATERAL_CONTRACT"`
 	JobManager        string `toml:"SWAN_JOB_CONTRACT"`
-	JobManagerCreated int64  `toml:"JobManagerCreated"`
+	JobManagerCreated uint64 `toml:"JobManagerCreated"`
 
 	TaskRegister           string `toml:"REGISTER_TASK_CONTRACT"`
 	ZkCollateral           string `toml:"ZK_COLLATERAL_CONTRACT"`
 	Sequencer              string `toml:"SEQUENCER_CONTRACT"`
 	EdgeTaskPayment        string `toml:"EDGE_TASK_PAYMENT"`
-	EdgeTaskPaymentCreated int64  `toml:"EdgeTaskPaymentCreated"`
+	EdgeTaskPaymentCreated uint64 `toml:"EdgeTaskPaymentCreated"`
 
 	JobCollateralUbiZero string `toml:"SWAN_COLLATERAL_UBI_ZERO_CONTRACT"`
 	ZkCollateralUbiZero  string `toml:"ZK_COLLATERAL_UBI_ZERO_CONTRACT"`

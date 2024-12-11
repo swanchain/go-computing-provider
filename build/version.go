@@ -89,7 +89,7 @@ type NetworkConfig struct {
 			RegisterTaskContract           string `json:"register_task_contract"`
 			SequencerContract              string `json:"sequencer_contract"`
 			EdgeTaskPayment                string `json:"edge_task_payment"`
-			EdgeTaskPaymentCreated         int64  `json:"edge_task_payment_created"`
+			EdgeTaskPaymentCreated         uint64 `json:"edge_task_payment_created"`
 		} `json:"legacy_contract"`
 		UpgradeContract struct {
 			SwanTokenContract              string `json:"swan_token_contract"`
@@ -101,7 +101,7 @@ type NetworkConfig struct {
 			RegisterTaskContract           string `json:"register_task_contract"`
 			SequencerContract              string `json:"sequencer_contract"`
 			EdgeTaskPayment                string `json:"edge_task_payment"`
-			EdgeTaskPaymentCreated         int64  `json:"edge_task_payment_created"`
+			EdgeTaskPaymentCreated         uint64 `json:"edge_task_payment_created"`
 		} `json:"upgrade_contract"`
 		OrchestratorCollateralUbiZeroContract string `json:"orchestrator_collateral_ubi_zero_contract"`
 		ZkCollateralUbiZeroContract           string `json:"zk_collateral_ubi_zero_contract"`
