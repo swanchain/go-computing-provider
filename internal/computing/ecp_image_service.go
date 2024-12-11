@@ -326,7 +326,28 @@ func (*ImageJobService) GetJobStatus(c *gin.Context) {
 			fmt.Printf("container name: %s, status: %s \n", entity.ContainerName, status)
 			statusStr = status
 		}
-		result = append(result, models.EcpJobStatusResp{Uuid: entity.Uuid, Status: statusStr, Message: entity.Message})
+
+		var portMap []models.PortMap
+		if len(entity.PortMap) > 1 {
+			splits := strings.Split(entity.PortMap, ",")
+			for _, s := range splits {
+				ps := strings.Split(s, ":")
+				containerP, _ := strconv.Atoi(ps[0])
+				hostP, _ := strconv.Atoi(ps[1])
+				portMap = append(portMap, models.PortMap{
+					ContainerPort: containerP,
+					ExternalPort:  hostP,
+				})
+			}
+		}
+		result = append(result, models.EcpJobStatusResp{
+			Uuid:               entity.Uuid,
+			Status:             statusStr,
+			ServiceUrl:         entity.ServiceUrl,
+			HealthPath:         entity.HealthUrlPath,
+			ServicePortMapping: portMap,
+			Message:            entity.Message,
+		})
 	}
 
 	c.JSON(http.StatusOK, util.CreateSuccessResponse(result))

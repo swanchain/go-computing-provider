@@ -29,7 +29,7 @@ curl -fsSL https://raw.githubusercontent.com/swanchain/go-computing-provider/rel
 ## Install ECP and Init CP Account
 - Download `computing-provider`
 ```bash
-wget https://github.com/swanchain/go-computing-provider/releases/download/v0.7.1/computing-provider
+wget https://github.com/swanchain/go-computing-provider/releases/download/v1.0.0/computing-provider
 ```
 
 - Initialize ECP repo
@@ -130,6 +130,17 @@ TARGET_HD_EPHEMERAL:    0.005 SWAN/GB-hour
 TARGET_GPU_DEFAULT:     1.6 SWAN/Default GPU unit a hour
 TARGET_GPU_3080:         SWAN/GPU unit a hour     
 
+## Config and Receive Inference task
+For container services with a single port, use `traefik`; for container services with multiple ports, use the public IP + port.
+- Configure it in the `$CP_PATH/config.toml`:
+  ```
+  [API]
+  Domain = ""                                 # The domain name
+  AutoDeleteImage = false                     # Default false, automatically delete unused images
+  PortRange = ["40000-40050","40060",""40065] # Externally exposed port number for deploying multi-port image tasks  
+  ```
+  - Using `traefik` as the entry point for requests, you need to configure a domain(*.example.com) to resolve to the IP where CP is running. The port 9000 must be open for external access.
+  - `PortRange`: Multi-port mapping requires a one-to-one mapping between host ports and the public network IP.
 
 ## Start ECP service
 ```bash

@@ -7,7 +7,7 @@ WalletWhiteList = ""                                                     # CP ac
 WalletBlackList = ""                                                     # CP reject user addresses from this blacklist for space deployment
 Pricing = "true"                                                         # Default True, indicating acceptance of smart pricing orders, which may include orders priced lower than self-determined pricing.
 AutoDeleteImage = false                                                  # Default false, automatically delete unused images
-PortRange = ["40000-40050","40070"]                                      # Externally exposed port number for deploying ECP image tasks
+PortRange = ["40000-40050","40070"]                                      # Externally exposed port number for deploying multi-port image tasks
 
 
 [UBI]

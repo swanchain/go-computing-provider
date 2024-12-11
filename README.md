@@ -363,7 +363,8 @@ make install
        AutoChainProof = true                                                   # When Sequencer doesn't have enough funds or the service is unavailable, automatically submit proof to the Swan chain 
        SequencerUrl = "https://sequencer.swanchain.io"                         # Sequencer service's API address
        EdgeUrl = "https://edge-api.swanchain.io/v1"                            # Edge service's API address
-   
+       VerifySign = true                                                       # Verify that the task signature is from Engine
+                                       
        [LOG]
        CrtFile = "/YOUR_DOMAIN_NAME_CRT_PATH/server.crt"                       # Your domain name SSL .crt file path
        KeyFile = "/YOUR_DOMAIN_NAME_KEY_PATH/server.key"                       # Your domain name SSL .key file path
@@ -644,15 +645,15 @@ nohup computing-provider run >> cp.log 2>&1 &
 ## CLI of Computing Provider
 * Check the current list of tasks running on CP, display detailed information for tasks using `-v`
 ```
-computing-provider task list --type fcp
+computing-provider task list --fcp
 ```
 * Retrieve detailed information for a specific task using `job_uuid`
 ```
-computing-provider task get [job_uuid]
+computing-provider task get --fcp [job_uuid]
 ```
 * Delete task by `job_uuid`
 ```
-computing-provider task delete [job_uuid]
+computing-provider task delete --fcp [job_uuid]
 ```
 
 ## Getting Help
