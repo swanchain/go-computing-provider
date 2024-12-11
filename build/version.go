@@ -10,7 +10,7 @@ var CurrentCommit string
 
 var NetWorkTag string
 
-const BuildVersion = "0.7.1"
+const BuildVersion = "1.0.0"
 
 const UBITaskImageIntelCpu = "filswan/ubi-worker-cpu-intel:latest"
 const UBITaskImageIntelGpu = "filswan/ubi-worker-gpu-intel:latest"
@@ -23,13 +23,18 @@ func UserVersion() string {
 	return BuildVersion + "+" + NetWorkTag + CurrentCommit
 }
 
-var currentVersion = "Mainnet_v1.0"
-var UpgradeVersionForMainnet = map[string]uint64{
-	"Mainnet_v1.0": 3144229,
+var UpgradeVersionForMainnet = []UpgradeInfo{
+	{
+		NetworkName: "Mainnet_v1.0.0",
+		Height:      3144229,
+	},
 }
 
-var UpgradeVersionForTestnet = map[string]uint64{
-	"Testnet_v1.0": 3144229,
+var UpgradeVersionForTestnet = []UpgradeInfo{
+	{
+		NetworkName: "Testnet_v1.0.0",
+		Height:      10316251,
+	},
 }
 
 //go:embed parameters.json
@@ -41,12 +46,32 @@ func LoadParam() []NetworkConfig {
 	if err != nil {
 		log.Fatalln(err)
 	}
+
+	var mainnetLast, testnetLast UpgradeInfo
+	if len(UpgradeVersionForMainnet) > 0 {
+		mainnetLast = UpgradeVersionForMainnet[len(UpgradeVersionForMainnet)-1]
+	}
+	if len(UpgradeVersionForTestnet) > 0 {
+		testnetLast = UpgradeVersionForTestnet[len(UpgradeVersionForTestnet)-1]
+	}
+
+	for i, networkConfig := range config {
+		if networkConfig.Network == NetWorkTag && NetWorkTag == "mainnet" {
+			config[i].BoundaryHeight = mainnetLast.Height
+			config[i].UpgradeName = mainnetLast.NetworkName
+		}
+		if networkConfig.Network == NetWorkTag && NetWorkTag == "testnet" {
+			config[i].BoundaryHeight = testnetLast.Height
+			config[i].UpgradeName = testnetLast.NetworkName
+		}
+	}
 	return config
 }
 
 type NetworkConfig struct {
 	Network        string `json:"network"`
 	BoundaryHeight uint64 `json:"boundary_height"`
+	UpgradeName    string `json:"upgrade_name"`
 	Config         struct {
 		SequencerUrl   string `json:"sequencer_url"`
 		ZkEnginePk     string `json:"zk_engine_pk"`
@@ -54,6 +79,7 @@ type NetworkConfig struct {
 		ChainRpc       string `json:"chain_rpc"`
 		EdgeUrl        string `json:"edge_url"`
 		LegacyContract struct {
+			NetworkName                    string `json:"network_name"`
 			SwanTokenContract              string `json:"swan_token_contract"`
 			OrchestratorCollateralContract string `json:"orchestrator_collateral_contract"`
 			JobManagerContract             string `json:"job_manager_contract"`
@@ -80,4 +106,9 @@ type NetworkConfig struct {
 		OrchestratorCollateralUbiZeroContract string `json:"orchestrator_collateral_ubi_zero_contract"`
 		ZkCollateralUbiZeroContract           string `json:"zk_collateral_ubi_zero_contract"`
 	} `json:"config"`
+}
+
+type UpgradeInfo struct {
+	Height      uint64
+	NetworkName string
 }

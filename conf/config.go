@@ -94,6 +94,7 @@ type RPC struct {
 }
 
 type CONTRACT struct {
+	UpgradeName       string
 	SwanToken         string `toml:"SWAN_CONTRACT"`
 	CpAccountRegister string `toml:"REGISTER_CP_CONTRACT"`
 
@@ -199,6 +200,7 @@ func getConfigByHeight() {
 				config.CONTRACT.EdgeTaskPayment = ncCopy.Config.LegacyContract.EdgeTaskPayment
 				config.CONTRACT.EdgeTaskPaymentCreated = ncCopy.Config.LegacyContract.EdgeTaskPaymentCreated
 			} else {
+				config.CONTRACT.UpgradeName = ncCopy.UpgradeName
 				config.CONTRACT.SwanToken = ncCopy.Config.UpgradeContract.SwanTokenContract
 				config.CONTRACT.JobCollateral = ncCopy.Config.UpgradeContract.OrchestratorCollateralContract
 				config.CONTRACT.JobManager = ncCopy.Config.UpgradeContract.JobManagerContract

@@ -956,6 +956,7 @@ var contractCmd = &cli.Command{
 				var taskData [][]string
 
 				taskData = append(taskData, []string{"Network:", netWork})
+				//taskData = append(taskData, []string{"Network Name:", contract.UpgradeName})
 				taskData = append(taskData, []string{"Swan Token:", contract.SwanToken})
 				taskData = append(taskData, []string{"Orchestrator Collateral:", contract.JobCollateral})
 				taskData = append(taskData, []string{"Task Manager:", contract.JobManager})
