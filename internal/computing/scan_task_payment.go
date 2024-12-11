@@ -160,16 +160,16 @@ func loadLastProcessedBlock(taskTypeOnChain int) int64 {
 	err := db.DB.Model(models.ScanChainEntity{}).Where(&models.ScanChainEntity{Id: int64(taskTypeOnChain)}).Limit(1).Find(&scan).Error
 	if err != nil {
 		logs.GetLogger().Errorf("failed to get scan chain, error: %v", err)
-		return conf.GetConfig().CONTRACT.EdgeTaskPaymentCreated
+		return int64(conf.GetConfig().CONTRACT.EdgeTaskPaymentCreated)
 	}
 
 	if taskTypeOnChain == models.ScannerTaskPaymentId {
 		if scan.BlockNumber == 0 {
-			return conf.GetConfig().CONTRACT.EdgeTaskPaymentCreated
+			return int64(conf.GetConfig().CONTRACT.EdgeTaskPaymentCreated)
 		}
 	} else if taskTypeOnChain == models.ScannerFcpTaskManagerId {
 		if scan.BlockNumber == 0 {
-			return conf.GetConfig().CONTRACT.JobManagerCreated
+			return int64(conf.GetConfig().CONTRACT.JobManagerCreated)
 		}
 	}
 	return scan.BlockNumber

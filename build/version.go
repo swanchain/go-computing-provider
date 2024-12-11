@@ -33,7 +33,7 @@ var UpgradeVersionForMainnet = []UpgradeInfo{
 var UpgradeVersionForTestnet = []UpgradeInfo{
 	{
 		NetworkName: "Testnet_v1.0.0",
-		Height:      10237900,
+		Height:      10238000,
 	},
 }
 
