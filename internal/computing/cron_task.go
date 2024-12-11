@@ -660,17 +660,3 @@ func handleTasksToGroup(list []*models.TaskEntity) []TaskGroup {
 	}
 	return groups
 }
-
-func tryLock(m *sync.Mutex) bool {
-	locked := make(chan bool, 1)
-	go func() {
-		m.Lock()
-		locked <- true
-	}()
-	select {
-	case <-locked:
-		return true
-	case <-time.After(0): // 立即返回，不阻塞
-		return false
-	}
-}
