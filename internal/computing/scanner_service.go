@@ -23,8 +23,6 @@ import (
 type TaskManagerContract struct {
 	cpAccount  string
 	contract   *fcp.FcpTaskManager
-	job        *models.JobEntity
-	count      int64
 	ethClient  *ethclient.Client
 	sigMethods map[string]abi.Method
 }
@@ -77,14 +75,11 @@ func (taskManager *TaskManagerContract) Scan() error {
 
 	endBlockNumber, err = taskManager.ethClient.BlockNumber(context.Background())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get chain height, error: %s", ecp.ParseTooManyError(err))
 	}
 
 	var step uint64 = 1000
-	var count int
 	for i := start; i <= endBlockNumber; i = i + step {
-		count++
-		taskManager.count += 1
 		end = i + step - 1
 		if end > endBlockNumber {
 			end = endBlockNumber
@@ -95,10 +90,9 @@ func (taskManager *TaskManagerContract) Scan() error {
 		}
 		time.Sleep(3 * time.Second)
 		if err := taskManager.scanTaskRewards(filterOps); err != nil {
-			logs.GetLogger().Errorf("debug_rpc_chain: count: %d, start: %d, end: %d, error: %s", count, i, end, ecp.ParseTooManyError(err))
-			return err
+			return fmt.Errorf("failed to scan task, start: %d, end: %d, error: %s", i, end, ecp.ParseTooManyError(err))
 		}
-		logs.GetLogger().Infof("debug_rpc_chain:count: %d, start: %d, end: %d", count, i, end)
+		logs.GetLogger().Infof("successfully to scan task, start: %d, end: %d", i, end)
 		saveLastProcessedBlock(int64(end), models.ScannerFcpTaskManagerId)
 	}
 	return nil

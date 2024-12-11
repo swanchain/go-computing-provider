@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/swanchain/go-computing-provider/internal/contract"
-	"github.com/swanchain/go-computing-provider/internal/contract/ecp"
 	"strconv"
 	"strings"
 	"sync"
@@ -483,7 +482,6 @@ func (task *CronTask) checkJobReward() {
 			}
 		}()
 
-		logs.GetLogger().Infof("debug_rpc_chain: num: %d, fcp start scanner chain", num)
 		taskManager, err := NewTaskManagerContract()
 		if err != nil {
 			logs.GetLogger().Errorf("failed to create task manager, error: %v", err)
@@ -491,11 +489,9 @@ func (task *CronTask) checkJobReward() {
 		}
 		err = taskManager.Scan()
 		if err != nil {
-			logs.GetLogger().Errorf("failed to scanner task, error: %v", ecp.ParseTooManyError(err))
-		} else {
-			logs.GetLogger().Infof("debug_rpc_chain: num: %d, total rpc: %d", num, taskManager.count)
+			logs.GetLogger().Errorf("failed to scan task, error: %v", err)
+			return
 		}
-		return
 	})
 	c.Start()
 }
