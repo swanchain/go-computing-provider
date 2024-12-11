@@ -23,6 +23,15 @@ func UserVersion() string {
 	return BuildVersion + "+" + NetWorkTag + CurrentCommit
 }
 
+var currentVersion = "Mainnet_v1.0"
+var UpgradeVersionForMainnet = map[string]uint64{
+	"Mainnet_v1.0": 3144229,
+}
+
+var UpgradeVersionForTestnet = map[string]uint64{
+	"Testnet_v1.0": 3144229,
+}
+
 //go:embed parameters.json
 var netWorkConfig string
 
