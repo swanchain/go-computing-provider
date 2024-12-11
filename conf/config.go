@@ -100,7 +100,7 @@ type CONTRACT struct {
 
 	JobCollateral     string `toml:"SWAN_COLLATERAL_CONTRACT"`
 	JobManager        string `toml:"SWAN_JOB_CONTRACT"`
-	JobManagerCreated uint64 `toml:"JobManagerCreated"`
+	JobManagerCreated int64  `toml:"JobManagerCreated"`
 
 	TaskRegister           string `toml:"REGISTER_TASK_CONTRACT"`
 	ZkCollateral           string `toml:"ZK_COLLATERAL_CONTRACT"`

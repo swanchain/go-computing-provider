@@ -231,3 +231,10 @@ func ParseError(err error) string {
 	}
 	return err.Error()
 }
+
+func ParseTooManyError(err error) string {
+	if strings.Contains(err.Error(), "Too Many Requests") {
+		return "429 Too Many Requests"
+	}
+	return err.Error()
+}

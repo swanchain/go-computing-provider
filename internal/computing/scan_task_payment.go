@@ -72,7 +72,7 @@ func (tps *TaskPaymentService) ScannerChainGetTaskPayment() {
 }
 
 func (tps *TaskPaymentService) scanAndProcessEvents(cpAccountAddress string) error {
-	lastProcessedBlock := loadLastProcessedBlock()
+	lastProcessedBlock := loadLastProcessedBlock(models.ScannerTaskPaymentId)
 	header, err := tps.client.HeaderByNumber(context.Background(), nil)
 	if err != nil {
 		time.Sleep(10 * time.Second)
@@ -105,7 +105,7 @@ func (tps *TaskPaymentService) scanAndProcessEvents(cpAccountAddress string) err
 	if iter.Error() != nil {
 		return fmt.Errorf("failed to iterator events, error: %v", iter.Error())
 	}
-	saveLastProcessedBlock(lastProcessedBlock)
+	saveLastProcessedBlock(lastProcessedBlock, models.ScannerTaskPaymentId)
 	return nil
 }
 
@@ -155,23 +155,29 @@ func checkAgain(cpAccountAddress string, blockNumber int64) {
 	}
 }
 
-func loadLastProcessedBlock() int64 {
+func loadLastProcessedBlock(taskTypeOnChain int) int64 {
 	var scan models.ScanChainEntity
-	err := db.DB.Model(models.ScanChainEntity{}).Where(&models.ScanChainEntity{Id: models.ScannerTaskPaymentId}).Limit(1).Find(&scan).Error
+	err := db.DB.Model(models.ScanChainEntity{}).Where(&models.ScanChainEntity{Id: int64(taskTypeOnChain)}).Limit(1).Find(&scan).Error
 	if err != nil {
 		logs.GetLogger().Errorf("failed to get scan chain, error: %v", err)
 		return conf.GetConfig().CONTRACT.EdgeTaskPaymentCreated
 	}
-	if scan.BlockNumber == 0 {
-		return conf.GetConfig().CONTRACT.EdgeTaskPaymentCreated
-	}
 
+	if taskTypeOnChain == models.ScannerTaskPaymentId {
+		if scan.BlockNumber == 0 {
+			return conf.GetConfig().CONTRACT.EdgeTaskPaymentCreated
+		}
+	} else if taskTypeOnChain == models.ScannerFcpTaskManagerId {
+		if scan.BlockNumber == 0 {
+			return conf.GetConfig().CONTRACT.JobManagerCreated
+		}
+	}
 	return scan.BlockNumber
 }
 
-func saveLastProcessedBlock(block int64) {
+func saveLastProcessedBlock(block int64, taskTypeOnChain int) {
 	db.DB.Save(&models.ScanChainEntity{
-		Id:          models.ScannerTaskPaymentId,
+		Id:          int64(taskTypeOnChain),
 		BlockNumber: block,
 		UpdateTime:  time.Now().Format("2006-01-02 15:04:05"),
 	})

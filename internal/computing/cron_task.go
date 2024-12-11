@@ -225,7 +225,7 @@ func (task *CronTask) watchExpiredTask() {
 			}
 		}()
 
-		jobList, err := NewJobService().GetJobList(models.All_FLAG, 0)
+		jobList, err := NewJobService().GetJobList(models.UN_DELETEED_FLAG)
 		if err != nil {
 			logs.GetLogger().Errorf("failed to get job data, error: %+v", err)
 			return
@@ -435,7 +435,7 @@ func (task *CronTask) cleanAbnormalDeployment() {
 
 func (task *CronTask) setFailedUbiTaskStatus() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("0 0/8 * * * ?", func() {
+	c.AddFunc("0 0 */10 * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("task job: [setFailedUbiTaskStatus], error: %+v", err)
@@ -473,22 +473,26 @@ func (task *CronTask) setFailedUbiTaskStatus() {
 }
 
 func (task *CronTask) checkJobReward() {
-	c := cron.New(cron.WithSeconds())
-	c.AddFunc("* * 0/20 * * ?", func() {
+	var num int
+
+	c := cron.New(cron.WithSeconds(), cron.WithChain(cron.DelayIfStillRunning(cron.DefaultLogger)))
+	c.AddFunc("@every 10h", func() {
+		num++
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("task job: [checkJobReward], error: %+v", err)
 			}
 		}()
 
-		jobList, err := NewJobService().GetJobListByNoReward()
+		taskManager, err := NewTaskManagerContract()
 		if err != nil {
-			logs.GetLogger().Errorf("failed to get job data, error: %+v", err)
+			logs.GetLogger().Errorf("failed to create task manager, error: %v", err)
 			return
 		}
-
-		for _, job := range jobList {
-			NewTaskManagerContract(job).Scan()
+		err = taskManager.Scan()
+		if err != nil {
+			logs.GetLogger().Errorf("failed to scan task, error: %v", err)
+			return
 		}
 	})
 	c.Start()
