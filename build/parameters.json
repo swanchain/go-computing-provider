@@ -61,11 +61,11 @@
         "job_manager_contract": "0x03214d989CDb90F81a2DB77F700DaBba8dDD1b6d",
         "job_manager_contract_created": 8080000,
         "register_cp_contract": "0x0c5ff16ecac04d89413aaa3ebf904ac0ea440675",
-        "zk_collateral_contract": "0x9584eC8C86A32963Cb36B135c2e58837e2e46d4b",
-        "register_task_contract": "0xE8b7f7A65C945F39514c535A35Fcb55Ff77DabeE",
-        "sequencer_contract": "0x3ec53c3db17a9b7a50967100f9e0b9e1c910c7d4",
-        "edge_task_payment": "0x114fd9a28fbbf687e4232e54d73e5449628d3219",
-        "edge_task_payment_created": 9084245
+        "zk_collateral_contract": "0x061aff8056be4dce6c6603db4cc26e36a75adf74",
+        "register_task_contract": "0xadbea2727cac1d28265cd54eee6a1da652df1d70",
+        "sequencer_contract": "0x65f54e77ac0e0364a0bff99314e2b1f37059acaa",
+        "edge_task_payment": "0x236c46cd8495ca98e407b093a5fe0fa4b1791d91",
+        "edge_task_payment_created": 10218600
       }
     }
   }
