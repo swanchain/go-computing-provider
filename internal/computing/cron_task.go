@@ -225,7 +225,7 @@ func (task *CronTask) watchExpiredTask() {
 			}
 		}()
 
-		jobList, err := NewJobService().GetJobList(models.UN_DELETEED_FLAG)
+		jobList, err := NewJobService().GetJobList(models.UN_DELETEED_FLAG, -1)
 		if err != nil {
 			logs.GetLogger().Errorf("failed to get job data, error: %+v", err)
 			return
@@ -473,11 +473,8 @@ func (task *CronTask) setFailedUbiTaskStatus() {
 }
 
 func (task *CronTask) checkJobReward() {
-	var num int
-
 	c := cron.New(cron.WithSeconds(), cron.WithChain(cron.DelayIfStillRunning(cron.DefaultLogger)))
 	c.AddFunc("@every 10h", func() {
-		num++
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("task job: [checkJobReward], error: %+v", err)
