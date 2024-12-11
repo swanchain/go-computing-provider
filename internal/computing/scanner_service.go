@@ -2,92 +2,80 @@ package computing
 
 import (
 	"context"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/contract"
+	"github.com/swanchain/go-computing-provider/internal/contract/ecp"
 	"github.com/swanchain/go-computing-provider/internal/contract/fcp"
 	"github.com/swanchain/go-computing-provider/internal/models"
+	"strings"
 	"time"
 )
 
 type TaskManagerContract struct {
-	cpAccount         string
-	taskManagerClient *fcp.FcpTaskManager
-	job               *models.JobEntity
+	cpAccount  string
+	contract   *fcp.FcpTaskManager
+	ethClient  *ethclient.Client
+	sigMethods map[string]abi.Method
 }
 
-func NewTaskManagerContract(job *models.JobEntity) *TaskManagerContract {
+func NewTaskManagerContract() (*TaskManagerContract, error) {
+	var tmc TaskManagerContract
 	cpAccountAddress, err := contract.GetCpAccountAddress()
 	if err != nil {
 		logs.GetLogger().Errorf("get cp account contract address failed, error: %v", err)
-		return nil
+		return nil, err
 	}
-	return &TaskManagerContract{
-		cpAccount: cpAccountAddress,
-		job:       job,
-	}
-}
-
-func (taskManager *TaskManagerContract) Scan() bool {
-	job := taskManager.job
-	var end uint64
-	var err error
-	defer func() {
-		if end > 0 {
-			if err := NewJobService().UpdateJobScannedBlock(job.TaskUuid, end); err != nil {
-				logs.GetLogger().Errorf("save job %s scanned block %d err: %v", job.TaskUuid, end, err)
-			}
-		}
-	}()
-
-	for i := 0; i < 3; i++ {
-		end, err = taskManager.retryScan(job)
-		if err != nil {
-			time.Sleep(time.Second)
-			continue
-		}
-	}
-
-	if err != nil {
-		return true
-	}
-	return false
-}
-
-func (taskManager *TaskManagerContract) retryScan(job *models.JobEntity) (uint64, error) {
-	var endBlockNumber uint64
-	var end uint64
-	var err error
-
-	scannedBlock := taskManager.ScannedBlock(job)
-	start := scannedBlock
-	if scannedBlock != 0 {
-		start = scannedBlock + 1
-	}
+	tmc.cpAccount = cpAccountAddress
 
 	chainUrl, err := conf.GetRpcByNetWorkName()
 	if err != nil {
 		logs.GetLogger().Errorf("failed to get rpc url, error: %v", err)
-		return 0, err
+		return nil, err
 	}
 	client, err := contract.GetEthClient(chainUrl)
 	if err != nil {
 		logs.GetLogger().Errorf("failed to dial rpc, error: %v", err)
-		return 0, err
+		return nil, err
 	}
-	defer client.Close()
+	tmc.ethClient = client
+	defer tmc.ethClient.Close()
 
-	taskManager.taskManagerClient, err = fcp.NewFcpTaskManager(common.HexToAddress(conf.GetConfig().CONTRACT.JobManager), client)
+	tmc.contract, err = fcp.NewFcpTaskManager(common.HexToAddress(conf.GetConfig().CONTRACT.JobManager), client)
 	if err != nil {
 		logs.GetLogger().Errorf("failed to create job manager contract client, error: %+v", err)
-		return 0, err
+		return nil, err
 	}
 
-	endBlockNumber, err = client.BlockNumber(context.Background())
+	tmc.sigMethods, err = ContractSigMethods(fcp.FcpTaskManagerABI)
 	if err != nil {
-		return 0, err
+		return nil, err
+	}
+	return &tmc, nil
+}
+
+func (taskManager *TaskManagerContract) Scan() error {
+	var endBlockNumber uint64
+	var end uint64
+	var err error
+
+	scannedBlock := loadLastProcessedBlock(models.ScannerFcpTaskManagerId)
+	start := uint64(scannedBlock)
+	if scannedBlock != 0 {
+		start = uint64(scannedBlock) + 1
+	}
+
+	endBlockNumber, err = taskManager.ethClient.BlockNumber(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to get chain height, error: %s", ecp.ParseTooManyError(err))
 	}
 
 	var step uint64 = 1000
@@ -101,17 +89,17 @@ func (taskManager *TaskManagerContract) retryScan(job *models.JobEntity) (uint64
 			End:   &end,
 		}
 		time.Sleep(3 * time.Second)
-		if err := taskManager.scanTaskRewards(job, filterOps); err != nil {
-			logs.GetLogger().Error(err)
-			return 0, err
+		if err := taskManager.scanTaskRewards(filterOps); err != nil {
+			return fmt.Errorf("failed to scan task, start: %d, end: %d, error: %s", i, end, ecp.ParseTooManyError(err))
 		}
+		logs.GetLogger().Infof("successfully to scan task, start: %d, end: %d", i, end)
+		saveLastProcessedBlock(int64(end), models.ScannerFcpTaskManagerId)
 	}
-	return end, nil
+	return nil
 }
 
-func (taskManager *TaskManagerContract) scanTaskRewards(job *models.JobEntity, opts *bind.FilterOpts) (err error) {
-	iterator, err := taskManager.taskManagerClient.FilterRewardReleased(opts, []string{job.TaskUuid},
-		[]common.Address{common.HexToAddress(taskManager.cpAccount)})
+func (taskManager *TaskManagerContract) scanTaskRewards(opts *bind.FilterOpts) (err error) {
+	iterator, err := taskManager.contract.FilterRewardReleased(opts, nil, []common.Address{common.HexToAddress(taskManager.cpAccount)})
 	if err != nil {
 		return err
 	}
@@ -119,19 +107,108 @@ func (taskManager *TaskManagerContract) scanTaskRewards(job *models.JobEntity, o
 	for iterator.Next() {
 		event := iterator.Event
 		if event != nil {
-			amount := contract.BalanceToStr(event.RewardAmount)
-			NewJobService().UpdateJobReward(job.TaskUuid, amount)
+			if err = taskManager.parseRewardReleased(event); err != nil {
+				logs.GetLogger().Error(err)
+			}
 		}
 	}
 	return nil
 }
 
-func (taskManager *TaskManagerContract) ScannedBlock(job *models.JobEntity) uint64 {
-	var block uint64
-	if job.ScannedBlock != 0 {
-		block = job.ScannedBlock
+func (taskManager *TaskManagerContract) parseRewardReleased(event *fcp.FcpTaskManagerRewardReleased) error {
+	raw := event.Raw
+	amount := contract.BalanceToStr(event.RewardAmount)
+
+	var taskUUIDs []string
+	paras, err := TransactionInputParas(taskManager.ethClient, taskManager.sigMethods, raw.TxHash)
+	if err != nil {
+		logs.GetLogger().Error(err)
+		// force parse tx data for old versions
+		tx, _, err := taskManager.ethClient.TransactionByHash(context.Background(), event.Raw.TxHash)
+		if err != nil {
+			return err
+		}
+
+		data := tx.Data()
+		if len(data) < 36 {
+			logs.GetLogger().Errorf("invalid transaction data size: %d", len(data))
+			return fmt.Errorf("invalid transaction data size")
+		}
+		index := -1
+		for i := len(data) - 1; i >= 0; i-- {
+			if data[i] != 0 {
+				index = i
+				break
+			}
+		}
+		if index < 0 {
+			logs.GetLogger().Errorf("invalid transaction data: %s", string(data))
+			return fmt.Errorf("invalid transaction data")
+		}
+
+		txData := data[:index+1]
+		taskUUIDs = append(taskUUIDs, string(txData[len(txData)-36:]))
 	} else {
-		block = job.StartedBlock
+		logs.GetLogger().Infof("tx %s parsed input paras %v", raw.TxHash.Hex(), paras)
+
+		if len(paras) == 0 {
+			return errors.New("invalid parameters")
+		}
+
+		switch paras[0].(type) {
+		case string:
+			taskUUIDs = append(taskUUIDs, paras[0].(string))
+		case []string:
+			taskUUIDs = append(taskUUIDs, paras[0].([]string)...)
+		default:
+			return fmt.Errorf("invalid task uuid %s", paras[0])
+		}
 	}
-	return block
+
+	var taskUUID string
+	taskUUIDHash := event.TaskUid.Hex()
+	for _, taskUUID = range taskUUIDs {
+		if crypto.Keccak256Hash([]byte(taskUUID)).Hex() == taskUUIDHash {
+			break
+		}
+	}
+
+	if taskUUID == "" {
+		return fmt.Errorf("tx not found task equal to log task uuid hash, taskuuid_event: %s, taskuuid_raw: %s", taskUUIDHash, raw.TxHash.Hex())
+	}
+	return NewJobService().UpdateJobReward(taskUUID, amount)
+}
+
+func TransactionInputParas(ethClient *ethclient.Client, sigMethods map[string]abi.Method, txHash common.Hash) ([]interface{}, error) {
+	tx, _, err := ethClient.TransactionByHash(context.Background(), txHash)
+	if err != nil {
+		return nil, err
+	}
+	data := tx.Data()
+	if len(data) < 4 {
+		return nil, errors.New("invalid tx data length")
+	}
+	sig := hex.EncodeToString(data[:4])
+	method, ok := sigMethods[sig]
+	if !ok {
+		return nil, fmt.Errorf("not found method %s for tx %s", sig, txHash.Hex())
+	}
+
+	return method.Inputs.Unpack(data[4:])
+}
+
+func ContractSigMethods(contractABI string) (methods map[string]abi.Method, err error) {
+	ca, err := ContractABI(contractABI)
+	if err != nil {
+		return
+	}
+	methods = make(map[string]abi.Method)
+	for _, method := range ca.Methods {
+		methods[hex.EncodeToString(method.ID)] = method
+	}
+	return
+}
+
+func ContractABI(contractABI string) (abi.ABI, error) {
+	return abi.JSON(strings.NewReader(contractABI))
 }

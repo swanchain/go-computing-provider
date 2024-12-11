@@ -363,5 +363,6 @@ func (*ScanChainEntity) TableName() string {
 }
 
 const (
-	ScannerTaskPaymentId = 1
+	ScannerTaskPaymentId    = 1
+	ScannerFcpTaskManagerId = 2
 )

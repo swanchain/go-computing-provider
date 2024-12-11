@@ -232,16 +232,6 @@ func ReceiveJob(c *gin.Context) {
 	}
 
 	go func() {
-		var currentBlockNumber uint64
-		for i := 0; i < 5; i++ {
-			currentBlockNumber, err = getChainBlockNumber()
-			if err != nil {
-				logs.GetLogger().Errorf("failed to get blockNumber, error: %v", err)
-				time.Sleep(time.Second)
-				continue
-			}
-		}
-
 		var jobEntity = new(models.JobEntity)
 		jobEntity.Source = jobData.StorageSource
 		jobEntity.SpaceUuid = spaceUuid
@@ -256,8 +246,6 @@ func ReceiveJob(c *gin.Context) {
 		jobEntity.DeployStatus = models.DEPLOY_RECEIVE_JOB
 		jobEntity.CreateTime = time.Now().Unix()
 		jobEntity.ExpireTime = time.Now().Unix() + int64(jobData.Duration)
-		jobEntity.StartedBlock = conf.GetConfig().CONTRACT.JobManagerCreated
-		jobEntity.ScannedBlock = currentBlockNumber
 		jobEntity.WalletAddress = spaceDetail.Data.Owner.PublicAddress
 		jobEntity.Name = spaceDetail.Data.Space.Name
 		jobEntity.Hardware = spaceDetail.Data.Space.ActiveOrder.Config.Description
