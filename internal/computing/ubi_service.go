@@ -1229,14 +1229,12 @@ func CronTaskForEcp() {
 
 			for _, entity := range taskList {
 				ubiTask := entity
-				if len(ubiTask.Uuid) == 0 {
-					if ubiTask.Contract != "" || ubiTask.BlockHash != "" {
-						ubiTask.Status = models.TASK_SUBMITTED_STATUS
-					} else {
-						ubiTask.Status = models.TASK_FAILED_STATUS
-					}
-					NewTaskService().SaveTaskEntity(&ubiTask)
+				if ubiTask.Contract != "" || ubiTask.BlockHash != "" {
+					ubiTask.Status = models.TASK_SUBMITTED_STATUS
+				} else {
+					ubiTask.Status = models.TASK_FAILED_STATUS
 				}
+				NewTaskService().SaveTaskEntity(&ubiTask)
 			}
 		}
 	}()
