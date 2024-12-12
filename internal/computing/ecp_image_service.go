@@ -365,27 +365,18 @@ func (*ImageJobService) DeleteJob(c *gin.Context) {
 		logs.GetLogger().Errorf("failed to get job, job_uuid: %s, error: %v", jobUuId, err)
 		return
 	}
-	if ecpJobEntity != nil {
-		containerName := ecpJobEntity.ContainerName
-		fmt.Printf("job containerName: %s\n", containerName)
+	containerName := ecpJobEntity.ContainerName
+	if len(containerName) != 0 {
 		if err = NewDockerService().RemoveContainerByName(containerName); err != nil {
 			logs.GetLogger().Errorf("failed to remove container, job_uuid: %s, error: %v", jobUuId, err)
 			return
 		}
 		NewEcpJobService().DeleteContainerByUuid(jobUuId)
 	} else {
-		taskEntity, err := NewTaskService().GetTaskByUuid(jobUuId)
-		if err != nil {
-			logs.GetLogger().Errorf("failed to get job, job_uuid: %s, error: %v", jobUuId, err)
+		NewTaskService().UpdateTaskStatusByUuid(jobUuId, models.TASK_SUBMITTED_STATUS)
+		if err = NewDockerService().RemoveContainerByName(jobUuId); err != nil {
+			logs.GetLogger().Errorf("failed to remove container, ubi mining job_uuid: %s, error: %v", jobUuId, err)
 			return
-		}
-		fmt.Printf("job containerName: %s\n", taskEntity.Uuid)
-		if taskEntity != nil {
-			NewTaskService().UpdateTaskStatusByUuid(jobUuId, models.TASK_SUBMITTED_STATUS)
-			if err = NewDockerService().RemoveContainerByName(taskEntity.Uuid); err != nil {
-				logs.GetLogger().Errorf("failed to remove container, ubi mining job_uuid: %s, error: %v", jobUuId, err)
-				return
-			}
 		}
 	}
 	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
