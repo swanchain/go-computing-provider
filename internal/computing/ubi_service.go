@@ -425,6 +425,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 		}
 		logs.GetLogger().Infof("successfully get pod name, taskId: %d, podName: %s", ubiTask.ID, podName)
 
+		NewTaskService().UpdateTaskStatusById(ubiTask.ID, models.TASK_RUNNING_STATUS)
 		req := k8sService.k8sClient.CoreV1().Pods(namespace).GetLogs(podName, &v1.PodLogOptions{
 			Container: "",
 			Follow:    true,
@@ -722,6 +723,7 @@ func DoUbiTaskForDocker(c *gin.Context) {
 			return
 		}
 		logs.GetLogger().Warnf("task_id: %d, started container, container name: %s", ubiTask.ID, containerName)
+		NewTaskService().UpdateTaskStatusById(ubiTask.ID, models.TASK_RUNNING_STATUS)
 
 		containerLogStream, err := dockerService.GetContainerLogStream(context.TODO(), containerName)
 		if err != nil {
@@ -1227,12 +1229,14 @@ func CronTaskForEcp() {
 
 			for _, entity := range taskList {
 				ubiTask := entity
-				if ubiTask.Contract != "" || ubiTask.BlockHash != "" {
-					ubiTask.Status = models.TASK_SUBMITTED_STATUS
-				} else {
-					ubiTask.Status = models.TASK_FAILED_STATUS
+				if len(ubiTask.Uuid) == 0 {
+					if ubiTask.Contract != "" || ubiTask.BlockHash != "" {
+						ubiTask.Status = models.TASK_SUBMITTED_STATUS
+					} else {
+						ubiTask.Status = models.TASK_FAILED_STATUS
+					}
+					NewTaskService().SaveTaskEntity(&ubiTask)
 				}
-				NewTaskService().SaveTaskEntity(&ubiTask)
 			}
 		}
 	}()

@@ -299,7 +299,7 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 	}
 
 	if job.JobType == models.MiningJobType {
-		imageJob.DeployMining(c, deployJob, totalCost, logUrl)
+		imageJob.DeployMining(c, deployJob, totalCost, logUrl, job.Price)
 		return
 	} else if job.JobType == models.InferenceJobType {
 		imageJob.DeployInference(c, deployJob, totalCost, logUrl)
@@ -365,13 +365,27 @@ func (*ImageJobService) DeleteJob(c *gin.Context) {
 		logs.GetLogger().Errorf("failed to get job, job_uuid: %s, error: %v", jobUuId, err)
 		return
 	}
-	containerName := ecpJobEntity.ContainerName
-	if err = NewDockerService().RemoveContainerByName(containerName); err != nil {
-		logs.GetLogger().Errorf("failed to remove container, job_uuid: %s, error: %v", jobUuId, err)
-		return
+	if ecpJobEntity != nil {
+		containerName := ecpJobEntity.ContainerName
+		if err = NewDockerService().RemoveContainerByName(containerName); err != nil {
+			logs.GetLogger().Errorf("failed to remove container, job_uuid: %s, error: %v", jobUuId, err)
+			return
+		}
+		NewEcpJobService().DeleteContainerByUuid(jobUuId)
+	} else {
+		taskEntity, err := NewTaskService().GetTaskByUuid(jobUuId)
+		if err != nil {
+			logs.GetLogger().Errorf("failed to get job, job_uuid: %s, error: %v", jobUuId, err)
+			return
+		}
+		if taskEntity != nil {
+			NewTaskService().UpdateTaskStatusByUuid(jobUuId, models.TASK_SUBMITTED_STATUS)
+			if err = NewDockerService().RemoveContainerByName(taskEntity.Uuid); err != nil {
+				logs.GetLogger().Errorf("failed to remove container, ubi mining job_uuid: %s, error: %v", jobUuId, err)
+				return
+			}
+		}
 	}
-	NewEcpJobService().DeleteContainerByUuid(jobUuId)
-
 	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
 }
 
@@ -422,9 +436,14 @@ func (*ImageJobService) DockerLogsHandler(c *gin.Context) {
 	}
 }
 
-func (*ImageJobService) DeployMining(c *gin.Context, deployJob models.DeployJobParam, totalCost float64, logUrl string) {
+func (*ImageJobService) DeployMining(c *gin.Context, deployJob models.DeployJobParam, totalCost float64, logUrl string, price string) {
 	var err error
-	containerName := deployJob.Name + "-" + generateString(5)
+	var containerName string
+	if price == "-1" {
+		containerName = deployJob.Uuid
+	} else {
+		containerName = deployJob.Name + "-" + generateString(5)
+	}
 	go func() {
 		if deployJob.BuildImagePath != "" && deployJob.BuildImageName != "" {
 			if err := NewDockerService().BuildImage(deployJob.BuildImagePath, deployJob.BuildImageName); err != nil {
@@ -465,6 +484,10 @@ func (*ImageJobService) DeployMining(c *gin.Context, deployJob models.DeployJobP
 			return
 		}
 		logs.GetLogger().Warnf("job_uuid: %s, started container, container name: %s", deployJob.Uuid, containerName)
+
+		if price == "-1" {
+			NewTaskService().UpdateTaskStatusByUuid(deployJob.Uuid, models.TASK_RUNNING_STATUS)
+		}
 
 		if err = NewEcpJobService().UpdateEcpJobEntityContainerName(deployJob.Uuid, containerName); err != nil {
 			logs.GetLogger().Errorf("failed to save job to db, error: %v", err)

@@ -45,6 +45,20 @@ func (taskServ TaskService) SaveTaskEntity(task *models.TaskEntity) (err error) 
 	return taskServ.Save(task).Error
 }
 
+func (taskServ TaskService) UpdateTaskStatusById(taskId int, status int) (err error) {
+	return taskServ.Model(&models.TaskEntity{}).Where("id=?", taskId).Update("status", status).Error
+}
+
+func (taskServ TaskService) UpdateTaskStatusByUuid(uuid string, status int) (err error) {
+	return taskServ.Model(&models.TaskEntity{}).Where("uuid=?", uuid).Update("status", status).Error
+}
+
+func (taskServ TaskService) GetTaskByUuid(uuid string) (*models.TaskEntity, error) {
+	var taskEntity models.TaskEntity
+	err := taskServ.Model(&models.TaskEntity{}).Where("uuid=?", uuid).Limit(1).Find(&taskEntity).Error
+	return &taskEntity, err
+}
+
 func (taskServ TaskService) UpdateTaskEntityByTaskId(task *models.TaskEntity) (err error) {
 	return taskServ.Model(&models.TaskEntity{}).Where("id=?", task.Id).Updates(task).Error
 }
