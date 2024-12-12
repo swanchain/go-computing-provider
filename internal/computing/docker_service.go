@@ -41,8 +41,10 @@ type DockerService struct {
 func NewDockerService() *DockerService {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
-		panic(err.Error())
+		logs.GetLogger().Errorf("failed to create docker client, please check that the docker service is running normally")
+		return nil
 	}
+
 	return &DockerService{
 		c: cli,
 	}

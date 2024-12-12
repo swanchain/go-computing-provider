@@ -160,6 +160,10 @@ func (task *CronTask) reportClusterResource() {
 		}()
 
 		k8sService := NewK8sService()
+		if k8sService == nil {
+			logs.GetLogger().Errorf("failed to create k8s client, please check that the k8s service is running normally")
+			return
+		}
 		statisticalSources, err := k8sService.StatisticalSources(context.TODO())
 		if err != nil {
 			logs.GetLogger().Errorf("failed to collect k8s statistical sources, error: %+v", err)
@@ -179,6 +183,10 @@ func (task *CronTask) watchNameSpaceForDeleted() {
 			}
 		}()
 		service := NewK8sService()
+		if service == nil {
+			logs.GetLogger().Errorf("failed to create k8s client, please check that the k8s service is running normally")
+			return
+		}
 		namespaces, err := service.ListNamespace(context.TODO())
 		if err != nil {
 			logs.GetLogger().Errorf("Failed get all namespace, error: %+v", err)
@@ -231,7 +239,13 @@ func (task *CronTask) watchExpiredTask() {
 			return
 		}
 
-		deployments, err := NewK8sService().k8sClient.AppsV1().Deployments(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
+		k8sService := NewK8sService()
+		if k8sService == nil {
+			logs.GetLogger().Errorf("failed to create k8s client, please check that the k8s service is running normally")
+			return
+		}
+
+		deployments, err := k8sService.k8sClient.AppsV1().Deployments(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			fmt.Println("Error listing deployments:", err)
 			return
@@ -265,7 +279,7 @@ func (task *CronTask) watchExpiredTask() {
 				if _, ok = deployOnK8s[spaceUuidDeployName]; ok {
 					if NewJobService().GetJobEntityBySpaceUuid(job.SpaceUuid) > 0 && time.Now().Unix() < job.ExpireTime {
 						if job.Status != models.JOB_RUNNING_STATUS {
-							foundDeployment, err := NewK8sService().k8sClient.AppsV1().Deployments(job.NameSpace).Get(context.TODO(), job.K8sDeployName, metav1.GetOptions{})
+							foundDeployment, err := k8sService.k8sClient.AppsV1().Deployments(job.NameSpace).Get(context.TODO(), job.K8sDeployName, metav1.GetOptions{})
 							if err != nil {
 								continue
 							}
@@ -301,7 +315,7 @@ func (task *CronTask) watchExpiredTask() {
 			createDuration := currentTime.Sub(createdTime)
 
 			if job.NameSpace != "" && job.K8sDeployName != "" {
-				foundDeployment, err := NewK8sService().k8sClient.AppsV1().Deployments(job.NameSpace).Get(context.TODO(), job.K8sDeployName, metav1.GetOptions{})
+				foundDeployment, err := k8sService.k8sClient.AppsV1().Deployments(job.NameSpace).Get(context.TODO(), job.K8sDeployName, metav1.GetOptions{})
 				if err != nil {
 					if createDuration.Hours() <= 2 && job.Status != models.JOB_RUNNING_STATUS {
 						continue
@@ -395,6 +409,10 @@ func (task *CronTask) cleanAbnormalDeployment() {
 		}()
 
 		k8sService := NewK8sService()
+		if k8sService == nil {
+			logs.GetLogger().Errorf("failed to create k8s client, please check that the k8s service is running normally")
+			return
+		}
 		namespaces, err := k8sService.ListNamespace(context.TODO())
 		if err != nil {
 			logs.GetLogger().Errorf("Failed get all namespace, error: %+v", err)
@@ -512,6 +530,10 @@ func (task *CronTask) getUbiTaskReward() {
 
 func addNodeLabel() {
 	k8sService := NewK8sService()
+	if k8sService == nil {
+		logs.GetLogger().Errorf("failed to create k8s client, please check that the k8s service is running normally")
+		return
+	}
 	nodes, err := k8sService.k8sClient.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		logs.GetLogger().Error(err)
