@@ -1262,7 +1262,7 @@ func CronTaskForEcp() {
 			}
 		}()
 
-		ticker := time.NewTicker(1 * time.Minute)
+		ticker := time.NewTicker(30 * time.Minute)
 		for range ticker.C {
 			NewTaskPaymentService().ScannerChainGetTaskPayment()
 		}
