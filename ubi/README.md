@@ -141,6 +141,20 @@ For container services with a single port, use `traefik`; for container services
   ```
   - Using `traefik` as the entry point for requests, you need to configure a domain(*.example.com) to resolve to the IP where CP is running. The port 9000 must be open for external access.
   - `PortRange`: Multi-port mapping requires a one-to-one mapping between host ports and the public network IP.
+-  Check the Status of Inference and Mining task
+  - Use the following command:
+  ```
+  computing-provider task list --ecp
+  ```
+  - Example output:
+  ```
+  TASK UUID                               TASK NAME                               IMAGE NAME                              CONTAINER NAME                                  CONTAINER STATUS        REWARD  CREATE TIME  
+  75f9df4e-b6a5-40b0-b7ac-02fb1840dafa    iron02                                  swanchain254/iron_mainnet_f2pool:latest iron02-2b0d5                                    terminated              0.0000  2024-10-24 10:23:32
+  842dd7d3-e9f0-4795-af3b-104fa5527099    Zil1                                    swanchain254/zil_mainnet_f2pool:latest  Zil1-gb5sq                                      terminated              0.6195  2024-11-15 03:49:44
+  30f60c6f-085e-4cd3-b751-bf6081a6a2e2    rvn-f2-003                              swanchain254/rvn_mainnet_f2pool:latest  rvn-f2-003-082ei                                terminated              7.5016  2024-11-15 05:40:14
+  9b16aa08-66aa-4ffe-b7d6-7a6db512ea6c    rvn-004                                 swanchain254/rvn_mainnet_f2pool:latest  rvn-004-to2cr                                   terminated              5.9034  2024-11-15 05:44:21
+  4c95d6e6-34b2-49de-be7d-7ee326b641c7    Zil                                     swanchain254/zil_mainnet_f2pool:latest  Zil-81ydq                                       terminated              0.1155  2024-11-15 06:56:49
+  ```
 
 ## Start ECP service
 ```bash

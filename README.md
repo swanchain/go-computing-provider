@@ -605,7 +605,7 @@ OPTIONS:
    --help, -h  show help
 ```
 
-### Step 6: Check the Status of ZK task;
+### Step 6: Check the Status of ZK task
 
 To check the ZK task list, use the following command:
 
