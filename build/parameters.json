@@ -20,16 +20,16 @@
         "edge_task_payment_created": 2569302
       },
       "upgrade_contract": {
-        "swan_token_contract": "0x39cBBeaF88a91404618d45a16e0977Adab4d1Af1",
+        "swan_token_contract": "0xBb4eC1b56cB624863298740Fd264ef2f910d5564",
         "orchestrator_collateral_contract": "0x643A820060c78D9122081aafF0C039b070937558",
         "job_manager_contract": "0x6e810C56d97d0cf64FB625d2Ed756379d0EDbC32",
         "job_manager_contract_created": 2129000,
         "register_cp_contract": "0xbef1ec33e5Ac3a491fFeE1600e0b00eac97cb138",
-        "zk_collateral_contract": "0x7A099B665e760BCCF3Aa0cBbb66C8da47F13C03d",
+        "zk_collateral_contract": "0x557f306f917009cf83c32b8b32a79202e79948e5",
         "register_task_contract": "0x4Cd9b2450c3e412a1F0F0aE78C79271337241E31",
         "sequencer_contract": "0xE0a88F1fA56D8a8D73E9bb9Fc03506439cb386Bd",
-        "edge_task_payment": "0xa07829335024918c0626968c5e93910f90de1dd7",
-        "edge_task_payment_created": 2569302
+        "edge_task_payment": "0xb9847963627e3dcca1b9bf70f4d3e0decf8119fb",
+        "edge_task_payment_created": 3088006
       },
       "orchestrator_collateral_ubi_zero_contract": "0x643A820060c78D9122081aafF0C039b070937558",
       "zk_collateral_ubi_zero_contract": "0x7A099B665e760BCCF3Aa0cBbb66C8da47F13C03d"
