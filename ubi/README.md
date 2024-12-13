@@ -133,7 +133,7 @@ TARGET_GPU_3080:         SWAN/GPU unit a hour
 ## Config and Receive Inference task
 The task type is configured as 4 (inference), and need to be configured as follows:
   * For container services with a single port, use `traefik`. Using `traefik` as the entry point for requests, you need to configure a domain(*.example.com) to resolve to the IP where CP is running. The port 9000 must be open for external access.
-  * For container services with multiple ports, use the public IP + port. Need to configure `PortRange`.
+  * For container services with multiple ports, use the public IP + port. Need to configure `PortRange`( one-to-one mapping between host ports and the public network IP).
 
 Configure it in the `$CP_PATH/config.toml`:
 ```
