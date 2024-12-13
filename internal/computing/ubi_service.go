@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/go-connections/nat"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/filswan/go-swan-lib/logs"
@@ -424,6 +425,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 		}
 		logs.GetLogger().Infof("successfully get pod name, taskId: %d, podName: %s", ubiTask.ID, podName)
 
+		NewTaskService().UpdateTaskStatusById(ubiTask.ID, models.TASK_RUNNING_STATUS)
 		req := k8sService.k8sClient.CoreV1().Pods(namespace).GetLogs(podName, &v1.PodLogOptions{
 			Container: "",
 			Follow:    true,
@@ -710,7 +712,7 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		logs.GetLogger().Warnf("task_id: %d, starting container, container name: %s", ubiTask.ID, containerName)
 
 		dockerService := NewDockerService()
-		if err = dockerService.ContainerCreateAndStart(containerConfig, hostConfig, containerName); err != nil {
+		if err = dockerService.ContainerCreateAndStart(containerConfig, hostConfig, nil, containerName); err != nil {
 			logs.GetLogger().Errorf("failed to create ubi task container, task_id: %d, error: %v", ubiTask.ID, err)
 			return
 		}
@@ -721,8 +723,9 @@ func DoUbiTaskForDocker(c *gin.Context) {
 			return
 		}
 		logs.GetLogger().Warnf("task_id: %d, started container, container name: %s", ubiTask.ID, containerName)
+		NewTaskService().UpdateTaskStatusById(ubiTask.ID, models.TASK_RUNNING_STATUS)
 
-		containerLogStream, err := dockerService.GetContainerLogStream(containerName)
+		containerLogStream, err := dockerService.GetContainerLogStream(context.TODO(), containerName)
 		if err != nil {
 			logs.GetLogger().Errorf("get docker container log stream failed, error: %v", err)
 			return
@@ -853,6 +856,29 @@ func GetCpResource(c *gin.Context) {
 		}
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.JsonError))
 		return
+	}
+
+	list, err := NewEcpJobService().GetEcpJobList([]string{models.CreatedStatus, models.RunningStatus})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.JsonError))
+		return
+	}
+
+	var taskGpuMap = make(map[string][]string)
+	for _, g := range list {
+		if len(strings.TrimSpace(g.GpuIndex)) > 0 {
+			taskGpuMap[g.GpuName] = append(taskGpuMap[g.GpuName], strings.Split(strings.TrimSpace(g.GpuIndex), ",")...)
+		}
+	}
+
+	if nodeResource.Gpu.AttachedGpus > 0 {
+		for i, detail := range nodeResource.Gpu.Details {
+			if detail.Status == models.Available {
+				if checkGpu(detail.ProductName, detail.Index, taskGpuMap) {
+					nodeResource.Gpu.Details[i].Status = models.Occupied
+				}
+			}
+		}
 	}
 
 	cpAccountAddress, err := contract.GetCpAccountAddress()
@@ -1109,12 +1135,29 @@ func reportClusterResourceForDocker() {
 		return
 	}
 
+	list, err := NewEcpJobService().GetEcpJobList([]string{models.CreatedStatus, models.RunningStatus})
+	if err != nil {
+		logs.GetLogger().Errorf("failed to get ecp job task, error: %v", err)
+		return
+	}
+
+	var taskGpuMap = make(map[string][]string)
+	for _, g := range list {
+		if len(strings.TrimSpace(g.GpuIndex)) > 0 {
+			taskGpuMap[g.GpuName] = append(taskGpuMap[g.GpuName], strings.Split(strings.TrimSpace(g.GpuIndex), ",")...)
+		}
+	}
+
 	var freeGpuMap = make(map[string]int)
 	var useGpuMap = make(map[string]int)
 	if nodeResource.Gpu.AttachedGpus > 0 {
 		for _, g := range nodeResource.Gpu.Details {
 			if g.Status == models.Available {
-				freeGpuMap[g.ProductName] += 1
+				if checkGpu(g.ProductName, g.Index, taskGpuMap) {
+					freeGpuMap[g.ProductName] = 0
+				} else {
+					freeGpuMap[g.ProductName] += 1
+				}
 			} else {
 				useGpuMap[g.ProductName] += 1
 			}
@@ -1124,18 +1167,51 @@ func reportClusterResourceForDocker() {
 		nodeResource.Cpu.Free, nodeResource.Memory.Free, nodeResource.Storage.Free, freeGpuMap, useGpuMap)
 }
 
-func CronTaskForEcp() {
-	go func() {
-		ticker := time.NewTicker(2 * time.Hour)
-		for range ticker.C {
-			NewDockerService().CleanResourceForDocker()
+func updateEcpTaskStatus() {
+	list, err := NewEcpJobService().GetEcpJobList([]string{models.CreatedStatus, models.RunningStatus})
+	if err != nil {
+		logs.GetLogger().Errorf("failed to get ecp job task, error: %v", err)
+		return
+	}
+
+	containerStatus, err := NewDockerService().GetContainerStatus()
+	if err != nil {
+		return
+	}
+
+	for _, entity := range list {
+		if time.Now().Unix()-entity.CreateTime < 3600 {
+			continue
 		}
-	}()
+		if status, ok := containerStatus[entity.ContainerName]; ok {
+			NewEcpJobService().UpdateEcpJobEntity(entity.Uuid, status)
+		} else {
+			NewEcpJobService().UpdateEcpJobEntity(entity.Uuid, models.TerminatedStatus)
+		}
+	}
+}
+
+func CronTaskForEcp() {
+	if conf.GetConfig().API.AutoDeleteImage {
+		go func() {
+			ticker := time.NewTicker(2 * time.Hour)
+			for range ticker.C {
+				NewDockerService().CleanResourceForDocker()
+			}
+		}()
+	}
 
 	go func() {
 		ticker := time.NewTicker(3 * time.Minute)
 		for range ticker.C {
 			reportClusterResourceForDocker()
+		}
+	}()
+
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		for range ticker.C {
+			updateEcpTaskStatus()
 		}
 	}()
 
@@ -1324,7 +1400,7 @@ func RestartResourceExporter() error {
 			MaximumRetryCount: 3,
 		},
 		Privileged: true,
-	}, resourceExporterContainerName)
+	}, nil, resourceExporterContainerName)
 	if err != nil {
 		return fmt.Errorf("create resource-exporter container failed, error: %v", err)
 	}
@@ -1535,4 +1611,58 @@ func RetryFn(fn func() error, maxRetries int, delay time.Duration) error {
 		time.Sleep(delay)
 	}
 	return fmt.Errorf("after %d attempts, last error: %w", maxRetries, err)
+}
+
+func RestartTraefikService() error {
+	dockerService := NewDockerService()
+	if err := dockerService.CreateNetwork("traefik-net"); err != nil {
+		return err
+	}
+
+	traefikServiceContainerName := "traefik-service"
+
+	dockerService.RemoveContainerByName(traefikServiceContainerName)
+	err := dockerService.PullImage(build.TraefikServerDockerImage)
+	if err != nil {
+		return fmt.Errorf("pull %s image failed, error: %v", build.UBIResourceExporterDockerImage, err)
+	}
+
+	err = dockerService.ContainerCreateAndStart(&container.Config{
+		Image: build.TraefikServerDockerImage,
+		Cmd: []string{
+			"--api.insecure=true",
+			"--log.level=INFO",
+			"--providers.docker.exposedbydefault=false",
+			"--providers.docker=true",
+			"--entrypoints.web.address=:80",
+		},
+		AttachStdout: true,
+		AttachStderr: true,
+		Tty:          true,
+	}, &container.HostConfig{
+		PortBindings: map[nat.Port][]nat.PortBinding{
+			"80/tcp": {{
+				HostIP:   "0.0.0.0",
+				HostPort: strconv.Itoa(traefikListenPortMapHost),
+			}},
+			"8080/tcp": {{
+				HostIP:   "0.0.0.0",
+				HostPort: "9080",
+			}},
+		},
+		Binds: []string{"/var/run/docker.sock:/var/run/docker.sock"},
+		RestartPolicy: container.RestartPolicy{
+			Name:              container.RestartPolicyOnFailure,
+			MaximumRetryCount: 3,
+		},
+		Privileged: true,
+	}, &network.NetworkingConfig{
+		EndpointsConfig: map[string]*network.EndpointSettings{
+			"traefik-net": {},
+		},
+	}, traefikServiceContainerName)
+	if err != nil {
+		return fmt.Errorf("create traefik-service container failed, error: %v", err)
+	}
+	return nil
 }

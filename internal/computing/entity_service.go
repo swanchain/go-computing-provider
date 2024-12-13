@@ -45,6 +45,20 @@ func (taskServ TaskService) SaveTaskEntity(task *models.TaskEntity) (err error) 
 	return taskServ.Save(task).Error
 }
 
+func (taskServ TaskService) UpdateTaskStatusById(taskId int, status int) (err error) {
+	return taskServ.Model(&models.TaskEntity{}).Where("id=?", taskId).Update("status", status).Error
+}
+
+func (taskServ TaskService) UpdateTaskStatusByUuid(uuid string, status int) (err error) {
+	return taskServ.Model(&models.TaskEntity{}).Where("uuid=?", uuid).Update("status", status).Error
+}
+
+func (taskServ TaskService) GetTaskByUuid(uuid string) (*models.TaskEntity, error) {
+	var taskEntity models.TaskEntity
+	err := taskServ.Model(&models.TaskEntity{}).Where("uuid=?", uuid).Limit(1).Find(&taskEntity).Error
+	return &taskEntity, err
+}
+
 func (taskServ TaskService) UpdateTaskEntityByTaskId(task *models.TaskEntity) (err error) {
 	return taskServ.Model(&models.TaskEntity{}).Where("id=?", task.Id).Updates(task).Error
 }
@@ -113,11 +127,26 @@ func (jobServ JobService) DeleteJobEntityBySpaceUuId(spaceUuid, jobUuid string, 
 	}).Error
 }
 
-func (jobServ JobService) GetJobList(status int) (list []*models.JobEntity, err error) {
-	if status >= 0 {
-		err = jobServ.Model(&models.JobEntity{}).Where("delete_at=?", status).Find(&list).Error
+func (jobServ JobService) GetJobList(status int, tailNum int) (list []*models.JobEntity, err error) {
+	if tailNum > 0 {
+		if status >= 0 {
+			err = jobServ.Model(&models.JobEntity{}).Where("delete_at=?", status).Order("create_time desc").Limit(tailNum).Find(&list).Error
+		} else {
+			err = jobServ.Model(&models.JobEntity{}).Order("create_time desc").Limit(tailNum).Find(&list).Error
+		}
 	} else {
-		err = jobServ.Model(&models.JobEntity{}).Find(&list).Error
+		if status >= 0 {
+			err = jobServ.Model(&models.JobEntity{}).Where("delete_at=?", status).Find(&list).Error
+		} else {
+			err = jobServ.Model(&models.JobEntity{}).Find(&list).Error
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	for i, j := 0, len(list)-1; i < j; i, j = i+1, j-1 {
+		list[i], list[j] = list[j], list[i]
 	}
 	return
 }
@@ -175,6 +204,31 @@ func (cpServ EcpJobService) GetEcpJobs(jobUuid string) ([]models.EcpJobEntity, e
 	return job, err
 }
 
+func (cpServ EcpJobService) GetEcpJobsByLimit(tailNum int) ([]models.EcpJobEntity, error) {
+	var jobList []models.EcpJobEntity
+	var err error
+	if tailNum > 0 {
+		err = cpServ.Model(&models.EcpJobEntity{}).Order("create_time desc").Limit(tailNum).Find(&jobList).Error
+	} else {
+		err = cpServ.Model(&models.EcpJobEntity{}).Order("create_time desc").Find(&jobList).Error
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	for i, j := 0, len(jobList)-1; i < j; i, j = i+1, j-1 {
+		jobList[i], jobList[j] = jobList[j], jobList[i]
+	}
+
+	return jobList, err
+}
+
+func (cpServ EcpJobService) GetEcpJobList(status []string) ([]models.EcpJobEntity, error) {
+	var jobs []models.EcpJobEntity
+	err := cpServ.Model(&models.EcpJobEntity{}).Where("status in ?", status).Find(&jobs).Error
+	return jobs, err
+}
+
 func (cpServ EcpJobService) UpdateEcpJobEntity(jobUuid, status string) (err error) {
 	return cpServ.Model(&models.EcpJobEntity{}).Where("uuid =?", jobUuid).Update("status", status).Error
 }
@@ -183,10 +237,18 @@ func (cpServ EcpJobService) UpdateEcpJobEntityContainerName(jobUuid string, cont
 	return cpServ.Model(&models.EcpJobEntity{}).Where("uuid =?", jobUuid).Update("container_name", containerName).Error
 }
 
+func (cpServ EcpJobService) UpdateEcpJobEntityPortsAndServiceUrl(jobUuid, portMap, serviceUrl string) (err error) {
+	return cpServ.Model(&models.EcpJobEntity{}).Where("uuid =?", jobUuid).Updates(map[string]interface{}{
+		"service_url": serviceUrl,
+		"port_map":    portMap,
+	}).Error
+}
+
 func (cpServ EcpJobService) UpdateEcpJobEntityMessage(jobUuid string, message string) (err error) {
-	return cpServ.Model(&models.EcpJobEntity{}).Where("uuid =?", jobUuid).Updates(map[string]string{
-		"message": message,
-		"status":  "exited",
+	return cpServ.Model(&models.EcpJobEntity{}).Where("uuid =?", jobUuid).Updates(map[string]interface{}{
+		"message":   message,
+		"status":    models.TerminatedStatus,
+		"delete_at": models.DELETED_FLAG,
 	}).Error
 }
 
@@ -202,8 +264,9 @@ func (cpServ EcpJobService) SaveEcpJobEntity(job *models.EcpJobEntity) (err erro
 }
 
 func (cpServ EcpJobService) DeleteContainerByUuid(uuid string) (err error) {
-	return cpServ.Model(&models.EcpJobEntity{}).Where("uuid =?", uuid).Updates(map[string]string{
-		"status": "terminated",
+	return cpServ.Model(&models.EcpJobEntity{}).Where("uuid =?", uuid).Updates(map[string]interface{}{
+		"status":    models.TerminatedStatus,
+		"delete_at": models.DELETED_FLAG,
 	}).Error
 }
 

@@ -53,6 +53,7 @@ func GetServiceProviderInfo(c *gin.Context) {
 func ReceiveJob(c *gin.Context) {
 	var jobData models.JobData
 	if err := c.ShouldBindJSON(&jobData); err != nil {
+		logs.GetLogger().Errorf("failed to parse request to json, error: %v", err)
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
 		return
 	}
@@ -846,6 +847,186 @@ func DoProof(c *gin.Context) {
 	c.JSON(http.StatusOK, util.CreateSuccessResponse(string(bytes)))
 }
 
+func DeployImage(c *gin.Context) {
+	var deployJob models.FcpDeployImageReq
+	if err := c.ShouldBindJSON(&deployJob); err != nil {
+		logs.GetLogger().Errorf("failed to parse request to json, error: %v", err)
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
+		return
+	}
+	logs.GetLogger().Infof("Image Job received Data: %+v", deployJob)
+
+	if !CheckWalletWhiteList(deployJob.WalletAddress) {
+		logs.GetLogger().Errorf("This cp does not accept tasks from wallet addresses outside the whitelist")
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SpaceCheckWhiteListError))
+		return
+	}
+
+	if CheckWalletBlackList(deployJob.WalletAddress) {
+		logs.GetLogger().Errorf("This cp does not accept tasks from wallet addresses inside the blacklist")
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SpaceCheckBlackListError))
+		return
+	}
+
+	if conf.GetConfig().HUB.VerifySign {
+		if len(deployJob.Sign) == 0 {
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BadParamError, "missing node_id_job_source_uri_signature field"))
+			return
+		}
+		cpAccountAddress, err := contract.GetCpAccountAddress()
+		if err != nil {
+			logs.GetLogger().Errorf("failed to get cp account contract address, error: %v", err)
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.GetCpAccountError))
+			return
+		}
+
+		signature, err := verifySignatureForHub(deployJob.WalletAddress, fmt.Sprintf("%s%s", cpAccountAddress, deployJob.Uuid), deployJob.Sign)
+		if err != nil {
+			logs.GetLogger().Errorf("failed to verify signature for space job, error: %+v", err)
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
+			return
+		}
+
+		if !signature {
+			logs.GetLogger().Errorf("space job sign verifing, job_uuid: %s, verify: %v", deployJob.Uuid, signature)
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "signature verify failed"))
+			return
+		}
+	}
+
+	var resource models.SpaceHardware
+	resource.Vcpu = int64(deployJob.Resource.Cpu)
+	resource.Memory = int64(deployJob.Resource.Memory)
+	resource.Storage = int64(deployJob.Resource.Storage)
+
+	if deployJob.Resource.Gpu > 0 && deployJob.Resource.GpuModel != "" {
+		resource.HardwareType = "GPU"
+		resource.Hardware = deployJob.Resource.GpuModel
+		resource.Gpu = int64(deployJob.Resource.Gpu)
+	} else {
+		resource.HardwareType = "CPU"
+	}
+
+	if !conf.GetConfig().API.Pricing {
+		checkPriceFlag, totalCost, err := checkPrice(deployJob.BidPrice, deployJob.Duration, resource)
+		if err != nil {
+			logs.GetLogger().Errorf("failed to check price, job_uuid: %s, error: %v", deployJob.Uuid, err)
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
+			return
+		}
+
+		if !checkPriceFlag {
+			logs.GetLogger().Warnf("the price is too low, job_uuid: %s, paid: %s, required: %0.4f", deployJob.Uuid, deployJob.BidPrice, totalCost)
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BelowPriceError))
+			return
+		}
+	}
+
+	available, gpuProductName, gpuIndex, err := checkResourceAvailableForSpace(1, resource)
+	if err != nil {
+		logs.GetLogger().Errorf("failed to check job resource, error: %+v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
+		return
+	}
+
+	if !available {
+		if gpuProductName != "" {
+			logs.GetLogger().Warnf("job_uuid: %s, name: %s, gpu_name: %s, not found a resources available", deployJob.Uuid, deployJob.Name, gpuProductName)
+		} else {
+			logs.GetLogger().Warnf("job_uuid: %s, name: %s, not found a resources available", deployJob.Uuid, deployJob.Name)
+		}
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError))
+		return
+	}
+
+	var hostName string
+	var logHost string
+	prefixStr := generateString(10)
+	if strings.HasPrefix(conf.GetConfig().API.Domain, ".") {
+		hostName = prefixStr + conf.GetConfig().API.Domain
+		logHost = "log" + conf.GetConfig().API.Domain
+	} else {
+		hostName = strings.Join([]string{prefixStr, conf.GetConfig().API.Domain}, ".")
+		logHost = "log." + conf.GetConfig().API.Domain
+	}
+
+	multiAddressSplit := strings.Split(conf.GetConfig().API.MultiAddress, "/")
+	wsUrl := fmt.Sprintf("wss://%s:%s/api/v1/computing/lagrange/spaces/log?job_uuid=%s", logHost, multiAddressSplit[4], deployJob.Uuid)
+
+	var jobData models.JobData
+	jobData.UUID = deployJob.Uuid
+	jobData.Name = deployJob.Name
+	jobData.Duration = deployJob.Duration
+	jobData.TaskUUID = deployJob.Uuid
+	jobData.BidPrice = deployJob.BidPrice
+	jobData.IpWhiteList = deployJob.IpWhiteList
+	jobData.BuildLog = wsUrl + "&type=build"
+	jobData.ContainerLog = wsUrl + "&type=container"
+	var ports []int
+	for _, p := range deployJob.DeployConfig.Ports {
+		ports = append(ports, p...)
+	}
+	if len(ports) == 1 {
+		jobData.JobRealUri = fmt.Sprintf("https://%s", hostName)
+	} else {
+		jobData.JobRealUri = ""
+	}
+
+	go func() {
+		var currentBlockNumber uint64
+		for i := 0; i < 5; i++ {
+			currentBlockNumber, err = getChainBlockNumber()
+			if err != nil {
+				logs.GetLogger().Errorf("failed to get blockNumber, error: %v", err)
+				time.Sleep(time.Second)
+				continue
+			}
+		}
+
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
+		var jobEntity = new(models.JobEntity)
+		jobEntity.SpaceUuid = deployJob.Uuid
+		jobEntity.RealUrl = jobData.JobRealUri
+		jobEntity.BuildLog = jobData.BuildLog
+		jobEntity.BuildLogPath = filepath.Join(cpRepoPath, "build/fcp", deployJob.Uuid, BuildFileName)
+		jobEntity.ContainerLog = jobData.ContainerLog
+		jobEntity.Duration = deployJob.Duration
+		jobEntity.JobUuid = deployJob.Uuid
+		jobEntity.DeployStatus = models.DEPLOY_RECEIVE_JOB
+		jobEntity.CreateTime = time.Now().Unix()
+		jobEntity.ExpireTime = time.Now().Unix() + int64(deployJob.Duration)
+		jobEntity.StartedBlock = conf.GetConfig().CONTRACT.JobManagerCreated
+		jobEntity.ScannedBlock = currentBlockNumber
+		jobEntity.WalletAddress = deployJob.WalletAddress
+		jobEntity.Name = deployJob.Name
+		jobEntity.SpaceType = 0
+		jobEntity.ResourceType = resource.HardwareType
+		jobEntity.NameSpace = constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(deployJob.WalletAddress)
+		jobEntity.K8sDeployName = constants.K8S_DEPLOY_NAME_PREFIX + strings.ToLower(deployJob.Uuid)
+		jobEntity.Status = models.JOB_RECEIVED_STATUS
+		jobEntity.K8sResourceType = "deployment"
+		jobEntity.IpWhiteList = strings.Join(deployJob.IpWhiteList, ",")
+		err = NewJobService().SaveJobEntity(jobEntity)
+		if err != nil {
+			logs.GetLogger().Errorf("failed to save job to db, job_uuid: %s, error: %+v", deployJob.Uuid, err)
+		}
+
+		go func() {
+			if err = submitJob(&jobData); err != nil {
+				logs.GetLogger().Errorf("failed to upload job data to MCS, job_uuid: %s, error: %v", jobData.UUID, err)
+				return
+			}
+			logs.GetLogger().Infof("successfully uploaded to MCS, jobuuid: %s", jobData.UUID)
+		}()
+
+		DeployImageSpaceTask(jobData, deployJob, hostName, resource, gpuProductName, gpuIndex)
+
+	}()
+
+	c.JSON(http.StatusOK, util.CreateSuccessResponse(jobData))
+
+}
+
 func handlePodEvent(conn *websocket.Conn, jobUuid string, walletAddress string) {
 	client := NewWsClient(conn)
 
@@ -1014,6 +1195,167 @@ func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName s
 		}
 	}
 	return
+}
+
+func DeployImageSpaceTask(jobData models.JobData, job models.FcpDeployImageReq, hostName string, resource models.SpaceHardware, gpuProductName string, gpuIndex []string) {
+	saveGpuCache(gpuProductName)
+	updateJobStatus(job.Uuid, models.DEPLOY_UPLOAD_RESULT)
+
+	var success bool
+	var jobUuid string
+	var walletAddress string
+	defer func() {
+		deleteGpuCache(gpuProductName)
+		if !success {
+			k8sNameSpace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(walletAddress)
+			DeleteJob(k8sNameSpace, jobUuid, "failed to deploy space")
+			NewJobService().DeleteJobEntityByJobUuId(job.Uuid, models.JOB_TERMINATED_STATUS)
+		}
+
+		if err := recover(); err != nil {
+			logs.GetLogger().Errorf("deploy space task painc, error: %+v", err)
+			return
+		}
+	}()
+
+	var deployJob models.DeployJobParam
+	deployJob.Uuid = job.Uuid
+	deployJob.Name = job.Name
+	deployJob.JobType = job.JobType
+	deployJob.HealthPath = job.DeployConfig.HealthPath
+
+	var envs []string
+	if len(job.DeployConfig.RunCommands) == 0 { // build images
+		deployJob.Image = job.DeployConfig.Image
+		deployJob.Cmd = job.DeployConfig.Cmd
+		var ports []int
+		for _, p := range job.DeployConfig.Ports {
+			ports = append(ports, p...)
+		}
+		deployJob.Ports = ports
+
+		for k, v := range job.DeployConfig.Envs {
+			envs = append(envs, fmt.Sprintf("%s=%s", k, v))
+		}
+		deployJob.Envs = envs
+	} else {
+		buildParams, err := parseDockerfileConfigForFcp(job)
+		if err != nil {
+			logs.GetLogger().Errorln(err)
+			return
+		}
+		deployJob.Image = buildParams.Image
+		deployJob.Cmd = buildParams.Cmd
+		deployJob.Ports = buildParams.Ports
+		deployJob.Envs = buildParams.Envs
+
+		clusterRuntime, err := NewK8sService().GetClusterRuntime()
+		if err != nil {
+			logs.GetLogger().Errorf("failed to get cluster runtime, error: %v", err)
+		} else {
+			logs.GetLogger().Infof("cluster runtime: %s", clusterRuntime)
+			if strings.Contains(strings.ToLower(clusterRuntime), "containerd") {
+				imageTar, err := NewDockerService().SaveDockerImage(deployJob.Image)
+				if err != nil {
+					logs.GetLogger().Errorf("failed to save image, imageName: %s error: %v", deployJob.Image, err)
+					return
+				}
+				if err = ImportImageToContainerd(imageTar); err != nil {
+					logs.GetLogger().Errorf("failed to load image into containerd, imageName: %s error: %v", deployJob.Image, err)
+					return
+				}
+			}
+
+		}
+	}
+
+	jobUuid = strings.ToLower(job.Uuid)
+	deploy := NewDeploy(job.Uuid, jobUuid, hostName, job.WalletAddress, "", int64(job.Duration), constants.SPACE_TYPE_PUBLIC, resource, 1)
+	deploy.WithIpWhiteList(job.IpWhiteList)
+	deploy.WithSpaceName(job.Name)
+	deploy.WithGpuProductName(gpuProductName)
+	deploy.WithGpuIndex(gpuIndex)
+	deploy.WithImage(deployJob.Image)
+
+	err := deploy.DeployImageToK8s(deployJob)
+	if err != nil {
+		logs.GetLogger().Errorf("failed to use yaml to deploy job, error: %v", err)
+		return
+	}
+	if deploy.nodePortUrl != "" {
+		jobData.JobRealUri = deploy.nodePortUrl[:len(deploy.nodePortUrl)-2]
+		if err = submitJob(&jobData); err != nil {
+			logs.GetLogger().Errorf("failed to upload job result to MCS, jobUuid: %s, error: %v", jobData.UUID, err)
+			return
+		}
+		updateJobStatus(job.Uuid, models.DEPLOY_TO_K8S)
+	}
+	success = true
+}
+
+func parseDockerfileConfigForFcp(job models.FcpDeployImageReq) (*models.DeployJobParam, error) {
+	var deployParam *models.DeployJobParam
+	if len(job.DeployConfig.RunCommands) != 0 {
+		content, envs, ports := generateDockerfileForFcp(job)
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
+		buildFolder := filepath.Join(cpRepoPath, "build/fcp", job.Uuid)
+		if err := os.MkdirAll(buildFolder, os.ModePerm); err != nil {
+			return nil, fmt.Errorf("failed to create dir, error: %v", err)
+		}
+		dockerfileFile := filepath.Join(buildFolder, "Dockerfile")
+		err := os.WriteFile(dockerfileFile, []byte(content), 0644)
+		if err != nil {
+			return nil, fmt.Errorf("failed to save Dockerfile: %v", err)
+		}
+
+		imageName := fmt.Sprintf("ecp-image/%s:%d", job.Uuid, time.Now().Unix())
+		if conf.GetConfig().Registry.ServerAddress != "" {
+			imageName = fmt.Sprintf("%s/%s:%d",
+				strings.TrimSpace(conf.GetConfig().Registry.ServerAddress), job.Uuid, time.Now().Unix())
+		}
+		imageName = strings.ToLower(imageName)
+
+		if _, err := os.Stat(dockerfileFile); err != nil {
+			return nil, fmt.Errorf("failed not found Dockerfile, path: %s", dockerfileFile)
+		}
+		deployParam.BuildImagePath = buildFolder
+		deployParam.BuildImageName = imageName
+		deployParam.Envs = envs
+		deployParam.Ports = ports
+	}
+	return deployParam, nil
+}
+
+func generateDockerfileForFcp(config models.FcpDeployImageReq) (string, []string, []int) {
+	var builder strings.Builder
+	builder.WriteString(fmt.Sprintf("FROM %s\n", config.DeployConfig.Image))
+
+	var envs []string
+	var ports []int
+	if config.DeployConfig.WorkDir != "" {
+		builder.WriteString(fmt.Sprintf("WORKDIR %s\n", config.DeployConfig.WorkDir))
+	}
+
+	for key, value := range config.DeployConfig.Envs {
+		builder.WriteString(fmt.Sprintf("ENV %s=%s\n", key, value))
+		envs = append(envs, fmt.Sprintf("%s=%s", key, value))
+	}
+
+	for _, cmd := range config.DeployConfig.RunCommands {
+		builder.WriteString(fmt.Sprintf("RUN %s\n", cmd))
+	}
+
+	for _, port := range config.DeployConfig.Ports {
+		builder.WriteString(fmt.Sprintf("EXPOSE %d\n", port))
+		ports = append(ports, port...)
+	}
+
+	if len(config.DeployConfig.Cmd) > 0 {
+		cmdStr := strings.Join(config.DeployConfig.Cmd, " ")
+		builder.WriteString(fmt.Sprintf("CMD [%s]\n", cmdStr))
+	}
+
+	return builder.String(), envs, ports
 }
 
 func DeleteJob(namespace, jobUuid string, msg string) error {

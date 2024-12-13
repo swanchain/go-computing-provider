@@ -14,6 +14,7 @@ import (
 	"io"
 	"math/big"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -74,6 +75,10 @@ func (tps *TaskPaymentService) scanAndProcessEvents(cpAccountAddress string) err
 	lastProcessedBlock := loadLastProcessedBlock(models.ScannerTaskPaymentId)
 	header, err := tps.client.HeaderByNumber(context.Background(), nil)
 	if err != nil {
+		time.Sleep(10 * time.Second)
+		if strings.Contains(err.Error(), "Too Many Requests") {
+			return fmt.Errorf("failed to get chain header, error: Too Many Requests")
+		}
 		return fmt.Errorf("failed to get chain header, error: %v", err)
 	}
 	currentBlock := header.Number.Uint64()
@@ -122,6 +127,7 @@ func handleEdgeTask(taskUuid, cpAccountAddress string, blockNumber int64, amount
 			logs.GetLogger().Errorf("failed to remove container, job_uuid: %s, error: %v", ecpJob.Uuid, err)
 			return
 		}
+		logs.GetLogger().Infof("scanner_deleted, task_uuid: %s", taskUuid)
 		NewEcpJobService().DeleteContainerByUuid(ecpJob.Uuid)
 	}
 }
@@ -154,16 +160,16 @@ func loadLastProcessedBlock(taskTypeOnChain int) int64 {
 	err := db.DB.Model(models.ScanChainEntity{}).Where(&models.ScanChainEntity{Id: int64(taskTypeOnChain)}).Limit(1).Find(&scan).Error
 	if err != nil {
 		logs.GetLogger().Errorf("failed to get scan chain, error: %v", err)
-		return conf.GetConfig().CONTRACT.EdgeTaskPaymentCreated
+		return int64(conf.GetConfig().CONTRACT.EdgeTaskPaymentCreated)
 	}
 
 	if taskTypeOnChain == models.ScannerTaskPaymentId {
 		if scan.BlockNumber == 0 {
-			return conf.GetConfig().CONTRACT.EdgeTaskPaymentCreated
+			return int64(conf.GetConfig().CONTRACT.EdgeTaskPaymentCreated)
 		}
 	} else if taskTypeOnChain == models.ScannerFcpTaskManagerId {
 		if scan.BlockNumber == 0 {
-			return conf.GetConfig().CONTRACT.JobManagerCreated
+			return int64(conf.GetConfig().CONTRACT.JobManagerCreated)
 		}
 	}
 	return scan.BlockNumber
@@ -196,6 +202,7 @@ func getTaskStatus(taskUuid, cpAccount string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("failed to read response: %v", err)
 	}
+	logs.GetLogger().Infof("task_status: http_status: %d, response: %s", resp.StatusCode, string(body))
 
 	if resp.StatusCode == http.StatusBadRequest {
 		return true, nil
@@ -203,6 +210,10 @@ func getTaskStatus(taskUuid, cpAccount string) (bool, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		return false, fmt.Errorf("failed to parse resp body: %v", string(body))
+	}
+
+	if resp.StatusCode != http.StatusBadRequest {
+		return true, nil
 	}
 
 	var ts TaskStatus

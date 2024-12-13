@@ -1,10 +1,12 @@
 package conf
 
 import (
+	"context"
 	_ "embed"
 	"fmt"
 	"github.com/BurntSushi/toml"
 	"github.com/swanchain/go-computing-provider/build"
+	"github.com/swanchain/go-computing-provider/internal/contract"
 	"log"
 	"net"
 	"os"
@@ -12,6 +14,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 )
 
 var config *ComputeNode
@@ -49,7 +52,9 @@ type API struct {
 	NodeName        string
 	WalletWhiteList string
 	WalletBlackList string
-	Pricing         Pricing `toml:"pricing"`
+	Pricing         Pricing  `toml:"pricing"`
+	AutoDeleteImage bool     `toml:"AutoDeleteImage"`
+	PortRange       []string `toml:"PortRange"`
 }
 type UBI struct {
 	UbiEnginePk     string
@@ -57,6 +62,7 @@ type UBI struct {
 	AutoChainProof  bool
 	SequencerUrl    string
 	EdgeUrl         string
+	VerifySign      bool
 }
 
 type LOG struct {
@@ -88,18 +94,22 @@ type RPC struct {
 }
 
 type CONTRACT struct {
+	UpgradeName       string
 	SwanToken         string `toml:"SWAN_CONTRACT"`
 	CpAccountRegister string `toml:"REGISTER_CP_CONTRACT"`
 
 	JobCollateral     string `toml:"SWAN_COLLATERAL_CONTRACT"`
 	JobManager        string `toml:"SWAN_JOB_CONTRACT"`
-	JobManagerCreated int64  `toml:"JobManagerCreated"`
+	JobManagerCreated uint64 `toml:"JobManagerCreated"`
 
 	TaskRegister           string `toml:"REGISTER_TASK_CONTRACT"`
 	ZkCollateral           string `toml:"ZK_COLLATERAL_CONTRACT"`
 	Sequencer              string `toml:"SEQUENCER_CONTRACT"`
 	EdgeTaskPayment        string `toml:"EDGE_TASK_PAYMENT"`
-	EdgeTaskPaymentCreated int64  `toml:"EdgeTaskPaymentCreated"`
+	EdgeTaskPaymentCreated uint64 `toml:"EdgeTaskPaymentCreated"`
+
+	JobCollateralUbiZero string `toml:"SWAN_COLLATERAL_UBI_ZERO_CONTRACT"`
+	ZkCollateralUbiZero  string `toml:"ZK_COLLATERAL_UBI_ZERO_CONTRACT"`
 }
 
 func GetRpcByNetWorkName() (string, error) {
@@ -151,25 +161,72 @@ func InitConfig(cpRepoPath string, standalone bool) error {
 		}
 	}
 
+	getConfigByHeight()
+	return nil
+}
+
+func getConfigByHeight() {
 	networkConfig := build.LoadParam()
 	for _, nc := range networkConfig {
 		ncCopy := nc
 		if ncCopy.Network == build.NetWorkTag {
-			config.CONTRACT.SwanToken = ncCopy.Config.SwanTokenContract
-			config.CONTRACT.JobCollateral = ncCopy.Config.OrchestratorCollateralContract
-			config.CONTRACT.JobManager = ncCopy.Config.JobManagerContract
-			config.CONTRACT.JobManagerCreated = ncCopy.Config.JobManagerContractCreated
-			config.CONTRACT.CpAccountRegister = ncCopy.Config.RegisterCpContract
-			config.CONTRACT.ZkCollateral = ncCopy.Config.ZkCollateralContract
-			config.CONTRACT.Sequencer = ncCopy.Config.SequencerContract
-			config.CONTRACT.TaskRegister = ncCopy.Config.RegisterTaskContract
-			config.CONTRACT.EdgeTaskPayment = ncCopy.Config.EdgeTaskPayment
-			config.CONTRACT.EdgeTaskPaymentCreated = ncCopy.Config.EdgeTaskPaymentCreated
+			var blockNumber uint64
+			var err error
+			var rpc string
+			if config.RPC.SwanChainRpc != "" {
+				rpc = config.RPC.SwanChainRpc
+			} else {
+				rpc = ncCopy.Config.ChainRpc
+			}
+			for {
+				blockNumber, err = getChainHeight(rpc)
+				if err != nil {
+					fmt.Printf("failed to get chain height, error: %v", err)
+					time.Sleep(2 * time.Second)
+					continue
+				}
+				break
+			}
+
+			if blockNumber < ncCopy.BoundaryHeight {
+				config.CONTRACT.SwanToken = ncCopy.Config.LegacyContract.SwanTokenContract
+				config.CONTRACT.JobCollateral = ncCopy.Config.LegacyContract.OrchestratorCollateralContract
+				config.CONTRACT.JobManager = ncCopy.Config.LegacyContract.JobManagerContract
+				config.CONTRACT.JobManagerCreated = ncCopy.Config.LegacyContract.JobManagerContractCreated
+				config.CONTRACT.CpAccountRegister = ncCopy.Config.LegacyContract.RegisterCpContract
+				config.CONTRACT.ZkCollateral = ncCopy.Config.LegacyContract.ZkCollateralContract
+				config.CONTRACT.Sequencer = ncCopy.Config.LegacyContract.SequencerContract
+				config.CONTRACT.TaskRegister = ncCopy.Config.LegacyContract.RegisterTaskContract
+				config.CONTRACT.EdgeTaskPayment = ncCopy.Config.LegacyContract.EdgeTaskPayment
+				config.CONTRACT.EdgeTaskPaymentCreated = ncCopy.Config.LegacyContract.EdgeTaskPaymentCreated
+			} else {
+				config.CONTRACT.UpgradeName = ncCopy.UpgradeName
+				config.CONTRACT.SwanToken = ncCopy.Config.UpgradeContract.SwanTokenContract
+				config.CONTRACT.JobCollateral = ncCopy.Config.UpgradeContract.OrchestratorCollateralContract
+				config.CONTRACT.JobManager = ncCopy.Config.UpgradeContract.JobManagerContract
+				config.CONTRACT.JobManagerCreated = ncCopy.Config.UpgradeContract.JobManagerContractCreated
+				config.CONTRACT.CpAccountRegister = ncCopy.Config.UpgradeContract.RegisterCpContract
+				config.CONTRACT.ZkCollateral = ncCopy.Config.UpgradeContract.ZkCollateralContract
+				config.CONTRACT.Sequencer = ncCopy.Config.UpgradeContract.SequencerContract
+				config.CONTRACT.TaskRegister = ncCopy.Config.UpgradeContract.RegisterTaskContract
+				config.CONTRACT.EdgeTaskPayment = ncCopy.Config.UpgradeContract.EdgeTaskPayment
+				config.CONTRACT.EdgeTaskPaymentCreated = ncCopy.Config.UpgradeContract.EdgeTaskPaymentCreated
+			}
 			config.UBI.SequencerUrl = ncCopy.Config.SequencerUrl
 			config.UBI.EdgeUrl = ncCopy.Config.EdgeUrl
+			config.CONTRACT.ZkCollateralUbiZero = ncCopy.Config.ZkCollateralUbiZeroContract
+			config.CONTRACT.JobCollateralUbiZero = ncCopy.Config.OrchestratorCollateralUbiZeroContract
 		}
 	}
-	return nil
+}
+
+func getChainHeight(rpc string) (uint64, error) {
+	client, err := contract.GetEthClient(rpc)
+	if err != nil {
+		return 0, fmt.Errorf("failed to dial rpc, error: %v", err)
+	}
+	defer client.Close()
+	return client.BlockNumber(context.Background())
 }
 
 func isValidDomain(domain string) bool {
@@ -179,6 +236,7 @@ func isValidDomain(domain string) bool {
 }
 
 func GetConfig() *ComputeNode {
+	getConfigByHeight()
 	return config
 }
 
@@ -346,6 +404,7 @@ func generateDefaultConfig() ComputeNode {
 			UbiEnginePk:     "",
 			EnableSequencer: true,
 			AutoChainProof:  true,
+			VerifySign:      true,
 		},
 		LOG: LOG{
 			CrtFile: "",
@@ -372,11 +431,13 @@ func generateDefaultConfig() ComputeNode {
 		CONTRACT: CONTRACT{
 			SwanToken:              "",
 			JobCollateral:          "",
+			JobCollateralUbiZero:   "",
 			JobManager:             "",
 			JobManagerCreated:      0,
 			CpAccountRegister:      "",
 			TaskRegister:           "",
 			ZkCollateral:           "",
+			ZkCollateralUbiZero:    "",
 			Sequencer:              "",
 			EdgeTaskPayment:        "",
 			EdgeTaskPaymentCreated: 0,

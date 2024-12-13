@@ -67,6 +67,7 @@ const (
 	CheckPriceError            = 4024
 	BelowPriceError            = 4025
 	ReadPriceError             = 4026
+	ReadLogError               = 4027
 
 	ProofParamError   = 7001
 	ProofReadLogError = 7002
@@ -109,6 +110,7 @@ var codeMsg = map[int]string{
 	NotAcceptNodePortError:     "not accept node port type job",
 	RpcConnectError:            "An error occurred while connect rpc",
 	ReadPriceError:             "An error occurred while read price info",
+	ReadLogError:               "failed to read logs",
 
 	ProofReadLogError: "An error occurred while read the log of proof",
 	ProofError:        "An error occurred while executing the calculation task",

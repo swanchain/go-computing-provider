@@ -94,8 +94,15 @@ var listCmd = &cli.Command{
 					sequencerStr = ""
 				}
 
+				var taskId string
+				if task.Type == models.Mining {
+					taskId = task.Uuid
+				} else {
+					taskId = strconv.Itoa(int(task.Id))
+				}
+
 				taskData = append(taskData,
-					[]string{strconv.Itoa(int(task.Id)), contract, models.GetResourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type),
+					[]string{taskId, contract, models.GetResourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type),
 						task.CheckCode, task.Sign, models.TaskStatusStr(task.Status), sequencerStr, createTime})
 
 				rowColorList = append(rowColorList, RowColor{
@@ -124,8 +131,15 @@ var listCmd = &cli.Command{
 					sequencerStr = ""
 				}
 
+				var taskId string
+				if task.Type == models.Mining {
+					taskId = task.Uuid
+				} else {
+					taskId = strconv.Itoa(int(task.Id))
+				}
+
 				taskData = append(taskData,
-					[]string{strconv.Itoa(int(task.Id)), contract, models.GetResourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type),
+					[]string{taskId, contract, models.GetResourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type),
 						models.TaskStatusStr(task.Status), sequencerStr, createTime})
 
 				rowColorList = append(rowColorList, RowColor{
@@ -156,12 +170,23 @@ var daemonCmd = &cli.Command{
 		if err != nil {
 			return fmt.Errorf("check %s container failed, error: %v", resourceExporterContainerName, err)
 		}
-
 		if !rsExist {
 			if err = computing.RestartResourceExporter(); err != nil {
 				logs.GetLogger().Errorf("restartResourceExporter failed, error: %v", err)
 			}
 		}
+
+		traefikServiceContainerName := "traefik-service"
+		tsExist, err := computing.NewDockerService().CheckRunningContainer(traefikServiceContainerName)
+		if err != nil {
+			return fmt.Errorf("check %s container failed, error: %v", traefikServiceContainerName, err)
+		}
+		if !tsExist {
+			if err = computing.RestartTraefikService(); err != nil {
+				logs.GetLogger().Errorf("restartTraefikService failed, error: %v", err)
+			}
+		}
+
 		if err := conf.InitConfig(cpRepoPath, true); err != nil {
 			logs.GetLogger().Fatal(err)
 		}
@@ -192,6 +217,7 @@ var daemonCmd = &cli.Command{
 		router.GET("/cp/price", computing.GetPrice)
 		router.POST("/cp/deploy", ecpImageService.DeployJob)
 		router.GET("/cp/job/status", ecpImageService.GetJobStatus)
+		router.GET("/cp/job/log", ecpImageService.DockerLogsHandler)
 		router.DELETE("/cp/job/:job_uuid", ecpImageService.DeleteJob)
 
 		shutdownChan := make(chan struct{})

@@ -208,3 +208,47 @@ func JobOnChainStatus(status int) string {
 
 	return str
 }
+
+type FcpDeployImageReq struct {
+	Uuid          string         `json:"uuid"`
+	Name          string         `json:"name"`
+	InstanceName  string         `json:"instance_name"`
+	Duration      int            `json:"duration"`
+	Sign          string         `json:"sign"`
+	WalletAddress string         `json:"wallet_address"`
+	IpWhitelist   []string       `json:"ip_whitelist"`
+	DeployConfig  DeployConfig   `json:"deploy_config"`
+	Resource      DeployResource `json:"resource"`
+	JobType       int            `json:"job_type"`
+	ResourceUrl   string         `json:"resource_url"`
+	IpWhiteList   []string       `json:"ip_white_list"`
+	BidPrice      string         `json:"bid_price"` // Amount users are willing to pay
+}
+
+type DeployConfig struct {
+	Image       string            `json:"image"`
+	HealthPath  string            `json:"health_path"`
+	Envs        map[string]string `json:"envs"`
+	Cmd         []string          `json:"cmd"`
+	RunCommands []string          `json:"run_commands"`
+	Ports       map[string][]int  `json:"ports"`
+	WorkDir     string            `json:"work_dir"`
+}
+
+type DeployResource struct {
+	Cpu      int    `json:"cpu"`
+	Gpu      int    `json:"gpu"`
+	GpuModel string `json:"gpu_model"`
+	Memory   int    `json:"memory"`
+	Storage  int    `json:"storage"`
+}
+
+type FcpDeployImageResp struct {
+	UUID               string    `json:"uuid,omitempty"`
+	ServiceUrl         string    `json:"service_url,omitempty"`
+	HealthPath         string    `json:"health_path,omitempty"`
+	Price              float64   `json:"price"`
+	ServicePortMapping []PortMap `json:"service_port_mapping,omitempty"`
+	ContainerLog       string    `json:"container_log"`
+	BuildLog           string    `json:"build_log"`
+}

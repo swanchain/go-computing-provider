@@ -6,6 +6,9 @@ NodeName = "<YOUR_CP_Node_Name>"                                         # The c
 WalletWhiteList = ""                                                     # CP accept user addresses from this whitelist for space deployment
 WalletBlackList = ""                                                     # CP reject user addresses from this blacklist for space deployment
 Pricing = "true"                                                         # Default True, indicating acceptance of smart pricing orders, which may include orders priced lower than self-determined pricing.
+AutoDeleteImage = false                                                  # Default false, automatically delete unused images
+PortRange = ["40000-40050","40070"]                                      # Externally exposed port number for deploying multi-port image tasks
+
 
 [UBI]
 UbiEnginePk = "0xB5aeb540B4895cd024c1625E146684940A849ED9"                # UBI Engine's public key, CP only accept the task from this UBI engine
@@ -13,6 +16,7 @@ EnableSequencer = true                                                    # Enab
 AutoChainProof = true                                                     # Sequencer insufficient balance or service unavailable, use chain to submit proof
 SequencerUrl = "https://sequencer.swanchain.io"                           # Sequencer service's API address
 EdgeUrl = "https://edge-api.swanchain.io/v1"                              # Edge service's API address
+VerifySign = true                                                         # Verify that the task signature is from Engine
 
 [LOG]
 CrtFile = "/YOUR_DOMAIN_NAME_CRT_PATH/server.crt"                         # Your domain name SSL .crt file path

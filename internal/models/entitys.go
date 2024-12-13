@@ -10,6 +10,7 @@ const (
 	FIL_C2_CPU32G = 2
 	FIL_C2_GPU512 = 3
 	FIL_C2_GPU32G = 4
+	Mining        = 5
 )
 
 func UbiTaskTypeStr(typeInt int) string {
@@ -23,6 +24,8 @@ func UbiTaskTypeStr(typeInt int) string {
 		typeStr = "fil-c2-512M"
 	case FIL_C2_GPU32G:
 		typeStr = "fil-c2-32G"
+	case Mining:
+		typeStr = "mining"
 	}
 	return typeStr
 }
@@ -95,6 +98,7 @@ func GetResourceTypeStr(resourceType int) string {
 
 type TaskEntity struct {
 	Id                 int64  `json:"id" gorm:"primaryKey;id"`
+	Uuid               string `json:"uuid"`
 	Type               int    `json:"type" gorm:"type"`
 	Name               string `json:"name" gorm:"name"`
 	Contract           string `json:"contract" gorm:"contract"`
@@ -339,14 +343,35 @@ type EcpJobEntity struct {
 	Name            string  `json:"name" gorm:"name"`
 	Image           string  `json:"image" gorm:"image"`
 	Env             string  `json:"env" gorm:"env"`
+	Cmd             string  `json:"cmd" gorm:"type:json"`
 	Status          string  `json:"status"` // created|restarting|running|removing|paused|exited|dead
 	Message         string  `json:"message"`
 	Reward          float64 `json:"reward"`
+	Cpu             int64   `json:"cpu"`
+	JobType         int     `json:"job_type"`
+	Memory          int64   `json:"memory"`
+	Storage         int64   `json:"storage"`
+	GpuName         string  `json:"gpu_name"`
+	GpuIndex        string  `json:"gpu_index"  gorm:"type:json"`
 	ContainerName   string  `json:"container_name" gorm:"container_name"`
+	HealthUrlPath   string  `json:"health_url_path"`
+	ServiceUrl      string  `json:"service_url" gorm:"service_url"`
+	PortMap         string  `json:"port_map" gorm:"port_map"`
 	LastBlockNumber int64   `json:"last_block_number" gorm:"last_block_number"`
 	CreateTime      int64   `json:"create_time" gorm:"create_time"`
 	DeleteAt        int     `json:"delete_at" gorm:"delete_at; default:0"` // 1 deleted
 }
+
+const (
+	MiningJobType    = 1
+	InferenceJobType = 2
+)
+
+const (
+	CreatedStatus    = "created"
+	RunningStatus    = "running"
+	TerminatedStatus = "terminated"
+)
 
 func (*EcpJobEntity) TableName() string {
 	return "t_ecp_job"
