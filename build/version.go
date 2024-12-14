@@ -26,7 +26,7 @@ func UserVersion() string {
 var UpgradeVersionForMainnet = []UpgradeInfo{
 	{
 		NetworkName: "Mainnet_v1.0.0",
-		Height:      3144229,
+		Height:      3144197, // 2024-12-16 23:00:00 (UTC+8)
 	},
 }
 
