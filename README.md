@@ -371,7 +371,7 @@ make install
 	
        [HUB]
        BalanceThreshold= 10                                                    # The cp’s collateral balance threshold
-       OrchestratorPk = "0x4B98086A20f3C19530AF32D21F85Bc6399358e20"           # Orchestrator's public key, CP only accept the task from this Orchestrator
+       OrchestratorPk = "0xE2F887D4Ed3E4E5179C2f30c6Fdb2344cCbB21b6"           # Orchestrator's public key, CP only accept the task from this Orchestrator
        VerifySign = true                                                       # Verify that the task signature is from Orchestrator
 	
        [MCS]
@@ -385,7 +385,7 @@ make install
        Password = ""                                 # The login password, if only a single node, you can ignore
 	
        [RPC]
-       SWAN_CHAIN_RPC = "https://mainnet-rpc01.swanchain.io"     # Swan chain RPC
+       SWAN_CHAIN_RPC = "https://mainnet-rpc.swanchain.org"     # Swan chain RPC
     ```
 
 **Note:**  
