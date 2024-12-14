@@ -2,7 +2,7 @@
 
 **ECP (Edge Computing Provider)** specializes in processing data at the source of data generation, using minimal latency setups ideal for real-time applications. This provider handles specific, localized tasks directly on devices at the network’s edge, such as IoT devices. 
 
-At the current stage, ECP supports the generation of **ZK-Snark proof of Filecoin network**, and more ZK proof types will be gradually endorsed, such as Aleo, Scroll, starkNet, etc
+At the current stage, ECP supports the generation of **FIL-C2** and **Aleo Proof**. More ZK proof types will be gradually endorsed, such as Scroll, starkNet, etc
 
 ## Prerequisites
  - Need to map the ECP service port of the intranet to the public network, the default port is`9085`:
