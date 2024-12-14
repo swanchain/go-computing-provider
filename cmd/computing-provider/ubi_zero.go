@@ -120,10 +120,10 @@ var collateralInfoCmd = &cli.Command{
 		taskData = append(taskData, []string{"   Owner Balance(ETH):", ownerBalance})
 		taskData = append(taskData, []string{"   Worker Balance(ETH):", workerBalance})
 		taskData = append(taskData, []string{""})
-		taskData = append(taskData, []string{"ECP Balance(SWAN):"})
+		taskData = append(taskData, []string{"ECP Balance(SWANU):"})
 		taskData = append(taskData, []string{"   Collateral:", ecpCollateralBalance})
 		taskData = append(taskData, []string{"   Escrow:", ecpEscrowBalance})
-		taskData = append(taskData, []string{"FCP Balance(SWAN):"})
+		taskData = append(taskData, []string{"FCP Balance(SWANU):"})
 		taskData = append(taskData, []string{"   Collateral:", fcpCollateralBalance})
 		taskData = append(taskData, []string{"   Escrow:", fcpEscrowBalance})
 
