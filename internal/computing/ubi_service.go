@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/go-connections/nat"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/filswan/go-swan-lib/logs"
@@ -151,7 +152,8 @@ func DoUbiTaskForK8s(c *gin.Context) {
 
 	c2GpuConfig := envVars["RUST_GPU_TOOLS_CUSTOM_GPU"]
 	c2GpuName := convertGpuName(strings.TrimSpace(c2GpuConfig))
-	nodeName, architecture, needCpu, needMemory, needStorage, err := checkResourceAvailableForUbi(ubiTask.ResourceType, c2GpuName, ubiTask.Resource)
+	c2GpuName = strings.ToUpper(c2GpuName)
+	nodeName, architecture, needCpu, needMemory, needStorage, gpuIndex, err := checkResourceAvailableForUbi(ubiTask.ResourceType, c2GpuName, ubiTask.Resource)
 	if err != nil {
 		taskEntity.Status = models.TASK_FAILED_STATUS
 		NewTaskService().SaveTaskEntity(taskEntity)
@@ -292,6 +294,10 @@ func DoUbiTaskForK8s(c *gin.Context) {
 		if gpuFlag == "0" {
 			delete(envVars, "RUST_GPU_TOOLS_CUSTOM_GPU")
 			envVars["BELLMAN_NO_GPU"] = "1"
+		} else {
+			if len(gpuIndex) > 0 {
+				envVars["CUDA_VISIBLE_DEVICES"] = gpuIndex[0]
+			}
 		}
 
 		delete(envVars, "FIL_PROOFS_PARAMETER_CACHE")
@@ -419,6 +425,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 		}
 		logs.GetLogger().Infof("successfully get pod name, taskId: %d, podName: %s", ubiTask.ID, podName)
 
+		NewTaskService().UpdateTaskStatusById(ubiTask.ID, models.TASK_RUNNING_STATUS)
 		req := k8sService.k8sClient.CoreV1().Pods(namespace).GetLogs(podName, &v1.PodLogOptions{
 			Container: "",
 			Follow:    true,
@@ -598,7 +605,7 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		gpuName = convertGpuName(strings.TrimSpace(gpuConfig))
 	}
 
-	_, architecture, _, needMemory, err := checkResourceForUbi(ubiTask.Resource, gpuName, ubiTask.ResourceType)
+	_, architecture, _, needMemory, indexs, err := checkResourceForUbi(ubiTask.Resource, gpuName, ubiTask.ResourceType)
 	if err != nil {
 		taskEntity.Status = models.TASK_FAILED_STATUS
 		NewTaskService().SaveTaskEntity(taskEntity)
@@ -656,14 +663,22 @@ func DoUbiTaskForDocker(c *gin.Context) {
 			if ok {
 				env = append(env, "RUST_GPU_TOOLS_CUSTOM_GPU="+gpuEnv)
 			}
+
+			var useIndexs []string
+			if len(indexs) > 0 {
+				useIndexs = append(useIndexs, indexs[0])
+				env = append(env, fmt.Sprintf("CUDA_VISIBLE_DEVICES=%s", strings.Join(useIndexs, ",")))
+			} else {
+				logs.GetLogger().Warnf("not resources available, task_id: %d", ubiTask.ID)
+				return
+			}
 			needResource = container.Resources{
 				Memory: needMemory * 1024 * 1024 * 1024,
 				DeviceRequests: []container.DeviceRequest{
 					{
 						Driver:       "nvidia",
-						Count:        -1,
-						Capabilities: [][]string{{"gpu"}},
-						Options:      nil,
+						DeviceIDs:    useIndexs,
+						Capabilities: [][]string{{"gpu", "compute", "utility"}},
 					},
 				},
 			}
@@ -697,7 +712,7 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		logs.GetLogger().Warnf("task_id: %d, starting container, container name: %s", ubiTask.ID, containerName)
 
 		dockerService := NewDockerService()
-		if err = dockerService.ContainerCreateAndStart(containerConfig, hostConfig, containerName); err != nil {
+		if err = dockerService.ContainerCreateAndStart(containerConfig, hostConfig, nil, containerName); err != nil {
 			logs.GetLogger().Errorf("failed to create ubi task container, task_id: %d, error: %v", ubiTask.ID, err)
 			return
 		}
@@ -708,8 +723,9 @@ func DoUbiTaskForDocker(c *gin.Context) {
 			return
 		}
 		logs.GetLogger().Warnf("task_id: %d, started container, container name: %s", ubiTask.ID, containerName)
+		NewTaskService().UpdateTaskStatusById(ubiTask.ID, models.TASK_RUNNING_STATUS)
 
-		containerLogStream, err := dockerService.GetContainerLogStream(containerName)
+		containerLogStream, err := dockerService.GetContainerLogStream(context.TODO(), containerName)
 		if err != nil {
 			logs.GetLogger().Errorf("get docker container log stream failed, error: %v", err)
 			return
@@ -733,16 +749,16 @@ func DoUbiTaskForDocker(c *gin.Context) {
 	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
 }
 
-func checkResourceForUbi(resource *models.TaskResource, gpuName string, resourceType int) (bool, string, int64, int64, error) {
+func checkResourceForUbi(resource *models.TaskResource, gpuName string, resourceType int) (bool, string, int64, int64, []string, error) {
 	dockerService := NewDockerService()
 	containerLogStr, err := dockerService.ContainerLogs("resource-exporter")
 	if err != nil {
-		return false, "", 0, 0, err
+		return false, "", 0, 0, nil, err
 	}
 
 	var nodeResource models.NodeResource
 	if err := json.Unmarshal([]byte(containerLogStr), &nodeResource); err != nil {
-		return false, "", 0, 0, err
+		return false, "", 0, 0, nil, err
 	}
 
 	needCpu, _ := strconv.ParseInt(resource.CPU, 10, 64)
@@ -765,11 +781,30 @@ func checkResourceForUbi(resource *models.TaskResource, gpuName string, resource
 		remainderStorage, err = strconv.ParseFloat(strings.Split(strings.TrimSpace(nodeResource.Storage.Free), " ")[0], 64)
 	}
 
-	var gpuMap = make(map[string]int)
+	type gpuData struct {
+		num    int
+		indexs []string
+	}
+
+	var indexs []string
+	var gpuMap = make(map[string]gpuData)
 	if nodeResource.Gpu.AttachedGpus > 0 {
 		for _, detail := range nodeResource.Gpu.Details {
 			if detail.Status == models.Available {
-				gpuMap[detail.ProductName] += 1
+				data, ok := gpuMap[detail.ProductName]
+				if ok {
+					data.num += 1
+					data.indexs = append(data.indexs, detail.Index)
+					gpuMap[detail.ProductName] = data
+				} else {
+					indexs = make([]string, 0)
+					indexs = append(indexs, detail.Index)
+					var dataNew = gpuData{
+						num:    1,
+						indexs: indexs,
+					}
+					gpuMap[detail.ProductName] = dataNew
+				}
 			}
 		}
 	}
@@ -780,22 +815,23 @@ func checkResourceForUbi(resource *models.TaskResource, gpuName string, resource
 		if resourceType == 1 {
 			if gpuName != "" {
 				var flag bool
-				for k, num := range gpuMap {
-					if strings.ToUpper(k) == gpuName && num > 0 {
+				for k, gm := range gpuMap {
+					if strings.ToUpper(k) == gpuName && gm.num > 0 {
+						indexs = gm.indexs
 						flag = true
 						break
 					}
 				}
 				if flag {
-					return true, nodeResource.CpuName, needCpu, int64(needMemory), nil
+					return true, nodeResource.CpuName, needCpu, int64(needMemory), indexs, nil
 				} else {
-					return false, nodeResource.CpuName, needCpu, int64(needMemory), nil
+					return false, nodeResource.CpuName, needCpu, int64(needMemory), indexs, nil
 				}
 			}
 		}
-		return true, nodeResource.CpuName, needCpu, int64(needMemory), nil
+		return true, nodeResource.CpuName, needCpu, int64(needMemory), indexs, nil
 	}
-	return false, nodeResource.CpuName, needCpu, int64(needMemory), nil
+	return false, nodeResource.CpuName, needCpu, int64(needMemory), indexs, nil
 }
 
 func GetCpResource(c *gin.Context) {
@@ -822,6 +858,29 @@ func GetCpResource(c *gin.Context) {
 		return
 	}
 
+	list, err := NewEcpJobService().GetEcpJobList([]string{models.CreatedStatus, models.RunningStatus})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.JsonError))
+		return
+	}
+
+	var taskGpuMap = make(map[string][]string)
+	for _, g := range list {
+		if len(strings.TrimSpace(g.GpuIndex)) > 0 {
+			taskGpuMap[g.GpuName] = append(taskGpuMap[g.GpuName], strings.Split(strings.TrimSpace(g.GpuIndex), ",")...)
+		}
+	}
+
+	if nodeResource.Gpu.AttachedGpus > 0 {
+		for i, detail := range nodeResource.Gpu.Details {
+			if detail.Status == models.Available {
+				if checkGpu(detail.ProductName, detail.Index, taskGpuMap) {
+					nodeResource.Gpu.Details[i].Status = models.Occupied
+				}
+			}
+		}
+	}
+
 	cpAccountAddress, err := contract.GetCpAccountAddress()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.GetCpAccountError))
@@ -835,6 +894,7 @@ func GetCpResource(c *gin.Context) {
 		NodeName:         conf.GetConfig().API.NodeName,
 		NodeId:           GetNodeId(cpRepo),
 		CpAccountAddress: cpAccountAddress,
+		ClientType:       "ECP",
 	})
 }
 
@@ -895,20 +955,26 @@ func submitUBIProof(c2Proof models.UbiC2Proof, task *models.TaskEntity) {
 			return
 		}
 
-		sequencerStub, err := ecp.NewSequencerStub(client, ecp.WithSequencerCpAccountAddress(cpAccountAddress))
-		if err != nil {
-			logs.GetLogger().Errorf("failed to get cp sequencer contract, error: %v", err)
-			return
-		}
-		sequencerBalanceStr, err := sequencerStub.GetCPBalance()
-		if err != nil {
-			logs.GetLogger().Errorf("failed to get cp sequencer contract, error: %v", err)
-			return
-		}
+		err = RetryFn(func() error {
+			sequencerStub, err := ecp.NewSequencerStub(client, ecp.WithSequencerCpAccountAddress(cpAccountAddress))
+			if err != nil {
+				logs.GetLogger().Errorf("failed to get cp sequencer contract, error: %v", err)
+				return err
+			}
+			sequencerBalanceStr, err := sequencerStub.GetCPBalance()
+			if err != nil {
+				logs.GetLogger().Errorf("failed to get cp sequencer contract, error: %v", err)
+				return err
+			}
 
-		sequencerBalance, err = strconv.ParseFloat(sequencerBalanceStr, 64)
+			sequencerBalance, err = strconv.ParseFloat(sequencerBalanceStr, 64)
+			if err != nil {
+				logs.GetLogger().Errorf("failed to convert numbers for cp sequencer balance, sequencerBalance: %s, error: %v", sequencerBalanceStr, err)
+				return err
+			}
+			return nil
+		}, 3, 2*time.Second)
 		if err != nil {
-			logs.GetLogger().Errorf("failed to convert numbers for cp sequencer balance, sequencerBalance: %s, error: %v", sequencerBalanceStr, err)
 			return
 		}
 	}
@@ -1069,32 +1135,83 @@ func reportClusterResourceForDocker() {
 		return
 	}
 
+	list, err := NewEcpJobService().GetEcpJobList([]string{models.CreatedStatus, models.RunningStatus})
+	if err != nil {
+		logs.GetLogger().Errorf("failed to get ecp job task, error: %v", err)
+		return
+	}
+
+	var taskGpuMap = make(map[string][]string)
+	for _, g := range list {
+		if len(strings.TrimSpace(g.GpuIndex)) > 0 {
+			taskGpuMap[g.GpuName] = append(taskGpuMap[g.GpuName], strings.Split(strings.TrimSpace(g.GpuIndex), ",")...)
+		}
+	}
+
 	var freeGpuMap = make(map[string]int)
+	var useGpuMap = make(map[string]int)
 	if nodeResource.Gpu.AttachedGpus > 0 {
 		for _, g := range nodeResource.Gpu.Details {
 			if g.Status == models.Available {
-				freeGpuMap[g.ProductName] += 1
+				if checkGpu(g.ProductName, g.Index, taskGpuMap) {
+					freeGpuMap[g.ProductName] = 0
+				} else {
+					freeGpuMap[g.ProductName] += 1
+				}
 			} else {
-				freeGpuMap[g.ProductName] = 0
+				useGpuMap[g.ProductName] += 1
 			}
 		}
 	}
-	logs.GetLogger().Infof("collect hardware resource, freeCpu:%s, freeMemory: %s, freeStorage: %s, freeGpu: %v",
-		nodeResource.Cpu.Free, nodeResource.Memory.Free, nodeResource.Storage.Free, freeGpuMap)
+	logs.GetLogger().Infof("collect hardware resource, freeCpu:%s, freeMemory: %s, freeStorage: %s, freeGpu: %v, useGpu: %v",
+		nodeResource.Cpu.Free, nodeResource.Memory.Free, nodeResource.Storage.Free, freeGpuMap, useGpuMap)
+}
+
+func updateEcpTaskStatus() {
+	list, err := NewEcpJobService().GetEcpJobList([]string{models.CreatedStatus, models.RunningStatus})
+	if err != nil {
+		logs.GetLogger().Errorf("failed to get ecp job task, error: %v", err)
+		return
+	}
+
+	containerStatus, err := NewDockerService().GetContainerStatus()
+	if err != nil {
+		return
+	}
+
+	for _, entity := range list {
+		if time.Now().Unix()-entity.CreateTime < 3600 {
+			continue
+		}
+		if status, ok := containerStatus[entity.ContainerName]; ok {
+			NewEcpJobService().UpdateEcpJobEntity(entity.Uuid, status)
+		} else {
+			NewEcpJobService().UpdateEcpJobEntity(entity.Uuid, models.TerminatedStatus)
+		}
+	}
 }
 
 func CronTaskForEcp() {
-	go func() {
-		ticker := time.NewTicker(2 * time.Hour)
-		for range ticker.C {
-			NewDockerService().CleanResourceForDocker()
-		}
-	}()
+	if conf.GetConfig().API.AutoDeleteImage {
+		go func() {
+			ticker := time.NewTicker(2 * time.Hour)
+			for range ticker.C {
+				NewDockerService().CleanResourceForDocker()
+			}
+		}()
+	}
 
 	go func() {
 		ticker := time.NewTicker(3 * time.Minute)
 		for range ticker.C {
 			reportClusterResourceForDocker()
+		}
+	}()
+
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		for range ticker.C {
+			updateEcpTaskStatus()
 		}
 	}()
 
@@ -1135,6 +1252,20 @@ func CronTaskForEcp() {
 			}
 		}
 	}()
+
+	go func() {
+		defer func() {
+			if err := recover(); err != nil {
+				logs.GetLogger().Errorf("Scanner task payment events, error: %+v", err)
+			}
+		}()
+
+		ticker := time.NewTicker(30 * time.Minute)
+		for range ticker.C {
+			NewTaskPaymentService().ScannerChainGetTaskPayment()
+		}
+	}()
+
 }
 
 func syncTaskStatusForSequencerService() error {
@@ -1269,7 +1400,7 @@ func RestartResourceExporter() error {
 			MaximumRetryCount: 3,
 		},
 		Privileged: true,
-	}, resourceExporterContainerName)
+	}, nil, resourceExporterContainerName)
 	if err != nil {
 		return fmt.Errorf("create resource-exporter container failed, error: %v", err)
 	}
@@ -1467,4 +1598,71 @@ func checkBalance(cpAccountAddress string) (bool, error) {
 	}
 
 	return false, fmt.Errorf("unknown error")
+}
+
+func RetryFn(fn func() error, maxRetries int, delay time.Duration) error {
+	var err error
+	for i := 0; i < maxRetries; i++ {
+		err = fn()
+		if err == nil {
+			return nil
+		}
+		fmt.Printf("Attempt %d failed: %v\n", i+1, err)
+		time.Sleep(delay)
+	}
+	return fmt.Errorf("after %d attempts, last error: %w", maxRetries, err)
+}
+
+func RestartTraefikService() error {
+	dockerService := NewDockerService()
+	if err := dockerService.CreateNetwork("traefik-net"); err != nil {
+		return err
+	}
+
+	traefikServiceContainerName := "traefik-service"
+
+	dockerService.RemoveContainerByName(traefikServiceContainerName)
+	err := dockerService.PullImage(build.TraefikServerDockerImage)
+	if err != nil {
+		return fmt.Errorf("pull %s image failed, error: %v", build.UBIResourceExporterDockerImage, err)
+	}
+
+	err = dockerService.ContainerCreateAndStart(&container.Config{
+		Image: build.TraefikServerDockerImage,
+		Cmd: []string{
+			"--api.insecure=true",
+			"--log.level=INFO",
+			"--providers.docker.exposedbydefault=false",
+			"--providers.docker=true",
+			"--entrypoints.web.address=:80",
+		},
+		AttachStdout: true,
+		AttachStderr: true,
+		Tty:          true,
+	}, &container.HostConfig{
+		PortBindings: map[nat.Port][]nat.PortBinding{
+			"80/tcp": {{
+				HostIP:   "0.0.0.0",
+				HostPort: strconv.Itoa(traefikListenPortMapHost),
+			}},
+			"8080/tcp": {{
+				HostIP:   "0.0.0.0",
+				HostPort: "9080",
+			}},
+		},
+		Binds: []string{"/var/run/docker.sock:/var/run/docker.sock"},
+		RestartPolicy: container.RestartPolicy{
+			Name:              container.RestartPolicyOnFailure,
+			MaximumRetryCount: 3,
+		},
+		Privileged: true,
+	}, &network.NetworkingConfig{
+		EndpointsConfig: map[string]*network.EndpointSettings{
+			"traefik-net": {},
+		},
+	}, traefikServiceContainerName)
+	if err != nil {
+		return fmt.Errorf("create traefik-service container failed, error: %v", err)
+	}
+	return nil
 }

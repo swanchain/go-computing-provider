@@ -353,21 +353,25 @@ make install
        NodeName = ""                                  # The computing-provider node name
        WalletWhiteList = ""                           # CP only accepts user addresses from this whitelist for space deployment
        WalletBlackList = ""                           # CP reject user addresses from this blacklist for space deployment
-       Pricing = true                                 # default True, indicating acceptance of smart pricing orders, which may include orders priced lower than self-determined pricing.
-   
+       Pricing = "true"                               # default True, indicating acceptance of smart pricing orders, which may include orders priced lower than self-determined pricing.
+       AutoDeleteImage = false                        # Default false, automatically delete unused images
+       PortRange= ["40000-40050","40070"]             # Externally exposed port number for deploying ECP image tasks
+      
        [UBI]
        UbiEnginePk = "0xB5aeb540B4895cd024c1625E146684940A849ED9"              # UBI Engine's public key, CP only accept the task from this UBI engine
        EnableSequencer = true                                                  # Submit the proof to Sequencer service(default: true)
        AutoChainProof = true                                                   # When Sequencer doesn't have enough funds or the service is unavailable, automatically submit proof to the Swan chain 
-       SequencerUrl = "https://sequencer.swanchain.io"                          # Sequencer service's API address
-   
+       SequencerUrl = "https://sequencer.swanchain.io"                         # Sequencer service's API address
+       EdgeUrl = "https://edge-api.swanchain.io/v1"                            # Edge service's API address
+       VerifySign = true                                                       # Verify that the task signature is from Engine
+                                       
        [LOG]
        CrtFile = "/YOUR_DOMAIN_NAME_CRT_PATH/server.crt"                       # Your domain name SSL .crt file path
        KeyFile = "/YOUR_DOMAIN_NAME_KEY_PATH/server.key"                       # Your domain name SSL .key file path
 	
        [HUB]
        BalanceThreshold= 10                                                    # The cp’s collateral balance threshold
-       OrchestratorPk = "0x4B98086A20f3C19530AF32D21F85Bc6399358e20"           # Orchestrator's public key, CP only accept the task from this Orchestrator
+       OrchestratorPk = "0xE2F887D4Ed3E4E5179C2f30c6Fdb2344cCbB21b6"           # Orchestrator's public key, CP only accept the task from this Orchestrator
        VerifySign = true                                                       # Verify that the task signature is from Orchestrator
 	
        [MCS]
@@ -381,7 +385,7 @@ make install
        Password = ""                                 # The login password, if only a single node, you can ignore
 	
        [RPC]
-       SWAN_CHAIN_RPC = "https://mainnet-rpc01.swanchain.io"     # Swan chain RPC
+       SWAN_CHAIN_RPC = "https://mainnet-rpc.swanchain.org"     # Swan chain RPC
     ```
 
 **Note:**  
@@ -411,7 +415,7 @@ make install
 	```bash
 	computing-provider wallet send --from <YOUR_WALLET_ADDRESS> 0x7791f48931DB81668854921fA70bFf0eB85B8211 0.01
 	```
-	**Note:** If you don't have `SwanETH` and `SWANU`, please follow [the guideline](https://docs.swanchain.io/swan-mainnet/getting-started-guide) to [bridge ETH to Swan Mainnet](https://bridge.swanchain.io).
+	**Note:** If you don't have `SwanETH` and `SWAN`, please follow [the guideline](https://docs.swanchain.io/swan-mainnet/getting-started-guide) to [bridge ETH to Swan Mainnet](https://bridge.swanchain.io).
 
 ## Initialization CP Account
 Deploy a CP account contract:
@@ -421,7 +425,7 @@ computing-provider account create --ownerAddress <YOUR_OWNER_WALLET_ADDRESS> \
 	--beneficiaryAddress <YOUR_BENEFICIARY_WALLET_ADDRESS>  \
 	--task-types 3
 ```
-**Note:** `--task-types`: Supports 4 task types (`1`: Fil-C2-512M, `2`: Mining, `3`: AI, `4`: Fil-C2-32G, `5`: NodePort), separated by commas. For FCP, it needs to be set to 3.
+**Note:** `--task-types`: Supports 5 task types (`1`: Fil-C2, `2`: Mining, `3`: AI, `4`: Inference, `5`: NodePort), separated by commas. For FCP, it needs to be set to 3.
 
 **Output:**
 ```
@@ -429,14 +433,14 @@ Contract deployed! Address: 0x3091c9647Ea5248079273B52C3707c958a3f2658
 Transaction hash: 0xb8fd9cc9bfac2b2890230b4f14999b9d449e050339b252273379ab11fac15926
 ```
 
-## Collateral `SWANU` for FCP
+## Collateral `SWAN` for FCP
 ```bash
  computing-provider collateral add --fcp --from <YOUR_WALLET_ADDRESS>  <amount>
 ```
 **Note:** Please deposit enough collaterals for the tasks
 
 
-## Withdraw `SWANU` from FCP
+## Withdraw `SWAN` from FCP
 ```bash
  computing-provider collateral withdraw --fcp --owner <YOUR_WALLET_ADDRESS> --account <YOUR_CP_ACCOUNT> <amount>
 ```
@@ -508,13 +512,13 @@ export CP_PATH=<YOUR_CP_PATH>
   **Note:** The nodes for deploying CP need to open ports in the range of `30000-32767`
 - Change the `tasktypes`
 ```bash
-computing-provider account changeTaskTypes --ownerAddress <YOUR_OWNER_WALLET_ADDRESS> 5
+computing-provider account changeTaskTypes --ownerAddress <YOUR_OWNER_WALLET_ADDRESS> 3,5
 ```
-> **Note:** `--task-types` Supports 4 task types:
->  - `1`: FIL-C2-512M
+> **Note:** `--task-types` Supports 5 task types:
+>  - `1`: FIL-C2
 >  - `2`: Mining
 >  - `3`: AI
->  - `4`: FIL-C2-32G
+>  - `4`: Inference
 >  - `5`: NodePort
 
 ## [**OPTIONAL**] Config and Receive ZK Tasks
@@ -542,13 +546,13 @@ This section mainly introduces how to enable the function of receiving ZK tasks 
 * Adjust the value of `RUST_GPU_TOOLS_CUSTOM_GPU` based on the GPU used by the CP's Kubernetes cluster for fil-c2 tasks.
 * For more device choices, please refer to this page:[https://github.com/filecoin-project/bellperson](https://github.com/filecoin-project/bellperson)
 
-### Step 2: Collateral `SWANU` for ZK tasks
+### Step 2: Collateral `SWAN` for ZK tasks
 
 ```bash
 computing-provider collateral add --ecp --from <YOUR_WALLET_ADDRESS>  <amount>
 ```
 
-> If you want to withdraw the collateral `SWANU`: 
+> If you want to withdraw the collateral `SWAN`: 
 > ```bash
 > computing-provider collateral withdraw --ecp --owner <YOUR_WALLET_ADDRESS> --account <YOUR_CP_ACCOUNT> <amount>
 > ```
@@ -558,11 +562,11 @@ computing-provider collateral add --ecp --from <YOUR_WALLET_ADDRESS>  <amount>
 ```bash
 computing-provider account changeTaskTypes --ownerAddress <YOUR_OWNER_WALLET_ADDRESS> 1,2,3,4
 ```
-> **Note:** `--task-types` Supports 4 task types:
->  - `1`: FIL-C2-512M
+> **Note:** `--task-types` Supports 5 task types:
+>  - `1`: FIL-C2
 >  - `2`: Mining
 >  - `3`: AI
->  - `4`: FIL-C2-32G
+>  - `4`: Inference
 >  - `5`: NodePort
 
 > If you need to run FCP and ECP at the same time, you need to set it to `1,2,3,4`
@@ -594,14 +598,14 @@ COMMANDS:
    changeOwnerAddress        Update OwnerAddress of CP
    changeWorkerAddress       Update workerAddress of CP
    changeBeneficiaryAddress  Update beneficiaryAddress of CP
-   changeTaskTypes           Update taskTypes of CP (1:Fil-C2-512M, 2:Aleo, 3: AI, 4:Fil-C2-32G), separated by commas
+   changeTaskTypes           Update taskTypes of CP (1:Fil-C2, 2:Mining, 3: AI, 4:Inference, 5:NodePort), separated by commas
    help, h                   Show a list of commands or help for one command
 
 OPTIONS:
    --help, -h  show help
 ```
 
-### Step 6: Check the Status of ZK task;
+### Step 6: Check the Status of ZK task
 
 To check the ZK task list, use the following command:
 
@@ -612,18 +616,23 @@ computing-provider ubi list --show-failed
 Example output:
 
 ```
-TASK ID	TASK CONTRACT                             	TASK TYPE	ZK TYPE    	STATUS   	REWARD	SEQUENCER	CREATE TIME
-40416  	0x3DB2568e8De50e767221117bB491cbe1e2CB4FF5	CPU      	fil-c2-512M	rewarded 	1.00  	YES      	2024-07-29 09:57:14
-40418  	                                          	CPU      	fil-c2-512M	verified 	0.00  	YES      	2024-07-29 10:07:12
-40425  	                                          	CPU      	fil-c2-512M	verified 	0.00  	YES      	2024-07-29 10:17:08
-40427  	                                          	CPU      	fil-c2-512M	verified 	0.00  	YES      	2024-07-29 10:27:08
-40436  	0x71c5C4eBEfD9349236a8244a1734fB1470CAAe1f	CPU      	fil-c2-512M	verified 	0.00  	NO       	2024-07-29 10:37:08
-40444  	                                          	CPU      	fil-c2-512M	verified 	0.00  	YES      	2024-07-29 10:47:08
-40450  	                                          	CPU      	fil-c2-512M	verified 	0.00  	YES      	2024-07-29 10:57:08
-40446  	0x13717662F88dc7fE629fA3B5DD78733FdDcdB970	CPU      	fil-c2-512M	verified 	0.00  	NO       	2024-07-29 11:07:12
-40462  	0x42183ab24a9Ac691bB8948E6cE60f506741811e4	CPU      	fil-c2-512M	verified 	0.00  	NO       	2024-07-29 11:17:08
-40468  	0xE09fDFBBD86650139C29A9818E3FF2612f48a740	CPU      	fil-c2-512M	verified 	0.00  	NO       	2024-07-29 11:27:08
-40467  	0x4C7003F3B794e806480eb5b9E1aeedF9AFc3b978	CPU      	fil-c2-512M	verified 	0.00  	NO       	2024-07-29 11:37:09
+TASK ID TASK CONTRACT                                   TASK TYPE       ZK TYPE STATUS          SEQUENCER       CREATE TIME         
+1114203 0x89580E512915cB33bB5Ac419196835fC19affaEe      GPU             fil-c2  verified        YES             2024-11-12 01:52:47
+1113642 0x89580E512915cB33bB5Ac419196835fC19affaEe      GPU             fil-c2  verified        YES             2024-11-12 02:22:30
+1132325 0x89580E512915cB33bB5Ac419196835fC19affaEe      GPU             fil-c2  verified        YES             2024-11-12 02:52:29
+1114228 0x89580E512915cB33bB5Ac419196835fC19affaEe      GPU             fil-c2  verified        YES             2024-11-12 03:22:10
+1113911 0xF222604e4628d0c15bFAfD1AABf23F7FF5756056      GPU             fil-c2  verified        YES             2024-11-12 04:22:43
+1114105 0xF222604e4628d0c15bFAfD1AABf23F7FF5756056      GPU             fil-c2  verified        YES             2024-11-12 04:52:46
+1113869 0xF222604e4628d0c15bFAfD1AABf23F7FF5756056      GPU             fil-c2  verified        YES             2024-11-12 05:22:29
+1114219 0xF222604e4628d0c15bFAfD1AABf23F7FF5756056      GPU             fil-c2  verified        YES             2024-11-12 05:52:44
+1113349 0xF222604e4628d0c15bFAfD1AABf23F7FF5756056      GPU             fil-c2  verified        YES             2024-11-12 06:22:50
+1114204 0xF222604e4628d0c15bFAfD1AABf23F7FF5756056      GPU             fil-c2  verified        YES             2024-11-12 06:52:40
+1113259 0xF222604e4628d0c15bFAfD1AABf23F7FF5756056      GPU             fil-c2  verified        YES             2024-11-12 07:22:29
+1113568 0xF222604e4628d0c15bFAfD1AABf23F7FF5756056      GPU             fil-c2  verified        YES             2024-11-12 07:52:37
+1132314 0xF222604e4628d0c15bFAfD1AABf23F7FF5756056      GPU             fil-c2  verified        YES             2024-11-12 08:22:39
+1132312 0xF222604e4628d0c15bFAfD1AABf23F7FF5756056      GPU             fil-c2  verified        YES             2024-11-12 08:52:39
+1113823 0xF222604e4628d0c15bFAfD1AABf23F7FF5756056      GPU             fil-c2  verified        YES             2024-11-12 09:22:28
+1132500 0xF222604e4628d0c15bFAfD1AABf23F7FF5756056      GPU             fil-c2  verified        YES             2024-11-12 09:52:37
 ```
 
 ## Restart the Computing Provider
@@ -636,15 +645,15 @@ nohup computing-provider run >> cp.log 2>&1 &
 ## CLI of Computing Provider
 * Check the current list of tasks running on CP, display detailed information for tasks using `-v`
 ```
-computing-provider task list --type fcp
+computing-provider task list --fcp
 ```
 * Retrieve detailed information for a specific task using `job_uuid`
 ```
-computing-provider task get [job_uuid]
+computing-provider task get --fcp [job_uuid]
 ```
 * Delete task by `job_uuid`
 ```
-computing-provider task delete [job_uuid]
+computing-provider task delete --fcp [job_uuid]
 ```
 
 ## Getting Help

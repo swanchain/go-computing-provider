@@ -16,7 +16,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -95,16 +94,16 @@ var listCmd = &cli.Command{
 					sequencerStr = ""
 				}
 
-				if len(strings.TrimSpace(task.Reward)) == 0 {
-					task.Reward = "0.00"
-				}
-				if len(task.Reward) >= 4 {
-					task.Reward = task.Reward[:4]
+				var taskId string
+				if task.Type == models.Mining {
+					taskId = task.Uuid
+				} else {
+					taskId = strconv.Itoa(int(task.Id))
 				}
 
 				taskData = append(taskData,
-					[]string{strconv.Itoa(int(task.Id)), contract, models.GetResourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type),
-						task.CheckCode, task.Sign, models.TaskStatusStr(task.Status), task.Reward, sequencerStr, task.SettlementTaskAddr, createTime})
+					[]string{taskId, contract, models.GetResourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type),
+						task.CheckCode, task.Sign, models.TaskStatusStr(task.Status), sequencerStr, createTime})
 
 				rowColorList = append(rowColorList, RowColor{
 					row:    i,
@@ -112,7 +111,7 @@ var listCmd = &cli.Command{
 					color:  getStatusColor(task.Status),
 				})
 			}
-			header := []string{"TASK ID", "TASK CONTRACT", "TASK TYPE", "ZK TYPE", "CHECK CODE", "SIGNATURE", "STATUS", "REWARD", "SEQUENCER", "SETTLEMENT CONTRACT", "CREATE TIME"}
+			header := []string{"TASK ID", "TASK CONTRACT", "TASK TYPE", "ZK TYPE", "CHECK CODE", "SIGNATURE", "STATUS", "SEQUENCER", "CREATE TIME"}
 			NewVisualTable(header, taskData, rowColorList).Generate(false)
 
 		} else {
@@ -132,16 +131,16 @@ var listCmd = &cli.Command{
 					sequencerStr = ""
 				}
 
-				if len(strings.TrimSpace(task.Reward)) == 0 {
-					task.Reward = "0.00"
-				}
-				if len(task.Reward) >= 4 {
-					task.Reward = task.Reward[:4]
+				var taskId string
+				if task.Type == models.Mining {
+					taskId = task.Uuid
+				} else {
+					taskId = strconv.Itoa(int(task.Id))
 				}
 
 				taskData = append(taskData,
-					[]string{strconv.Itoa(int(task.Id)), contract, models.GetResourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type),
-						models.TaskStatusStr(task.Status), task.Reward, sequencerStr, createTime})
+					[]string{taskId, contract, models.GetResourceTypeStr(task.ResourceType), models.UbiTaskTypeStr(task.Type),
+						models.TaskStatusStr(task.Status), sequencerStr, createTime})
 
 				rowColorList = append(rowColorList, RowColor{
 					row:    i,
@@ -150,7 +149,7 @@ var listCmd = &cli.Command{
 				})
 			}
 
-			header := []string{"TASK ID", "TASK CONTRACT", "TASK TYPE", "ZK TYPE", "STATUS", "REWARD", "SEQUENCER", "CREATE TIME"}
+			header := []string{"TASK ID", "TASK CONTRACT", "TASK TYPE", "ZK TYPE", "STATUS", "SEQUENCER", "CREATE TIME"}
 			NewVisualTable(header, taskData, rowColorList).Generate(false)
 		}
 		return nil
@@ -171,12 +170,23 @@ var daemonCmd = &cli.Command{
 		if err != nil {
 			return fmt.Errorf("check %s container failed, error: %v", resourceExporterContainerName, err)
 		}
-
 		if !rsExist {
 			if err = computing.RestartResourceExporter(); err != nil {
 				logs.GetLogger().Errorf("restartResourceExporter failed, error: %v", err)
 			}
 		}
+
+		traefikServiceContainerName := "traefik-service"
+		tsExist, err := computing.NewDockerService().CheckRunningContainer(traefikServiceContainerName)
+		if err != nil {
+			return fmt.Errorf("check %s container failed, error: %v", traefikServiceContainerName, err)
+		}
+		if !tsExist {
+			if err = computing.RestartTraefikService(); err != nil {
+				logs.GetLogger().Errorf("restartTraefikService failed, error: %v", err)
+			}
+		}
+
 		if err := conf.InitConfig(cpRepoPath, true); err != nil {
 			logs.GetLogger().Fatal(err)
 		}
@@ -207,6 +217,7 @@ var daemonCmd = &cli.Command{
 		router.GET("/cp/price", computing.GetPrice)
 		router.POST("/cp/deploy", ecpImageService.DeployJob)
 		router.GET("/cp/job/status", ecpImageService.GetJobStatus)
+		router.GET("/cp/job/log", ecpImageService.DockerLogsHandler)
 		router.DELETE("/cp/job/:job_uuid", ecpImageService.DeleteJob)
 
 		shutdownChan := make(chan struct{})

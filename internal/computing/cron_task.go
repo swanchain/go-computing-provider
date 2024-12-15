@@ -160,6 +160,10 @@ func (task *CronTask) reportClusterResource() {
 		}()
 
 		k8sService := NewK8sService()
+		if k8sService == nil {
+			logs.GetLogger().Errorf("failed to create k8s client, please check that the k8s service is running normally")
+			return
+		}
 		statisticalSources, err := k8sService.StatisticalSources(context.TODO())
 		if err != nil {
 			logs.GetLogger().Errorf("failed to collect k8s statistical sources, error: %+v", err)
@@ -179,6 +183,10 @@ func (task *CronTask) watchNameSpaceForDeleted() {
 			}
 		}()
 		service := NewK8sService()
+		if service == nil {
+			logs.GetLogger().Errorf("failed to create k8s client, please check that the k8s service is running normally")
+			return
+		}
 		namespaces, err := service.ListNamespace(context.TODO())
 		if err != nil {
 			logs.GetLogger().Errorf("Failed get all namespace, error: %+v", err)
@@ -202,16 +210,18 @@ func (task *CronTask) watchNameSpaceForDeleted() {
 }
 
 func (task *CronTask) cleanImageResource() {
-	c := cron.New(cron.WithSeconds())
-	c.AddFunc("* 0/30 * * * ?", func() {
-		defer func() {
-			if err := recover(); err != nil {
-				logs.GetLogger().Errorf("cleanImageResource catch panic error: %+v", err)
-			}
-		}()
-		NewDockerService().CleanResourceForK8s()
-	})
-	c.Start()
+	if conf.GetConfig().API.AutoDeleteImage {
+		c := cron.New(cron.WithSeconds())
+		c.AddFunc("* 0/30 * * * ?", func() {
+			defer func() {
+				if err := recover(); err != nil {
+					logs.GetLogger().Errorf("cleanImageResource catch panic error: %+v", err)
+				}
+			}()
+			NewDockerService().CleanResourceForK8s()
+		})
+		c.Start()
+	}
 }
 
 func (task *CronTask) watchExpiredTask() {
@@ -223,13 +233,19 @@ func (task *CronTask) watchExpiredTask() {
 			}
 		}()
 
-		jobList, err := NewJobService().GetJobList(models.All_FLAG)
+		jobList, err := NewJobService().GetJobList(models.UN_DELETEED_FLAG, -1)
 		if err != nil {
 			logs.GetLogger().Errorf("failed to get job data, error: %+v", err)
 			return
 		}
 
-		deployments, err := NewK8sService().k8sClient.AppsV1().Deployments(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
+		k8sService := NewK8sService()
+		if k8sService == nil {
+			logs.GetLogger().Errorf("failed to create k8s client, please check that the k8s service is running normally")
+			return
+		}
+
+		deployments, err := k8sService.k8sClient.AppsV1().Deployments(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			fmt.Println("Error listing deployments:", err)
 			return
@@ -263,7 +279,7 @@ func (task *CronTask) watchExpiredTask() {
 				if _, ok = deployOnK8s[spaceUuidDeployName]; ok {
 					if NewJobService().GetJobEntityBySpaceUuid(job.SpaceUuid) > 0 && time.Now().Unix() < job.ExpireTime {
 						if job.Status != models.JOB_RUNNING_STATUS {
-							foundDeployment, err := NewK8sService().k8sClient.AppsV1().Deployments(job.NameSpace).Get(context.TODO(), job.K8sDeployName, metav1.GetOptions{})
+							foundDeployment, err := k8sService.k8sClient.AppsV1().Deployments(job.NameSpace).Get(context.TODO(), job.K8sDeployName, metav1.GetOptions{})
 							if err != nil {
 								continue
 							}
@@ -299,7 +315,7 @@ func (task *CronTask) watchExpiredTask() {
 			createDuration := currentTime.Sub(createdTime)
 
 			if job.NameSpace != "" && job.K8sDeployName != "" {
-				foundDeployment, err := NewK8sService().k8sClient.AppsV1().Deployments(job.NameSpace).Get(context.TODO(), job.K8sDeployName, metav1.GetOptions{})
+				foundDeployment, err := k8sService.k8sClient.AppsV1().Deployments(job.NameSpace).Get(context.TODO(), job.K8sDeployName, metav1.GetOptions{})
 				if err != nil {
 					if createDuration.Hours() <= 2 && job.Status != models.JOB_RUNNING_STATUS {
 						continue
@@ -393,6 +409,10 @@ func (task *CronTask) cleanAbnormalDeployment() {
 		}()
 
 		k8sService := NewK8sService()
+		if k8sService == nil {
+			logs.GetLogger().Errorf("failed to create k8s client, please check that the k8s service is running normally")
+			return
+		}
 		namespaces, err := k8sService.ListNamespace(context.TODO())
 		if err != nil {
 			logs.GetLogger().Errorf("Failed get all namespace, error: %+v", err)
@@ -433,7 +453,7 @@ func (task *CronTask) cleanAbnormalDeployment() {
 
 func (task *CronTask) setFailedUbiTaskStatus() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("0 0/8 * * * ?", func() {
+	c.AddFunc("0 0 */10 * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("task job: [setFailedUbiTaskStatus], error: %+v", err)
@@ -471,28 +491,24 @@ func (task *CronTask) setFailedUbiTaskStatus() {
 }
 
 func (task *CronTask) checkJobReward() {
-	c := cron.New(cron.WithSeconds())
-	c.AddFunc("* * 0/20 * * ?", func() {
+	c := cron.New(cron.WithSeconds(), cron.WithChain(cron.DelayIfStillRunning(cron.DefaultLogger)))
+	c.AddFunc("@every 10h", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("task job: [checkJobReward], error: %+v", err)
 			}
 		}()
 
-		jobList, err := NewJobService().GetJobListByNoReward()
+		taskManager, err := NewTaskManagerContract()
 		if err != nil {
-			logs.GetLogger().Errorf("failed to get job data, error: %+v", err)
+			logs.GetLogger().Errorf("failed to create task manager, error: %v", err)
 			return
 		}
-
-		poolSize := 5
-		taskQueue, wg := startWorkerPool(poolSize)
-		for _, job := range jobList {
-			jobCopy := job
-			submitTask(taskQueue, NewTaskManagerContract(jobCopy))
+		err = taskManager.Scan()
+		if err != nil {
+			logs.GetLogger().Errorf("failed to scan task, error: %v", err)
+			return
 		}
-		close(taskQueue)
-		wg.Wait()
 	})
 	c.Start()
 }
@@ -514,6 +530,10 @@ func (task *CronTask) getUbiTaskReward() {
 
 func addNodeLabel() {
 	k8sService := NewK8sService()
+	if k8sService == nil {
+		logs.GetLogger().Errorf("failed to create k8s client, please check that the k8s service is running normally")
+		return
+	}
 	nodes, err := k8sService.k8sClient.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		logs.GetLogger().Error(err)
@@ -535,7 +555,7 @@ func addNodeLabel() {
 					continue
 				}
 			}
-			err := k8sService.AddNodeLabel(cpNode.Name, collectInfo.CpuName)
+			err := k8sService.AddNodeLabelForArchitecture(cpNode.Name, collectInfo.CpuName)
 			if err != nil {
 				logs.GetLogger().Errorf("nodeName: %s, error: %v", cpNode.Name, err)
 			}

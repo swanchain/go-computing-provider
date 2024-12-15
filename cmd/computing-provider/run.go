@@ -87,6 +87,7 @@ func cpManager(router *gin.RouterGroup) {
 	router.GET("/lagrange/cp/public_key", computing.GetPublicKey)
 	router.GET("/lagrange/cp/price", computing.GetPrice)
 	router.GET("/lagrange/cp/check_node_port", computing.CheckNodeportServiceEnv)
+	router.POST("/lagrange/cp/deploy", computing.DeployImage)
 
 	router.POST("/cp/ubi", computing.DoUbiTaskForK8s)
 	router.POST("/cp/receive/ubi", computing.ReceiveUbiProof)
@@ -551,7 +552,7 @@ var createAccountCmd = &cli.Command{
 		},
 		&cli.StringFlag{
 			Name:  "task-types",
-			Usage: "Task types of CP (1:Fil-C2-512M, 2:Mining, 3:AI, 4:Fil-C2-32G, 5:NodePort), separated by commas",
+			Usage: "Task types of CP (1:Fil-C2, 2:Mining, 3:AI, 4:Inference, 5:NodePort), separated by commas",
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -858,7 +859,7 @@ var changeWorkerAddressCmd = &cli.Command{
 
 var changeTaskTypesCmd = &cli.Command{
 	Name:      "changeTaskTypes",
-	Usage:     "Update taskTypes of CP (1:Fil-C2-512M, 2:Mining, 3: AI, 4:Fil-C2-32G, 5:NodePort), separated by commas",
+	Usage:     "Update taskTypes of CP (1:Fil-C2, 2:Mining, 3: AI, 4:Inference, 5:NodePort), separated by commas",
 	ArgsUsage: "[TaskTypes]",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
@@ -955,6 +956,7 @@ var contractCmd = &cli.Command{
 				var taskData [][]string
 
 				taskData = append(taskData, []string{"Network:", netWork})
+				//taskData = append(taskData, []string{"Network Name:", contract.UpgradeName})
 				taskData = append(taskData, []string{"Swan Token:", contract.SwanToken})
 				taskData = append(taskData, []string{"Orchestrator Collateral:", contract.JobCollateral})
 				taskData = append(taskData, []string{"Task Manager:", contract.JobManager})
@@ -962,6 +964,7 @@ var contractCmd = &cli.Command{
 				taskData = append(taskData, []string{"Register Task:", contract.TaskRegister})
 				taskData = append(taskData, []string{"ZK Collateral:", contract.ZkCollateral})
 				taskData = append(taskData, []string{"Sequencer:", contract.Sequencer})
+				taskData = append(taskData, []string{"Edge Task Payment:", contract.EdgeTaskPayment})
 
 				var rowColorList []RowColor
 				rowColorList = append(rowColorList,

@@ -13,6 +13,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/registry"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/swanchain/go-computing-provider/build"
@@ -40,8 +41,10 @@ type DockerService struct {
 func NewDockerService() *DockerService {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
-		panic(err.Error())
+		logs.GetLogger().Errorf("failed to create docker client, please check that the docker service is running normally")
+		return nil
 	}
+
 	return &DockerService{
 		c: cli,
 	}
@@ -350,9 +353,9 @@ func (ds *DockerService) CheckRunningContainer(containerName string) (bool, erro
 	return false, nil
 }
 
-func (ds *DockerService) ContainerCreateAndStart(config *container.Config, hostConfig *container.HostConfig, containerName string) error {
+func (ds *DockerService) ContainerCreateAndStart(config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, containerName string) error {
 	ctx := context.Background()
-	resp, err := ds.c.ContainerCreate(ctx, config, hostConfig, nil, nil, containerName)
+	resp, err := ds.c.ContainerCreate(ctx, config, hostConfig, networkingConfig, nil, containerName)
 	if err != nil {
 		return err
 	}
@@ -381,12 +384,12 @@ func (ds *DockerService) ContainerLogs(containerName string) (string, error) {
 	}
 }
 
-func (ds *DockerService) GetContainerLogStream(containerName string) (io.ReadCloser, error) {
-	ctx := context.Background()
+func (ds *DockerService) GetContainerLogStream(ctx context.Context, containerName string) (io.ReadCloser, error) {
 	return ds.c.ContainerLogs(ctx, containerName, container.LogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Follow:     true,
+		Timestamps: false,
 	})
 }
 
@@ -471,6 +474,30 @@ func (ds *DockerService) GetContainerStatus() (map[string]string, error) {
 		}
 	}
 	return containerStatus, nil
+}
+
+func (ds *DockerService) CreateNetwork(networkName string) error {
+	ctx := context.Background()
+	networks, err := ds.c.NetworkList(ctx, network.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	var exist bool
+	for _, network := range networks {
+		if network.Name == networkName {
+			exist = true
+			break
+		}
+	}
+
+	if !exist {
+		_, err = ds.c.NetworkCreate(ctx, networkName, network.CreateOptions{
+			Driver: "bridge",
+		})
+		return err
+	}
+	return nil
 }
 
 func ImportImageToContainerd(tarFile string) error {

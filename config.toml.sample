@@ -5,13 +5,18 @@ Domain = ""                                                              # The d
 NodeName = "<YOUR_CP_Node_Name>"                                         # The computing-provider node name
 WalletWhiteList = ""                                                     # CP accept user addresses from this whitelist for space deployment
 WalletBlackList = ""                                                     # CP reject user addresses from this blacklist for space deployment
-Pricing = true                                                           # Bid mode. true: auto; false: manual
+Pricing = "true"                                                         # Default True, indicating acceptance of smart pricing orders, which may include orders priced lower than self-determined pricing.
+AutoDeleteImage = false                                                  # Default false, automatically delete unused images
+PortRange = ["40000-40050","40070"]                                      # Externally exposed port number for deploying multi-port image tasks
+
 
 [UBI]
 UbiEnginePk = "0xB5aeb540B4895cd024c1625E146684940A849ED9"                # UBI Engine's public key, CP only accept the task from this UBI engine
 EnableSequencer = true                                                    # Enable aa Sequencer to receive zk-task proofs
 AutoChainProof = true                                                     # Sequencer insufficient balance or service unavailable, use chain to submit proof
-SequencerUrl = "https://sequencer.swanchain.io"                            # Sequencer service's API address
+SequencerUrl = "https://sequencer.swanchain.io"                           # Sequencer service's API address
+EdgeUrl = "https://edge-api.swanchain.io/v1"                              # Edge service's API address
+VerifySign = true                                                         # Verify that the task signature is from Engine
 
 [LOG]
 CrtFile = "/YOUR_DOMAIN_NAME_CRT_PATH/server.crt"                         # Your domain name SSL .crt file path
@@ -19,7 +24,7 @@ KeyFile = "/YOUR_DOMAIN_NAME_KEY_PATH/server.key"                         # Your
 
 [HUB]
 BalanceThreshold= 10                                                      # The cp’s collateral balance threshold
-OrchestratorPk = "0x4B98086A20f3C19530AF32D21F85Bc6399358e20"             # Orchestrator's public key, CP only accept the task from this Orchestrator
+OrchestratorPk = "0xE2F887D4Ed3E4E5179C2f30c6Fdb2344cCbB21b6"             # Orchestrator's public key, CP only accept the task from this Orchestrator
 VerifySign = true                                                         # Verify that the task signature is from Orchestrator
 
 [MCS]

@@ -79,7 +79,8 @@ var generateNetworkCmd = &cli.Command{
 		filePath := filepath.Join(cpRepoPath, "network-policy.yaml")
 		if _, err := os.Stat(filePath); err != nil {
 			networkPolicyContent = strings.ReplaceAll(networkPolicyContent, "$NETWORK_SET", string(networkSetBytes))
-			networkPolicyContent = strings.ReplaceAll(networkPolicyContent, "$G_SUBNET_NAME", models.NetworkGlobalSubnet)
+			networkPolicyContent = strings.ReplaceAll(networkPolicyContent, "$G_NETWORK_NAME", models.NetworkGlobalSubnet)
+			networkPolicyContent = strings.ReplaceAll(networkPolicyContent, "$G_SUBNET_NAME", models.NetworkNetset)
 			networkPolicyContent = strings.ReplaceAll(networkPolicyContent, "$G_OUT_NAME", models.NetworkGlobalOutAccess)
 			networkPolicyContent = strings.ReplaceAll(networkPolicyContent, "$G_IN_NAME", models.NetworkGlobalInAccess)
 			networkPolicyContent = strings.ReplaceAll(networkPolicyContent, "$G_NS_NAME", models.NetworkGlobalNamespace)

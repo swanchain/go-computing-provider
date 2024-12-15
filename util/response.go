@@ -67,6 +67,7 @@ const (
 	CheckPriceError            = 4024
 	BelowPriceError            = 4025
 	ReadPriceError             = 4026
+	ReadLogError               = 4027
 
 	ProofParamError   = 7001
 	ProofReadLogError = 7002
@@ -84,7 +85,7 @@ var codeMsg = map[int]string{
 	GetLocationError:           "An error occurred while get location of cp",
 	GetCpAccountError:          "An error occurred while get cp account address",
 	GeResourceError:            "An error occurred while get cp account resource",
-	JsonError:                  "An error occurred while converting to json",
+	JsonError:                  "Invalid JSON format",
 	BadParamError:              "The request parameter is not valid",
 	SignatureError:             "Verify signature failed",
 	SpaceParseResourceUriError: "An error occurred while parsing sourceUri",
@@ -102,13 +103,14 @@ var codeMsg = map[int]string{
 	GenerateRsaError:           "An error occurred while generate rsa key pair",
 	SaveRsaKeyError:            "An error occurred while save rsa key pair",
 	ReadRsaKeyError:            "An error occurred while read rsa key pair",
-	CheckPriceError:            "An error occurred while check price",
-	BelowPriceError:            "Bid below the set price",
+	CheckPriceError:            "Unable to verify price",
+	BelowPriceError:            "Bid price below minimum requirement",
 	CheckNodePortError:         "An error occurred while check cluster port availability",
 	CheckResourceLimitError:    "An error occurred while check resource limit components",
 	NotAcceptNodePortError:     "not accept node port type job",
 	RpcConnectError:            "An error occurred while connect rpc",
 	ReadPriceError:             "An error occurred while read price info",
+	ReadLogError:               "failed to read logs",
 
 	ProofReadLogError: "An error occurred while read the log of proof",
 	ProofError:        "An error occurred while executing the calculation task",

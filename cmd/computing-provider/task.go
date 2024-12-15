@@ -33,21 +33,41 @@ var taskList = &cli.Command{
 			Name:  "show-completed",
 			Usage: "Display completed jobs",
 		},
-		&cli.StringFlag{
-			Name:  "type",
-			Usage: "Task type. Support fcp and edge types",
+		&cli.BoolFlag{
+			Name:  "fcp",
+			Usage: "Specify the fcp task",
+		},
+		&cli.BoolFlag{
+			Name:  "ecp",
+			Usage: "Specify the ecp task",
 		},
 		&cli.BoolFlag{
 			Name:    "verbose",
 			Usage:   "--verbose",
 			Aliases: []string{"v"},
 		},
+		&cli.IntFlag{
+			Name:  "tail",
+			Usage: "Show the last number of lines. If not specified, all are displayed by default",
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		showCompleted := cctx.Bool("show-completed")
 		fullFlag := cctx.Bool("verbose")
-		taskType := cctx.String("type")
+		fcpFlag := cctx.Bool("fcp")
+		ecpFlag := cctx.Bool("ecp")
+		if !fcpFlag && !ecpFlag {
+			return fmt.Errorf("must specify one of fcp or ecp")
+		}
+		var taskType string
+		if fcpFlag {
+			taskType = "fcp"
+		}
+		if ecpFlag {
+			taskType = "ecp"
+		}
 		cpRepoPath, ok := os.LookupEnv("CP_PATH")
+		tailNum := cctx.Int("tail")
 		if !ok {
 			return fmt.Errorf("missing CP_PATH env, please set export CP_PATH=<YOUR CP_PATH>")
 		}
@@ -55,11 +75,11 @@ var taskList = &cli.Command{
 			return fmt.Errorf("load config file failed, error: %+v", err)
 		}
 
-		switch strings.TrimSpace(taskType) {
+		switch taskType {
 		case "fcp":
-			return fcpTaskList(showCompleted, fullFlag)
-		case "edge":
-			return edgeTaskList(showCompleted, fullFlag)
+			return fcpTaskList(showCompleted, fullFlag, tailNum)
+		case "ecp":
+			return ecpTaskList(tailNum)
 		default:
 			return fmt.Errorf("only support fcp and edge types")
 		}
@@ -70,9 +90,31 @@ var taskDetail = &cli.Command{
 	Name:      "get",
 	Usage:     "Get job detail info",
 	ArgsUsage: "[job_uuid]",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:  "fcp",
+			Usage: "Specify the fcp task",
+		},
+		&cli.BoolFlag{
+			Name:  "ecp",
+			Usage: "Specify the ecp task",
+		},
+	},
 	Action: func(cctx *cli.Context) error {
 		if cctx.NArg() != 1 {
 			return fmt.Errorf("incorrect number of arguments, got %d, missing args: job_uuid", cctx.NArg())
+		}
+		fcpFlag := cctx.Bool("fcp")
+		ecpFlag := cctx.Bool("ecp")
+		if !fcpFlag && !ecpFlag {
+			return fmt.Errorf("must specify one of fcp or ecp")
+		}
+		var taskType string
+		if fcpFlag {
+			taskType = "fcp"
+		}
+		if ecpFlag {
+			taskType = "ecp"
 		}
 
 		cpRepoPath, ok := os.LookupEnv("CP_PATH")
@@ -84,33 +126,61 @@ var taskDetail = &cli.Command{
 		}
 
 		jobUuid := cctx.Args().First()
-		job, err := computing.NewJobService().GetJobEntityByJobUuid(jobUuid)
-		if err != nil {
-			return fmt.Errorf("job_uuid: %s, get job detail failed, error: %+v", jobUuid, err)
+
+		if taskType == "fcp" {
+			job, err := computing.NewJobService().GetJobEntityByJobUuid(jobUuid)
+			if err != nil {
+				return fmt.Errorf("job_uuid: %s, get job detail failed, error: %+v", jobUuid, err)
+			}
+
+			var taskData [][]string
+			taskData = append(taskData, []string{"TASK UUID:", job.TaskUuid})
+			taskData = append(taskData, []string{"TASK TYPE:", job.ResourceType})
+			taskData = append(taskData, []string{"WALLET ADDRESS:", job.WalletAddress})
+			taskData = append(taskData, []string{"SPACE NAME:", job.Name})
+			taskData = append(taskData, []string{"SPACE URL:", job.RealUrl})
+			taskData = append(taskData, []string{"HARDWARE:", job.Hardware})
+			taskData = append(taskData, []string{"STATUS:", models.GetJobStatus(job.Status)})
+			taskData = append(taskData, []string{"RESULT URL:", job.ResultUrl})
+			taskData = append(taskData, []string{"CREATE TIME:", time.Unix(job.CreateTime, 0).Format("2006-01-02 15:04:05")})
+			taskData = append(taskData, []string{"EXPIRE TIME:", time.Unix(job.ExpireTime, 0).Format("2006-01-02 15:04:05")})
+
+			rowColor := getColor(job.Status)
+			header := []string{"JOB UUID:", job.JobUuid}
+
+			var rowColorList []RowColor
+			rowColorList = append(rowColorList, RowColor{
+				row:    6,
+				column: []int{1},
+				color:  rowColor,
+			})
+			NewVisualTable(header, taskData, rowColorList).SetAutoWrapText(false).Generate(false)
+		} else {
+			job, err := computing.NewEcpJobService().GetEcpJobByUuid(jobUuid)
+			if err != nil {
+				return fmt.Errorf("failed to get job, job_uuid: %s, error: %v", jobUuid, err)
+			}
+
+			var jobType = "Mining"
+			if job.JobType == models.InferenceJobType {
+				jobType = "Inference"
+			}
+
+			var taskData [][]string
+			taskData = append(taskData, []string{"TASK NAME:", job.Name})
+			taskData = append(taskData, []string{"TASK TYPE:", jobType})
+			taskData = append(taskData, []string{"CONTAINER NAME:", job.ContainerName})
+			taskData = append(taskData, []string{"GPU NAME:", job.GpuName})
+			taskData = append(taskData, []string{"GPU INDEX:", job.GpuIndex})
+			taskData = append(taskData, []string{"SERVICE URL:", job.ServiceUrl})
+			taskData = append(taskData, []string{"PORTS:", job.PortMap})
+			taskData = append(taskData, []string{"STATUS:", job.Status})
+			taskData = append(taskData, []string{"CREATE TIME:", time.Unix(job.CreateTime, 0).Format("2006-01-02 15:04:05")})
+
+			header := []string{"TASK UUID:", job.Uuid}
+			NewVisualTable(header, taskData, []RowColor{}).SetAutoWrapText(false).Generate(false)
 		}
 
-		var taskData [][]string
-		taskData = append(taskData, []string{"TASK UUID:", job.TaskUuid})
-		taskData = append(taskData, []string{"TASK TYPE:", job.ResourceType})
-		taskData = append(taskData, []string{"WALLET ADDRESS:", job.WalletAddress})
-		taskData = append(taskData, []string{"SPACE NAME:", job.Name})
-		taskData = append(taskData, []string{"SPACE URL:", job.RealUrl})
-		taskData = append(taskData, []string{"HARDWARE:", job.Hardware})
-		taskData = append(taskData, []string{"STATUS:", models.GetJobStatus(job.Status)})
-		taskData = append(taskData, []string{"RESULT URL:", job.ResultUrl})
-		taskData = append(taskData, []string{"CREATE TIME:", time.Unix(job.CreateTime, 0).Format("2006-01-02 15:04:05")})
-		taskData = append(taskData, []string{"EXPIRE TIME:", time.Unix(job.ExpireTime, 0).Format("2006-01-02 15:04:05")})
-
-		rowColor := getColor(job.Status)
-		header := []string{"JOB UUID:", job.JobUuid}
-
-		var rowColorList []RowColor
-		rowColorList = append(rowColorList, RowColor{
-			row:    6,
-			column: []int{1},
-			color:  rowColor,
-		})
-		NewVisualTable(header, taskData, rowColorList).SetAutoWrapText(false).Generate(false)
 		return nil
 	},
 }
@@ -119,9 +189,33 @@ var taskDelete = &cli.Command{
 	Name:      "delete",
 	Usage:     "Delete an task from the k8s",
 	ArgsUsage: "[job_uuid]",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:  "fcp",
+			Usage: "Specify the fcp task",
+		},
+		&cli.BoolFlag{
+			Name:  "ecp",
+			Usage: "Specify the ecp task",
+		},
+	},
 	Action: func(cctx *cli.Context) error {
 		if cctx.NArg() != 1 {
 			return fmt.Errorf("incorrect number of arguments, got %d, missing args: task_uuid", cctx.NArg())
+		}
+		jobUuid := strings.ToLower(cctx.Args().First())
+
+		fcpFlag := cctx.Bool("fcp")
+		ecpFlag := cctx.Bool("ecp")
+		if !fcpFlag && !ecpFlag {
+			return fmt.Errorf("must specify one of fcp or ecp")
+		}
+		var taskType string
+		if fcpFlag {
+			taskType = "fcp"
+		}
+		if ecpFlag {
+			taskType = "ecp"
 		}
 
 		cpRepoPath, ok := os.LookupEnv("CP_PATH")
@@ -132,28 +226,40 @@ var taskDelete = &cli.Command{
 			return fmt.Errorf("failed to load config file, error: %+v", err)
 		}
 
-		jobUuid := strings.ToLower(cctx.Args().First())
-		job, err := computing.NewJobService().GetJobEntityByJobUuid(jobUuid)
-		if err != nil {
-			return fmt.Errorf("failed to get job detail, job_uuid: %s, error: %+v", jobUuid, err)
+		if taskType == "fcp" {
+			job, err := computing.NewJobService().GetJobEntityByJobUuid(jobUuid)
+			if err != nil {
+				return fmt.Errorf("failed to get job detail, job_uuid: %s, error: %+v", jobUuid, err)
+			}
+
+			if job.JobUuid == "" {
+				return fmt.Errorf("not found the job_uuid='%s' job detail", jobUuid)
+			}
+
+			serviceName := constants.K8S_SERVICE_NAME_PREFIX + jobUuid
+			ingressName := constants.K8S_INGRESS_NAME_PREFIX + jobUuid
+
+			k8sService := computing.NewK8sService()
+			k8sService.DeleteIngress(context.TODO(), job.NameSpace, ingressName)
+			k8sService.DeleteService(context.TODO(), job.NameSpace, serviceName)
+			k8sService.DeleteDeployment(context.TODO(), job.NameSpace, job.K8sDeployName)
+			time.Sleep(3 * time.Second)
+			k8sService.DeleteDeployRs(context.TODO(), job.NameSpace, job.JobUuid)
+
+			computing.NewJobService().DeleteJobEntityByJobUuId(job.JobUuid, models.JOB_TERMINATED_STATUS)
+			fmt.Printf("job_uuid: %s space serivce successfully deleted \n", jobUuid)
+		} else {
+			ecpJobEntity, err := computing.NewEcpJobService().GetEcpJobByUuid(jobUuid)
+			if err != nil {
+				return fmt.Errorf("failed to get job, job_uuid: %s, error: %v", jobUuid, err)
+			}
+			containerName := ecpJobEntity.ContainerName
+			if err = computing.NewDockerService().RemoveContainerByName(containerName); err != nil {
+				return fmt.Errorf("failed to remove container, job_uuid: %s, error: %v", jobUuid, err)
+			}
+			computing.NewEcpJobService().DeleteContainerByUuid(jobUuid)
+			fmt.Printf("job_uuid: %s serivce successfully deleted \n", jobUuid)
 		}
-
-		if job.JobUuid == "" {
-			return fmt.Errorf("not found the job_uuid='%s' job detail", jobUuid)
-		}
-
-		serviceName := constants.K8S_SERVICE_NAME_PREFIX + jobUuid
-		ingressName := constants.K8S_INGRESS_NAME_PREFIX + jobUuid
-
-		k8sService := computing.NewK8sService()
-		k8sService.DeleteIngress(context.TODO(), job.NameSpace, ingressName)
-		k8sService.DeleteService(context.TODO(), job.NameSpace, serviceName)
-		k8sService.DeleteDeployment(context.TODO(), job.NameSpace, job.K8sDeployName)
-		time.Sleep(3 * time.Second)
-		k8sService.DeleteDeployRs(context.TODO(), job.NameSpace, job.JobUuid)
-
-		computing.NewJobService().DeleteJobEntityByJobUuId(job.JobUuid, models.JOB_TERMINATED_STATUS)
-		fmt.Printf("job_uuid: %s space serivce successfully deleted \n", jobUuid)
 		return nil
 	},
 }
@@ -177,7 +283,7 @@ func getColor(status int) []tablewriter.Colors {
 	return rowColor
 }
 
-func fcpTaskList(showCompleted, fullFlag bool) error {
+func fcpTaskList(showCompleted, fullFlag bool, tailNum int) error {
 	var taskData [][]string
 	var rowColorList []RowColor
 
@@ -188,7 +294,7 @@ func fcpTaskList(showCompleted, fullFlag bool) error {
 		jobStatus = models.UN_DELETEED_FLAG
 	}
 
-	list, err := computing.NewJobService().GetJobList(jobStatus)
+	list, err := computing.NewJobService().GetJobList(jobStatus, tailNum)
 	if err != nil {
 		return fmt.Errorf("get jobs failed, error: %+v", err)
 	}
@@ -252,11 +358,11 @@ func fcpTaskList(showCompleted, fullFlag bool) error {
 	return nil
 }
 
-func edgeTaskList(showCompleted, fullFlag bool) error {
+func ecpTaskList(tailNum int) error {
 	var taskData [][]string
 	var rowColorList []RowColor
 
-	ecpJobs, err := computing.NewEcpJobService().GetEcpJobs("")
+	ecpJobs, err := computing.NewEcpJobService().GetEcpJobsByLimit(tailNum)
 	if err != nil {
 		return err
 	}
@@ -270,17 +376,19 @@ func edgeTaskList(showCompleted, fullFlag bool) error {
 		createTime := time.Unix(entity.CreateTime, 0).Format("2006-01-02 15:04:05")
 		statusStr := "terminated"
 		if status, ok := containerStatus[entity.ContainerName]; ok {
-			computing.NewEcpJobService().UpdateEcpJobEntity(entity.Uuid, status)
+			if entity.Status != "terminated" {
+				computing.NewEcpJobService().UpdateEcpJobEntity(entity.Uuid, status)
+			}
 			statusStr = status
 		}
-		taskData = append(taskData, []string{entity.Uuid, entity.Name, entity.Image, entity.ContainerName, statusStr, createTime})
+		taskData = append(taskData, []string{entity.Uuid, entity.Name, entity.Image, entity.ContainerName, statusStr, fmt.Sprintf("%.4f", entity.Reward), createTime})
 		rowColorList = append(rowColorList, RowColor{
 			row:    i,
 			column: []int{4},
 			color:  getContainerStatusColor(statusStr),
 		})
 	}
-	header := []string{"TASK UUID", "TASK NAME", "IMAGE NAME", "CONTAINER NAME", "CONTAINER STATUS", "CREATE TIME"}
+	header := []string{"TASK UUID", "TASK NAME", "IMAGE NAME", "CONTAINER NAME", "CONTAINER STATUS", "REWARD", "CREATE TIME"}
 	NewVisualTable(header, taskData, rowColorList).Generate(true)
 	return nil
 }

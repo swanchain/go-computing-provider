@@ -2,7 +2,7 @@
 
 **ECP (Edge Computing Provider)** specializes in processing data at the source of data generation, using minimal latency setups ideal for real-time applications. This provider handles specific, localized tasks directly on devices at the network’s edge, such as IoT devices. 
 
-At the current stage, ECP supports the generation of **ZK-Snark proof of Filecoin network**, and more ZK proof types will be gradually endorsed, such as Aleo, Scroll, starkNet, etc
+At the current stage, ECP supports the generation of **FIL-C2** and **Aleo Proof**. More ZK proof types will be gradually endorsed, such as Scroll, starkNet, etc
 
 ## Prerequisites
  - Need to map the ECP service port of the intranet to the public network, the default port is`9085`:
@@ -29,7 +29,7 @@ curl -fsSL https://raw.githubusercontent.com/swanchain/go-computing-provider/rel
 ## Install ECP and Init CP Account
 - Download `computing-provider`
 ```bash
-wget https://github.com/swanchain/go-computing-provider/releases/download/v0.7.0/computing-provider
+wget https://github.com/swanchain/go-computing-provider/releases/download/v1.0.0/computing-provider
 ```
 
 - Initialize ECP repo
@@ -66,12 +66,12 @@ Output:
                     --beneficiaryAddress <YOUR_BENEFICIAERY_ADDRESS>  \
                     --task-types 1,2,4
 ```
-**Note:** `--task-types`: Supports 4 task types (1: Fil-C2-512M, 2: Mining, 3: AI, 4: Fil-C2-32G, 5: NodePort), separated by commas. For ECP, it needs to be set to 1,2,4.
-- Collateral `SWANU` for ECP
+**Note:** `--task-types`: Supports 5 task types (1: Fil-C2, 2: Mining, 3: AI, 4: Inference, 5: NodePort), separated by commas. For ECP, it needs to be set to 1,2,4.
+- Collateral `SWAN` for ECP
 ```bash
 computing-provider collateral add --ecp --from <YOUR_WALLET_ADDRESS>  <AMOUNT>   
 ```
-> If you want to withdraw `SWANU` from ECP
+> If you want to withdraw `SWAN` from ECP
 >```bash
 >computing-provider collateral withdraw --ecp --owner <YOUR_WALLET_ADDRESS> --account <YOUR_CP_ACCOUNT> <amount>
 >```
@@ -86,7 +86,78 @@ computing-provider collateral add --ecp --from <YOUR_WALLET_ADDRESS>  <AMOUNT>
 >    computing-provider sequencer withdraw --owner <YOUR_OWNER_WALLET_ADDRESS>  <amount>
 >    ```
     
->**Note:** Currently one zk-task requires 0.0000005 SwanETH, 
+>**Note:** the gas cost is decided by the **[Dynamic Pricing Strategy](https://docs.swanchain.io/bulders/market-provider/web3-zk-computing-market/sequencer)**
+
+
+## Config resource price
+
+**Pricing:** Indicating acceptance of smart pricing orders, which may include orders priced lower than self-determined pricing. default "true"
+
+Configure it in the `$CP_PATH/price.toml`:
+```
+[API]
+Pricing = "true"   
+```
+
+1. Generate the pricing config with default values(Located at `$CP_PATH/price.toml`):
+```
+computing-provider --repo <YOUR_CP_PATH> price generate
+```
+
+2. Customize your resource prices, adjust resource prices based on how many swans are configured per hour
+
+```
+vi $CP_PATH/price.toml
+```
+example:
+```
+TARGET_CPU="0.2"            # SWAN/thread-hour
+TARGET_MEMORY="0.1"         # SWAN/GB-hour
+TARGET_HD_EPHEMERAL="0.005" # SWAN/GB-hour
+TARGET_GPU_DEFAULT="1.6"    # SWAN/Default GPU unit a hour
+TARGET_GPU_3080=""          # SWAN/3080 GPU unit a hour
+```
+
+3. View the configured price information:
+```
+computing-provider --repo <YOUR_CP_PATH> price view
+```
+
+CP Hardware Price Info:                                  
+TARGET_CPU:             0.2 SWAN/thread-hour            
+TARGET_MEMORY:          0.1 SWAN/GB-hour                
+TARGET_HD_EPHEMERAL:    0.005 SWAN/GB-hour              
+TARGET_GPU_DEFAULT:     1.6 SWAN/Default GPU unit a hour
+TARGET_GPU_3080:         SWAN/GPU unit a hour     
+
+## Config and Receive Inference task
+The task type is configured as 4 (inference), and need to be configured as follows:
+  * For container services with a single port, use `traefik`. Using `traefik` as the entry point for requests, you need to configure a domain(*.example.com) to resolve to the IP where CP is running. The port 9000 must be open for external access.
+  * For container services with multiple ports, use the public IP + port. Need to configure `PortRange`( one-to-one mapping between host ports and the public network IP).
+
+Configure it in the `$CP_PATH/config.toml`:
+```
+[API]
+Domain = ""                                 # The domain name
+AutoDeleteImage = false                     # Default false, automatically delete unused images
+PortRange = ["40000-40050","40060",""40065] # Externally exposed port number for deploying multi-port image tasks  
+```
+
+Check the Status of Inference and Mining task
+
+- Use the following command:
+```
+computing-provider task list --ecp
+```
+- Example output:
+```
+TASK UUID                               TASK NAME                               IMAGE NAME                              CONTAINER NAME                                  CONTAINER STATUS        REWARD  CREATE TIME  
+75f9df4e-b6a5-40b0-b7ac-02fb1840dafa    iron02                                  swanchain254/iron_mainnet_f2pool:latest iron02-2b0d5                                    terminated              0.0000  2024-10-24 10:23:32
+842dd7d3-e9f0-4795-af3b-104fa5527099    Zil1                                    swanchain254/zil_mainnet_f2pool:latest  Zil1-gb5sq                                      terminated              0.6195  2024-11-15 03:49:44
+30f60c6f-085e-4cd3-b751-bf6081a6a2e2    rvn-f2-003                              swanchain254/rvn_mainnet_f2pool:latest  rvn-f2-003-082ei                                terminated              7.5016  2024-11-15 05:40:14
+9b16aa08-66aa-4ffe-b7d6-7a6db512ea6c    rvn-004                                 swanchain254/rvn_mainnet_f2pool:latest  rvn-004-to2cr                                   terminated              5.9034  2024-11-15 05:44:21
+4c95d6e6-34b2-49de-be7d-7ee326b641c7    Zil                                     swanchain254/zil_mainnet_f2pool:latest  Zil-81ydq                                       terminated              0.1155  2024-11-15 06:56:49
+```
 
 ## Start ECP service
 ```bash
@@ -107,7 +178,7 @@ nohup ./computing-provider ubi daemon >> cp.log 2>&1 &
 ### Why need Sequencer?
 In past tests, we discovered that due to the frequent interactions required by ECP (Ethereum Compliance Proof) to submit proofs to the blockchain, ECP incurs significant gas costs. To reduce these gas costs, the Sequencer has emerged as a Layer 3 solution.
 
-The ECP can submit proofs to the Sequencer service, which will then package and submit all proofs from the entire network over a period of time (**currently 24 hours**) in a single transaction. This way, ECP only needs to pay a minimal gas fee to the Sequencer (currently, **a single proof requires 0.0000005 SwanETH**). For more detailed information, see [here](https://docs.swanchain.io/swan-provider/market-provider-mp/zk-engine/sequencer).
+The ECP can submit proofs to the Sequencer service, which will then package and submit all proofs from the entire network over a period of time (**currently 24 hours**) in a single transaction. This way, ECP only needs to pay a minimal gas fee to the Sequencer (currently, the gas is decided by the [Dynamic Pricing Strategy](https://docs.swanchain.io/bulders/market-provider/web3-zk-computing-market/sequencer)). For more detailed information, see [here](https://docs.swanchain.io/swan-provider/market-provider-mp/zk-engine/sequencer).
 
 ### How to Set it?
 We **strongly recommend** enabling the Sequencer feature (enabled by default). The steps to enable it are as follows:
