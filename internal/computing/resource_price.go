@@ -47,7 +47,7 @@ func GeneratePriceConfig() error {
 
 	var statisticalSources []*models.NodeResource
 	k8sService := NewK8sService()
-	if k8sService != nil {
+	if k8sService != nil && k8sService.k8sClient != nil {
 		statisticalSources, err = k8sService.StatisticalSources(context.TODO())
 		if err != nil {
 			return fmt.Errorf("failed to get gpu resource from k8s, error: %v", err)
