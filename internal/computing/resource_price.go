@@ -34,7 +34,7 @@ func GeneratePriceConfig() error {
 	cpRepoPath, _ := os.LookupEnv("CP_PATH")
 	resourcePriceFile := filepath.Join(cpRepoPath, resourceConfigFile)
 	if _, err := os.Stat(resourcePriceFile); err == nil {
-		return fmt.Errorf("price.conf configuration already exists")
+		return fmt.Errorf("price.toml configuration already exists")
 	}
 
 	file, err := os.OpenFile(resourcePriceFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
