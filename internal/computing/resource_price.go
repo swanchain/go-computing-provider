@@ -46,19 +46,22 @@ func GeneratePriceConfig() error {
 	file.WriteString(resourcePrice)
 
 	var statisticalSources []*models.NodeResource
-	statisticalSources, err = NewK8sService().StatisticalSources(context.TODO())
-	if err != nil {
-		logs.GetLogger().Errorf("failed to get gpu resource, error: %v", err)
+	k8sService := NewK8sService()
+	if k8sService != nil {
+		statisticalSources, err = k8sService.StatisticalSources(context.TODO())
+		if err != nil {
+			return fmt.Errorf("failed to get gpu resource from k8s, error: %v", err)
+		}
+	} else {
 		dockerService := NewDockerService()
 		containerLogStr, err := dockerService.ContainerLogs("resource-exporter")
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get gpu resource from k8s, error: %v", err)
 		}
 		var nodeResource models.NodeResource
 		if err = json.Unmarshal([]byte(containerLogStr), &nodeResource); err != nil {
 			return err
 		}
-
 		statisticalSources = append(statisticalSources, &nodeResource)
 	}
 
