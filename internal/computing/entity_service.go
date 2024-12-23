@@ -280,7 +280,7 @@ func (cpServ CpBalanceService) SaveCpBalance(cpBalance models.CpBalanceEntity) (
 
 func (cpServ CpBalanceService) GetCpBalance(cpAccount string) (*models.CpBalanceEntity, error) {
 	var cpBalance models.CpBalanceEntity
-	err := cpServ.Model(&models.CpBalanceEntity{}).Where("cp_account=?", cpAccount).First(&cpBalance).Error
+	err := cpServ.Model(&models.CpBalanceEntity{}).Where("cp_account=?", cpAccount).Limit(1).Find(&cpBalance).Error
 	return &cpBalance, err
 }
 

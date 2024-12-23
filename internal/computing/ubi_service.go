@@ -1544,7 +1544,7 @@ func submitTaskToSequencer(proof string, task *models.TaskEntity, timeOut int64,
 
 func checkBalance(cpAccountAddress string) (bool, error) {
 	cpBalance, err := NewCpBalanceService().GetCpBalance(cpAccountAddress)
-	if err != nil {
+	if err != nil || cpBalance == nil || cpBalance.WorkerBalance == 0 {
 		return false, fmt.Errorf("failed to get cp balance, error: %v", err)
 	}
 	logs.GetLogger().Infof("cpAccount: %s, sequencer balance: %f ETH, worker address balance: %f ETH", cpAccountAddress, cpBalance.SequencerBalance, cpBalance.WorkerBalance)
@@ -1634,8 +1634,8 @@ func GetCpBalance() {
 		WorkerBalance:    roundToSixDecimal(workerBalance),
 		SequencerBalance: roundToSixDecimal(sequencerBalance),
 	}
-	_, err = NewCpBalanceService().GetCpBalance(cpAccountAddress)
-	if err != nil {
+	cpBalanceEntity, err := NewCpBalanceService().GetCpBalance(cpAccountAddress)
+	if err != nil || cpBalanceEntity == nil || cpBalanceEntity.WorkerBalance == 0 {
 		err = NewCpBalanceService().SaveCpBalance(cpBalance)
 	} else {
 		err = NewCpBalanceService().UpdateCpBalance(cpBalance)
