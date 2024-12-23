@@ -1268,6 +1268,7 @@ func CronTaskForEcp() {
 	}()
 
 	go func() {
+		GetCpBalance()
 		ticker := time.NewTicker(30 * time.Minute)
 		for range ticker.C {
 			GetCpBalance()

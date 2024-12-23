@@ -44,6 +44,7 @@ func (task *CronTask) RunTask() {
 	task.getUbiTaskReward()
 	task.checkJobReward()
 	task.cleanImageResource()
+	task.CheckCpBalance()
 }
 
 func CheckClusterNetworkPolicy() {
