@@ -711,10 +711,6 @@ var changeOwnerAddressCmd = &cli.Command{
 			return fmt.Errorf("the target newOwnerAddress is invalid wallet address")
 		}
 
-		if err := checkWalletAddress(newOwnerAddr, "owner"); err != nil {
-			return err
-		}
-
 		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 
 		client, cpStub, err := getVerifyAccountClient(ownerAddress)
