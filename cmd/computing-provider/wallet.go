@@ -779,6 +779,8 @@ var sequencerAddCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
+		computing.GetCpBalance()
+
 		fmt.Printf("Transfer to Sequencer Account Tx Hash: %s \n", txHash)
 		return nil
 	},
@@ -820,6 +822,7 @@ var sequencerWithdrawCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
+		computing.GetCpBalance()
 		fmt.Println(txHash)
 		return nil
 	},

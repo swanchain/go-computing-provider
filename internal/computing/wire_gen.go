@@ -47,3 +47,11 @@ func NewEcpJobService() EcpJobService {
 	}
 	return ecpJobService
 }
+
+func NewCpBalanceService() CpBalanceService {
+	gormDB := db.NewDbService()
+	cpBalanceService := CpBalanceService{
+		DB: gormDB,
+	}
+	return cpBalanceService
+}
