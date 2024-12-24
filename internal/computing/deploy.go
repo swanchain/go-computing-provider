@@ -749,7 +749,7 @@ func (d *Deploy) createEnv(envs ...coreV1.EnvVar) []coreV1.EnvVar {
 			useIndexs = append(useIndexs, d.gpuIndex[i])
 		}
 		defaultEnv = append(defaultEnv, coreV1.EnvVar{
-			Name:  "CUDA_VISIBLE_DEVICES",
+			Name:  "NVIDIA_VISIBLE_DEVICES",
 			Value: strings.Join(useIndexs, ","),
 		})
 	}
