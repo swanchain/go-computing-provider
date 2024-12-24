@@ -270,7 +270,30 @@ func (cpServ EcpJobService) DeleteContainerByUuid(uuid string) (err error) {
 	}).Error
 }
 
+type CpBalanceService struct {
+	*gorm.DB
+}
+
+func (cpServ CpBalanceService) SaveCpBalance(cpBalance models.CpBalanceEntity) (err error) {
+	return cpServ.Model(&models.CpBalanceEntity{}).Save(&cpBalance).Error
+}
+
+func (cpServ CpBalanceService) GetCpBalance(cpAccount string) (*models.CpBalanceEntity, error) {
+	var cpBalance models.CpBalanceEntity
+	err := cpServ.Model(&models.CpBalanceEntity{}).Where("cp_account=?", cpAccount).Limit(1).Find(&cpBalance).Error
+	return &cpBalance, err
+}
+
+func (cpServ CpBalanceService) UpdateCpBalance(cpBalance models.CpBalanceEntity) error {
+	err := cpServ.Model(&models.CpBalanceEntity{}).Where("cp_account=?", cpBalance.CpAccount).Updates(map[string]interface{}{
+		"worker_balance":    cpBalance.WorkerBalance,
+		"sequencer_balance": cpBalance.SequencerBalance,
+	}).Error
+	return err
+}
+
 var taskSet = wire.NewSet(db.NewDbService, wire.Struct(new(TaskService), "*"))
 var jobSet = wire.NewSet(db.NewDbService, wire.Struct(new(JobService), "*"))
 var cpInfoSet = wire.NewSet(db.NewDbService, wire.Struct(new(CpInfoService), "*"))
 var ecpJobSet = wire.NewSet(db.NewDbService, wire.Struct(new(EcpJobService), "*"))
+var cpBalanceSet = wire.NewSet(db.NewDbService, wire.Struct(new(CpBalanceService), "*"))

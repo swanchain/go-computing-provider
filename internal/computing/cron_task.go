@@ -44,6 +44,7 @@ func (task *CronTask) RunTask() {
 	task.getUbiTaskReward()
 	task.checkJobReward()
 	task.cleanImageResource()
+	task.CheckCpBalance()
 }
 
 func CheckClusterNetworkPolicy() {
@@ -561,6 +562,19 @@ func addNodeLabel() {
 			}
 		}
 	}
+}
+
+func (task *CronTask) CheckCpBalance() {
+	c := cron.New(cron.WithSeconds())
+	c.AddFunc("* 0/30 * * * ?", func() {
+		defer func() {
+			if err := recover(); err != nil {
+				logs.GetLogger().Errorf("check cp balance catch panic error: %+v", err)
+			}
+		}()
+		GetCpBalance()
+	})
+	c.Start()
 }
 
 func reportJobStatus(jobUuid string, deployStatus int) bool {

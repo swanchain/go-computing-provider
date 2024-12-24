@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -1266,6 +1267,14 @@ func CronTaskForEcp() {
 		}
 	}()
 
+	go func() {
+		GetCpBalance()
+		ticker := time.NewTicker(30 * time.Minute)
+		for range ticker.C {
+			GetCpBalance()
+		}
+	}()
+
 }
 
 func syncTaskStatusForSequencerService() error {
@@ -1535,71 +1544,113 @@ func submitTaskToSequencer(proof string, task *models.TaskEntity, timeOut int64,
 }
 
 func checkBalance(cpAccountAddress string) (bool, error) {
-	chainUrl, err := conf.GetRpcByNetWorkName()
-	if err != nil {
-		return false, fmt.Errorf("failed to get rpc url, cpAccount: %s, error: %v", cpAccountAddress, err)
+	cpBalance, err := NewCpBalanceService().GetCpBalance(cpAccountAddress)
+	if err != nil || cpBalance == nil || cpBalance.WorkerBalance == 0 {
+		return false, fmt.Errorf("failed to get cp balance, error: %v", err)
 	}
-	client, err := contract.GetEthClient(chainUrl)
-	if err != nil {
-		return false, fmt.Errorf("failed to dial rpc, cpAccount: %d, error: %v", cpAccountAddress, err)
-	}
-	client.Close()
-
-	_, workerAddress, err := GetOwnerAddressAndWorkerAddress()
-	if err != nil {
-		return false, fmt.Errorf("failed to get worker address, cpAccount: %s,error: %v", cpAccountAddress, err)
-	}
-
-	workerBalance, err := wallet.BalanceNumber(client, workerAddress)
-	if err != nil {
-		return false, fmt.Errorf("failed to get worker banlance, cpAccount: %s,error: %v", cpAccountAddress, err)
-	}
-
-	sequencerStub, err := ecp.NewSequencerStub(client, ecp.WithSequencerCpAccountAddress(cpAccountAddress))
-	if err != nil {
-		return false, fmt.Errorf("failed to get cp sequencer contract, cpAccount: %s, error: %v", cpAccountAddress, err)
-	}
-	sequencerBalanceStr, err := sequencerStub.GetCPBalance()
-	if err != nil {
-		return false, fmt.Errorf("failed to get cp sequencer contract, cpAccount: %s, error: %v", cpAccountAddress, err)
-	}
-
-	sequencerBalance, err := strconv.ParseFloat(sequencerBalanceStr, 64)
-	if err != nil {
-		return false, fmt.Errorf("failed to convert numbers for cp sequencer balance, cpAccount: %s, sequencerBalance: %s, error: %v", cpAccountAddress, sequencerBalanceStr, err)
-	}
-
-	logs.GetLogger().Infof("cpAccount: %s, sequencer balance: %s ETH, worker address balance: %s ETH", cpAccountAddress, fmt.Sprintf("%.6f", sequencerBalance),
-		fmt.Sprintf("%.6f", workerBalance))
+	logs.GetLogger().Infof("cpAccount: %s, sequencer balance: %f ETH, worker address balance: %f ETH", cpAccountAddress, cpBalance.SequencerBalance, cpBalance.WorkerBalance)
 
 	if conf.GetConfig().UBI.EnableSequencer && !conf.GetConfig().UBI.AutoChainProof {
-		if sequencerBalance > 0.000001 {
+		if cpBalance.SequencerBalance > 0.000001 {
 			return true, nil
 		} else {
-			return false, fmt.Errorf("No sufficient balance in the sequencer account, current balance: %s ETH", fmt.Sprintf("%.6f", sequencerBalance))
+			return false, fmt.Errorf("No sufficient balance in the sequencer account, current balance: %f ETH", cpBalance.SequencerBalance)
 		}
 	}
 
 	if conf.GetConfig().UBI.EnableSequencer && conf.GetConfig().UBI.AutoChainProof {
-		if sequencerBalance > 0.000001 || workerBalance > 0.00001 {
+		if cpBalance.SequencerBalance > 0.000001 || cpBalance.WorkerBalance > 0.00001 {
 			return true, nil
 		} else {
-			return false, fmt.Errorf("Not enough funds in the sequencer account and worker address, sequencer balance: %s ETH, worker address: %s ETH", fmt.Sprintf("%.6f", sequencerBalance),
-				fmt.Sprintf("%.6f", workerBalance))
+			return false, fmt.Errorf("Not enough funds in the sequencer account and worker address, sequencer balance: %f ETH, worker address: %f ETH", cpBalance.SequencerBalance,
+				cpBalance.WorkerBalance)
 		}
 	}
 
 	if !conf.GetConfig().UBI.EnableSequencer && conf.GetConfig().UBI.AutoChainProof {
-		if workerBalance > 0.00001 {
+		if cpBalance.WorkerBalance > 0.00001 {
 			return true, nil
 		} else {
-			return false, fmt.Errorf("No sufficient balance in the worker address, current balance: %s ETH", fmt.Sprintf("%.6f", workerBalance))
+			return false, fmt.Errorf("No sufficient balance in the worker address, current balance: %f ETH", cpBalance.WorkerBalance)
 		}
 	}
 
 	return false, fmt.Errorf("unknown error")
 }
 
+func GetCpBalance() {
+	cpAccountAddress, err := contract.GetCpAccountAddress()
+	if err != nil {
+		logs.GetLogger().Errorf("get cp account contract address failed, error: %v", err)
+		return
+	}
+
+	chainUrl, err := conf.GetRpcByNetWorkName()
+	if err != nil {
+		logs.GetLogger().Errorf("failed to get rpc url, cpAccount: %s, error: %v", cpAccountAddress, err)
+		return
+
+	}
+	client, err := contract.GetEthClient(chainUrl)
+	if err != nil {
+		logs.GetLogger().Errorf("failed to dial rpc, cpAccount: %d, error: %v", cpAccountAddress, err)
+		return
+	}
+	client.Close()
+
+	_, workerAddress, err := GetOwnerAddressAndWorkerAddress()
+	if err != nil {
+		logs.GetLogger().Errorf("failed to get worker address, cpAccount: %s,error: %v", cpAccountAddress, err)
+		return
+	}
+
+	workerBalance, err := wallet.BalanceNumber(client, workerAddress)
+	if err != nil {
+		logs.GetLogger().Errorf("failed to get worker banlance, cpAccount: %s,error: %v", cpAccountAddress, err)
+		return
+	}
+
+	sequencerStub, err := ecp.NewSequencerStub(client, ecp.WithSequencerCpAccountAddress(cpAccountAddress))
+	if err != nil {
+		logs.GetLogger().Errorf("failed to get cp sequencer contract, cpAccount: %s, error: %v", cpAccountAddress, err)
+		return
+	}
+	sequencerBalanceStr, err := sequencerStub.GetCPBalance()
+	if err != nil {
+		logs.GetLogger().Errorf("failed to get cp sequencer contract, cpAccount: %s, error: %v", cpAccountAddress, err)
+		return
+	}
+
+	sequencerBalance, err := strconv.ParseFloat(sequencerBalanceStr, 64)
+	if err != nil {
+		logs.GetLogger().Errorf("failed to convert numbers for cp sequencer balance, cpAccount: %s, sequencerBalance: %s, error: %v", cpAccountAddress, sequencerBalanceStr, err)
+		return
+	}
+
+	logs.GetLogger().Infof("cpAccount: %s, sequencer balance: %s ETH, worker address balance: %s ETH", cpAccountAddress, fmt.Sprintf("%.6f", sequencerBalance),
+		fmt.Sprintf("%.6f", workerBalance))
+
+	var cpBalance = models.CpBalanceEntity{
+		CpAccount:        cpAccountAddress,
+		WorkerBalance:    roundToSixDecimal(workerBalance),
+		SequencerBalance: roundToSixDecimal(sequencerBalance),
+	}
+	cpBalanceEntity, err := NewCpBalanceService().GetCpBalance(cpAccountAddress)
+	if err != nil || cpBalanceEntity == nil || cpBalanceEntity.WorkerBalance == 0 {
+		err = NewCpBalanceService().SaveCpBalance(cpBalance)
+	} else {
+		err = NewCpBalanceService().UpdateCpBalance(cpBalance)
+	}
+
+	if err != nil {
+		logs.GetLogger().Errorf("failed to update cp balance, error: %v", err)
+		return
+	}
+}
+
+func roundToSixDecimal(num float64) float64 {
+	return math.Round(num*1e6) / 1e6
+}
 func RetryFn(fn func() error, maxRetries int, delay time.Duration) error {
 	var err error
 	for i := 0; i < maxRetries; i++ {

@@ -391,3 +391,14 @@ const (
 	ScannerTaskPaymentId    = 1
 	ScannerFcpTaskManagerId = 2
 )
+
+type CpBalanceEntity struct {
+	Id               int64   `json:"id" gorm:"primaryKey"`
+	CpAccount        string  `json:"cp_account" gorm:"cp_account"`
+	WorkerBalance    float64 `json:"worker_balance" gorm:"worker_balance"`
+	SequencerBalance float64 `json:"sequencer_balance" gorm:"sequencer_balance"`
+}
+
+func (*CpBalanceEntity) TableName() string {
+	return "t_cp_balance"
+}
