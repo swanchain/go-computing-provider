@@ -201,7 +201,7 @@ var taskDelete = &cli.Command{
 	},
 	Action: func(cctx *cli.Context) error {
 		if cctx.NArg() != 1 {
-			return fmt.Errorf("incorrect number of arguments, got %d, missing args: task_uuid", cctx.NArg())
+			return fmt.Errorf("incorrect number of arguments, got %d, missing args: job_uuid", cctx.NArg())
 		}
 		jobUuid := strings.ToLower(cctx.Args().First())
 
