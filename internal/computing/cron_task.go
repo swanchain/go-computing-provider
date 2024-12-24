@@ -161,7 +161,7 @@ func (task *CronTask) reportClusterResource() {
 		}()
 
 		k8sService := NewK8sService()
-		if k8sService == nil {
+		if k8sService == nil || k8sService.k8sClient == nil {
 			logs.GetLogger().Errorf("failed to create k8s client, please check that the k8s service is running normally")
 			return
 		}
@@ -184,7 +184,7 @@ func (task *CronTask) watchNameSpaceForDeleted() {
 			}
 		}()
 		service := NewK8sService()
-		if service == nil {
+		if service == nil || service.k8sClient == nil {
 			logs.GetLogger().Errorf("failed to create k8s client, please check that the k8s service is running normally")
 			return
 		}
@@ -241,7 +241,7 @@ func (task *CronTask) watchExpiredTask() {
 		}
 
 		k8sService := NewK8sService()
-		if k8sService == nil {
+		if k8sService == nil || k8sService.k8sClient == nil {
 			logs.GetLogger().Errorf("failed to create k8s client, please check that the k8s service is running normally")
 			return
 		}
@@ -410,7 +410,7 @@ func (task *CronTask) cleanAbnormalDeployment() {
 		}()
 
 		k8sService := NewK8sService()
-		if k8sService == nil {
+		if k8sService == nil || k8sService.k8sClient == nil {
 			logs.GetLogger().Errorf("failed to create k8s client, please check that the k8s service is running normally")
 			return
 		}
@@ -531,7 +531,7 @@ func (task *CronTask) getUbiTaskReward() {
 
 func addNodeLabel() {
 	k8sService := NewK8sService()
-	if k8sService == nil {
+	if k8sService == nil || k8sService.k8sClient == nil {
 		logs.GetLogger().Errorf("failed to create k8s client, please check that the k8s service is running normally")
 		return
 	}
