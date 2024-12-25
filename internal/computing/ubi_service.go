@@ -1545,8 +1545,13 @@ func submitTaskToSequencer(proof string, task *models.TaskEntity, timeOut int64,
 
 func checkBalance(cpAccountAddress string) (bool, error) {
 	cpBalance, err := NewCpBalanceService().GetCpBalance(cpAccountAddress)
-	if err != nil {
-		return false, fmt.Errorf("failed to get cp balance, error: %v", err)
+	if err != nil || cpBalance == nil {
+		if err != nil {
+			return false, err
+		}
+		if cpBalance == nil {
+			return false, fmt.Errorf("not found cp balance")
+		}
 	}
 	logs.GetLogger().Infof("cpAccount: %s, sequencer balance: %f ETH, worker address balance: %f ETH", cpAccountAddress, cpBalance.SequencerBalance, cpBalance.WorkerBalance)
 
