@@ -847,6 +847,7 @@ var changeWorkerAddressCmd = &cli.Command{
 		if err = computing.NewCpInfoService().UpdateCpInfoByNodeId(&models.CpInfoEntity{NodeId: nodeId, WorkerAddress: workerAddress}); err != nil {
 			return fmt.Errorf("update worker_address of cp to db failed, error: %v", err)
 		}
+		computing.GetCpBalance()
 
 		fmt.Printf("changeWorkerAddress Transaction hash: %s \n", changeBeneficiaryAddressTx)
 		return nil
