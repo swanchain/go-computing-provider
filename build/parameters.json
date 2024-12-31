@@ -5,7 +5,7 @@
       "sequencer_url": "https://sequencer.swanchain.io",
       "zk_engine_pk": "0xB5aeb540B4895cd024c1625E146684940A849ED9",
       "orchestrator_pk": "0x4B98086A20f3C19530AF32D21F85Bc6399358e20",
-      "chain_rpc": "https://mainnet-rpc.swanchain.org",
+      "chain_rpc": "https://mainnet-rpc-01.swanchain.org",
       "edge_url": "https://edge-api.swanchain.io/v1",
       "legacy_contract": {
         "swan_token_contract": "0x39cBBeaF88a91404618d45a16e0977Adab4d1Af1",
