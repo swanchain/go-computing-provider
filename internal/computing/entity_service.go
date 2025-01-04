@@ -280,7 +280,9 @@ func (cpServ CpBalanceService) SaveCpBalance(cpBalance models.CpBalanceEntity) (
 
 func (cpServ CpBalanceService) GetCpBalance(cpAccount string) (*models.CpBalanceEntity, error) {
 	var cpBalance models.CpBalanceEntity
-	err := cpServ.Model(&models.CpBalanceEntity{}).Where("cp_account=?", cpAccount).Limit(1).Find(&cpBalance).Error
+	var maxID int
+	cpServ.Table("t_cp_balance").Select("MAX(id)").Scan(&maxID)
+	err := cpServ.Model(&models.CpBalanceEntity{}).Where("cp_account=?", cpAccount).Order("id desc").Limit(1).Find(&cpBalance).Error
 	return &cpBalance, err
 }
 
