@@ -1644,6 +1644,7 @@ func GetCpBalance() {
 	if err != nil || cpBalanceEntity == nil {
 		err = NewCpBalanceService().SaveCpBalance(cpBalance)
 	} else {
+		cpBalance.Id = cpBalanceEntity.Id
 		err = NewCpBalanceService().UpdateCpBalance(cpBalance)
 	}
 

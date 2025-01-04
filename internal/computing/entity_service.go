@@ -285,7 +285,7 @@ func (cpServ CpBalanceService) GetCpBalance(cpAccount string) (*models.CpBalance
 }
 
 func (cpServ CpBalanceService) UpdateCpBalance(cpBalance models.CpBalanceEntity) error {
-	err := cpServ.Model(&models.CpBalanceEntity{}).Where("cp_account=?", cpBalance.CpAccount).Updates(map[string]interface{}{
+	err := cpServ.Model(&models.CpBalanceEntity{}).Where("cp_account=? and id=?", cpBalance.CpAccount, cpBalance.Id).Updates(map[string]interface{}{
 		"worker_balance":    cpBalance.WorkerBalance,
 		"sequencer_balance": cpBalance.SequencerBalance,
 	}).Error
