@@ -1371,7 +1371,7 @@ func syncUbiMiningTaskStatus() {
 		return
 	}
 
-	taskGroups := handleTasksToGroup(taskList)
+	taskGroups := handleTasksToGroupForMining(taskList)
 	var taskIdAndStatus = make(map[int64]string)
 	for _, group := range taskGroups {
 		taskList, err := NewSequencer().QueryTask(group.Type, group.Ids...)
