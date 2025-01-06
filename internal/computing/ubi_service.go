@@ -1291,7 +1291,7 @@ func syncTaskStatusForSequencerService() error {
 	taskGroups := handleTasksToGroup(taskList)
 	var taskIdAndStatus = make(map[int64]string)
 	for _, group := range taskGroups {
-		taskList, err := NewSequencer().QueryTask(group.Type, group.Ids...)
+		taskList, err := NewSequencer().QueryTask(group.Type, group.Ids, nil)
 		if err != nil {
 			logs.GetLogger().Errorf("failed to query task, task ids: %v, error: %v", group.Ids, err)
 			continue
@@ -1372,21 +1372,21 @@ func syncUbiMiningTaskStatus() {
 	}
 
 	taskGroups := handleTasksToGroupForMining(taskList)
-	var taskIdAndStatus = make(map[int64]string)
+	var taskIdAndStatus = make(map[string]string)
 	for _, group := range taskGroups {
-		taskList, err := NewSequencer().QueryTask(group.Type, group.Ids...)
+		taskList, err := NewSequencer().QueryTask(group.Type, nil, group.Uuids)
 		if err != nil {
 			logs.GetLogger().Errorf("failed to query task, task ids: %v, error: %v", group.Ids, err)
 			continue
 		}
 
-		var taskMap = make(map[int64]SequenceTask)
+		var taskMap = make(map[string]SequenceTask)
 		for _, t := range taskList.Data.List {
-			taskMap[int64(t.Id)] = t
+			taskMap[t.Uuid] = t
 		}
 
 		for _, item := range group.Items {
-			if t, ok := taskMap[item.Id]; ok {
+			if t, ok := taskMap[item.Uuid]; ok {
 				var status int
 				switch t.Status {
 				case "received":
@@ -1416,7 +1416,7 @@ func syncUbiMiningTaskStatus() {
 				if item.Status == status {
 					continue
 				}
-				taskIdAndStatus[item.Id] = models.TaskStatusStr(status)
+				taskIdAndStatus[item.Uuid] = models.TaskStatusStr(status)
 				item.Status = status
 				NewTaskService().UpdateTaskEntityByTaskUuId(item)
 			}

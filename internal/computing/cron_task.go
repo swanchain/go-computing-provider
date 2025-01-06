@@ -659,7 +659,8 @@ func checkFcpJobInfoInChain(job *models.JobEntity) {
 type TaskGroup struct {
 	Items []*models.TaskEntity
 	Ids   []int64
-	Type  int // 1: contract  2: sequncer
+	Uuids []string
+	Type  int // 1: contract  2: sequncer 3: mining
 }
 
 func handleTasksToGroup(list []*models.TaskEntity) []TaskGroup {
@@ -707,7 +708,7 @@ func handleTasksToGroupForMining(list []*models.TaskEntity) []TaskGroup {
 			group = TaskGroup{}
 		}
 		group.Items = append(group.Items, list[i])
-		group.Ids = append(group.Ids, list[i].Id)
+		group.Uuids = append(group.Uuids, list[i].Uuid)
 		group.Type = 3
 	}
 	if len(group.Items) > 0 {

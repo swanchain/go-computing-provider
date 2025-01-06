@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/contract"
 	"github.com/swanchain/go-computing-provider/internal/contract/account"
@@ -157,22 +156,27 @@ func (s *Sequencer) SendTaskProof(data []byte) (SendProofResp, error) {
 	return spr, fmt.Errorf(spr.Msg)
 }
 
-func (s *Sequencer) QueryTask(taskType int, taskIds ...int64) (TaskListResp, error) {
+func (s *Sequencer) QueryTask(taskType int, taskIds []int64, uuids []string) (TaskListResp, error) {
 	if tokenCache == "" {
 		if err := s.GetToken(); err != nil {
 			return TaskListResp{}, fmt.Errorf("failed to get token, error: %v", err)
 		}
 	}
 
-	reqData, err := json.Marshal(taskIds)
-	if err != nil {
-		return TaskListResp{}, err
-	}
-
 	var reqUrl string
 	if taskType == 3 {
+		reqData, err := json.Marshal(uuids)
+		if err != nil {
+			return TaskListResp{}, err
+		}
+
 		reqUrl = s.url + task + fmt.Sprintf("?type=%d&uuids=%s", taskType, string(reqData))
 	} else {
+		reqData, err := json.Marshal(taskIds)
+		if err != nil {
+			return TaskListResp{}, err
+		}
+
 		reqUrl = s.url + task + fmt.Sprintf("?type=%d&ids=%s", taskType, string(reqData))
 	}
 
@@ -181,7 +185,6 @@ func (s *Sequencer) QueryTask(taskType int, taskIds ...int64) (TaskListResp, err
 		return TaskListResp{}, fmt.Errorf("error creating request: %v", err)
 	}
 
-	logs.GetLogger().Infof("tokenCache: %s", tokenCache)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Authorization", tokenCache)
 	client := &http.Client{}
@@ -275,6 +278,7 @@ type TaskListResp struct {
 
 type SequenceTask struct {
 	Id                 int    `json:"id"`
+	Uuid               string `json:"uuid"`
 	Type               int    `json:"type"`
 	InputParam         string `json:"input_param"`
 	VerifyParam        string `json:"verify_param"`
