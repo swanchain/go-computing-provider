@@ -64,7 +64,7 @@ func (taskServ TaskService) UpdateTaskEntityByTaskId(task *models.TaskEntity) (e
 }
 
 func (taskServ TaskService) UpdateTaskEntityByTaskUuId(task *models.TaskEntity) (err error) {
-	return taskServ.Model(&models.TaskEntity{}).Where("uuid=?", task.Uuid).Updates(task).Error
+	return taskServ.Debug().Model(&models.TaskEntity{}).Where("uuid=?", task.Uuid).Updates(task).Error
 }
 
 func (taskServ TaskService) GetTaskEntity(taskId int64) (*models.TaskEntity, error) {
@@ -82,7 +82,7 @@ func (taskServ TaskService) GetTaskListNoRewardForFilC2() (list []*models.TaskEn
 }
 
 func (taskServ TaskService) GetTaskListNoRewardForMining() (list []*models.TaskEntity, err error) {
-	err = taskServ.Model(&models.TaskEntity{}).Where("uuid !='' and (status !=? or status !=? or status !=?) ", models.TASK_TIMEOUT_STATUS,
+	err = taskServ.Debug().Model(&models.TaskEntity{}).Where("uuid !='' and (status !=? or status !=? or status !=?) ", models.TASK_TIMEOUT_STATUS,
 		models.TASK_VERIFYFAILED_STATUS, models.TASK_VERIFIED_STATUS).Find(&list).Error
 	if err != nil {
 		return nil, err
