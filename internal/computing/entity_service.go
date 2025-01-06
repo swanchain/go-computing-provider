@@ -69,8 +69,16 @@ func (taskServ TaskService) GetTaskEntity(taskId int64) (*models.TaskEntity, err
 	return &taskEntity, err
 }
 
-func (taskServ TaskService) GetTaskListNoReward() (list []*models.TaskEntity, err error) {
-	err = taskServ.Model(&models.TaskEntity{}).Where("sequencer=? and sequence_task_addr ==''", models.TaskSequencer).Find(&list).Error
+func (taskServ TaskService) GetTaskListNoRewardForFilC2() (list []*models.TaskEntity, err error) {
+	err = taskServ.Model(&models.TaskEntity{}).Where("sequencer=? and sequence_task_addr =='' and uuid=''", models.TaskSequencer).Find(&list).Error
+	if err != nil {
+		return nil, err
+	}
+	return
+}
+
+func (taskServ TaskService) GetTaskListNoRewardForMining() (list []*models.TaskEntity, err error) {
+	err = taskServ.Model(&models.TaskEntity{}).Where("uuid !=''", models.TaskSequencer).Find(&list).Error
 	if err != nil {
 		return nil, err
 	}
@@ -280,12 +288,12 @@ func (cpServ CpBalanceService) SaveCpBalance(cpBalance models.CpBalanceEntity) (
 
 func (cpServ CpBalanceService) GetCpBalance(cpAccount string) (*models.CpBalanceEntity, error) {
 	var cpBalance models.CpBalanceEntity
-	err := cpServ.Model(&models.CpBalanceEntity{}).Where("cp_account=?", cpAccount).Limit(1).Find(&cpBalance).Error
+	err := cpServ.Model(&models.CpBalanceEntity{}).Where("cp_account=?", cpAccount).Order("id desc").Limit(1).Find(&cpBalance).Error
 	return &cpBalance, err
 }
 
 func (cpServ CpBalanceService) UpdateCpBalance(cpBalance models.CpBalanceEntity) error {
-	err := cpServ.Model(&models.CpBalanceEntity{}).Where("cp_account=?", cpBalance.CpAccount).Updates(map[string]interface{}{
+	err := cpServ.Model(&models.CpBalanceEntity{}).Where("cp_account=? and id=?", cpBalance.CpAccount, cpBalance.Id).Updates(map[string]interface{}{
 		"worker_balance":    cpBalance.WorkerBalance,
 		"sequencer_balance": cpBalance.SequencerBalance,
 	}).Error

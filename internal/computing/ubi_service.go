@@ -1278,9 +1278,9 @@ func CronTaskForEcp() {
 }
 
 func syncTaskStatusForSequencerService() error {
-	taskList, err := NewTaskService().GetTaskListNoReward()
+	taskList, err := NewTaskService().GetTaskListNoRewardForFilC2()
 	if err != nil {
-		return fmt.Errorf("failed to get task list, error: %+v", err)
+		return fmt.Errorf("failed to get ubi fil-c2 task list, error: %+v", err)
 	}
 
 	taskGroups := handleTasksToGroup(taskList)
@@ -1356,6 +1356,26 @@ func syncTaskStatusForSequencerService() error {
 		logs.GetLogger().Infof("successfully updated the task status: %v", taskIdAndStatus)
 	}
 	return nil
+}
+
+func syncUbiMiningTaskStatus() {
+	//taskList, err := NewTaskService().GetTaskListNoRewardForMining()
+	//if err != nil {
+	//	logs.GetLogger().Errorf("failed to get ubi mining task list, error: %+v", err)
+	//	return
+	//}
+	//
+	//taskGroups := handleTasksToGroup(taskList)
+	//var taskIdAndStatus = make(map[int64]string)
+	//for _, group := range taskGroups {
+	//	taskList, err := NewSequencer().QueryTask(group.Type, group.Ids...)
+	//	if err != nil {
+	//		logs.GetLogger().Errorf("failed to query task, task ids: %v, error: %v", group.Ids, err)
+	//		continue
+	//	}
+	//
+	//}
+
 }
 
 func SyncCpAccountInfo() (*models.Account, error) {
@@ -1641,9 +1661,10 @@ func GetCpBalance() {
 		SequencerBalance: roundToSixDecimal(sequencerBalance),
 	}
 	cpBalanceEntity, err := NewCpBalanceService().GetCpBalance(cpAccountAddress)
-	if err != nil || cpBalanceEntity == nil || cpBalanceEntity.WorkerBalance == 0 {
+	if err != nil || cpBalanceEntity == nil {
 		err = NewCpBalanceService().SaveCpBalance(cpBalance)
 	} else {
+		cpBalance.Id = cpBalanceEntity.Id
 		err = NewCpBalanceService().UpdateCpBalance(cpBalance)
 	}
 

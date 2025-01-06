@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/contract"
 	"github.com/swanchain/go-computing-provider/internal/contract/account"
@@ -168,12 +169,19 @@ func (s *Sequencer) QueryTask(taskType int, taskIds ...int64) (TaskListResp, err
 		return TaskListResp{}, err
 	}
 
-	var reqUrl = s.url + task + fmt.Sprintf("?type=%d&ids=%s", taskType, string(reqData))
+	var reqUrl string
+	if taskType == 3 {
+		reqUrl = s.url + task + fmt.Sprintf("?type=%d&uuids=%s", taskType, string(reqData))
+	} else {
+		reqUrl = s.url + task + fmt.Sprintf("?type=%d&ids=%s", taskType, string(reqData))
+	}
+
 	req, err := http.NewRequest("GET", reqUrl, nil)
 	if err != nil {
 		return TaskListResp{}, fmt.Errorf("error creating request: %v", err)
 	}
 
+	logs.GetLogger().Infof("tokenCache: %s", tokenCache)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Authorization", tokenCache)
 	client := &http.Client{}

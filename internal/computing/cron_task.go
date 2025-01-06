@@ -695,3 +695,23 @@ func handleTasksToGroup(list []*models.TaskEntity) []TaskGroup {
 	}
 	return groups
 }
+
+func handleTasksToGroupForMining(list []*models.TaskEntity) []TaskGroup {
+	var groups []TaskGroup
+	var group TaskGroup
+
+	const batchSize = 20
+	for i := 0; i < len(list); i++ {
+		if len(group.Items) > batchSize {
+			groups = append(groups, group)
+			group = TaskGroup{}
+		}
+		group.Items = append(group.Items, list[i])
+		group.Ids = append(group.Ids, list[i].Id)
+		group.Type = 3
+	}
+	if len(group.Items) > 0 {
+		groups = append(groups, group)
+	}
+	return groups
+}
