@@ -507,6 +507,24 @@ func DoUbiTaskForDocker(c *gin.Context) {
 	logs.GetLogger().Infof("ubi task received: id: %d, deadline: %d,resource_type: %d, type: %s, input_param: %s, signature: %s",
 		ubiTask.ID, ubiTask.DeadLine, ubiTask.ResourceType, models.UbiTaskTypeStr(ubiTask.Type), ubiTask.InputParam, ubiTask.Signature)
 
+	var taskEntity = new(models.TaskEntity)
+	taskEntity.Id = int64(ubiTask.ID)
+	taskEntity.Type = ubiTask.Type
+	taskEntity.Name = ubiTask.Name
+	taskEntity.ResourceType = ubiTask.ResourceType
+	taskEntity.InputParam = ubiTask.InputParam
+	taskEntity.VerifyParam = ubiTask.VerifyParam
+	taskEntity.Status = models.TASK_RECEIVED_STATUS
+	taskEntity.CreateTime = time.Now().Unix()
+	taskEntity.Deadline = ubiTask.DeadLine
+	taskEntity.CheckCode = ubiTask.CheckCode
+	err := NewTaskService().SaveTaskEntity(taskEntity)
+	if err != nil {
+		logs.GetLogger().Errorf("save task entity failed, error: %v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SaveTaskEntityError))
+		return
+	}
+
 	if ubiTask.ID == 0 {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: id"))
 		return
@@ -559,6 +577,9 @@ func DoUbiTaskForDocker(c *gin.Context) {
 
 	balance, err := checkBalance(cpAccountAddress)
 	if err != nil || !balance {
+		taskEntity.Status = models.TASK_REJECTED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
+
 		logs.GetLogger().Errorf("failed check cp account balance, error: %v", err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckBalanceError))
 		return
@@ -573,6 +594,8 @@ func DoUbiTaskForDocker(c *gin.Context) {
 
 	logs.GetLogger().Infof("ubi task sign verifing, task_id: %d, verify: %v", ubiTask.ID, signature)
 	if !signature {
+		taskEntity.Status = models.TASK_REJECTED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "signature verify failed"))
 		return
 	}
@@ -580,24 +603,6 @@ func DoUbiTaskForDocker(c *gin.Context) {
 	var gpuFlag = "0"
 	if ubiTask.ResourceType == 1 {
 		gpuFlag = "1"
-	}
-
-	var taskEntity = new(models.TaskEntity)
-	taskEntity.Id = int64(ubiTask.ID)
-	taskEntity.Type = ubiTask.Type
-	taskEntity.Name = ubiTask.Name
-	taskEntity.ResourceType = ubiTask.ResourceType
-	taskEntity.InputParam = ubiTask.InputParam
-	taskEntity.VerifyParam = ubiTask.VerifyParam
-	taskEntity.Status = models.TASK_RECEIVED_STATUS
-	taskEntity.CreateTime = time.Now().Unix()
-	taskEntity.Deadline = ubiTask.DeadLine
-	taskEntity.CheckCode = ubiTask.CheckCode
-	err = NewTaskService().SaveTaskEntity(taskEntity)
-	if err != nil {
-		logs.GetLogger().Errorf("save task entity failed, error: %v", err)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SaveTaskEntityError))
-		return
 	}
 
 	var gpuName string
@@ -1353,29 +1358,73 @@ func syncTaskStatusForSequencerService() error {
 		}
 	}
 	if len(taskIdAndStatus) > 0 {
-		logs.GetLogger().Infof("successfully updated the task status: %v", taskIdAndStatus)
+		logs.GetLogger().Infof("successfully updated the fil-c2 task status: %v", taskIdAndStatus)
 	}
+	syncUbiMiningTaskStatus()
 	return nil
 }
 
 func syncUbiMiningTaskStatus() {
-	//taskList, err := NewTaskService().GetTaskListNoRewardForMining()
-	//if err != nil {
-	//	logs.GetLogger().Errorf("failed to get ubi mining task list, error: %+v", err)
-	//	return
-	//}
-	//
-	//taskGroups := handleTasksToGroup(taskList)
-	//var taskIdAndStatus = make(map[int64]string)
-	//for _, group := range taskGroups {
-	//	taskList, err := NewSequencer().QueryTask(group.Type, group.Ids...)
-	//	if err != nil {
-	//		logs.GetLogger().Errorf("failed to query task, task ids: %v, error: %v", group.Ids, err)
-	//		continue
-	//	}
-	//
-	//}
+	taskList, err := NewTaskService().GetTaskListNoRewardForMining()
+	if err != nil {
+		logs.GetLogger().Errorf("failed to get ubi mining task list, error: %+v", err)
+		return
+	}
 
+	taskGroups := handleTasksToGroup(taskList)
+	var taskIdAndStatus = make(map[int64]string)
+	for _, group := range taskGroups {
+		taskList, err := NewSequencer().QueryTask(group.Type, group.Ids...)
+		if err != nil {
+			logs.GetLogger().Errorf("failed to query task, task ids: %v, error: %v", group.Ids, err)
+			continue
+		}
+
+		var taskMap = make(map[int64]SequenceTask)
+		for _, t := range taskList.Data.List {
+			taskMap[int64(t.Id)] = t
+		}
+
+		for _, item := range group.Items {
+			if t, ok := taskMap[item.Id]; ok {
+				var status int
+				switch t.Status {
+				case "received":
+					status = models.TASK_RECEIVED_STATUS
+				case "running":
+					status = models.TASK_RUNNING_STATUS
+				case "submitted":
+					status = models.TASK_SUBMITTED_STATUS
+				case "verified":
+					status = models.TASK_VERIFIED_STATUS
+				case "rewarded":
+					status = models.TASK_REWARDED_STATUS
+				case "invalid":
+					status = models.TASK_INVALID_STATUS
+				case "repeated":
+					status = models.TASK_REPEATED_STATUS
+				case "timeout":
+					status = models.TASK_TIMEOUT_STATUS
+				case "verifyFailed":
+					status = models.TASK_VERIFYFAILED_STATUS
+				case "failed":
+					status = models.TASK_FAILED_STATUS
+				default:
+					status = models.TASK_UNKNOWN_STATUS
+				}
+
+				if item.Status == status {
+					continue
+				}
+				taskIdAndStatus[item.Id] = models.TaskStatusStr(status)
+				item.Status = status
+				NewTaskService().UpdateTaskEntityByTaskUuId(item)
+			}
+		}
+	}
+	if len(taskIdAndStatus) > 0 {
+		logs.GetLogger().Infof("successfully updated the mining task status: %v", taskIdAndStatus)
+	}
 }
 
 func SyncCpAccountInfo() (*models.Account, error) {
