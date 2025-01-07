@@ -1372,7 +1372,7 @@ func syncUbiMiningTaskStatus() {
 	}
 
 	taskGroups := handleTasksToGroupForMining(taskList)
-	var taskIdAndStatus = make(map[string]string)
+	var taskIdAndStatus = make(map[int64]string)
 	for _, group := range taskGroups {
 		taskList, err := NewSequencer().QueryTask(group.Type, nil, group.Uuids)
 		if err != nil {
@@ -1416,7 +1416,7 @@ func syncUbiMiningTaskStatus() {
 				if item.Status == status {
 					continue
 				}
-				taskIdAndStatus[item.Uuid] = models.TaskStatusStr(status)
+				taskIdAndStatus[item.Id] = models.TaskStatusStr(status)
 				item.Status = status
 				NewTaskService().UpdateTaskEntityByTaskUuId(item)
 			}
