@@ -164,17 +164,15 @@ func (s *Sequencer) QueryTask(taskType int, taskIds []int64, uuids []string) (Ta
 		}
 	}
 
+	logs.GetLogger().Infof("token: %s", tokenCache)
 	var reqUrl string
 	if taskType == 3 {
-		if err := s.GetToken(); err != nil {
-			return TaskListResp{}, fmt.Errorf("failed to get token, error: %v", err)
-		}
-
 		reqData, err := json.Marshal(uuids)
 		if err != nil {
 			return TaskListResp{}, err
 		}
 		reqUrl = s.url + task + fmt.Sprintf("?type=%d&uuids=%s", taskType, string(reqData))
+		logs.GetLogger().Infof("reqUrl: %s", reqUrl)
 	} else {
 		reqData, err := json.Marshal(taskIds)
 		if err != nil {
@@ -207,7 +205,6 @@ func (s *Sequencer) QueryTask(taskType int, taskIds []int64, uuids []string) (Ta
 	if err != nil {
 		return TaskListResp{}, fmt.Errorf("error reading response: %v", err)
 	}
-	logs.GetLogger().Infof("token: %s", tokenCache)
 	logs.GetLogger().Infof("body: %s", string(body))
 
 	var taskListResp TaskListResp

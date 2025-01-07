@@ -701,7 +701,7 @@ func handleTasksToGroupForMining(list []*models.TaskEntity) []TaskGroup {
 	var groups []TaskGroup
 	var group TaskGroup
 
-	const batchSize = 20
+	const batchSize = 10
 	for i := 0; i < len(list); i++ {
 		if len(group.Items) > batchSize {
 			groups = append(groups, group)
