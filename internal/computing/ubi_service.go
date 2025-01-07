@@ -1374,7 +1374,6 @@ func syncUbiMiningTaskStatus() {
 	taskGroups := handleTasksToGroupForMining(taskList)
 	var taskIdAndStatus = make(map[string]string)
 	for _, group := range taskGroups {
-		logs.GetLogger().Infof("group: %+v", group)
 		taskList, err := NewSequencer().QueryTask(group.Type, nil, group.Uuids)
 		if err != nil {
 			logs.GetLogger().Errorf("failed to query task, task ids: %v, error: %v", group.Uuids, err)

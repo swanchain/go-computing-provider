@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/contract"
 	"github.com/swanchain/go-computing-provider/internal/contract/account"
@@ -165,11 +166,14 @@ func (s *Sequencer) QueryTask(taskType int, taskIds []int64, uuids []string) (Ta
 
 	var reqUrl string
 	if taskType == 3 {
+		if err := s.GetToken(); err != nil {
+			return TaskListResp{}, fmt.Errorf("failed to get token, error: %v", err)
+		}
+
 		reqData, err := json.Marshal(uuids)
 		if err != nil {
 			return TaskListResp{}, err
 		}
-
 		reqUrl = s.url + task + fmt.Sprintf("?type=%d&uuids=%s", taskType, string(reqData))
 	} else {
 		reqData, err := json.Marshal(taskIds)
@@ -203,6 +207,8 @@ func (s *Sequencer) QueryTask(taskType int, taskIds []int64, uuids []string) (Ta
 	if err != nil {
 		return TaskListResp{}, fmt.Errorf("error reading response: %v", err)
 	}
+	logs.GetLogger().Infof("token: %s", tokenCache)
+	logs.GetLogger().Infof("body: %s", string(body))
 
 	var taskListResp TaskListResp
 	if resp.StatusCode != http.StatusOK {
