@@ -51,6 +51,23 @@ func DoUbiTaskForK8s(c *gin.Context) {
 	}
 	logs.GetLogger().Infof("receive ubi task received: %+v", ubiTask)
 
+	var taskEntity = new(models.TaskEntity)
+	taskEntity.Id = int64(ubiTask.ID)
+	taskEntity.Type = ubiTask.Type
+	taskEntity.Name = ubiTask.Name
+	taskEntity.ResourceType = ubiTask.ResourceType
+	taskEntity.InputParam = ubiTask.InputParam
+	taskEntity.VerifyParam = ubiTask.VerifyParam
+	taskEntity.Status = models.TASK_RECEIVED_STATUS
+	taskEntity.CreateTime = time.Now().Unix()
+	taskEntity.Deadline = ubiTask.DeadLine
+	taskEntity.CheckCode = ubiTask.CheckCode
+	err := NewTaskService().SaveTaskEntity(taskEntity)
+	if err != nil {
+		logs.GetLogger().Errorf("save task entity failed, error: %v", err)
+		return
+	}
+
 	if ubiTask.ID == 0 {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: id"))
 		return
@@ -103,6 +120,9 @@ func DoUbiTaskForK8s(c *gin.Context) {
 
 	balance, err := checkBalance(cpAccountAddress)
 	if err != nil || !balance {
+		taskEntity.Status = models.TASK_REJECTED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
+
 		logs.GetLogger().Errorf("failed check cp account balance, error: %v", err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckBalanceError))
 		return
@@ -110,6 +130,9 @@ func DoUbiTaskForK8s(c *gin.Context) {
 
 	signature, err := verifySignature(conf.GetConfig().UBI.UbiEnginePk, fmt.Sprintf("%s%d", cpAccountAddress, ubiTask.ID), ubiTask.Signature)
 	if err != nil {
+		taskEntity.Status = models.TASK_FAILED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
+
 		logs.GetLogger().Errorf("verifySignature for ubi task failed, error: %+v", err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.UbiTaskParamError, "sign data failed"))
 		return
@@ -117,6 +140,9 @@ func DoUbiTaskForK8s(c *gin.Context) {
 
 	logs.GetLogger().Infof("ubi task sign verifing, task_id: %d, type: %s, verify: %v", ubiTask.ID, models.UbiTaskTypeStr(ubiTask.Type), signature)
 	if !signature {
+		taskEntity.Status = models.TASK_REJECTED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
+
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.UbiTaskParamError, "signature verify failed"))
 		return
 	}
@@ -124,23 +150,6 @@ func DoUbiTaskForK8s(c *gin.Context) {
 	var gpuFlag = "0"
 	if ubiTask.ResourceType == 1 {
 		gpuFlag = "1"
-	}
-
-	var taskEntity = new(models.TaskEntity)
-	taskEntity.Id = int64(ubiTask.ID)
-	taskEntity.Type = ubiTask.Type
-	taskEntity.Name = ubiTask.Name
-	taskEntity.ResourceType = ubiTask.ResourceType
-	taskEntity.InputParam = ubiTask.InputParam
-	taskEntity.VerifyParam = ubiTask.VerifyParam
-	taskEntity.Status = models.TASK_RECEIVED_STATUS
-	taskEntity.CreateTime = time.Now().Unix()
-	taskEntity.Deadline = ubiTask.DeadLine
-	taskEntity.CheckCode = ubiTask.CheckCode
-	err = NewTaskService().SaveTaskEntity(taskEntity)
-	if err != nil {
-		logs.GetLogger().Errorf("save task entity failed, error: %v", err)
-		return
 	}
 
 	var envFilePath string
@@ -164,7 +173,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 	}
 
 	if nodeName == "" {
-		taskEntity.Status = models.TASK_FAILED_STATUS
+		taskEntity.Status = models.TASK_REJECTED_STATUS
 		taskEntity.Error = "No resources available"
 		NewTaskService().SaveTaskEntity(taskEntity)
 		logs.GetLogger().Warnf("ubi task id: %d, type: %s, not found a resources available", ubiTask.ID, models.GetResourceTypeStr(ubiTask.ResourceType))

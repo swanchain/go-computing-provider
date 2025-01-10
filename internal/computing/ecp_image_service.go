@@ -81,6 +81,34 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		return
 	}
 	logs.GetLogger().Infof("Job received Data: %+v", job)
+	if job.JobType == 0 {
+		job.JobType = models.MiningJobType
+	}
+
+	var taskEntity = new(models.TaskEntity)
+	if job.Price == "-1" && job.JobType == models.MiningJobType {
+		var maxID int64
+		result := NewTaskService().Model(&models.TaskEntity{}).Select("MAX(id)").Scan(&maxID)
+		if result.Error != nil {
+			logs.GetLogger().Errorf("failed to fetch max task id, error: %v", err)
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SaveTaskEntityError))
+			return
+		}
+		taskEntity.Id = maxID + 1
+		taskEntity.Uuid = job.Uuid
+		taskEntity.Type = models.Mining
+		taskEntity.Name = job.Name
+		taskEntity.ResourceType = models.RESOURCE_TYPE_GPU
+		taskEntity.Status = models.TASK_RECEIVED_STATUS
+		taskEntity.CreateTime = time.Now().Unix()
+		taskEntity.Sequencer = 0
+		err = NewTaskService().SaveTaskEntity(taskEntity)
+		if err != nil {
+			logs.GetLogger().Errorf("save task entity failed, error: %v", err)
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SaveTaskEntityError))
+			return
+		}
+	}
 
 	if !CheckWalletWhiteListForEcp(job.WalletAddress) {
 		logs.GetLogger().Errorf("This cp does not accept tasks from wallet addresses outside the whitelist")
@@ -92,10 +120,6 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		logs.GetLogger().Errorf("This cp does not accept tasks from wallet addresses inside the blacklist")
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SpaceCheckBlackListError))
 		return
-	}
-
-	if job.JobType == 0 {
-		job.JobType = 1
 	}
 
 	if strings.TrimSpace(job.Uuid) == "" {
@@ -137,6 +161,10 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 
 		signature, err := verifySignature(job.WalletAddress, fmt.Sprintf("%s%s", cpAccountAddress, job.Uuid), job.Sign)
 		if err != nil {
+			if job.Price == "-1" && job.JobType == models.MiningJobType {
+				taskEntity.Status = models.TASK_FAILED_STATUS
+				NewTaskService().SaveTaskEntity(taskEntity)
+			}
 			logs.GetLogger().Errorf("failed to verifySignature for ecp job, error: %+v", err)
 			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
 			return
@@ -144,6 +172,10 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 
 		logs.GetLogger().Infof("ubi task sign verifing, task_id: %s, verify: %v", job.Uuid, signature)
 		if !signature {
+			if job.Price == "-1" && job.JobType == models.MiningJobType {
+				taskEntity.Status = models.TASK_REJECTED_STATUS
+				NewTaskService().SaveTaskEntity(taskEntity)
+			}
 			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "signature verify failed"))
 			return
 		}
@@ -168,10 +200,18 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 
 	isReceive, _, needCpu, _, indexs, err := checkResourceForImage(job.Resource)
 	if err != nil {
+		if job.Price == "-1" && job.JobType == models.MiningJobType {
+			taskEntity.Status = models.TASK_FAILED_STATUS
+			NewTaskService().SaveTaskEntity(taskEntity)
+		}
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
 		return
 	}
 	if !isReceive {
+		if job.Price == "-1" && job.JobType == models.MiningJobType {
+			taskEntity.Status = models.TASK_REJECTED_STATUS
+			NewTaskService().SaveTaskEntity(taskEntity)
+		}
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError))
 		return
 	}
