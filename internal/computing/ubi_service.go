@@ -1719,8 +1719,7 @@ func GetCpBalance() {
 		SequencerBalance: roundToSixDecimal(sequencerBalance),
 	}
 	cpBalanceEntity, err := NewCpBalanceService().GetCpBalance(cpAccountAddress)
-	fmt.Printf("cpBalanceEntity: %v, err: %v, %t", cpBalanceEntity, err, cpBalanceEntity == nil)
-	if err != nil || cpBalanceEntity == nil {
+	if err != nil || cpBalanceEntity.CpAccount == "" {
 		err = NewCpBalanceService().SaveCpBalance(cpBalance)
 	} else {
 		cpBalance.Id = cpBalanceEntity.Id
