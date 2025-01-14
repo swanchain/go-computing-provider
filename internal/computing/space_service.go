@@ -60,13 +60,13 @@ func ReceiveJob(c *gin.Context) {
 	logs.GetLogger().Infof("Job received Data: %+v", jobData)
 
 	if !CheckWalletWhiteList(jobData.JobSourceURI) {
-		logs.GetLogger().Errorf("This cp does not accept tasks from wallet addresses outside the whitelist")
+		logs.GetLogger().Errorf("%s is not in the white list", getWalletAddress(jobData.JobSourceURI))
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SpaceCheckWhiteListError))
 		return
 	}
 
 	if CheckWalletBlackList(jobData.JobSourceURI) {
-		logs.GetLogger().Errorf("This cp does not accept tasks from wallet addresses inside the blacklist")
+		logs.GetLogger().Errorf("%s is in the black list", getWalletAddress(jobData.JobSourceURI))
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SpaceCheckBlackListError))
 		return
 	}
@@ -857,13 +857,13 @@ func DeployImage(c *gin.Context) {
 	logs.GetLogger().Infof("Image Job received Data: %+v", deployJob)
 
 	if !CheckWalletWhiteList(deployJob.WalletAddress) {
-		logs.GetLogger().Errorf("This cp does not accept tasks from wallet addresses outside the whitelist")
+		logs.GetLogger().Errorf("%s is not in the white list", deployJob.WalletAddress)
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SpaceCheckWhiteListError))
 		return
 	}
 
 	if CheckWalletBlackList(deployJob.WalletAddress) {
-		logs.GetLogger().Errorf("This cp does not accept tasks from wallet addresses inside the blacklist")
+		logs.GetLogger().Errorf("%s is in the black list", deployJob.WalletAddress)
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SpaceCheckBlackListError))
 		return
 	}
@@ -1882,12 +1882,17 @@ func CheckWalletWhiteList(jobSourceURI string) bool {
 		return true
 	}
 
-	spaceDetail, err := getSpaceDetail(jobSourceURI)
-	if err != nil {
-		logs.GetLogger().Errorln(err)
-		return false
+	var userWalletAddress string
+	if strings.HasPrefix(jobSourceURI, "http") {
+		spaceDetail, err := getSpaceDetail(jobSourceURI)
+		if err != nil {
+			logs.GetLogger().Errorln(err)
+			return false
+		}
+		userWalletAddress = spaceDetail.Data.Owner.PublicAddress
+	} else {
+		userWalletAddress = jobSourceURI
 	}
-	userWalletAddress := spaceDetail.Data.Owner.PublicAddress
 
 	for _, address := range whiteList {
 		if userWalletAddress == address {
@@ -1895,6 +1900,15 @@ func CheckWalletWhiteList(jobSourceURI string) bool {
 		}
 	}
 	return false
+}
+
+func getWalletAddress(jobSourceURI string) string {
+	spaceDetail, err := getSpaceDetail(jobSourceURI)
+	if err != nil {
+		logs.GetLogger().Errorln(err)
+		return ""
+	}
+	return spaceDetail.Data.Owner.PublicAddress
 }
 
 func CheckWalletBlackList(jobSourceURI string) bool {
@@ -1908,12 +1922,17 @@ func CheckWalletBlackList(jobSourceURI string) bool {
 		return true
 	}
 
-	spaceDetail, err := getSpaceDetail(jobSourceURI)
-	if err != nil {
-		logs.GetLogger().Errorln(err)
-		return false
+	var userWalletAddress string
+	if strings.HasPrefix(jobSourceURI, "http") {
+		spaceDetail, err := getSpaceDetail(jobSourceURI)
+		if err != nil {
+			logs.GetLogger().Errorln(err)
+			return false
+		}
+		userWalletAddress = spaceDetail.Data.Owner.PublicAddress
+	} else {
+		userWalletAddress = jobSourceURI
 	}
-	userWalletAddress := spaceDetail.Data.Owner.PublicAddress
 
 	for _, address := range blackList {
 		if userWalletAddress == address {
