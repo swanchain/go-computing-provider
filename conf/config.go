@@ -46,15 +46,16 @@ type ComputeNode struct {
 }
 
 type API struct {
-	Port            int
-	MultiAddress    string
-	Domain          string
-	NodeName        string
-	WalletWhiteList string
-	WalletBlackList string
-	Pricing         Pricing  `toml:"pricing"`
-	AutoDeleteImage bool     `toml:"AutoDeleteImage"`
-	PortRange       []string `toml:"PortRange"`
+	Port             int
+	MultiAddress     string
+	Domain           string
+	NodeName         string
+	WalletWhiteList  string
+	WalletBlackList  string
+	Pricing          Pricing  `toml:"pricing"`
+	AutoDeleteImage  bool     `toml:"AutoDeleteImage"`
+	ClearLogDuration int      `toml:"ClearLogDuration"`
+	PortRange        []string `toml:"PortRange"`
 }
 type UBI struct {
 	UbiEnginePk     string
@@ -71,7 +72,6 @@ type LOG struct {
 }
 
 type HUB struct {
-	AccessToken      string
 	BalanceThreshold float64
 	OrchestratorPk   string
 	VerifySign       bool

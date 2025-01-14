@@ -479,7 +479,7 @@ func (*ImageJobService) DeployMining(c *gin.Context, deployJob models.DeployJobP
 	}
 	go func() {
 		if deployJob.BuildImagePath != "" && deployJob.BuildImageName != "" {
-			if err := NewDockerService().BuildImage(deployJob.BuildImagePath, deployJob.BuildImageName); err != nil {
+			if err := NewDockerService().BuildImage(deployJob.Uuid, deployJob.BuildImagePath, deployJob.BuildImageName); err != nil {
 				logs.GetLogger().Errorf("failed to building %s image, job_uuid: %s, error: %v", deployJob.Image, deployJob.Uuid, err)
 				NewEcpJobService().UpdateEcpJobEntityMessage(deployJob.Uuid, fmt.Sprintf("failed to build image: %s", deployJob.Image))
 			}
@@ -564,7 +564,7 @@ func (*ImageJobService) DeployInference(c *gin.Context, deployJob models.DeployJ
 
 	go func() {
 		if deployJob.BuildImagePath != "" && deployJob.BuildImageName != "" {
-			if err := NewDockerService().BuildImage(deployJob.BuildImagePath, deployJob.BuildImageName); err != nil {
+			if err := NewDockerService().BuildImage(deployJob.Uuid, deployJob.BuildImagePath, deployJob.BuildImageName); err != nil {
 				logs.GetLogger().Errorf("failed to building %s image, job_uuid: %s, error: %v", deployJob.Image, deployJob.Uuid, err)
 				NewEcpJobService().UpdateEcpJobEntityMessage(deployJob.Uuid, fmt.Sprintf("failed to build image: %s", deployJob.Image))
 			}

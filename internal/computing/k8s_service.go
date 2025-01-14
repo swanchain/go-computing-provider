@@ -946,6 +946,60 @@ func (s *K8sService) GetClusterRuntime() (string, error) {
 	return runtime, nil
 }
 
+func (s *K8sService) UpdateContainerLogToFile(jobUuid string) {
+	jobEntity, err := NewJobService().GetJobEntityByJobUuid(jobUuid)
+	if err != nil {
+		logs.GetLogger().Error(err)
+		return
+	}
+
+	pods, err := s.k8sClient.CoreV1().Pods(jobEntity.NameSpace).List(context.TODO(), metaV1.ListOptions{
+		LabelSelector: fmt.Sprintf("lad_app=%s", jobUuid),
+	})
+	if err != nil {
+		return
+	}
+
+	if len(pods.Items) > 0 {
+		line := int64(10000)
+		containerStatuses := pods.Items[0].Status.ContainerStatuses
+		if len(containerStatuses) == 0 {
+			return
+		}
+		lastIndex := len(containerStatuses) - 1
+		req := s.k8sClient.CoreV1().Pods(jobEntity.NameSpace).GetLogs(pods.Items[0].Name, &coreV1.PodLogOptions{
+			Container:  containerStatuses[lastIndex].Name,
+			Follow:     true,
+			Timestamps: true,
+			TailLines:  &line,
+		})
+
+		podLogs, err := req.Stream(context.Background())
+		if err != nil {
+			logs.GetLogger().Errorf("Error opening log stream: %v", err)
+			return
+		}
+		defer podLogs.Close()
+
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
+		logDir := filepath.Join(cpRepoPath, constants.LOG_PATH_PREFIX, jobUuid)
+		os.MkdirAll(logDir, os.ModePerm)
+
+		logFileName := filepath.Join(logDir, constants.Container_LOG_NAME)
+		logFile, err := os.OpenFile(logFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			logs.GetLogger().Errorf("failed to open container log file, error: %v", err)
+			return
+		}
+		defer logFile.Close()
+
+		if _, err = io.Copy(logFile, podLogs); err != nil {
+			logs.GetLogger().Errorf("failed to write container log to file, error: %v", err)
+			return
+		}
+	}
+}
+
 func readLog(req *rest.Request) (*strings.Builder, error) {
 	podLogs, err := req.Stream(context.TODO())
 	if err != nil {

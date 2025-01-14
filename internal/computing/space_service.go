@@ -71,12 +71,12 @@ func ReceiveJob(c *gin.Context) {
 		return
 	}
 
+	cpRepoPath, _ := os.LookupEnv("CP_PATH")
 	if conf.GetConfig().HUB.VerifySign {
 		if len(jobData.NodeIdJobSourceUriSignature) == 0 {
 			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BadParamError, "missing node_id_job_source_uri_signature field"))
 			return
 		}
-		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 		nodeID := GetNodeId(cpRepoPath)
 
 		cpAccountAddress, err := contract.GetCpAccountAddress()
@@ -240,7 +240,7 @@ func ReceiveJob(c *gin.Context) {
 		jobEntity.SourceUrl = jobSourceUri
 		jobEntity.RealUrl = jobData.JobRealUri
 		jobEntity.BuildLog = jobData.BuildLog
-		jobEntity.BuildLogPath = filepath.Join(deployParam.BuildImagePath, BuildFileName)
+		jobEntity.BuildLogPath = filepath.Join(cpRepoPath, constants.LOG_PATH_PREFIX, jobData.UUID, constants.BUILD_LOG_NAME)
 		jobEntity.ContainerLog = jobData.ContainerLog
 		jobEntity.Duration = jobData.Duration
 		jobEntity.JobUuid = jobData.UUID
@@ -987,8 +987,8 @@ func DeployImage(c *gin.Context) {
 		var jobEntity = new(models.JobEntity)
 		jobEntity.SpaceUuid = deployJob.Uuid
 		jobEntity.RealUrl = jobData.JobRealUri
-		jobEntity.BuildLog = jobData.BuildLog
-		jobEntity.BuildLogPath = filepath.Join(cpRepoPath, "build/fcp", deployJob.Uuid, BuildFileName)
+		jobEntity.BuildLog = filepath.Join(cpRepoPath, constants.LOG_PATH_PREFIX, jobData.UUID, constants.BUILD_LOG_NAME)
+		jobEntity.BuildLogPath = filepath.Join(cpRepoPath, constants.LOG_PATH_PREFIX, jobData.UUID, constants.Container_LOG_NAME)
 		jobEntity.ContainerLog = jobData.ContainerLog
 		jobEntity.Duration = deployJob.Duration
 		jobEntity.JobUuid = deployJob.Uuid
@@ -1467,7 +1467,12 @@ func updateJobStatus(jobUuid string, jobStatus int, url ...string) {
 				Url:    "",
 			}
 		}
+
 	}()
+
+	if jobStatus == models.DEPLOY_TO_K8S {
+		NewK8sService().UpdateContainerLogToFile(jobUuid)
+	}
 }
 
 func getSpaceDetail(jobSourceURI string) (models.SpaceJSON, error) {

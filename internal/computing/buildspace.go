@@ -122,7 +122,7 @@ func BuildImagesByDockerfile(jobUuid, spaceName, imagePath string) (string, stri
 	log.Printf("Image path: %s", imagePath)
 
 	dockerService := NewDockerService()
-	if err := dockerService.BuildImage(imagePath, imageName); err != nil {
+	if err := dockerService.BuildImage(jobUuid, imagePath, imageName); err != nil {
 		logs.GetLogger().Errorf("Error building Docker image: %v", err)
 		return "", ""
 	}

@@ -45,6 +45,7 @@ func (task *CronTask) RunTask() {
 	task.checkJobReward()
 	task.cleanImageResource()
 	task.CheckCpBalance()
+
 }
 
 func CheckClusterNetworkPolicy() {
@@ -573,6 +574,28 @@ func (task *CronTask) CheckCpBalance() {
 			}
 		}()
 		GetCpBalance()
+	})
+	c.Start()
+}
+
+func (task *CronTask) UpdateContainerLog() {
+	c := cron.New(cron.WithSeconds())
+	c.AddFunc("* 0/10 * * * ?", func() {
+		defer func() {
+			if err := recover(); err != nil {
+				logs.GetLogger().Errorf("update container log catch panic error: %+v", err)
+			}
+		}()
+
+		jobList, err := NewJobService().GetJobList(models.UN_DELETEED_FLAG, -1)
+		if err != nil {
+			logs.GetLogger().Errorf("failed to get job data, error: %+v", err)
+			return
+		}
+
+		for _, job := range jobList {
+			NewK8sService().UpdateContainerLogToFile(job.JobUuid)
+		}
 	})
 	c.Start()
 }
