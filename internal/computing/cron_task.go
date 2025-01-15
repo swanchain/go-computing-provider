@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/swanchain/go-computing-provider/internal/contract"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -45,6 +47,8 @@ func (task *CronTask) RunTask() {
 	task.checkJobReward()
 	task.cleanImageResource()
 	task.CheckCpBalance()
+	task.UpdateContainerLog()
+	task.DeleteSpaceLog()
 
 }
 
@@ -567,7 +571,7 @@ func addNodeLabel() {
 
 func (task *CronTask) CheckCpBalance() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("* 0/30 * * * ?", func() {
+	c.AddFunc("0 0/30 * * *", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("check cp balance catch panic error: %+v", err)
@@ -580,7 +584,7 @@ func (task *CronTask) CheckCpBalance() {
 
 func (task *CronTask) UpdateContainerLog() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("* 0/10 * * * ?", func() {
+	c.AddFunc("* 0/10 * * *", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("update container log catch panic error: %+v", err)
@@ -595,6 +599,36 @@ func (task *CronTask) UpdateContainerLog() {
 
 		for _, job := range jobList {
 			NewK8sService().UpdateContainerLogToFile(job.JobUuid)
+		}
+	})
+	c.Start()
+}
+
+func (task *CronTask) DeleteSpaceLog() {
+	c := cron.New(cron.WithSeconds())
+	c.AddFunc("* 0/30 * * *", func() {
+		defer func() {
+			if err := recover(); err != nil {
+				logs.GetLogger().Errorf("update container log catch panic error: %+v", err)
+			}
+		}()
+
+		jobList, err := NewJobService().GetJobList(models.DELETED_FLAG, -1)
+		if err != nil {
+			logs.GetLogger().Errorf("failed to get job data, error: %+v", err)
+			return
+		}
+
+		for _, job := range jobList {
+			if job.ExpireTime+int64(conf.GetConfig().API.ClearLogDuration)*3600 < time.Now().Unix() {
+				cpRepoPath, _ := os.LookupEnv("CP_PATH")
+				logDir := filepath.Join(cpRepoPath, constants.LOG_PATH_PREFIX, job.JobUuid)
+				err := os.Remove(logDir)
+				if err != nil {
+					logs.GetLogger().Errorf("failed to delete logs, job_uuid: %s, error: %v", job.JobUuid, err)
+					continue
+				}
+			}
 		}
 	})
 	c.Start()
