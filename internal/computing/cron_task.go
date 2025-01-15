@@ -622,8 +622,7 @@ func (task *CronTask) DeleteSpaceLog() {
 		for _, job := range jobList {
 			if job.ExpireTime+int64(conf.GetConfig().API.ClearLogDuration)*3600 < time.Now().Unix() {
 				cpRepoPath, _ := os.LookupEnv("CP_PATH")
-				logDir := filepath.Join(cpRepoPath, constants.LOG_PATH_PREFIX, job.JobUuid)
-				err := os.Remove(logDir)
+				err := os.RemoveAll(filepath.Join(cpRepoPath, constants.LOG_PATH_PREFIX, job.JobUuid))
 				if err != nil {
 					logs.GetLogger().Errorf("failed to delete logs, job_uuid: %s, error: %v", job.JobUuid, err)
 					continue

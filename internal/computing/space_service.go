@@ -1062,39 +1062,14 @@ func handleConnection(conn *websocket.Conn, jobDetail models.JobEntity, logType 
 			client.HandleLogs(logFile)
 		}
 	} else if logType == "container" {
-		k8sNameSpace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(jobDetail.WalletAddress)
-
-		k8sService := NewK8sService()
-		pods, err := k8sService.k8sClient.CoreV1().Pods(k8sNameSpace).List(context.TODO(), metaV1.ListOptions{
-			LabelSelector: fmt.Sprintf("lad_app=%s", jobDetail.JobUuid),
-		})
-		if err != nil {
-			logs.GetLogger().Errorf("Error listing Pods: %v", err)
-			return
-		}
-
-		if len(pods.Items) > 0 {
-			line := int64(1000)
-			containerStatuses := pods.Items[0].Status.ContainerStatuses
-			if len(containerStatuses) == 0 {
-				return
-			}
-			lastIndex := len(containerStatuses) - 1
-			req := k8sService.k8sClient.CoreV1().Pods(k8sNameSpace).GetLogs(pods.Items[0].Name, &v1.PodLogOptions{
-				Container:  containerStatuses[lastIndex].Name,
-				Follow:     true,
-				Timestamps: true,
-				TailLines:  &line,
-			})
-
-			podLogs, err := req.Stream(context.Background())
-			if err != nil {
-				logs.GetLogger().Errorf("Error opening log stream: %v", err)
-				return
-			}
-			defer podLogs.Close()
-
-			client.HandleLogs(podLogs)
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
+		containerLogPath := filepath.Join(cpRepoPath, constants.LOG_PATH_PREFIX, jobDetail.JobUuid, constants.Container_LOG_NAME)
+		if _, err := os.Stat(containerLogPath); err != nil {
+			client.HandleLogs(strings.NewReader("Not found container logs"))
+		} else {
+			logFile, _ := os.Open(containerLogPath)
+			defer logFile.Close()
+			client.HandleLogs(logFile)
 		}
 	}
 }
