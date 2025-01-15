@@ -953,6 +953,30 @@ func (s *K8sService) UpdateContainerLogToFile(jobUuid string) {
 		return
 	}
 
+	err = wait.PollUntilContextTimeout(context.Background(), 2*time.Second, 3*time.Minute, true, func(ctx context.Context) (done bool, err error) {
+		k8sService := NewK8sService()
+		pods, err := k8sService.k8sClient.CoreV1().Pods(jobEntity.NameSpace).List(context.TODO(), metaV1.ListOptions{
+			LabelSelector: fmt.Sprintf("lad_app=%s", jobUuid),
+		})
+		if err != nil {
+			logs.GetLogger().Errorf("Error listing Pods: %v", err)
+			return
+		}
+
+		if len(pods.Items) > 0 {
+			for _, item := range pods.Items {
+				if item.Status.Phase == coreV1.PodRunning {
+					return true, nil
+				}
+			}
+		}
+		return false, nil
+	})
+	if err != nil {
+		logs.GetLogger().Errorf("failed to waiting for pod to be ready, job_uuid: %s, error: %v", jobUuid, err)
+		return
+	}
+
 	pods, err := s.k8sClient.CoreV1().Pods(jobEntity.NameSpace).List(context.TODO(), metaV1.ListOptions{
 		LabelSelector: fmt.Sprintf("lad_app=%s", jobUuid),
 	})
