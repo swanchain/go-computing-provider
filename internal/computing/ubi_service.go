@@ -301,12 +301,14 @@ func DoUbiTaskForK8s(c *gin.Context) {
 			return
 		}
 
+		var nodeSelector = make(map[string]string)
 		if gpuFlag == "0" {
 			delete(envVars, "RUST_GPU_TOOLS_CUSTOM_GPU")
 			envVars["BELLMAN_NO_GPU"] = "1"
 		} else {
 			if len(gpuIndex) > 0 {
 				envVars["CUDA_VISIBLE_DEVICES"] = gpuIndex[0]
+				nodeSelector = generateLabel(strings.ReplaceAll(c2GpuName, " ", "-"))
 			}
 		}
 
@@ -346,7 +348,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 				Template: v1.PodTemplateSpec{
 					Spec: v1.PodSpec{
 						NodeName:     nodeName,
-						NodeSelector: generateLabel(strings.ReplaceAll(c2GpuName, " ", "-")),
+						NodeSelector: nodeSelector,
 						Containers: []v1.Container{
 							{
 								Name:  JobName + generateString(5),
