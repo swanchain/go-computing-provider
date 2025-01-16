@@ -571,7 +571,7 @@ func addNodeLabel() {
 
 func (task *CronTask) CheckCpBalance() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("0 0/30 * * *", func() {
+	c.AddFunc("0 0/30 * * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("check cp balance catch panic error: %+v", err)
@@ -584,7 +584,7 @@ func (task *CronTask) CheckCpBalance() {
 
 func (task *CronTask) UpdateContainerLog() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("* 0/10 * * *", func() {
+	c.AddFunc("* 0/10 * * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("update container log catch panic error: %+v", err)
