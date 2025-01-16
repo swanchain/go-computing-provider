@@ -606,7 +606,7 @@ func (task *CronTask) UpdateContainerLog() {
 
 func (task *CronTask) DeleteSpaceLog() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("* 0/30 * * *", func() {
+	c.AddFunc("* 0/5 * * *", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("update container log catch panic error: %+v", err)
