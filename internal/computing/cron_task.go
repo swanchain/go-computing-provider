@@ -606,7 +606,7 @@ func (task *CronTask) UpdateContainerLog() {
 
 func (task *CronTask) DeleteSpaceLog() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("* 0/5 * * *", func() {
+	c.AddFunc("0 0/5 * * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("update container log catch panic error: %+v", err)
@@ -618,10 +618,12 @@ func (task *CronTask) DeleteSpaceLog() {
 			logs.GetLogger().Errorf("failed to get job data, error: %+v", err)
 			return
 		}
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 
 		for _, job := range jobList {
+			logs.GetLogger().Infof("cpRepoPath: %s,job_uuid: %s, ExpireTime: %d, result: %t ", cpRepoPath, job.JobUuid, job.ExpireTime, job.ExpireTime+int64(conf.GetConfig().API.ClearLogDuration)*3600 < time.Now().Unix())
 			if job.ExpireTime+int64(conf.GetConfig().API.ClearLogDuration)*3600 < time.Now().Unix() {
-				cpRepoPath, _ := os.LookupEnv("CP_PATH")
+
 				err := os.RemoveAll(filepath.Join(cpRepoPath, constants.LOG_PATH_PREFIX, job.JobUuid))
 				if err != nil {
 					logs.GetLogger().Errorf("failed to delete logs, job_uuid: %s, error: %v", job.JobUuid, err)
