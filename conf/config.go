@@ -216,6 +216,9 @@ func getConfigByHeight() {
 			config.UBI.EdgeUrl = ncCopy.Config.EdgeUrl
 			config.CONTRACT.ZkCollateralUbiZero = ncCopy.Config.ZkCollateralUbiZeroContract
 			config.CONTRACT.JobCollateralUbiZero = ncCopy.Config.OrchestratorCollateralUbiZeroContract
+			if config.API.ClearLogDuration == 0 {
+				config.API.ClearLogDuration = 24
+			}
 		}
 	}
 }
