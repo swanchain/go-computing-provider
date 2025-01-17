@@ -239,6 +239,8 @@ var daemonCmd = &cli.Command{
 func getStatusColor(taskStatus int) []tablewriter.Colors {
 	var rowColor []tablewriter.Colors
 	switch taskStatus {
+	case models.TASK_REJECTED_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
 	case models.TASK_RECEIVED_STATUS:
 		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgYellowColor}}
 	case models.TASK_RUNNING_STATUS:

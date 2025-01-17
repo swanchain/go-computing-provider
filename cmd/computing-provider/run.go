@@ -711,10 +711,6 @@ var changeOwnerAddressCmd = &cli.Command{
 			return fmt.Errorf("the target newOwnerAddress is invalid wallet address")
 		}
 
-		if err := checkWalletAddress(newOwnerAddr, "owner"); err != nil {
-			return err
-		}
-
 		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 
 		client, cpStub, err := getVerifyAccountClient(ownerAddress)
@@ -851,6 +847,7 @@ var changeWorkerAddressCmd = &cli.Command{
 		if err = computing.NewCpInfoService().UpdateCpInfoByNodeId(&models.CpInfoEntity{NodeId: nodeId, WorkerAddress: workerAddress}); err != nil {
 			return fmt.Errorf("update worker_address of cp to db failed, error: %v", err)
 		}
+		computing.GetCpBalance()
 
 		fmt.Printf("changeWorkerAddress Transaction hash: %s \n", changeBeneficiaryAddressTx)
 		return nil

@@ -419,7 +419,10 @@ func (d *Deploy) ModelInferenceToK8s() error {
 
 	imageName := "lagrange/" + modelInfo.Framework + ":v1.0"
 
-	logFile := filepath.Join(d.SpacePath, BuildFileName)
+	logDir := filepath.Join(cpPath, constants.LOG_PATH_PREFIX, d.originalJobUuid)
+	os.MkdirAll(logDir, os.ModePerm)
+
+	logFile := filepath.Join(logDir, constants.BUILD_LOG_NAME)
 	if _, err = os.Create(logFile); err != nil {
 		return err
 	}
@@ -749,7 +752,7 @@ func (d *Deploy) createEnv(envs ...coreV1.EnvVar) []coreV1.EnvVar {
 			useIndexs = append(useIndexs, d.gpuIndex[i])
 		}
 		defaultEnv = append(defaultEnv, coreV1.EnvVar{
-			Name:  "CUDA_VISIBLE_DEVICES",
+			Name:  "NVIDIA_VISIBLE_DEVICES",
 			Value: strings.Join(useIndexs, ","),
 		})
 	}

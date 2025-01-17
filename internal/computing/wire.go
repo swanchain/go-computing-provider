@@ -26,3 +26,8 @@ func NewEcpJobService() EcpJobService {
 	wire.Build(ecpJobSet)
 	return EcpJobService{}
 }
+
+func NewCpBalanceService() CpBalanceService {
+	wire.Build(cpBalanceSet)
+	return CpBalanceService{}
+}

@@ -31,7 +31,8 @@ func UbiTaskTypeStr(typeInt int) string {
 }
 
 const (
-	TASK_RECEIVED_STATUS = iota + 1
+	TASK_REJECTED_STATUS = iota
+	TASK_RECEIVED_STATUS
 	TASK_RUNNING_STATUS
 	TASK_SUBMITTED_STATUS
 	TASK_FAILED_STATUS
@@ -48,6 +49,8 @@ const (
 func TaskStatusStr(status int) string {
 	var statusStr string
 	switch status {
+	case TASK_REJECTED_STATUS:
+		statusStr = "rejected"
 	case TASK_RECEIVED_STATUS:
 		statusStr = "received"
 	case TASK_RUNNING_STATUS:
@@ -391,3 +394,14 @@ const (
 	ScannerTaskPaymentId    = 1
 	ScannerFcpTaskManagerId = 2
 )
+
+type CpBalanceEntity struct {
+	Id               int64   `json:"id" gorm:"primaryKey"`
+	CpAccount        string  `json:"cp_account" gorm:"cp_account"`
+	WorkerBalance    float64 `json:"worker_balance" gorm:"worker_balance"`
+	SequencerBalance float64 `json:"sequencer_balance" gorm:"sequencer_balance"`
+}
+
+func (*CpBalanceEntity) TableName() string {
+	return "t_cp_balance"
+}

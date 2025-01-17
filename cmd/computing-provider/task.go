@@ -201,7 +201,7 @@ var taskDelete = &cli.Command{
 	},
 	Action: func(cctx *cli.Context) error {
 		if cctx.NArg() != 1 {
-			return fmt.Errorf("incorrect number of arguments, got %d, missing args: task_uuid", cctx.NArg())
+			return fmt.Errorf("incorrect number of arguments, got %d, missing args: job_uuid", cctx.NArg())
 		}
 		jobUuid := strings.ToLower(cctx.Args().First())
 
@@ -301,6 +301,7 @@ func fcpTaskList(showCompleted, fullFlag bool, tailNum int) error {
 	for i, job := range list {
 
 		expireTime := time.Unix(job.ExpireTime, 0).Format("2006-01-02 15:04:05")
+		createTime := time.Unix(job.CreateTime, 0).Format("2006-01-02 15:04:05")
 
 		var reward = "0.00"
 		if len(strings.TrimSpace(job.Reward)) > 0 {
@@ -311,7 +312,7 @@ func fcpTaskList(showCompleted, fullFlag bool, tailNum int) error {
 
 		if fullFlag {
 			taskData = append(taskData,
-				[]string{job.JobUuid, job.TaskUuid, job.ResourceType, job.WalletAddress, job.SpaceUuid, job.Name, models.GetJobStatus(job.Status), reward, expireTime})
+				[]string{job.JobUuid, job.TaskUuid, job.ResourceType, job.WalletAddress, job.SpaceUuid, job.Name, models.GetJobStatus(job.Status), reward, createTime, expireTime})
 
 			rowColorList = append(rowColorList, RowColor{
 				row:    i,
@@ -338,7 +339,7 @@ func fcpTaskList(showCompleted, fullFlag bool, tailNum int) error {
 			}
 
 			taskData = append(taskData,
-				[]string{jobUuid, job.ResourceType, walletAddress, spaceUuid, job.Name, models.GetJobStatus(job.Status), expireTime})
+				[]string{jobUuid, job.ResourceType, walletAddress, spaceUuid, job.Name, models.GetJobStatus(job.Status), createTime, expireTime})
 
 			rowColorList = append(rowColorList, RowColor{
 				row:    i,
@@ -349,10 +350,10 @@ func fcpTaskList(showCompleted, fullFlag bool, tailNum int) error {
 	}
 
 	if fullFlag {
-		header := []string{"JOB UUID", "TASK UUID", "TASK TYPE", "WALLET ADDRESS", "SPACE UUID", "SPACE NAME", "STATUS", "REWARD", "EXPIRE TIME"}
+		header := []string{"JOB UUID", "TASK UUID", "TASK TYPE", "WALLET ADDRESS", "SPACE UUID", "SPACE NAME", "STATUS", "REWARD", "CREATE TIME", "EXPIRE TIME"}
 		NewVisualTable(header, taskData, rowColorList).Generate(true)
 	} else {
-		header := []string{"JOB UUID", "TASK TYPE", "WALLET ADDRESS", "SPACE UUID", "SPACE NAME", "STATUS", "EXPIRE TIME"}
+		header := []string{"JOB UUID", "TASK TYPE", "WALLET ADDRESS", "SPACE UUID", "SPACE NAME", "STATUS", "CREATE TIME", "EXPIRE TIME"}
 		NewVisualTable(header, taskData, rowColorList).Generate(true)
 	}
 	return nil

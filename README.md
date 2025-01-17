@@ -298,7 +298,7 @@ spec:
     spec:
       containers:
       - name: resource-exporter
-        image: filswan/resource-exporter:v11.3.0
+        image: filswan/resource-exporter:v11.3.2
         imagePullPolicy: IfNotPresent
         securityContext:
           privileged: true
@@ -355,6 +355,7 @@ make install
        WalletBlackList = ""                           # CP reject user addresses from this blacklist for space deployment
        Pricing = "true"                               # default True, indicating acceptance of smart pricing orders, which may include orders priced lower than self-determined pricing.
        AutoDeleteImage = false                        # Default false, automatically delete unused images
+       ClearLogDuration = 24                          # The interval for automatically clearing the log, the unit is hours
        PortRange= ["40000-40050","40070"]             # Externally exposed port number for deploying ECP image tasks
       
        [UBI]
@@ -385,7 +386,7 @@ make install
        Password = ""                                 # The login password, if only a single node, you can ignore
 	
        [RPC]
-       SWAN_CHAIN_RPC = "https://mainnet-rpc.swanchain.org"     # Swan chain RPC
+       SWAN_CHAIN_RPC = "https://mainnet-rpc-01.swanchain.org"     # Swan chain RPC
     ```
 
 **Note:**  

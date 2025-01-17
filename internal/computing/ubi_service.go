@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -49,6 +50,23 @@ func DoUbiTaskForK8s(c *gin.Context) {
 		return
 	}
 	logs.GetLogger().Infof("receive ubi task received: %+v", ubiTask)
+
+	var taskEntity = new(models.TaskEntity)
+	taskEntity.Id = int64(ubiTask.ID)
+	taskEntity.Type = ubiTask.Type
+	taskEntity.Name = ubiTask.Name
+	taskEntity.ResourceType = ubiTask.ResourceType
+	taskEntity.InputParam = ubiTask.InputParam
+	taskEntity.VerifyParam = ubiTask.VerifyParam
+	taskEntity.Status = models.TASK_RECEIVED_STATUS
+	taskEntity.CreateTime = time.Now().Unix()
+	taskEntity.Deadline = ubiTask.DeadLine
+	taskEntity.CheckCode = ubiTask.CheckCode
+	err := NewTaskService().SaveTaskEntity(taskEntity)
+	if err != nil {
+		logs.GetLogger().Errorf("save task entity failed, error: %v", err)
+		return
+	}
 
 	if ubiTask.ID == 0 {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: id"))
@@ -102,6 +120,9 @@ func DoUbiTaskForK8s(c *gin.Context) {
 
 	balance, err := checkBalance(cpAccountAddress)
 	if err != nil || !balance {
+		taskEntity.Status = models.TASK_REJECTED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
+
 		logs.GetLogger().Errorf("failed check cp account balance, error: %v", err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckBalanceError))
 		return
@@ -109,6 +130,9 @@ func DoUbiTaskForK8s(c *gin.Context) {
 
 	signature, err := verifySignature(conf.GetConfig().UBI.UbiEnginePk, fmt.Sprintf("%s%d", cpAccountAddress, ubiTask.ID), ubiTask.Signature)
 	if err != nil {
+		taskEntity.Status = models.TASK_FAILED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
+
 		logs.GetLogger().Errorf("verifySignature for ubi task failed, error: %+v", err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.UbiTaskParamError, "sign data failed"))
 		return
@@ -116,6 +140,9 @@ func DoUbiTaskForK8s(c *gin.Context) {
 
 	logs.GetLogger().Infof("ubi task sign verifing, task_id: %d, type: %s, verify: %v", ubiTask.ID, models.UbiTaskTypeStr(ubiTask.Type), signature)
 	if !signature {
+		taskEntity.Status = models.TASK_REJECTED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
+
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.UbiTaskParamError, "signature verify failed"))
 		return
 	}
@@ -123,23 +150,6 @@ func DoUbiTaskForK8s(c *gin.Context) {
 	var gpuFlag = "0"
 	if ubiTask.ResourceType == 1 {
 		gpuFlag = "1"
-	}
-
-	var taskEntity = new(models.TaskEntity)
-	taskEntity.Id = int64(ubiTask.ID)
-	taskEntity.Type = ubiTask.Type
-	taskEntity.Name = ubiTask.Name
-	taskEntity.ResourceType = ubiTask.ResourceType
-	taskEntity.InputParam = ubiTask.InputParam
-	taskEntity.VerifyParam = ubiTask.VerifyParam
-	taskEntity.Status = models.TASK_RECEIVED_STATUS
-	taskEntity.CreateTime = time.Now().Unix()
-	taskEntity.Deadline = ubiTask.DeadLine
-	taskEntity.CheckCode = ubiTask.CheckCode
-	err = NewTaskService().SaveTaskEntity(taskEntity)
-	if err != nil {
-		logs.GetLogger().Errorf("save task entity failed, error: %v", err)
-		return
 	}
 
 	var envFilePath string
@@ -163,7 +173,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 	}
 
 	if nodeName == "" {
-		taskEntity.Status = models.TASK_FAILED_STATUS
+		taskEntity.Status = models.TASK_REJECTED_STATUS
 		taskEntity.Error = "No resources available"
 		NewTaskService().SaveTaskEntity(taskEntity)
 		logs.GetLogger().Warnf("ubi task id: %d, type: %s, not found a resources available", ubiTask.ID, models.GetResourceTypeStr(ubiTask.ResourceType))
@@ -291,12 +301,14 @@ func DoUbiTaskForK8s(c *gin.Context) {
 			return
 		}
 
+		var nodeSelector = make(map[string]string)
 		if gpuFlag == "0" {
 			delete(envVars, "RUST_GPU_TOOLS_CUSTOM_GPU")
 			envVars["BELLMAN_NO_GPU"] = "1"
 		} else {
 			if len(gpuIndex) > 0 {
 				envVars["CUDA_VISIBLE_DEVICES"] = gpuIndex[0]
+				nodeSelector = generateLabel(strings.ReplaceAll(c2GpuName, " ", "-"))
 			}
 		}
 
@@ -336,7 +348,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 				Template: v1.PodTemplateSpec{
 					Spec: v1.PodSpec{
 						NodeName:     nodeName,
-						NodeSelector: generateLabel(strings.ReplaceAll(c2GpuName, " ", "-")),
+						NodeSelector: nodeSelector,
 						Containers: []v1.Container{
 							{
 								Name:  JobName + generateString(5),
@@ -506,6 +518,24 @@ func DoUbiTaskForDocker(c *gin.Context) {
 	logs.GetLogger().Infof("ubi task received: id: %d, deadline: %d,resource_type: %d, type: %s, input_param: %s, signature: %s",
 		ubiTask.ID, ubiTask.DeadLine, ubiTask.ResourceType, models.UbiTaskTypeStr(ubiTask.Type), ubiTask.InputParam, ubiTask.Signature)
 
+	var taskEntity = new(models.TaskEntity)
+	taskEntity.Id = int64(ubiTask.ID)
+	taskEntity.Type = ubiTask.Type
+	taskEntity.Name = ubiTask.Name
+	taskEntity.ResourceType = ubiTask.ResourceType
+	taskEntity.InputParam = ubiTask.InputParam
+	taskEntity.VerifyParam = ubiTask.VerifyParam
+	taskEntity.Status = models.TASK_RECEIVED_STATUS
+	taskEntity.CreateTime = time.Now().Unix()
+	taskEntity.Deadline = ubiTask.DeadLine
+	taskEntity.CheckCode = ubiTask.CheckCode
+	err := NewTaskService().SaveTaskEntity(taskEntity)
+	if err != nil {
+		logs.GetLogger().Errorf("save task entity failed, error: %v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SaveTaskEntityError))
+		return
+	}
+
 	if ubiTask.ID == 0 {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: id"))
 		return
@@ -558,6 +588,9 @@ func DoUbiTaskForDocker(c *gin.Context) {
 
 	balance, err := checkBalance(cpAccountAddress)
 	if err != nil || !balance {
+		taskEntity.Status = models.TASK_REJECTED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
+
 		logs.GetLogger().Errorf("failed check cp account balance, error: %v", err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckBalanceError))
 		return
@@ -572,6 +605,8 @@ func DoUbiTaskForDocker(c *gin.Context) {
 
 	logs.GetLogger().Infof("ubi task sign verifing, task_id: %d, verify: %v", ubiTask.ID, signature)
 	if !signature {
+		taskEntity.Status = models.TASK_REJECTED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "signature verify failed"))
 		return
 	}
@@ -579,24 +614,6 @@ func DoUbiTaskForDocker(c *gin.Context) {
 	var gpuFlag = "0"
 	if ubiTask.ResourceType == 1 {
 		gpuFlag = "1"
-	}
-
-	var taskEntity = new(models.TaskEntity)
-	taskEntity.Id = int64(ubiTask.ID)
-	taskEntity.Type = ubiTask.Type
-	taskEntity.Name = ubiTask.Name
-	taskEntity.ResourceType = ubiTask.ResourceType
-	taskEntity.InputParam = ubiTask.InputParam
-	taskEntity.VerifyParam = ubiTask.VerifyParam
-	taskEntity.Status = models.TASK_RECEIVED_STATUS
-	taskEntity.CreateTime = time.Now().Unix()
-	taskEntity.Deadline = ubiTask.DeadLine
-	taskEntity.CheckCode = ubiTask.CheckCode
-	err = NewTaskService().SaveTaskEntity(taskEntity)
-	if err != nil {
-		logs.GetLogger().Errorf("save task entity failed, error: %v", err)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SaveTaskEntityError))
-		return
 	}
 
 	var gpuName string
@@ -1266,18 +1283,26 @@ func CronTaskForEcp() {
 		}
 	}()
 
+	go func() {
+		GetCpBalance()
+		ticker := time.NewTicker(30 * time.Minute)
+		for range ticker.C {
+			GetCpBalance()
+		}
+	}()
+
 }
 
 func syncTaskStatusForSequencerService() error {
-	taskList, err := NewTaskService().GetTaskListNoReward()
+	taskList, err := NewTaskService().GetTaskListNoRewardForFilC2()
 	if err != nil {
-		return fmt.Errorf("failed to get task list, error: %+v", err)
+		return fmt.Errorf("failed to get ubi fil-c2 task list, error: %+v", err)
 	}
 
 	taskGroups := handleTasksToGroup(taskList)
 	var taskIdAndStatus = make(map[int64]string)
 	for _, group := range taskGroups {
-		taskList, err := NewSequencer().QueryTask(group.Type, group.Ids...)
+		taskList, err := NewSequencer().QueryTask(group.Type, group.Ids, nil)
 		if err != nil {
 			logs.GetLogger().Errorf("failed to query task, task ids: %v, error: %v", group.Ids, err)
 			continue
@@ -1344,9 +1369,73 @@ func syncTaskStatusForSequencerService() error {
 		}
 	}
 	if len(taskIdAndStatus) > 0 {
-		logs.GetLogger().Infof("successfully updated the task status: %v", taskIdAndStatus)
+		logs.GetLogger().Infof("successfully updated the fil-c2 task status: %v", taskIdAndStatus)
 	}
+	syncUbiMiningTaskStatus()
 	return nil
+}
+
+func syncUbiMiningTaskStatus() {
+	taskList, err := NewTaskService().GetTaskListNoRewardForMining()
+	if err != nil {
+		logs.GetLogger().Errorf("failed to get ubi mining task list, error: %+v", err)
+		return
+	}
+
+	taskGroups := handleTasksToGroupForMining(taskList)
+	var taskIdAndStatus = make(map[int64]string)
+	for _, group := range taskGroups {
+		taskList, err := NewSequencer().QueryTask(group.Type, nil, group.Uuids)
+		if err != nil {
+			logs.GetLogger().Errorf("failed to query task, task ids: %v, error: %v", group.Uuids, err)
+			continue
+		}
+
+		var taskMap = make(map[string]SequenceTask)
+		for _, t := range taskList.Data.List {
+			taskMap[t.Uuid] = t
+		}
+
+		for _, item := range group.Items {
+			if t, ok := taskMap[item.Uuid]; ok {
+				var status int
+				switch t.Status {
+				case "received":
+					status = models.TASK_RECEIVED_STATUS
+				case "running":
+					status = models.TASK_RUNNING_STATUS
+				case "submitted":
+					status = models.TASK_SUBMITTED_STATUS
+				case "verified":
+					status = models.TASK_VERIFIED_STATUS
+				case "rewarded":
+					status = models.TASK_REWARDED_STATUS
+				case "invalid":
+					status = models.TASK_INVALID_STATUS
+				case "repeated":
+					status = models.TASK_REPEATED_STATUS
+				case "timeout":
+					status = models.TASK_TIMEOUT_STATUS
+				case "verifyFailed":
+					status = models.TASK_VERIFYFAILED_STATUS
+				case "failed":
+					status = models.TASK_FAILED_STATUS
+				default:
+					status = models.TASK_UNKNOWN_STATUS
+				}
+
+				if item.Status == status {
+					continue
+				}
+				taskIdAndStatus[item.Id] = models.TaskStatusStr(status)
+				item.Status = status
+				NewTaskService().UpdateTaskEntityByTaskUuId(item)
+			}
+		}
+	}
+	if len(taskIdAndStatus) > 0 {
+		logs.GetLogger().Infof("successfully updated the mining task status: %v", taskIdAndStatus)
+	}
 }
 
 func SyncCpAccountInfo() (*models.Account, error) {
@@ -1535,71 +1624,119 @@ func submitTaskToSequencer(proof string, task *models.TaskEntity, timeOut int64,
 }
 
 func checkBalance(cpAccountAddress string) (bool, error) {
-	chainUrl, err := conf.GetRpcByNetWorkName()
-	if err != nil {
-		return false, fmt.Errorf("failed to get rpc url, cpAccount: %s, error: %v", cpAccountAddress, err)
+	cpBalance, err := NewCpBalanceService().GetCpBalance(cpAccountAddress)
+	if err != nil || cpBalance == nil {
+		if err != nil {
+			return false, err
+		}
+		if cpBalance == nil {
+			return false, fmt.Errorf("not found cp balance")
+		}
 	}
-	client, err := contract.GetEthClient(chainUrl)
-	if err != nil {
-		return false, fmt.Errorf("failed to dial rpc, cpAccount: %d, error: %v", cpAccountAddress, err)
-	}
-	client.Close()
-
-	_, workerAddress, err := GetOwnerAddressAndWorkerAddress()
-	if err != nil {
-		return false, fmt.Errorf("failed to get worker address, cpAccount: %s,error: %v", cpAccountAddress, err)
-	}
-
-	workerBalance, err := wallet.BalanceNumber(client, workerAddress)
-	if err != nil {
-		return false, fmt.Errorf("failed to get worker banlance, cpAccount: %s,error: %v", cpAccountAddress, err)
-	}
-
-	sequencerStub, err := ecp.NewSequencerStub(client, ecp.WithSequencerCpAccountAddress(cpAccountAddress))
-	if err != nil {
-		return false, fmt.Errorf("failed to get cp sequencer contract, cpAccount: %s, error: %v", cpAccountAddress, err)
-	}
-	sequencerBalanceStr, err := sequencerStub.GetCPBalance()
-	if err != nil {
-		return false, fmt.Errorf("failed to get cp sequencer contract, cpAccount: %s, error: %v", cpAccountAddress, err)
-	}
-
-	sequencerBalance, err := strconv.ParseFloat(sequencerBalanceStr, 64)
-	if err != nil {
-		return false, fmt.Errorf("failed to convert numbers for cp sequencer balance, cpAccount: %s, sequencerBalance: %s, error: %v", cpAccountAddress, sequencerBalanceStr, err)
-	}
-
-	logs.GetLogger().Infof("cpAccount: %s, sequencer balance: %s ETH, worker address balance: %s ETH", cpAccountAddress, fmt.Sprintf("%.6f", sequencerBalance),
-		fmt.Sprintf("%.6f", workerBalance))
+	logs.GetLogger().Infof("cpAccount: %s, sequencer balance: %f ETH, worker address balance: %f ETH", cpAccountAddress, cpBalance.SequencerBalance, cpBalance.WorkerBalance)
 
 	if conf.GetConfig().UBI.EnableSequencer && !conf.GetConfig().UBI.AutoChainProof {
-		if sequencerBalance > 0.000001 {
+		if cpBalance.SequencerBalance > 0.000001 {
 			return true, nil
 		} else {
-			return false, fmt.Errorf("No sufficient balance in the sequencer account, current balance: %s ETH", fmt.Sprintf("%.6f", sequencerBalance))
+			return false, fmt.Errorf("No sufficient balance in the sequencer account, current balance: %f ETH", cpBalance.SequencerBalance)
 		}
 	}
 
 	if conf.GetConfig().UBI.EnableSequencer && conf.GetConfig().UBI.AutoChainProof {
-		if sequencerBalance > 0.000001 || workerBalance > 0.00001 {
+		if cpBalance.SequencerBalance > 0.000001 || cpBalance.WorkerBalance > 0.00001 {
 			return true, nil
 		} else {
-			return false, fmt.Errorf("Not enough funds in the sequencer account and worker address, sequencer balance: %s ETH, worker address: %s ETH", fmt.Sprintf("%.6f", sequencerBalance),
-				fmt.Sprintf("%.6f", workerBalance))
+			return false, fmt.Errorf("Not enough funds in the sequencer account and worker address, sequencer balance: %f ETH, worker address: %f ETH", cpBalance.SequencerBalance,
+				cpBalance.WorkerBalance)
 		}
 	}
 
 	if !conf.GetConfig().UBI.EnableSequencer && conf.GetConfig().UBI.AutoChainProof {
-		if workerBalance > 0.00001 {
+		if cpBalance.WorkerBalance > 0.00001 {
 			return true, nil
 		} else {
-			return false, fmt.Errorf("No sufficient balance in the worker address, current balance: %s ETH", fmt.Sprintf("%.6f", workerBalance))
+			return false, fmt.Errorf("No sufficient balance in the worker address, current balance: %f ETH", cpBalance.WorkerBalance)
 		}
 	}
 
 	return false, fmt.Errorf("unknown error")
 }
 
+func GetCpBalance() {
+	cpAccountAddress, err := contract.GetCpAccountAddress()
+	if err != nil {
+		logs.GetLogger().Errorf("get cp account contract address failed, error: %v", err)
+		return
+	}
+
+	chainUrl, err := conf.GetRpcByNetWorkName()
+	if err != nil {
+		logs.GetLogger().Errorf("failed to get rpc url, cpAccount: %s, error: %v", cpAccountAddress, err)
+		return
+
+	}
+	client, err := contract.GetEthClient(chainUrl)
+	if err != nil {
+		logs.GetLogger().Errorf("failed to dial rpc, cpAccount: %d, error: %v", cpAccountAddress, err)
+		return
+	}
+	client.Close()
+
+	_, workerAddress, err := GetOwnerAddressAndWorkerAddress()
+	if err != nil {
+		logs.GetLogger().Errorf("failed to get worker address, cpAccount: %s,error: %v", cpAccountAddress, err)
+		return
+	}
+
+	workerBalance, err := wallet.BalanceNumber(client, workerAddress)
+	if err != nil {
+		logs.GetLogger().Errorf("failed to get worker banlance, cpAccount: %s,error: %v", cpAccountAddress, err)
+		return
+	}
+
+	sequencerStub, err := ecp.NewSequencerStub(client, ecp.WithSequencerCpAccountAddress(cpAccountAddress))
+	if err != nil {
+		logs.GetLogger().Errorf("failed to get cp sequencer contract, cpAccount: %s, error: %v", cpAccountAddress, err)
+		return
+	}
+	sequencerBalanceStr, err := sequencerStub.GetCPBalance()
+	if err != nil {
+		logs.GetLogger().Errorf("failed to get cp sequencer contract, cpAccount: %s, error: %v", cpAccountAddress, err)
+		return
+	}
+
+	sequencerBalance, err := strconv.ParseFloat(sequencerBalanceStr, 64)
+	if err != nil {
+		logs.GetLogger().Errorf("failed to convert numbers for cp sequencer balance, cpAccount: %s, sequencerBalance: %s, error: %v", cpAccountAddress, sequencerBalanceStr, err)
+		return
+	}
+
+	logs.GetLogger().Infof("cpAccount: %s, sequencer balance: %s ETH, worker address balance: %s ETH", cpAccountAddress, fmt.Sprintf("%.6f", sequencerBalance),
+		fmt.Sprintf("%.6f", workerBalance))
+
+	var cpBalance = models.CpBalanceEntity{
+		CpAccount:        cpAccountAddress,
+		WorkerBalance:    roundToSixDecimal(workerBalance),
+		SequencerBalance: roundToSixDecimal(sequencerBalance),
+	}
+	cpBalanceEntity, err := NewCpBalanceService().GetCpBalance(cpAccountAddress)
+	if err != nil || cpBalanceEntity.CpAccount == "" {
+		err = NewCpBalanceService().SaveCpBalance(cpBalance)
+	} else {
+		cpBalance.Id = cpBalanceEntity.Id
+		err = NewCpBalanceService().UpdateCpBalance(cpBalance)
+	}
+
+	if err != nil {
+		logs.GetLogger().Errorf("failed to update cp balance, error: %v", err)
+		return
+	}
+}
+
+func roundToSixDecimal(num float64) float64 {
+	return math.Round(num*1e6) / 1e6
+}
 func RetryFn(fn func() error, maxRetries int, delay time.Duration) error {
 	var err error
 	for i := 0; i < maxRetries; i++ {

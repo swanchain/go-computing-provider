@@ -17,6 +17,7 @@ import (
 	"github.com/docker/docker/api/types/registry"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/swanchain/go-computing-provider/build"
+	"github.com/swanchain/go-computing-provider/constants"
 	"io"
 	"os"
 	"os/exec"
@@ -31,8 +32,6 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 )
-
-const BuildFileName = "build.log"
 
 type DockerService struct {
 	c *client.Client
@@ -75,7 +74,7 @@ func ExtractExposedPort(dockerfilePath string) (string, error) {
 	return exposedPort, nil
 }
 
-func (ds *DockerService) BuildImage(buildPath, imageName string) error {
+func (ds *DockerService) BuildImage(jobUuid, buildPath, imageName string) error {
 	// Create a buffer
 	buf := new(bytes.Buffer)
 	tw := tar.NewWriter(buf)
@@ -120,7 +119,11 @@ func (ds *DockerService) BuildImage(buildPath, imageName string) error {
 	}
 	defer buildResponse.Body.Close()
 
-	logFile, err := os.Create(filepath.Join(buildPath, BuildFileName))
+	cpRepoPath, _ := os.LookupEnv("CP_PATH")
+	logDir := filepath.Join(cpRepoPath, constants.LOG_PATH_PREFIX, jobUuid)
+	os.MkdirAll(logDir, os.ModePerm)
+
+	logFile, err := os.Create(filepath.Join(logDir, constants.BUILD_LOG_NAME))
 	if err != nil {
 		return err
 	}

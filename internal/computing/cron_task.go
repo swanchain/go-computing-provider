@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/swanchain/go-computing-provider/internal/contract"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -44,6 +46,10 @@ func (task *CronTask) RunTask() {
 	task.getUbiTaskReward()
 	task.checkJobReward()
 	task.cleanImageResource()
+	task.CheckCpBalance()
+	task.UpdateContainerLog()
+	task.DeleteSpaceLog()
+
 }
 
 func CheckClusterNetworkPolicy() {
@@ -160,7 +166,7 @@ func (task *CronTask) reportClusterResource() {
 		}()
 
 		k8sService := NewK8sService()
-		if k8sService == nil {
+		if k8sService == nil || k8sService.k8sClient == nil {
 			logs.GetLogger().Errorf("failed to create k8s client, please check that the k8s service is running normally")
 			return
 		}
@@ -183,7 +189,7 @@ func (task *CronTask) watchNameSpaceForDeleted() {
 			}
 		}()
 		service := NewK8sService()
-		if service == nil {
+		if service == nil || service.k8sClient == nil {
 			logs.GetLogger().Errorf("failed to create k8s client, please check that the k8s service is running normally")
 			return
 		}
@@ -240,7 +246,7 @@ func (task *CronTask) watchExpiredTask() {
 		}
 
 		k8sService := NewK8sService()
-		if k8sService == nil {
+		if k8sService == nil || k8sService.k8sClient == nil {
 			logs.GetLogger().Errorf("failed to create k8s client, please check that the k8s service is running normally")
 			return
 		}
@@ -409,7 +415,7 @@ func (task *CronTask) cleanAbnormalDeployment() {
 		}()
 
 		k8sService := NewK8sService()
-		if k8sService == nil {
+		if k8sService == nil || k8sService.k8sClient == nil {
 			logs.GetLogger().Errorf("failed to create k8s client, please check that the k8s service is running normally")
 			return
 		}
@@ -530,7 +536,7 @@ func (task *CronTask) getUbiTaskReward() {
 
 func addNodeLabel() {
 	k8sService := NewK8sService()
-	if k8sService == nil {
+	if k8sService == nil || k8sService.k8sClient == nil {
 		logs.GetLogger().Errorf("failed to create k8s client, please check that the k8s service is running normally")
 		return
 	}
@@ -561,6 +567,73 @@ func addNodeLabel() {
 			}
 		}
 	}
+}
+
+func (task *CronTask) CheckCpBalance() {
+	c := cron.New(cron.WithSeconds())
+	c.AddFunc("0 0/30 * * * ?", func() {
+		defer func() {
+			if err := recover(); err != nil {
+				logs.GetLogger().Errorf("check cp balance catch panic error: %+v", err)
+			}
+		}()
+		GetCpBalance()
+	})
+	c.Start()
+}
+
+func (task *CronTask) UpdateContainerLog() {
+	c := cron.New(cron.WithSeconds())
+	c.AddFunc("* 0/10 * * * ?", func() {
+		defer func() {
+			if err := recover(); err != nil {
+				logs.GetLogger().Errorf("update container log catch panic error: %+v", err)
+			}
+		}()
+
+		jobList, err := NewJobService().GetJobList(models.UN_DELETEED_FLAG, -1)
+		if err != nil {
+			logs.GetLogger().Errorf("failed to get job data, error: %+v", err)
+			return
+		}
+
+		for _, job := range jobList {
+			NewK8sService().UpdateContainerLogToFile(job.JobUuid)
+		}
+	})
+	c.Start()
+}
+
+func (task *CronTask) DeleteSpaceLog() {
+	c := cron.New(cron.WithSeconds())
+	c.AddFunc("0 0/30 * * * ?", func() {
+		defer func() {
+			if err := recover(); err != nil {
+				logs.GetLogger().Errorf("update container log catch panic error: %+v", err)
+			}
+		}()
+
+		jobList, err := NewJobService().GetJobList(models.DELETED_FLAG, -1)
+		if err != nil {
+			logs.GetLogger().Errorf("failed to get job data, error: %+v", err)
+			return
+		}
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
+
+		for _, job := range jobList {
+			if job.CreateTime+int64(24*7*3600) < time.Now().Unix() {
+				continue
+			}
+			if job.ExpireTime+int64(conf.GetConfig().API.ClearLogDuration)*3600 < time.Now().Unix() {
+				err := os.RemoveAll(filepath.Join(cpRepoPath, constants.LOG_PATH_PREFIX, job.JobUuid))
+				if err != nil {
+					logs.GetLogger().Errorf("failed to delete logs, job_uuid: %s, error: %v", job.JobUuid, err)
+					continue
+				}
+			}
+		}
+	})
+	c.Start()
 }
 
 func reportJobStatus(jobUuid string, deployStatus int) bool {
@@ -645,7 +718,8 @@ func checkFcpJobInfoInChain(job *models.JobEntity) {
 type TaskGroup struct {
 	Items []*models.TaskEntity
 	Ids   []int64
-	Type  int // 1: contract  2: sequncer
+	Uuids []string
+	Type  int // 1: contract  2: sequncer 3: mining
 }
 
 func handleTasksToGroup(list []*models.TaskEntity) []TaskGroup {
@@ -678,6 +752,26 @@ func handleTasksToGroup(list []*models.TaskEntity) []TaskGroup {
 	}
 	if len(group1.Items) > 0 {
 		groups = append(groups, group1)
+	}
+	return groups
+}
+
+func handleTasksToGroupForMining(list []*models.TaskEntity) []TaskGroup {
+	var groups []TaskGroup
+	var group TaskGroup
+
+	const batchSize = 10
+	for i := 0; i < len(list); i++ {
+		if len(group.Items) > batchSize {
+			groups = append(groups, group)
+			group = TaskGroup{}
+		}
+		group.Items = append(group.Items, list[i])
+		group.Uuids = append(group.Uuids, list[i].Uuid)
+		group.Type = 3
+	}
+	if len(group.Items) > 0 {
+		groups = append(groups, group)
 	}
 	return groups
 }
