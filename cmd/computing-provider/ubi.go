@@ -182,9 +182,7 @@ var daemonCmd = &cli.Command{
 			return fmt.Errorf("check %s container failed, error: %v", traefikServiceContainerName, err)
 		}
 		if !tsExist {
-			if err = computing.RestartTraefikService(); err != nil {
-				logs.GetLogger().Errorf("restartTraefikService failed, error: %v", err)
-			}
+			computing.RestartTraefikService()
 		}
 
 		if err := conf.InitConfig(cpRepoPath, true); err != nil {
