@@ -51,6 +51,23 @@ func DoUbiTaskForK8s(c *gin.Context) {
 	}
 	logs.GetLogger().Infof("receive ubi task received: %+v", ubiTask)
 
+	var taskEntity = new(models.TaskEntity)
+	taskEntity.Id = int64(ubiTask.ID)
+	taskEntity.Type = ubiTask.Type
+	taskEntity.Name = ubiTask.Name
+	taskEntity.ResourceType = ubiTask.ResourceType
+	taskEntity.InputParam = ubiTask.InputParam
+	taskEntity.VerifyParam = ubiTask.VerifyParam
+	taskEntity.Status = models.TASK_RECEIVED_STATUS
+	taskEntity.CreateTime = time.Now().Unix()
+	taskEntity.Deadline = ubiTask.DeadLine
+	taskEntity.CheckCode = ubiTask.CheckCode
+	err := NewTaskService().SaveTaskEntity(taskEntity)
+	if err != nil {
+		logs.GetLogger().Errorf("save task entity failed, error: %v", err)
+		return
+	}
+
 	if ubiTask.ID == 0 {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: id"))
 		return
@@ -103,6 +120,9 @@ func DoUbiTaskForK8s(c *gin.Context) {
 
 	balance, err := checkBalance(cpAccountAddress)
 	if err != nil || !balance {
+		taskEntity.Status = models.TASK_REJECTED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
+
 		logs.GetLogger().Errorf("failed check cp account balance, error: %v", err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckBalanceError))
 		return
@@ -110,6 +130,9 @@ func DoUbiTaskForK8s(c *gin.Context) {
 
 	signature, err := verifySignature(conf.GetConfig().UBI.UbiEnginePk, fmt.Sprintf("%s%d", cpAccountAddress, ubiTask.ID), ubiTask.Signature)
 	if err != nil {
+		taskEntity.Status = models.TASK_FAILED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
+
 		logs.GetLogger().Errorf("verifySignature for ubi task failed, error: %+v", err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.UbiTaskParamError, "sign data failed"))
 		return
@@ -117,6 +140,9 @@ func DoUbiTaskForK8s(c *gin.Context) {
 
 	logs.GetLogger().Infof("ubi task sign verifing, task_id: %d, type: %s, verify: %v", ubiTask.ID, models.UbiTaskTypeStr(ubiTask.Type), signature)
 	if !signature {
+		taskEntity.Status = models.TASK_REJECTED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
+
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.UbiTaskParamError, "signature verify failed"))
 		return
 	}
@@ -124,23 +150,6 @@ func DoUbiTaskForK8s(c *gin.Context) {
 	var gpuFlag = "0"
 	if ubiTask.ResourceType == 1 {
 		gpuFlag = "1"
-	}
-
-	var taskEntity = new(models.TaskEntity)
-	taskEntity.Id = int64(ubiTask.ID)
-	taskEntity.Type = ubiTask.Type
-	taskEntity.Name = ubiTask.Name
-	taskEntity.ResourceType = ubiTask.ResourceType
-	taskEntity.InputParam = ubiTask.InputParam
-	taskEntity.VerifyParam = ubiTask.VerifyParam
-	taskEntity.Status = models.TASK_RECEIVED_STATUS
-	taskEntity.CreateTime = time.Now().Unix()
-	taskEntity.Deadline = ubiTask.DeadLine
-	taskEntity.CheckCode = ubiTask.CheckCode
-	err = NewTaskService().SaveTaskEntity(taskEntity)
-	if err != nil {
-		logs.GetLogger().Errorf("save task entity failed, error: %v", err)
-		return
 	}
 
 	var envFilePath string
@@ -164,7 +173,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 	}
 
 	if nodeName == "" {
-		taskEntity.Status = models.TASK_FAILED_STATUS
+		taskEntity.Status = models.TASK_REJECTED_STATUS
 		taskEntity.Error = "No resources available"
 		NewTaskService().SaveTaskEntity(taskEntity)
 		logs.GetLogger().Warnf("ubi task id: %d, type: %s, not found a resources available", ubiTask.ID, models.GetResourceTypeStr(ubiTask.ResourceType))
@@ -292,12 +301,14 @@ func DoUbiTaskForK8s(c *gin.Context) {
 			return
 		}
 
+		var nodeSelector = make(map[string]string)
 		if gpuFlag == "0" {
 			delete(envVars, "RUST_GPU_TOOLS_CUSTOM_GPU")
 			envVars["BELLMAN_NO_GPU"] = "1"
 		} else {
 			if len(gpuIndex) > 0 {
 				envVars["CUDA_VISIBLE_DEVICES"] = gpuIndex[0]
+				nodeSelector = generateLabel(strings.ReplaceAll(c2GpuName, " ", "-"))
 			}
 		}
 
@@ -337,7 +348,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 				Template: v1.PodTemplateSpec{
 					Spec: v1.PodSpec{
 						NodeName:     nodeName,
-						NodeSelector: generateLabel(strings.ReplaceAll(c2GpuName, " ", "-")),
+						NodeSelector: nodeSelector,
 						Containers: []v1.Container{
 							{
 								Name:  JobName + generateString(5),
@@ -507,6 +518,24 @@ func DoUbiTaskForDocker(c *gin.Context) {
 	logs.GetLogger().Infof("ubi task received: id: %d, deadline: %d,resource_type: %d, type: %s, input_param: %s, signature: %s",
 		ubiTask.ID, ubiTask.DeadLine, ubiTask.ResourceType, models.UbiTaskTypeStr(ubiTask.Type), ubiTask.InputParam, ubiTask.Signature)
 
+	var taskEntity = new(models.TaskEntity)
+	taskEntity.Id = int64(ubiTask.ID)
+	taskEntity.Type = ubiTask.Type
+	taskEntity.Name = ubiTask.Name
+	taskEntity.ResourceType = ubiTask.ResourceType
+	taskEntity.InputParam = ubiTask.InputParam
+	taskEntity.VerifyParam = ubiTask.VerifyParam
+	taskEntity.Status = models.TASK_RECEIVED_STATUS
+	taskEntity.CreateTime = time.Now().Unix()
+	taskEntity.Deadline = ubiTask.DeadLine
+	taskEntity.CheckCode = ubiTask.CheckCode
+	err := NewTaskService().SaveTaskEntity(taskEntity)
+	if err != nil {
+		logs.GetLogger().Errorf("save task entity failed, error: %v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SaveTaskEntityError))
+		return
+	}
+
 	if ubiTask.ID == 0 {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: id"))
 		return
@@ -559,6 +588,9 @@ func DoUbiTaskForDocker(c *gin.Context) {
 
 	balance, err := checkBalance(cpAccountAddress)
 	if err != nil || !balance {
+		taskEntity.Status = models.TASK_REJECTED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
+
 		logs.GetLogger().Errorf("failed check cp account balance, error: %v", err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckBalanceError))
 		return
@@ -573,6 +605,8 @@ func DoUbiTaskForDocker(c *gin.Context) {
 
 	logs.GetLogger().Infof("ubi task sign verifing, task_id: %d, verify: %v", ubiTask.ID, signature)
 	if !signature {
+		taskEntity.Status = models.TASK_REJECTED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "signature verify failed"))
 		return
 	}
@@ -580,24 +614,6 @@ func DoUbiTaskForDocker(c *gin.Context) {
 	var gpuFlag = "0"
 	if ubiTask.ResourceType == 1 {
 		gpuFlag = "1"
-	}
-
-	var taskEntity = new(models.TaskEntity)
-	taskEntity.Id = int64(ubiTask.ID)
-	taskEntity.Type = ubiTask.Type
-	taskEntity.Name = ubiTask.Name
-	taskEntity.ResourceType = ubiTask.ResourceType
-	taskEntity.InputParam = ubiTask.InputParam
-	taskEntity.VerifyParam = ubiTask.VerifyParam
-	taskEntity.Status = models.TASK_RECEIVED_STATUS
-	taskEntity.CreateTime = time.Now().Unix()
-	taskEntity.Deadline = ubiTask.DeadLine
-	taskEntity.CheckCode = ubiTask.CheckCode
-	err = NewTaskService().SaveTaskEntity(taskEntity)
-	if err != nil {
-		logs.GetLogger().Errorf("save task entity failed, error: %v", err)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SaveTaskEntityError))
-		return
 	}
 
 	var gpuName string
@@ -1278,15 +1294,15 @@ func CronTaskForEcp() {
 }
 
 func syncTaskStatusForSequencerService() error {
-	taskList, err := NewTaskService().GetTaskListNoReward()
+	taskList, err := NewTaskService().GetTaskListNoRewardForFilC2()
 	if err != nil {
-		return fmt.Errorf("failed to get task list, error: %+v", err)
+		return fmt.Errorf("failed to get ubi fil-c2 task list, error: %+v", err)
 	}
 
 	taskGroups := handleTasksToGroup(taskList)
 	var taskIdAndStatus = make(map[int64]string)
 	for _, group := range taskGroups {
-		taskList, err := NewSequencer().QueryTask(group.Type, group.Ids...)
+		taskList, err := NewSequencer().QueryTask(group.Type, group.Ids, nil)
 		if err != nil {
 			logs.GetLogger().Errorf("failed to query task, task ids: %v, error: %v", group.Ids, err)
 			continue
@@ -1353,9 +1369,73 @@ func syncTaskStatusForSequencerService() error {
 		}
 	}
 	if len(taskIdAndStatus) > 0 {
-		logs.GetLogger().Infof("successfully updated the task status: %v", taskIdAndStatus)
+		logs.GetLogger().Infof("successfully updated the fil-c2 task status: %v", taskIdAndStatus)
 	}
+	syncUbiMiningTaskStatus()
 	return nil
+}
+
+func syncUbiMiningTaskStatus() {
+	taskList, err := NewTaskService().GetTaskListNoRewardForMining()
+	if err != nil {
+		logs.GetLogger().Errorf("failed to get ubi mining task list, error: %+v", err)
+		return
+	}
+
+	taskGroups := handleTasksToGroupForMining(taskList)
+	var taskIdAndStatus = make(map[int64]string)
+	for _, group := range taskGroups {
+		taskList, err := NewSequencer().QueryTask(group.Type, nil, group.Uuids)
+		if err != nil {
+			logs.GetLogger().Errorf("failed to query task, task ids: %v, error: %v", group.Uuids, err)
+			continue
+		}
+
+		var taskMap = make(map[string]SequenceTask)
+		for _, t := range taskList.Data.List {
+			taskMap[t.Uuid] = t
+		}
+
+		for _, item := range group.Items {
+			if t, ok := taskMap[item.Uuid]; ok {
+				var status int
+				switch t.Status {
+				case "received":
+					status = models.TASK_RECEIVED_STATUS
+				case "running":
+					status = models.TASK_RUNNING_STATUS
+				case "submitted":
+					status = models.TASK_SUBMITTED_STATUS
+				case "verified":
+					status = models.TASK_VERIFIED_STATUS
+				case "rewarded":
+					status = models.TASK_REWARDED_STATUS
+				case "invalid":
+					status = models.TASK_INVALID_STATUS
+				case "repeated":
+					status = models.TASK_REPEATED_STATUS
+				case "timeout":
+					status = models.TASK_TIMEOUT_STATUS
+				case "verifyFailed":
+					status = models.TASK_VERIFYFAILED_STATUS
+				case "failed":
+					status = models.TASK_FAILED_STATUS
+				default:
+					status = models.TASK_UNKNOWN_STATUS
+				}
+
+				if item.Status == status {
+					continue
+				}
+				taskIdAndStatus[item.Id] = models.TaskStatusStr(status)
+				item.Status = status
+				NewTaskService().UpdateTaskEntityByTaskUuId(item)
+			}
+		}
+	}
+	if len(taskIdAndStatus) > 0 {
+		logs.GetLogger().Infof("successfully updated the mining task status: %v", taskIdAndStatus)
+	}
 }
 
 func SyncCpAccountInfo() (*models.Account, error) {
@@ -1641,9 +1721,10 @@ func GetCpBalance() {
 		SequencerBalance: roundToSixDecimal(sequencerBalance),
 	}
 	cpBalanceEntity, err := NewCpBalanceService().GetCpBalance(cpAccountAddress)
-	if err != nil || cpBalanceEntity == nil || cpBalanceEntity.WorkerBalance == 0 {
+	if err != nil || cpBalanceEntity.CpAccount == "" {
 		err = NewCpBalanceService().SaveCpBalance(cpBalance)
 	} else {
+		cpBalance.Id = cpBalanceEntity.Id
 		err = NewCpBalanceService().UpdateCpBalance(cpBalance)
 	}
 

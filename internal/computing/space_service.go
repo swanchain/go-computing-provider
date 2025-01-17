@@ -60,23 +60,23 @@ func ReceiveJob(c *gin.Context) {
 	logs.GetLogger().Infof("Job received Data: %+v", jobData)
 
 	if !CheckWalletWhiteList(jobData.JobSourceURI) {
-		logs.GetLogger().Errorf("This cp does not accept tasks from wallet addresses outside the whitelist")
+		logs.GetLogger().Errorf("%s is not in the white list", getWalletAddress(jobData.JobSourceURI))
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SpaceCheckWhiteListError))
 		return
 	}
 
 	if CheckWalletBlackList(jobData.JobSourceURI) {
-		logs.GetLogger().Errorf("This cp does not accept tasks from wallet addresses inside the blacklist")
+		logs.GetLogger().Errorf("%s is in the black list", getWalletAddress(jobData.JobSourceURI))
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SpaceCheckBlackListError))
 		return
 	}
 
+	cpRepoPath, _ := os.LookupEnv("CP_PATH")
 	if conf.GetConfig().HUB.VerifySign {
 		if len(jobData.NodeIdJobSourceUriSignature) == 0 {
 			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BadParamError, "missing node_id_job_source_uri_signature field"))
 			return
 		}
-		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 		nodeID := GetNodeId(cpRepoPath)
 
 		cpAccountAddress, err := contract.GetCpAccountAddress()
@@ -240,7 +240,7 @@ func ReceiveJob(c *gin.Context) {
 		jobEntity.SourceUrl = jobSourceUri
 		jobEntity.RealUrl = jobData.JobRealUri
 		jobEntity.BuildLog = jobData.BuildLog
-		jobEntity.BuildLogPath = filepath.Join(deployParam.BuildImagePath, BuildFileName)
+		jobEntity.BuildLogPath = filepath.Join(cpRepoPath, constants.LOG_PATH_PREFIX, jobData.UUID, constants.BUILD_LOG_NAME)
 		jobEntity.ContainerLog = jobData.ContainerLog
 		jobEntity.Duration = jobData.Duration
 		jobEntity.JobUuid = jobData.UUID
@@ -857,13 +857,13 @@ func DeployImage(c *gin.Context) {
 	logs.GetLogger().Infof("Image Job received Data: %+v", deployJob)
 
 	if !CheckWalletWhiteList(deployJob.WalletAddress) {
-		logs.GetLogger().Errorf("This cp does not accept tasks from wallet addresses outside the whitelist")
+		logs.GetLogger().Errorf("%s is not in the white list", deployJob.WalletAddress)
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SpaceCheckWhiteListError))
 		return
 	}
 
 	if CheckWalletBlackList(deployJob.WalletAddress) {
-		logs.GetLogger().Errorf("This cp does not accept tasks from wallet addresses inside the blacklist")
+		logs.GetLogger().Errorf("%s is in the black list", deployJob.WalletAddress)
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SpaceCheckBlackListError))
 		return
 	}
@@ -987,8 +987,8 @@ func DeployImage(c *gin.Context) {
 		var jobEntity = new(models.JobEntity)
 		jobEntity.SpaceUuid = deployJob.Uuid
 		jobEntity.RealUrl = jobData.JobRealUri
-		jobEntity.BuildLog = jobData.BuildLog
-		jobEntity.BuildLogPath = filepath.Join(cpRepoPath, "build/fcp", deployJob.Uuid, BuildFileName)
+		jobEntity.BuildLog = filepath.Join(cpRepoPath, constants.LOG_PATH_PREFIX, jobData.UUID, constants.BUILD_LOG_NAME)
+		jobEntity.BuildLogPath = filepath.Join(cpRepoPath, constants.LOG_PATH_PREFIX, jobData.UUID, constants.Container_LOG_NAME)
 		jobEntity.ContainerLog = jobData.ContainerLog
 		jobEntity.Duration = deployJob.Duration
 		jobEntity.JobUuid = deployJob.Uuid
@@ -1062,39 +1062,14 @@ func handleConnection(conn *websocket.Conn, jobDetail models.JobEntity, logType 
 			client.HandleLogs(logFile)
 		}
 	} else if logType == "container" {
-		k8sNameSpace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(jobDetail.WalletAddress)
-
-		k8sService := NewK8sService()
-		pods, err := k8sService.k8sClient.CoreV1().Pods(k8sNameSpace).List(context.TODO(), metaV1.ListOptions{
-			LabelSelector: fmt.Sprintf("lad_app=%s", jobDetail.JobUuid),
-		})
-		if err != nil {
-			logs.GetLogger().Errorf("Error listing Pods: %v", err)
-			return
-		}
-
-		if len(pods.Items) > 0 {
-			line := int64(1000)
-			containerStatuses := pods.Items[0].Status.ContainerStatuses
-			if len(containerStatuses) == 0 {
-				return
-			}
-			lastIndex := len(containerStatuses) - 1
-			req := k8sService.k8sClient.CoreV1().Pods(k8sNameSpace).GetLogs(pods.Items[0].Name, &v1.PodLogOptions{
-				Container:  containerStatuses[lastIndex].Name,
-				Follow:     true,
-				Timestamps: true,
-				TailLines:  &line,
-			})
-
-			podLogs, err := req.Stream(context.Background())
-			if err != nil {
-				logs.GetLogger().Errorf("Error opening log stream: %v", err)
-				return
-			}
-			defer podLogs.Close()
-
-			client.HandleLogs(podLogs)
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
+		containerLogPath := filepath.Join(cpRepoPath, constants.LOG_PATH_PREFIX, jobDetail.JobUuid, constants.Container_LOG_NAME)
+		if _, err := os.Stat(containerLogPath); err != nil {
+			client.HandleLogs(strings.NewReader("Not found container logs"))
+		} else {
+			logFile, _ := os.Open(containerLogPath)
+			defer logFile.Close()
+			client.HandleLogs(logFile)
 		}
 	}
 }
@@ -1467,7 +1442,12 @@ func updateJobStatus(jobUuid string, jobStatus int, url ...string) {
 				Url:    "",
 			}
 		}
+
 	}()
+
+	if jobStatus == models.DEPLOY_TO_K8S {
+		NewK8sService().UpdateContainerLogToFile(jobUuid)
+	}
 }
 
 func getSpaceDetail(jobSourceURI string) (models.SpaceJSON, error) {
@@ -1882,12 +1862,17 @@ func CheckWalletWhiteList(jobSourceURI string) bool {
 		return true
 	}
 
-	spaceDetail, err := getSpaceDetail(jobSourceURI)
-	if err != nil {
-		logs.GetLogger().Errorln(err)
-		return false
+	var userWalletAddress string
+	if strings.HasPrefix(jobSourceURI, "http") {
+		spaceDetail, err := getSpaceDetail(jobSourceURI)
+		if err != nil {
+			logs.GetLogger().Errorln(err)
+			return false
+		}
+		userWalletAddress = spaceDetail.Data.Owner.PublicAddress
+	} else {
+		userWalletAddress = jobSourceURI
 	}
-	userWalletAddress := spaceDetail.Data.Owner.PublicAddress
 
 	for _, address := range whiteList {
 		if userWalletAddress == address {
@@ -1895,6 +1880,15 @@ func CheckWalletWhiteList(jobSourceURI string) bool {
 		}
 	}
 	return false
+}
+
+func getWalletAddress(jobSourceURI string) string {
+	spaceDetail, err := getSpaceDetail(jobSourceURI)
+	if err != nil {
+		logs.GetLogger().Errorln(err)
+		return ""
+	}
+	return spaceDetail.Data.Owner.PublicAddress
 }
 
 func CheckWalletBlackList(jobSourceURI string) bool {
@@ -1908,12 +1902,17 @@ func CheckWalletBlackList(jobSourceURI string) bool {
 		return true
 	}
 
-	spaceDetail, err := getSpaceDetail(jobSourceURI)
-	if err != nil {
-		logs.GetLogger().Errorln(err)
-		return false
+	var userWalletAddress string
+	if strings.HasPrefix(jobSourceURI, "http") {
+		spaceDetail, err := getSpaceDetail(jobSourceURI)
+		if err != nil {
+			logs.GetLogger().Errorln(err)
+			return false
+		}
+		userWalletAddress = spaceDetail.Data.Owner.PublicAddress
+	} else {
+		userWalletAddress = jobSourceURI
 	}
-	userWalletAddress := spaceDetail.Data.Owner.PublicAddress
 
 	for _, address := range blackList {
 		if userWalletAddress == address {

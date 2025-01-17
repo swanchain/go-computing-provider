@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type Sequencer struct {
@@ -156,19 +157,24 @@ func (s *Sequencer) SendTaskProof(data []byte) (SendProofResp, error) {
 	return spr, fmt.Errorf(spr.Msg)
 }
 
-func (s *Sequencer) QueryTask(taskType int, taskIds ...int64) (TaskListResp, error) {
+func (s *Sequencer) QueryTask(taskType int, taskIds []int64, uuids []string) (TaskListResp, error) {
 	if tokenCache == "" {
 		if err := s.GetToken(); err != nil {
 			return TaskListResp{}, fmt.Errorf("failed to get token, error: %v", err)
 		}
 	}
+	var reqUrl string
+	if taskType == 3 {
+		reqUrl = s.url + task + fmt.Sprintf("?type=%d&uuids=%s", taskType, strings.Join(uuids, ","))
+	} else {
+		reqData, err := json.Marshal(taskIds)
+		if err != nil {
+			return TaskListResp{}, err
+		}
 
-	reqData, err := json.Marshal(taskIds)
-	if err != nil {
-		return TaskListResp{}, err
+		reqUrl = s.url + task + fmt.Sprintf("?type=%d&ids=%s", taskType, string(reqData))
 	}
 
-	var reqUrl = s.url + task + fmt.Sprintf("?type=%d&ids=%s", taskType, string(reqData))
 	req, err := http.NewRequest("GET", reqUrl, nil)
 	if err != nil {
 		return TaskListResp{}, fmt.Errorf("error creating request: %v", err)
@@ -267,6 +273,7 @@ type TaskListResp struct {
 
 type SequenceTask struct {
 	Id                 int    `json:"id"`
+	Uuid               string `json:"uuid"`
 	Type               int    `json:"type"`
 	InputParam         string `json:"input_param"`
 	VerifyParam        string `json:"verify_param"`
