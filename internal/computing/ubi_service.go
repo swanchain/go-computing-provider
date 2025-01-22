@@ -686,7 +686,10 @@ func DoUbiTaskForDocker(c *gin.Context) {
 				useIndexs = append(useIndexs, indexs[0])
 				env = append(env, fmt.Sprintf("CUDA_VISIBLE_DEVICES=%s", strings.Join(useIndexs, ",")))
 			} else {
+				taskEntity.Status = models.TASK_REJECTED_STATUS
+				NewTaskService().SaveTaskEntity(taskEntity)
 				logs.GetLogger().Warnf("not resources available, task_id: %d", ubiTask.ID)
+				c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError))
 				return
 			}
 			needResource = container.Resources{
