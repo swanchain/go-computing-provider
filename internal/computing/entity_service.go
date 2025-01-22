@@ -64,7 +64,9 @@ func (taskServ TaskService) UpdateTaskEntityByTaskId(task *models.TaskEntity) (e
 }
 
 func (taskServ TaskService) UpdateTaskEntityByTaskUuId(task *models.TaskEntity) (err error) {
-	return taskServ.Model(&models.TaskEntity{}).Where("uuid=?", task.Uuid).Updates(task).Error
+	return taskServ.Model(&models.TaskEntity{}).Where("uuid=?", task.Uuid).Updates(map[string]interface{}{
+		"status": task.Status,
+	}).Error
 }
 
 func (taskServ TaskService) GetTaskEntity(taskId int64) (*models.TaskEntity, error) {

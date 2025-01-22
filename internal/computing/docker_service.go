@@ -206,7 +206,7 @@ func (ds *DockerService) RemoveImage(imageId string) error {
 }
 
 func (ds *DockerService) RemoveContainerByName(containerName string) error {
-	containerList, err := ds.c.ContainerList(context.Background(), container.ListOptions{})
+	containerList, err := ds.c.ContainerList(context.Background(), container.ListOptions{All: true})
 	if err != nil {
 		return err
 	}
