@@ -124,23 +124,6 @@ func ReceiveJob(c *gin.Context) {
 		}
 	}
 
-	available, gpuProductName, gpuIndex, err := checkResourceAvailableForSpace(jobData.JobType, spaceDetail.Data.Space.ActiveOrder.Config)
-	if err != nil {
-		logs.GetLogger().Errorf("failed to check job resource, error: %+v", err)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
-		return
-	}
-
-	if !available {
-		if gpuProductName != "" {
-			logs.GetLogger().Warnf("job_uuid: %s, name: %s, gpu_name: %s, not found a resources available", jobData.UUID, jobData.Name, gpuProductName)
-		} else {
-			logs.GetLogger().Warnf("job_uuid: %s, name: %s, not found a resources available", jobData.UUID, jobData.Name)
-		}
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError))
-		return
-	}
-
 	var hostName string
 	var logHost string
 	prefixStr := generateString(10)
@@ -161,8 +144,58 @@ func ReceiveJob(c *gin.Context) {
 	jobData.JobRealUri = fmt.Sprintf("https://%s", hostName)
 	jobData.NodeIdJobSourceUriSignature = ""
 
+	var jobEntity = new(models.JobEntity)
+	jobEntity.Source = jobData.StorageSource
+	jobEntity.SpaceUuid = spaceUuid
+	jobEntity.TaskUuid = jobData.TaskUUID
+	jobEntity.SourceUrl = jobSourceUri
+	jobEntity.RealUrl = jobData.JobRealUri
+	jobEntity.BuildLog = jobData.BuildLog
+	jobEntity.BuildLogPath = filepath.Join(cpRepoPath, constants.LOG_PATH_PREFIX, jobData.UUID, constants.BUILD_LOG_NAME)
+	jobEntity.ContainerLog = jobData.ContainerLog
+	jobEntity.Duration = jobData.Duration
+	jobEntity.JobUuid = jobData.UUID
+	jobEntity.DeployStatus = models.DEPLOY_RECEIVE_JOB
+	jobEntity.CreateTime = time.Now().Unix()
+	jobEntity.ExpireTime = time.Now().Unix() + int64(jobData.Duration)
+	jobEntity.WalletAddress = spaceDetail.Data.Owner.PublicAddress
+	jobEntity.Name = spaceDetail.Data.Space.Name
+	jobEntity.Hardware = spaceDetail.Data.Space.ActiveOrder.Config.Description
+	jobEntity.SpaceType = 0
+	jobEntity.ResourceType = spaceDetail.Data.Space.ActiveOrder.Config.HardwareType
+	jobEntity.NameSpace = constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(spaceDetail.Data.Owner.PublicAddress)
+	jobEntity.K8sDeployName = constants.K8S_DEPLOY_NAME_PREFIX + strings.ToLower(jobData.UUID)
+	jobEntity.Status = models.JOB_RECEIVED_STATUS
+	jobEntity.K8sResourceType = "deployment"
+	jobEntity.IpWhiteList = strings.Join(jobData.IpWhiteList, ",")
+	err = NewJobService().SaveJobEntity(jobEntity)
+	if err != nil {
+		logs.GetLogger().Errorf("failed to save job to db, job_uuid: %s, error: %+v", jobData.UUID, err)
+	}
+
+	available, gpuProductName, gpuIndex, err := checkResourceAvailableForSpace(jobData.JobType, spaceDetail.Data.Space.ActiveOrder.Config)
+	if err != nil {
+		NewJobService().UpdateJobEntityStatusByJobUuid(jobEntity.JobUuid, models.JOB_FAILED_STATUS)
+		logs.GetLogger().Errorf("failed to check job resource, error: %+v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
+		return
+	}
+
+	if !available {
+		NewJobService().UpdateJobEntityStatusByJobUuid(jobEntity.JobUuid, models.JOB_REJECTED_STATUS)
+
+		if gpuProductName != "" {
+			logs.GetLogger().Warnf("job_uuid: %s, name: %s, gpu_name: %s, not found a resources available", jobData.UUID, jobData.Name, gpuProductName)
+		} else {
+			logs.GetLogger().Warnf("job_uuid: %s, name: %s, not found a resources available", jobData.UUID, jobData.Name)
+		}
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError))
+		return
+	}
+
 	deployParam, err := DownloadSpaceResources(jobData.UUID, spaceDetail.Data.Files)
 	if err != nil {
+		NewJobService().UpdateJobEntityStatusByJobUuid(jobEntity.JobUuid, models.JOB_FAILED_STATUS)
 		logs.GetLogger().Errorf("failed to download space resource, job_uuid: %s, error: %v", jobData.UUID, err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.DownloadResourceError))
 		return
@@ -220,6 +253,7 @@ func ReceiveJob(c *gin.Context) {
 
 			_, serviceNodePort, err = NewK8sService().CheckServiceNodePort(0)
 			if err != nil {
+				NewJobService().UpdateJobEntityStatusByJobUuid(jobEntity.JobUuid, models.JOB_FAILED_STATUS)
 				logs.GetLogger().Errorf("failed to check port, error: %v", err)
 				c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.PortNoAvailableError))
 				return
@@ -233,35 +267,6 @@ func ReceiveJob(c *gin.Context) {
 	}
 
 	go func() {
-		var jobEntity = new(models.JobEntity)
-		jobEntity.Source = jobData.StorageSource
-		jobEntity.SpaceUuid = spaceUuid
-		jobEntity.TaskUuid = jobData.TaskUUID
-		jobEntity.SourceUrl = jobSourceUri
-		jobEntity.RealUrl = jobData.JobRealUri
-		jobEntity.BuildLog = jobData.BuildLog
-		jobEntity.BuildLogPath = filepath.Join(cpRepoPath, constants.LOG_PATH_PREFIX, jobData.UUID, constants.BUILD_LOG_NAME)
-		jobEntity.ContainerLog = jobData.ContainerLog
-		jobEntity.Duration = jobData.Duration
-		jobEntity.JobUuid = jobData.UUID
-		jobEntity.DeployStatus = models.DEPLOY_RECEIVE_JOB
-		jobEntity.CreateTime = time.Now().Unix()
-		jobEntity.ExpireTime = time.Now().Unix() + int64(jobData.Duration)
-		jobEntity.WalletAddress = spaceDetail.Data.Owner.PublicAddress
-		jobEntity.Name = spaceDetail.Data.Space.Name
-		jobEntity.Hardware = spaceDetail.Data.Space.ActiveOrder.Config.Description
-		jobEntity.SpaceType = 0
-		jobEntity.ResourceType = spaceDetail.Data.Space.ActiveOrder.Config.HardwareType
-		jobEntity.NameSpace = constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(spaceDetail.Data.Owner.PublicAddress)
-		jobEntity.K8sDeployName = constants.K8S_DEPLOY_NAME_PREFIX + strings.ToLower(jobData.UUID)
-		jobEntity.Status = models.JOB_RECEIVED_STATUS
-		jobEntity.K8sResourceType = "deployment"
-		jobEntity.IpWhiteList = strings.Join(jobData.IpWhiteList, ",")
-		err = NewJobService().SaveJobEntity(jobEntity)
-		if err != nil {
-			logs.GetLogger().Errorf("failed to save job to db, job_uuid: %s, error: %+v", jobData.UUID, err)
-		}
-
 		go func() {
 			if err = submitJob(&jobData); err != nil {
 				logs.GetLogger().Errorf("failed to upload job data to MCS, job_uuid: %s, spaceUuid: %s, error: %v", jobData.UUID, spaceUuid, err)
@@ -856,13 +861,87 @@ func DeployImage(c *gin.Context) {
 	}
 	logs.GetLogger().Infof("Image Job received Data: %+v", deployJob)
 
+	var hostName string
+	var logHost string
+	prefixStr := generateString(10)
+	if strings.HasPrefix(conf.GetConfig().API.Domain, ".") {
+		hostName = prefixStr + conf.GetConfig().API.Domain
+		logHost = "log" + conf.GetConfig().API.Domain
+	} else {
+		hostName = strings.Join([]string{prefixStr, conf.GetConfig().API.Domain}, ".")
+		logHost = "log." + conf.GetConfig().API.Domain
+	}
+
+	multiAddressSplit := strings.Split(conf.GetConfig().API.MultiAddress, "/")
+	wsUrl := fmt.Sprintf("wss://%s:%s/api/v1/computing/lagrange/spaces/log?job_uuid=%s", logHost, multiAddressSplit[4], deployJob.Uuid)
+
+	var jobData models.JobData
+	jobData.UUID = deployJob.Uuid
+	jobData.Name = deployJob.Name
+	jobData.Duration = deployJob.Duration
+	jobData.TaskUUID = deployJob.Uuid
+	jobData.BidPrice = deployJob.BidPrice
+	jobData.IpWhiteList = deployJob.IpWhiteList
+	jobData.BuildLog = wsUrl + "&type=build"
+	jobData.ContainerLog = wsUrl + "&type=container"
+	var ports []int
+	for _, p := range deployJob.DeployConfig.Ports {
+		ports = append(ports, p...)
+	}
+	if len(ports) == 1 {
+		jobData.JobRealUri = fmt.Sprintf("https://%s", hostName)
+	} else {
+		jobData.JobRealUri = ""
+	}
+
+	var resource models.SpaceHardware
+	resource.Vcpu = int64(deployJob.Resource.Cpu)
+	resource.Memory = int64(deployJob.Resource.Memory)
+	resource.Storage = int64(deployJob.Resource.Storage)
+
+	if deployJob.Resource.Gpu > 0 && deployJob.Resource.GpuModel != "" {
+		resource.HardwareType = "GPU"
+		resource.Hardware = deployJob.Resource.GpuModel
+		resource.Gpu = int64(deployJob.Resource.Gpu)
+	} else {
+		resource.HardwareType = "CPU"
+	}
+
+	cpRepoPath, _ := os.LookupEnv("CP_PATH")
+	var jobEntity = new(models.JobEntity)
+	jobEntity.SpaceUuid = deployJob.Uuid
+	jobEntity.RealUrl = jobData.JobRealUri
+	jobEntity.BuildLog = filepath.Join(cpRepoPath, constants.LOG_PATH_PREFIX, jobData.UUID, constants.BUILD_LOG_NAME)
+	jobEntity.BuildLogPath = filepath.Join(cpRepoPath, constants.LOG_PATH_PREFIX, jobData.UUID, constants.Container_LOG_NAME)
+	jobEntity.ContainerLog = jobData.ContainerLog
+	jobEntity.Duration = deployJob.Duration
+	jobEntity.JobUuid = deployJob.Uuid
+	jobEntity.DeployStatus = models.DEPLOY_RECEIVE_JOB
+	jobEntity.CreateTime = time.Now().Unix()
+	jobEntity.ExpireTime = time.Now().Unix() + int64(deployJob.Duration)
+	jobEntity.WalletAddress = deployJob.WalletAddress
+	jobEntity.Name = deployJob.Name
+	jobEntity.SpaceType = 0
+	jobEntity.ResourceType = resource.HardwareType
+	jobEntity.NameSpace = constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(deployJob.WalletAddress)
+	jobEntity.K8sDeployName = constants.K8S_DEPLOY_NAME_PREFIX + strings.ToLower(deployJob.Uuid)
+	jobEntity.Status = models.JOB_RECEIVED_STATUS
+	jobEntity.K8sResourceType = "deployment"
+	jobEntity.IpWhiteList = strings.Join(deployJob.IpWhiteList, ",")
+	err := NewJobService().SaveJobEntity(jobEntity)
+	if err != nil {
+		logs.GetLogger().Errorf("failed to save job to db, job_uuid: %s, error: %+v", deployJob.Uuid, err)
+	}
+
 	if !CheckWalletWhiteList(deployJob.WalletAddress) {
+		NewJobService().UpdateJobEntityStatusByJobUuid(jobEntity.JobUuid, models.JOB_REJECTED_STATUS)
 		logs.GetLogger().Errorf("%s is not in the white list", deployJob.WalletAddress)
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SpaceCheckWhiteListError))
 		return
 	}
 
 	if CheckWalletBlackList(deployJob.WalletAddress) {
+		NewJobService().UpdateJobEntityStatusByJobUuid(jobEntity.JobUuid, models.JOB_REJECTED_STATUS)
 		logs.GetLogger().Errorf("%s is in the black list", deployJob.WalletAddress)
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SpaceCheckBlackListError))
 		return
@@ -888,23 +967,11 @@ func DeployImage(c *gin.Context) {
 		}
 
 		if !signature {
+			NewJobService().UpdateJobEntityStatusByJobUuid(jobEntity.JobUuid, models.JOB_REJECTED_STATUS)
 			logs.GetLogger().Errorf("space job sign verifing, job_uuid: %s, verify: %v", deployJob.Uuid, signature)
 			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "signature verify failed"))
 			return
 		}
-	}
-
-	var resource models.SpaceHardware
-	resource.Vcpu = int64(deployJob.Resource.Cpu)
-	resource.Memory = int64(deployJob.Resource.Memory)
-	resource.Storage = int64(deployJob.Resource.Storage)
-
-	if deployJob.Resource.Gpu > 0 && deployJob.Resource.GpuModel != "" {
-		resource.HardwareType = "GPU"
-		resource.Hardware = deployJob.Resource.GpuModel
-		resource.Gpu = int64(deployJob.Resource.Gpu)
-	} else {
-		resource.HardwareType = "CPU"
 	}
 
 	if !conf.GetConfig().API.Pricing {
@@ -939,78 +1006,7 @@ func DeployImage(c *gin.Context) {
 		return
 	}
 
-	var hostName string
-	var logHost string
-	prefixStr := generateString(10)
-	if strings.HasPrefix(conf.GetConfig().API.Domain, ".") {
-		hostName = prefixStr + conf.GetConfig().API.Domain
-		logHost = "log" + conf.GetConfig().API.Domain
-	} else {
-		hostName = strings.Join([]string{prefixStr, conf.GetConfig().API.Domain}, ".")
-		logHost = "log." + conf.GetConfig().API.Domain
-	}
-
-	multiAddressSplit := strings.Split(conf.GetConfig().API.MultiAddress, "/")
-	wsUrl := fmt.Sprintf("wss://%s:%s/api/v1/computing/lagrange/spaces/log?job_uuid=%s", logHost, multiAddressSplit[4], deployJob.Uuid)
-
-	var jobData models.JobData
-	jobData.UUID = deployJob.Uuid
-	jobData.Name = deployJob.Name
-	jobData.Duration = deployJob.Duration
-	jobData.TaskUUID = deployJob.Uuid
-	jobData.BidPrice = deployJob.BidPrice
-	jobData.IpWhiteList = deployJob.IpWhiteList
-	jobData.BuildLog = wsUrl + "&type=build"
-	jobData.ContainerLog = wsUrl + "&type=container"
-	var ports []int
-	for _, p := range deployJob.DeployConfig.Ports {
-		ports = append(ports, p...)
-	}
-	if len(ports) == 1 {
-		jobData.JobRealUri = fmt.Sprintf("https://%s", hostName)
-	} else {
-		jobData.JobRealUri = ""
-	}
-
 	go func() {
-		var currentBlockNumber uint64
-		for i := 0; i < 5; i++ {
-			currentBlockNumber, err = getChainBlockNumber()
-			if err != nil {
-				logs.GetLogger().Errorf("failed to get blockNumber, error: %v", err)
-				time.Sleep(time.Second)
-				continue
-			}
-		}
-
-		cpRepoPath, _ := os.LookupEnv("CP_PATH")
-		var jobEntity = new(models.JobEntity)
-		jobEntity.SpaceUuid = deployJob.Uuid
-		jobEntity.RealUrl = jobData.JobRealUri
-		jobEntity.BuildLog = filepath.Join(cpRepoPath, constants.LOG_PATH_PREFIX, jobData.UUID, constants.BUILD_LOG_NAME)
-		jobEntity.BuildLogPath = filepath.Join(cpRepoPath, constants.LOG_PATH_PREFIX, jobData.UUID, constants.Container_LOG_NAME)
-		jobEntity.ContainerLog = jobData.ContainerLog
-		jobEntity.Duration = deployJob.Duration
-		jobEntity.JobUuid = deployJob.Uuid
-		jobEntity.DeployStatus = models.DEPLOY_RECEIVE_JOB
-		jobEntity.CreateTime = time.Now().Unix()
-		jobEntity.ExpireTime = time.Now().Unix() + int64(deployJob.Duration)
-		jobEntity.StartedBlock = conf.GetConfig().CONTRACT.JobManagerCreated
-		jobEntity.ScannedBlock = currentBlockNumber
-		jobEntity.WalletAddress = deployJob.WalletAddress
-		jobEntity.Name = deployJob.Name
-		jobEntity.SpaceType = 0
-		jobEntity.ResourceType = resource.HardwareType
-		jobEntity.NameSpace = constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(deployJob.WalletAddress)
-		jobEntity.K8sDeployName = constants.K8S_DEPLOY_NAME_PREFIX + strings.ToLower(deployJob.Uuid)
-		jobEntity.Status = models.JOB_RECEIVED_STATUS
-		jobEntity.K8sResourceType = "deployment"
-		jobEntity.IpWhiteList = strings.Join(deployJob.IpWhiteList, ",")
-		err = NewJobService().SaveJobEntity(jobEntity)
-		if err != nil {
-			logs.GetLogger().Errorf("failed to save job to db, job_uuid: %s, error: %+v", deployJob.Uuid, err)
-		}
-
 		go func() {
 			if err = submitJob(&jobData); err != nil {
 				logs.GetLogger().Errorf("failed to upload job data to MCS, job_uuid: %s, error: %v", jobData.UUID, err)

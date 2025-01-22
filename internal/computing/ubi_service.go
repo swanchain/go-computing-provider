@@ -1751,14 +1751,13 @@ func RetryFn(fn func() error, maxRetries int, delay time.Duration) error {
 }
 
 func RestartTraefikService() error {
+	traefikServiceContainerName := "traefik-service"
 	dockerService := NewDockerService()
+	dockerService.RemoveContainerByName(traefikServiceContainerName)
 	if err := dockerService.CreateNetwork("traefik-net"); err != nil {
 		return err
 	}
 
-	traefikServiceContainerName := "traefik-service"
-
-	dockerService.RemoveContainerByName(traefikServiceContainerName)
 	err := dockerService.PullImage(build.TraefikServerDockerImage)
 	if err != nil {
 		return fmt.Errorf("pull %s image failed, error: %v", build.UBIResourceExporterDockerImage, err)
