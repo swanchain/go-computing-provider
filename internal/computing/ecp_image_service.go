@@ -192,6 +192,10 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		}
 
 		if !checkPriceFlag {
+			if job.Price == "-1" && job.JobType == models.MiningJobType {
+				taskEntity.Status = models.TASK_REJECTED_STATUS
+				NewTaskService().SaveTaskEntity(taskEntity)
+			}
 			logs.GetLogger().Errorf("bid below the set price, job_uuid: %s, pid: %s, need: %0.4f", job.Uuid, job.Price, totalCost)
 			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BelowPriceError))
 			return
