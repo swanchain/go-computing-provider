@@ -1512,6 +1512,7 @@ func RestartResourceExporter() error {
 		AttachStderr: true,
 		Tty:          true,
 	}, &container.HostConfig{
+		Binds: []string{"/etc/machine-id:/etc/machine-id"},
 		RestartPolicy: container.RestartPolicy{
 			Name:              container.RestartPolicyOnFailure,
 			MaximumRetryCount: 3,
