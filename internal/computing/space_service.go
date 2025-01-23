@@ -1658,6 +1658,8 @@ func checkResourceAvailableForUbi(taskId, taskType int, gpuName string, resource
 					logs.GetLogger().Warnf("the task_id: %d is not available for this node=%s resource. Reason: %s",
 						taskType, node.Name, strings.Join(noAvailableStr, ";"))
 				}
+			} else {
+				noAvailableStr = append(noAvailableStr, fmt.Sprintf("gpu need name:%s, num:%s, no gpu of this type found", gpuName, resource.Gpu))
 			}
 			nodeName = ""
 			continue
