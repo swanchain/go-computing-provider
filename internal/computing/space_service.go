@@ -1554,6 +1554,8 @@ func checkResourceAvailableForSpace(jobUuid string, jobType int, resourceConfig 
 						logs.GetLogger().Warnf("the job_uuid: %s is not available for this node=%s resource. Reason: %s",
 							jobUuid, node.Name, strings.Join(noAvailableStr, ";"))
 					}
+				} else {
+					noAvailableStr = append(noAvailableStr, fmt.Sprintf("gpu need name:%s, num:%d, no gpu of this type found", hardwareDetail.Gpu.Unit, hardwareDetail.Gpu.Quantity))
 				}
 			}
 			continue
