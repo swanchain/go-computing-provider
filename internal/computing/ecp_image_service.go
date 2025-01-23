@@ -61,7 +61,7 @@ func (*ImageJobService) CheckJobCondition(c *gin.Context) {
 		}
 	}
 
-	receive, _, _, _, _, err := checkResourceForImage(job.Uuid, job.Resource)
+	receive, _, _, _, _, _, err := checkResourceForImage(job.Uuid, job.Resource)
 	if receive {
 		c.JSON(http.StatusOK, util.CreateSuccessResponse(map[string]interface{}{
 			"price": totalCost,
@@ -202,7 +202,7 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		}
 	}
 
-	isReceive, _, needCpu, _, indexs, err := checkResourceForImage(job.Uuid, job.Resource)
+	isReceive, _, needCpu, _, indexs, noAvailableMsgs, err := checkResourceForImage(job.Uuid, job.Resource)
 	if err != nil {
 		if job.Price == "-1" && job.JobType == models.MiningJobType {
 			taskEntity.Status = models.TASK_FAILED_STATUS
@@ -216,7 +216,7 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 			taskEntity.Status = models.TASK_REJECTED_STATUS
 			NewTaskService().SaveTaskEntity(taskEntity)
 		}
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError))
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError, strings.Join(noAvailableMsgs, ";")))
 		return
 	}
 
@@ -772,10 +772,10 @@ func checkPriceForDocker(userPrice string, duration int, resource *models.Hardwa
 	return userPayPrice >= totalCost, totalCost, nil
 }
 
-func checkResourceForImage(jobUud string, resource *models.HardwareResource) (bool, string, int64, int64, []string, error) {
+func checkResourceForImage(jobUud string, resource *models.HardwareResource) (bool, string, int64, int64, []string, []string, error) {
 	list, err := NewEcpJobService().GetEcpJobList([]string{models.CreatedStatus, models.RunningStatus})
 	if err != nil {
-		return false, "", 0, 0, nil, err
+		return false, "", 0, 0, nil, nil, err
 	}
 
 	var taskGpuMap = make(map[string][]string)
@@ -788,12 +788,12 @@ func checkResourceForImage(jobUud string, resource *models.HardwareResource) (bo
 	dockerService := NewDockerService()
 	containerLogStr, err := dockerService.ContainerLogs("resource-exporter")
 	if err != nil {
-		return false, "", 0, 0, nil, err
+		return false, "", 0, 0, nil, nil, err
 	}
 
 	var nodeResource models.NodeResource
 	if err := json.Unmarshal([]byte(containerLogStr), &nodeResource); err != nil {
-		return false, "", 0, 0, nil, err
+		return false, "", 0, 0, nil, nil, err
 	}
 
 	needCpu := resource.CPU
@@ -873,22 +873,22 @@ func checkResourceForImage(jobUud string, resource *models.HardwareResource) (bo
 			}
 		}
 		if flag {
-			return true, nodeResource.CpuName, needCpu, int64(needMemory), newGpuIndex, nil
+			return true, nodeResource.CpuName, needCpu, int64(needMemory), newGpuIndex, nil, nil
 		} else {
 			noAvailableStr = append(noAvailableStr, fmt.Sprintf("gpu need name:%s, num:%d, remainder:%d", resource.GPUModel, resource.GPU, len(newGpuIndex)))
 			logs.GetLogger().Warnf("the task_uuid: %s resource is not available. Reason: %s",
 				jobUud, strings.Join(noAvailableStr, ";"))
-			return false, nodeResource.CpuName, needCpu, int64(needMemory), newGpuIndex, nil
+			return false, nodeResource.CpuName, needCpu, int64(needMemory), newGpuIndex, noAvailableStr, nil
 		}
 	}
 
 	if len(noAvailableStr) == 0 {
-		return true, nodeResource.CpuName, needCpu, int64(needMemory), indexs, nil
+		return true, nodeResource.CpuName, needCpu, int64(needMemory), indexs, nil, nil
 	}
 
 	logs.GetLogger().Warnf("the task_uuid: %s resource is not available. Reason: %s",
 		jobUud, strings.Join(noAvailableStr, ";"))
-	return false, nodeResource.CpuName, needCpu, int64(needMemory), indexs, nil
+	return false, nodeResource.CpuName, needCpu, int64(needMemory), indexs, noAvailableStr, nil
 }
 
 func parsePrice(priceStr string) (float64, error) {

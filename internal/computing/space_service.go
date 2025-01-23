@@ -174,7 +174,7 @@ func ReceiveJob(c *gin.Context) {
 		}
 	}
 
-	available, gpuProductName, gpuIndex, err := checkResourceAvailableForSpace(jobData.UUID, jobData.JobType, spaceDetail.Data.Space.ActiveOrder.Config)
+	available, gpuProductName, gpuIndex, noAvailableMsgs, err := checkResourceAvailableForSpace(jobData.UUID, jobData.JobType, spaceDetail.Data.Space.ActiveOrder.Config)
 	if err != nil {
 		logs.GetLogger().Errorf("failed to check job resource, error: %+v", err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
@@ -188,7 +188,7 @@ func ReceiveJob(c *gin.Context) {
 		} else {
 			logs.GetLogger().Warnf("job_uuid: %s, name: %s, not found a resources available", jobData.UUID, jobData.Name)
 		}
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError))
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError, strings.Join(noAvailableMsgs, ";")))
 		return
 	}
 
@@ -1460,7 +1460,7 @@ func getSpaceDetail(jobSourceURI string) (models.SpaceJSON, error) {
 	return spaceJson, nil
 }
 
-func checkResourceAvailableForSpace(jobUuid string, jobType int, resourceConfig models.SpaceHardware) (bool, string, []string, error) {
+func checkResourceAvailableForSpace(jobUuid string, jobType int, resourceConfig models.SpaceHardware) (bool, string, []string, []string, error) {
 	var taskType string
 	var hardwareDetail models.Resource
 	if jobType == 1 {
@@ -1473,18 +1473,18 @@ func checkResourceAvailableForSpace(jobUuid string, jobType int, resourceConfig 
 
 	activePods, err := k8sService.GetAllActivePod(context.TODO())
 	if err != nil {
-		return false, "", nil, err
+		return false, "", nil, nil, err
 	}
 
 	nodes, err := k8sService.k8sClient.CoreV1().Nodes().List(context.TODO(), metaV1.ListOptions{})
 	if err != nil {
-		return false, "", nil, err
+		return false, "", nil, nil, err
 	}
 
 	nodeGpuSummary, err := k8sService.GetNodeGpuSummary(context.TODO())
 	if err != nil {
 		logs.GetLogger().Errorf("Failed collect k8s gpu, error: %+v", err)
-		return false, "", nil, err
+		return false, "", nil, nil, err
 	}
 
 	gpuName := strings.ToUpper(strings.ReplaceAll(hardwareDetail.Gpu.Unit, " ", "-"))
@@ -1500,6 +1500,7 @@ func checkResourceAvailableForSpace(jobUuid string, jobType int, resourceConfig 
 		FreeIndex []string
 	}
 
+	var noAvailableStr []string
 	for _, node := range nodes.Items {
 		var nodeName = node.Name
 		var nodeGpuInfo = nodeGpuSummary[nodeName]
@@ -1518,7 +1519,7 @@ func checkResourceAvailableForSpace(jobUuid string, jobType int, resourceConfig 
 		}
 
 		logs.GetLogger().Infof("checkResourceForSpace: nodeName: %s,remainingCpu: %d, remainingMemory: %.2f, remainingStorage: %.2f, remainingGpu: %+v", node.Name, remainderCpu, remainderMemory, remainderStorage, freeGpuMap)
-		var noAvailableStr []string
+
 		if remainderCpu < needCpu {
 			noAvailableStr = append(noAvailableStr, fmt.Sprintf("cpu need: %d, remainder: %d", needCpu, remainderCpu))
 		}
@@ -1531,7 +1532,7 @@ func checkResourceAvailableForSpace(jobUuid string, jobType int, resourceConfig 
 
 		if taskType == "CPU" {
 			if len(noAvailableStr) == 0 {
-				return true, "", nil, nil
+				return true, "", nil, nil, nil
 			} else {
 				logs.GetLogger().Warnf("the job_uuid: %s is not available for this node=%s resource. Reason: %s",
 					jobUuid, node.Name, strings.Join(noAvailableStr, ";"))
@@ -1548,7 +1549,7 @@ func checkResourceAvailableForSpace(jobUuid string, jobType int, resourceConfig 
 					}
 
 					if len(noAvailableStr) == 0 {
-						return true, gpuName, remainingGpu, nil
+						return true, gpuName, remainingGpu, nil, nil
 					} else {
 						logs.GetLogger().Warnf("the job_uuid: %s is not available for this node=%s resource. Reason: %s",
 							jobUuid, node.Name, strings.Join(noAvailableStr, ";"))
@@ -1558,25 +1559,38 @@ func checkResourceAvailableForSpace(jobUuid string, jobType int, resourceConfig 
 			continue
 		}
 	}
-	return false, "", nil, nil
+
+	if len(nodes.Items) > 1 {
+		var noAvailableSummary []string
+		noAvailableSummary = append(noAvailableSummary, fmt.Sprintf("cpu need: %d", needCpu))
+		noAvailableSummary = append(noAvailableSummary, fmt.Sprintf("memory need: %f", needMemory))
+		noAvailableSummary = append(noAvailableSummary, fmt.Sprintf("storage need: %f", needStorage))
+		if hardwareDetail.Gpu.Quantity >= 1 {
+			noAvailableSummary = append(noAvailableSummary, fmt.Sprintf("gpu need name:%s, num:%d,", hardwareDetail.Gpu.Unit, hardwareDetail.Gpu.Quantity))
+		}
+		noAvailableSummary = append(noAvailableStr, "not found available node")
+		return false, "", nil, noAvailableSummary, nil
+	} else {
+		return false, "", nil, noAvailableStr, nil
+	}
 }
 
-func checkResourceAvailableForUbi(taskType int, gpuName string, resource *models.TaskResource) (string, string, int64, int64, int64, []string, error) {
+func checkResourceAvailableForUbi(taskId, taskType int, gpuName string, resource *models.TaskResource) (string, string, int64, int64, int64, []string, []string, error) {
 	k8sService := NewK8sService()
 	activePods, err := k8sService.GetAllActivePod(context.TODO())
 	if err != nil {
-		return "", "", 0, 0, 0, nil, err
+		return "", "", 0, 0, 0, nil, nil, err
 	}
 
 	nodes, err := k8sService.k8sClient.CoreV1().Nodes().List(context.TODO(), metaV1.ListOptions{})
 	if err != nil {
-		return "", "", 0, 0, 0, nil, err
+		return "", "", 0, 0, 0, nil, nil, err
 	}
 
 	nodeGpuSummary, err := k8sService.GetNodeGpuSummary(context.TODO())
 	if err != nil {
 		logs.GetLogger().Errorf("Failed collect k8s gpu, error: %+v", err)
-		return "", "", 0, 0, 0, nil, err
+		return "", "", 0, 0, 0, nil, nil, err
 	}
 
 	needCpu, _ := strconv.ParseInt(resource.CPU, 10, 64)
@@ -1589,6 +1603,7 @@ func checkResourceAvailableForUbi(taskType int, gpuName string, resource *models
 		needStorage, err = strconv.ParseFloat(strings.Split(strings.TrimSpace(resource.Storage), " ")[0], 64)
 	}
 
+	var noAvailableStr []string
 	var nodeName, architecture string
 	for _, node := range nodes.Items {
 		if _, ok := node.Labels[constants.CPU_INTEL]; ok {
@@ -1605,30 +1620,61 @@ func checkResourceAvailableForUbi(taskType int, gpuName string, resource *models
 
 		logs.GetLogger().Infof("checkResourceAvailableForUbi: needCpu: %d, needMemory: %.2f, needStorage: %.2f", needCpu, needMemory, needStorage)
 		logs.GetLogger().Infof("checkResourceAvailableForUbi: remainingCpu: %d, remainingMemory: %.2f, remainingStorage: %.2f", remainderCpu, remainderMemory, remainderStorage)
-		if needCpu <= remainderCpu && needMemory <= remainderMemory && needStorage <= remainderStorage {
-			nodeName = node.Name
-			if taskType == 0 {
-				return nodeName, architecture, needCpu, int64(needMemory), int64(needStorage), nil, nil
-			} else if taskType == 1 {
-				if gpuName == "" {
-					nodeName = ""
-					continue
-				}
-				gpuName = strings.ReplaceAll(gpuName, " ", "-")
-				logs.GetLogger().Infof("needGpuName: %s, nodeGpu: %+v, nodeGpuSummary: %+v", gpuName, nodeGpu, nodeGpuSummary)
 
-				if gData, ok := nodeGpuSummary[node.Name][gpuName]; ok {
-					remainingGpu := difference(gData.FreeIndex, nodeGpu[gpuName].UsedIndex)
-					if len(remainingGpu) > 0 {
-						return nodeName, architecture, needCpu, int64(needMemory), int64(needStorage), remainingGpu, nil
-					}
-				}
+		if remainderCpu < needCpu {
+			noAvailableStr = append(noAvailableStr, fmt.Sprintf("cpu need: %d, remainder: %d", needCpu, remainderCpu))
+		}
+		if remainderMemory < needMemory {
+			noAvailableStr = append(noAvailableStr, fmt.Sprintf("memory need: %f, remainder: %f", needMemory, remainderMemory))
+		}
+		if remainderStorage < needStorage {
+			noAvailableStr = append(noAvailableStr, fmt.Sprintf("storage need: %f, remainder: %f", needStorage, remainderStorage))
+		}
+
+		if taskType == 0 {
+			if len(noAvailableStr) == 0 {
+				return nodeName, architecture, needCpu, int64(needMemory), int64(needStorage), nil, nil, nil
+			}
+			logs.GetLogger().Warnf("the taskid: %d is not available for this node=%s resource. Reason: %s",
+				taskId, node.Name, strings.Join(noAvailableStr, ";"))
+			continue
+		} else if taskType == 1 {
+			if gpuName == "" {
 				nodeName = ""
 				continue
 			}
+			gpuName = strings.ReplaceAll(gpuName, " ", "-")
+			logs.GetLogger().Infof("needGpuName: %s, nodeGpu: %+v, nodeGpuSummary: %+v", gpuName, nodeGpu, nodeGpuSummary)
+
+			if gData, ok := nodeGpuSummary[node.Name][gpuName]; ok {
+				remainingGpu := difference(gData.FreeIndex, nodeGpu[gpuName].UsedIndex)
+
+				if len(remainingGpu) > 0 {
+					noAvailableStr = append(noAvailableStr, fmt.Sprintf("gpu need name:%s, num:%s, remainder: %d", gpuName, resource.Gpu, len(remainingGpu)))
+					return nodeName, architecture, needCpu, int64(needMemory), int64(needStorage), remainingGpu, nil, nil
+				} else {
+					logs.GetLogger().Warnf("the task_id: %d is not available for this node=%s resource. Reason: %s",
+						taskType, node.Name, strings.Join(noAvailableStr, ";"))
+				}
+			}
+			nodeName = ""
+			continue
 		}
 	}
-	return nodeName, architecture, needCpu, int64(needMemory), int64(needStorage), nil, nil
+
+	if len(nodes.Items) > 1 {
+		var noAvailableSummary []string
+		noAvailableSummary = append(noAvailableSummary, fmt.Sprintf("cpu need: %d", needCpu))
+		noAvailableSummary = append(noAvailableSummary, fmt.Sprintf("memory need: %f", needMemory))
+		noAvailableSummary = append(noAvailableSummary, fmt.Sprintf("storage need: %f", needStorage))
+		if resource.Gpu != "" {
+			noAvailableSummary = append(noAvailableSummary, fmt.Sprintf("gpu need name:%s, num:%s,", gpuName, resource.Gpu))
+		}
+		noAvailableSummary = append(noAvailableSummary, "not found available node")
+		return nodeName, architecture, needCpu, int64(needMemory), int64(needStorage), nil, noAvailableSummary, nil
+	} else {
+		return nodeName, architecture, needCpu, int64(needMemory), int64(needStorage), nil, noAvailableStr, nil
+	}
 }
 
 func generateString(length int) string {
