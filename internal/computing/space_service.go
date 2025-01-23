@@ -124,6 +124,23 @@ func ReceiveJob(c *gin.Context) {
 		}
 	}
 
+	available, gpuProductName, gpuIndex, err := checkResourceAvailableForSpace(jobData.UUID, jobData.JobType, spaceDetail.Data.Space.ActiveOrder.Config)
+	if err != nil {
+		logs.GetLogger().Errorf("failed to check job resource, error: %+v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
+		return
+	}
+
+	if !available {
+		if gpuProductName != "" {
+			logs.GetLogger().Warnf("job_uuid: %s, name: %s, gpu_name: %s, not found a resources available", jobData.UUID, jobData.Name, gpuProductName)
+		} else {
+			logs.GetLogger().Warnf("job_uuid: %s, name: %s, not found a resources available", jobData.UUID, jobData.Name)
+		}
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError))
+		return
+	}
+
 	var hostName string
 	var logHost string
 	prefixStr := generateString(10)
@@ -861,6 +878,89 @@ func DeployImage(c *gin.Context) {
 	}
 	logs.GetLogger().Infof("Image Job received Data: %+v", deployJob)
 
+	if !CheckWalletWhiteList(deployJob.WalletAddress) {
+		logs.GetLogger().Errorf("%s is not in the white list", deployJob.WalletAddress)
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SpaceCheckWhiteListError))
+		return
+	}
+
+	if CheckWalletBlackList(deployJob.WalletAddress) {
+		logs.GetLogger().Errorf("%s is in the black list", deployJob.WalletAddress)
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SpaceCheckBlackListError))
+		return
+	}
+
+	if conf.GetConfig().HUB.VerifySign {
+		if len(deployJob.Sign) == 0 {
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BadParamError, "missing node_id_job_source_uri_signature field"))
+			return
+		}
+		cpAccountAddress, err := contract.GetCpAccountAddress()
+		if err != nil {
+			logs.GetLogger().Errorf("failed to get cp account contract address, error: %v", err)
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.GetCpAccountError))
+			return
+		}
+
+		signature, err := verifySignatureForHub(deployJob.WalletAddress, fmt.Sprintf("%s%s", cpAccountAddress, deployJob.Uuid), deployJob.Sign)
+		if err != nil {
+			logs.GetLogger().Errorf("failed to verify signature for space job, error: %+v", err)
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
+			return
+		}
+
+		if !signature {
+			logs.GetLogger().Errorf("space job sign verifing, job_uuid: %s, verify: %v", deployJob.Uuid, signature)
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "signature verify failed"))
+			return
+		}
+	}
+
+	var resource models.SpaceHardware
+	resource.Vcpu = int64(deployJob.Resource.Cpu)
+	resource.Memory = int64(deployJob.Resource.Memory)
+	resource.Storage = int64(deployJob.Resource.Storage)
+
+	if deployJob.Resource.Gpu > 0 && deployJob.Resource.GpuModel != "" {
+		resource.HardwareType = "GPU"
+		resource.Hardware = deployJob.Resource.GpuModel
+		resource.Gpu = int64(deployJob.Resource.Gpu)
+	} else {
+		resource.HardwareType = "CPU"
+	}
+
+	if !conf.GetConfig().API.Pricing {
+		checkPriceFlag, totalCost, err := checkPrice(deployJob.BidPrice, deployJob.Duration, resource)
+		if err != nil {
+			logs.GetLogger().Errorf("failed to check price, job_uuid: %s, error: %v", deployJob.Uuid, err)
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
+			return
+		}
+
+		if !checkPriceFlag {
+			logs.GetLogger().Warnf("the price is too low, job_uuid: %s, paid: %s, required: %0.4f", deployJob.Uuid, deployJob.BidPrice, totalCost)
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BelowPriceError))
+			return
+		}
+	}
+
+	available, gpuProductName, gpuIndex, err := checkResourceAvailableForSpace(deployJob.Uuid, 1, resource)
+	if err != nil {
+		logs.GetLogger().Errorf("failed to check job resource, error: %+v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
+		return
+	}
+
+	if !available {
+		if gpuProductName != "" {
+			logs.GetLogger().Warnf("job_uuid: %s, name: %s, gpu_name: %s, not found a resources available", deployJob.Uuid, deployJob.Name, gpuProductName)
+		} else {
+			logs.GetLogger().Warnf("job_uuid: %s, name: %s, not found a resources available", deployJob.Uuid, deployJob.Name)
+		}
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError))
+		return
+	}
+
 	var hostName string
 	var logHost string
 	prefixStr := generateString(10)
@@ -1477,7 +1577,7 @@ func getSpaceDetail(jobSourceURI string) (models.SpaceJSON, error) {
 	return spaceJson, nil
 }
 
-func checkResourceAvailableForSpace(jobType int, resourceConfig models.SpaceHardware) (bool, string, []string, error) {
+func checkResourceAvailableForSpace(jobUuid string, jobType int, resourceConfig models.SpaceHardware) (bool, string, []string, error) {
 	var taskType string
 	var hardwareDetail models.Resource
 	if jobType == 1 {
@@ -1534,23 +1634,45 @@ func checkResourceAvailableForSpace(jobType int, resourceConfig models.SpaceHard
 			}
 		}
 
-		logs.GetLogger().Infof("checkResourceAvailableForSpace: nodeName: %s,remainingCpu: %d, remainingMemory: %.2f, remainingStorage: %.2f, remainingGpu: %+v", node.Name, remainderCpu, remainderMemory, remainderStorage, freeGpuMap)
-		if needCpu <= remainderCpu && needMemory <= remainderMemory && needStorage <= remainderStorage {
-			if taskType == "CPU" {
+		logs.GetLogger().Infof("checkResourceForSpace: nodeName: %s,remainingCpu: %d, remainingMemory: %.2f, remainingStorage: %.2f, remainingGpu: %+v", node.Name, remainderCpu, remainderMemory, remainderStorage, freeGpuMap)
+		var noAvailableStr []string
+		if remainderCpu < needCpu {
+			noAvailableStr = append(noAvailableStr, fmt.Sprintf("cpu need: %d, remainder: %d", needCpu, remainderCpu))
+		}
+		if remainderMemory < needMemory {
+			noAvailableStr = append(noAvailableStr, fmt.Sprintf("memory need: %f, remainder: %f", needMemory, remainderMemory))
+		}
+		if remainderStorage < needStorage {
+			noAvailableStr = append(noAvailableStr, fmt.Sprintf("storage need: %f, remainder: %f", needStorage, remainderStorage))
+		}
+
+		if taskType == "CPU" {
+			if len(noAvailableStr) == 0 {
 				return true, "", nil, nil
-			} else if taskType == "GPU" {
-				for gname, gData := range nodeGpuInfo {
-					logs.GetLogger().Infof("useGpuSummaryOnNode: %+v, useGpuSummaryInK8SOn: %+v", gData.UsedIndex, nodeGpu[gname].UsedIndex)
-					if strings.Contains(gname, gpuName) {
-						gpuName = gname
-						remainingGpu := difference(gData.FreeIndex, nodeGpu[gpuName].UsedIndex)
-						if gpuNum <= int64(len(remainingGpu)) {
-							return true, gpuName, remainingGpu, nil
-						}
+			} else {
+				logs.GetLogger().Warnf("the job_uuid: %s is not available for this node=%s resource. Reason: %s",
+					jobUuid, node.Name, strings.Join(noAvailableStr, ";"))
+			}
+		} else if taskType == "GPU" {
+			for gname, gData := range nodeGpuInfo {
+				logs.GetLogger().Infof("useGpuSummaryOnNode: %+v, useGpuSummaryInK8SOn: %+v", gData.UsedIndex, nodeGpu[gname].UsedIndex)
+				if strings.Contains(gname, gpuName) {
+					gpuName = gname
+					remainingGpu := difference(gData.FreeIndex, nodeGpu[gpuName].UsedIndex)
+
+					if int64(len(remainingGpu)) < gpuNum {
+						noAvailableStr = append(noAvailableStr, fmt.Sprintf("gpu need name:%s, num:%d, remainder: %d", hardwareDetail.Gpu.Unit, hardwareDetail.Gpu.Quantity, len(remainingGpu)))
+					}
+
+					if len(noAvailableStr) == 0 {
+						return true, gpuName, remainingGpu, nil
+					} else {
+						logs.GetLogger().Warnf("the job_uuid: %s is not available for this node=%s resource. Reason: %s",
+							jobUuid, node.Name, strings.Join(noAvailableStr, ";"))
 					}
 				}
-				continue
 			}
+			continue
 		}
 	}
 	return false, "", nil, nil

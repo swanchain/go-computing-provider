@@ -622,14 +622,13 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		gpuName = convertGpuName(strings.TrimSpace(gpuConfig))
 	}
 
-	_, architecture, _, needMemory, indexs, err := checkResourceForUbi(ubiTask.Resource, gpuName, ubiTask.ResourceType)
+	_, architecture, _, needMemory, indexs, err := checkResourceForUbi(ubiTask.ID, ubiTask.Resource, gpuName, ubiTask.ResourceType)
 	if err != nil {
 		taskEntity.Status = models.TASK_FAILED_STATUS
 		NewTaskService().SaveTaskEntity(taskEntity)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
 		return
 	}
-
 	var ubiTaskImage string
 	if architecture == constants.CPU_AMD {
 		ubiTaskImage = build.UBITaskImageAmdCpu
@@ -686,6 +685,8 @@ func DoUbiTaskForDocker(c *gin.Context) {
 				useIndexs = append(useIndexs, indexs[0])
 				env = append(env, fmt.Sprintf("CUDA_VISIBLE_DEVICES=%s", strings.Join(useIndexs, ",")))
 			} else {
+				taskEntity.Status = models.TASK_REJECTED_STATUS
+				NewTaskService().SaveTaskEntity(taskEntity)
 				logs.GetLogger().Warnf("not resources available, task_id: %d", ubiTask.ID)
 				return
 			}
@@ -766,7 +767,12 @@ func DoUbiTaskForDocker(c *gin.Context) {
 	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
 }
 
-func checkResourceForUbi(resource *models.TaskResource, gpuName string, resourceType int) (bool, string, int64, int64, []string, error) {
+func checkResourceForUbi(taskId int, resource *models.TaskResource, gpuName string, resourceType int) (bool, string, int64, int64, []string, error) {
+	var needGpuNum int64
+	if resource.Gpu != "" {
+		needGpuNum, _ = strconv.ParseInt(resource.Gpu, 10, 64)
+	}
+
 	dockerService := NewDockerService()
 	containerLogStr, err := dockerService.ContainerLogs("resource-exporter")
 	if err != nil {
@@ -828,26 +834,67 @@ func checkResourceForUbi(resource *models.TaskResource, gpuName string, resource
 
 	logs.GetLogger().Infof("checkResourceForUbi: needCpu: %d, needMemory: %.2f, needStorage: %.2f", needCpu, needMemory, needStorage)
 	logs.GetLogger().Infof("checkResourceForUbi: remainingCpu: %d, remainingMemory: %.2f, remainingStorage: %.2f, remainingGpu: %+v", remainderCpu, remainderMemory, remainderStorage, gpuMap)
-	if needCpu <= remainderCpu && needMemory <= remainderMemory && needStorage <= remainderStorage {
-		if resourceType == 1 {
-			if gpuName != "" {
-				var flag bool
-				for k, gm := range gpuMap {
-					if strings.ToUpper(k) == gpuName && gm.num > 0 {
-						indexs = gm.indexs
-						flag = true
-						break
-					}
-				}
-				if flag {
-					return true, nodeResource.CpuName, needCpu, int64(needMemory), indexs, nil
-				} else {
-					return false, nodeResource.CpuName, needCpu, int64(needMemory), indexs, nil
+
+	var noAvailableStr []string
+	if remainderCpu < needCpu {
+		noAvailableStr = append(noAvailableStr, fmt.Sprintf("cpu need: %d, remainder: %d", needCpu, remainderCpu))
+	}
+	if remainderMemory < needMemory {
+		noAvailableStr = append(noAvailableStr, fmt.Sprintf("memory need: %f, remainder: %f", needMemory, remainderMemory))
+	}
+	if remainderStorage < needStorage {
+		noAvailableStr = append(noAvailableStr, fmt.Sprintf("storage need: %f, remainder: %f", needStorage, remainderStorage))
+	}
+
+	if resourceType == 1 {
+		if gpuName != "" {
+			var flag bool
+			var newGpuNum []string
+			for k, gm := range gpuMap {
+				if strings.ToUpper(k) == gpuName && gm.num > 0 {
+					newGpuNum = gm.indexs
+					flag = true
+					break
 				}
 			}
+			if flag {
+				return true, nodeResource.CpuName, needCpu, int64(needMemory), newGpuNum, nil
+			} else {
+				noAvailableStr = append(noAvailableStr, fmt.Sprintf("gpu need name:%s, num:%d, remainder:%d", gpuName, needGpuNum, len(newGpuNum)))
+				logs.GetLogger().Warnf("the task_id: %d resource is not available. Reason: %s",
+					taskId, strings.Join(noAvailableStr, ";"))
+				return false, nodeResource.CpuName, needCpu, int64(needMemory), newGpuNum, nil
+			}
 		}
-		return true, nodeResource.CpuName, needCpu, int64(needMemory), indexs, nil
+	} else {
+		if len(noAvailableStr) > 0 {
+			logs.GetLogger().Warnf("the task_id: %d resource is not available. Reason: %s",
+				taskId, strings.Join(noAvailableStr, ";"))
+		} else {
+			return true, nodeResource.CpuName, needCpu, int64(needMemory), indexs, nil
+		}
 	}
+
+	//if needCpu <= remainderCpu && needMemory <= remainderMemory && needStorage <= remainderStorage {
+	//	if resourceType == 1 {
+	//		if gpuName != "" {
+	//			var flag bool
+	//			for k, gm := range gpuMap {
+	//				if strings.ToUpper(k) == gpuName && gm.num > 0 {
+	//					indexs = gm.indexs
+	//					flag = true
+	//					break
+	//				}
+	//			}
+	//			if flag {
+	//				return true, nodeResource.CpuName, needCpu, int64(needMemory), indexs, nil
+	//			} else {
+	//				return false, nodeResource.CpuName, needCpu, int64(needMemory), indexs, nil
+	//			}
+	//		}
+	//	}
+	//	return true, nodeResource.CpuName, needCpu, int64(needMemory), indexs, nil
+	//}
 	return false, nodeResource.CpuName, needCpu, int64(needMemory), indexs, nil
 }
 
