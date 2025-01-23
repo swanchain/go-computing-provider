@@ -20,7 +20,6 @@ import (
 	"github.com/swanchain/go-computing-provider/constants"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -302,11 +301,11 @@ func (ds *DockerService) CleanResourceForDocker() {
 		}
 	}
 
-	cmd := exec.Command("docker", "system", "prune", "-f")
-	if err = cmd.Run(); err != nil {
-		logs.GetLogger().Errorf("failed to clean resource, error: %+v", err)
-		return
-	}
+	ctx := context.Background()
+	danglingFilters := filters.NewArgs()
+	danglingFilters.Add("dangling", "true")
+	ds.c.ImagesPrune(ctx, danglingFilters)
+	ds.c.ContainersPrune(ctx, filters.NewArgs())
 }
 
 func (ds *DockerService) PullImage(imageName string) error {

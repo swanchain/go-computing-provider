@@ -279,37 +279,6 @@ func (task *CronTask) watchExpiredTask() {
 					}
 					continue
 				}
-			} else {
-				// compatible with space_uuid
-				spaceUuidDeployName := constants.K8S_DEPLOY_NAME_PREFIX + strings.ToLower(job.SpaceUuid)
-				if _, ok = deployOnK8s[spaceUuidDeployName]; ok {
-					if NewJobService().GetJobEntityBySpaceUuid(job.SpaceUuid) > 0 && time.Now().Unix() < job.ExpireTime {
-						if job.Status != models.JOB_RUNNING_STATUS {
-							foundDeployment, err := k8sService.k8sClient.AppsV1().Deployments(job.NameSpace).Get(context.TODO(), job.K8sDeployName, metav1.GetOptions{})
-							if err != nil {
-								continue
-							}
-							if foundDeployment.Status.AvailableReplicas > 0 {
-								job.PodStatus = models.POD_RUNNING_STATUS
-								job.Status = models.JOB_RUNNING_STATUS
-								NewJobService().UpdateJobEntityByJobUuid(job)
-							}
-						}
-						continue
-					}
-
-					var nameSpace = job.NameSpace
-					if job.Status == models.JOB_TERMINATED_STATUS || job.Status == models.JOB_COMPLETED_STATUS {
-						if strings.TrimSpace(nameSpace) == "" {
-							nameSpace = constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(job.WalletAddress)
-						}
-
-						if err = DeleteJob(nameSpace, job.SpaceUuid, "cron-task abnormal state, compatible with space_uuid"); err != nil {
-							logs.GetLogger().Errorf("failed to use spaceUuid: %s delete job, error: %v", job.SpaceUuid, err)
-						}
-						continue
-					}
-				}
 			}
 
 			if job.DeleteAt == models.DELETED_FLAG {
@@ -359,10 +328,6 @@ func (task *CronTask) watchExpiredTask() {
 					continue
 				}
 
-				if err = DeleteJob(job.NameSpace, job.SpaceUuid, "compatible with old versions, cron-task abnormal state"); err != nil {
-					logs.GetLogger().Errorf("failed to use spaceUuid: %s delete job, error: %v", job.SpaceUuid, err)
-					continue
-				}
 				deleteSpaceIdAndJobUuid[job.JobUuid] = job.SpaceUuid + "_" + job.JobUuid
 			}
 		}
