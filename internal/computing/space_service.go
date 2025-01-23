@@ -72,74 +72,6 @@ func ReceiveJob(c *gin.Context) {
 	}
 
 	cpRepoPath, _ := os.LookupEnv("CP_PATH")
-	if conf.GetConfig().HUB.VerifySign {
-		if len(jobData.NodeIdJobSourceUriSignature) == 0 {
-			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BadParamError, "missing node_id_job_source_uri_signature field"))
-			return
-		}
-		nodeID := GetNodeId(cpRepoPath)
-
-		cpAccountAddress, err := contract.GetCpAccountAddress()
-		if err != nil {
-			logs.GetLogger().Errorf("failed to get cp account contract address, error: %v", err)
-			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.GetCpAccountError))
-			return
-		}
-
-		signature, err := verifySignatureForHub(conf.GetConfig().HUB.OrchestratorPk, fmt.Sprintf("%s%s%s", cpAccountAddress, nodeID, jobData.JobSourceURI), jobData.NodeIdJobSourceUriSignature)
-		if err != nil {
-			logs.GetLogger().Errorf("failed to verify signature for space job, error: %+v", err)
-			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
-			return
-		}
-
-		if !signature {
-			logs.GetLogger().Errorf("space job sign verifing, job_uuid: %s, verify: %v", jobData.UUID, signature)
-			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "signature verify failed"))
-			return
-		}
-	}
-
-	spaceDetail, err := getSpaceDetail(jobData.JobSourceURI)
-	if err != nil {
-		logs.GetLogger().Errorln(err)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SpaceParseResourceUriError))
-		return
-	}
-
-	if jobData.JobType == 1 {
-		if !conf.GetConfig().API.Pricing {
-			checkPriceFlag, totalCost, err := checkPrice(jobData.BidPrice, jobData.Duration, spaceDetail.Data.Space.ActiveOrder.Config)
-			if err != nil {
-				logs.GetLogger().Errorf("failed to check price, job_uuid: %s, error: %v", jobData.UUID, err)
-				c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
-				return
-			}
-
-			if !checkPriceFlag {
-				logs.GetLogger().Warnf("the price is too low, job_uuid: %s, paid: %s, required: %0.4f", jobData.UUID, jobData.BidPrice, totalCost)
-				c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BelowPriceError))
-				return
-			}
-		}
-	}
-
-	available, gpuProductName, gpuIndex, err := checkResourceAvailableForSpace(jobData.UUID, jobData.JobType, spaceDetail.Data.Space.ActiveOrder.Config)
-	if err != nil {
-		logs.GetLogger().Errorf("failed to check job resource, error: %+v", err)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
-		return
-	}
-
-	if !available {
-		if gpuProductName != "" {
-			logs.GetLogger().Warnf("job_uuid: %s, name: %s, gpu_name: %s, not found a resources available", jobData.UUID, jobData.Name, gpuProductName)
-		} else {
-			logs.GetLogger().Warnf("job_uuid: %s, name: %s, not found a resources available", jobData.UUID, jobData.Name)
-		}
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError))
-		return
-	}
 
 	var hostName string
 	var logHost string
@@ -150,6 +82,13 @@ func ReceiveJob(c *gin.Context) {
 	} else {
 		hostName = strings.Join([]string{prefixStr, conf.GetConfig().API.Domain}, ".")
 		logHost = "log." + conf.GetConfig().API.Domain
+	}
+
+	spaceDetail, err := getSpaceDetail(jobData.JobSourceURI)
+	if err != nil {
+		logs.GetLogger().Errorln(err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SpaceParseResourceUriError))
+		return
 	}
 
 	multiAddressSplit := strings.Split(conf.GetConfig().API.MultiAddress, "/")
@@ -190,9 +129,53 @@ func ReceiveJob(c *gin.Context) {
 		logs.GetLogger().Errorf("failed to save job to db, job_uuid: %s, error: %+v", jobData.UUID, err)
 	}
 
-	available, gpuProductName, gpuIndex, err := checkResourceAvailableForSpace(jobData.JobType, spaceDetail.Data.Space.ActiveOrder.Config)
+	if conf.GetConfig().HUB.VerifySign {
+		if len(jobData.NodeIdJobSourceUriSignature) == 0 {
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BadParamError, "missing node_id_job_source_uri_signature field"))
+			return
+		}
+		nodeID := GetNodeId(cpRepoPath)
+
+		cpAccountAddress, err := contract.GetCpAccountAddress()
+		if err != nil {
+			logs.GetLogger().Errorf("failed to get cp account contract address, error: %v", err)
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.GetCpAccountError))
+			return
+		}
+
+		signature, err := verifySignatureForHub(conf.GetConfig().HUB.OrchestratorPk, fmt.Sprintf("%s%s%s", cpAccountAddress, nodeID, jobData.JobSourceURI), jobData.NodeIdJobSourceUriSignature)
+		if err != nil {
+			logs.GetLogger().Errorf("failed to verify signature for space job, error: %+v", err)
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
+			return
+		}
+
+		if !signature {
+			logs.GetLogger().Errorf("space job sign verifing, job_uuid: %s, verify: %v", jobData.UUID, signature)
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "signature verify failed"))
+			return
+		}
+	}
+
+	if jobData.JobType == 1 {
+		if !conf.GetConfig().API.Pricing {
+			checkPriceFlag, totalCost, err := checkPrice(jobData.BidPrice, jobData.Duration, spaceDetail.Data.Space.ActiveOrder.Config)
+			if err != nil {
+				logs.GetLogger().Errorf("failed to check price, job_uuid: %s, error: %v", jobData.UUID, err)
+				c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
+				return
+			}
+
+			if !checkPriceFlag {
+				logs.GetLogger().Warnf("the price is too low, job_uuid: %s, paid: %s, required: %0.4f", jobData.UUID, jobData.BidPrice, totalCost)
+				c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BelowPriceError))
+				return
+			}
+		}
+	}
+
+	available, gpuProductName, gpuIndex, err := checkResourceAvailableForSpace(jobData.UUID, jobData.JobType, spaceDetail.Data.Space.ActiveOrder.Config)
 	if err != nil {
-		NewJobService().UpdateJobEntityStatusByJobUuid(jobEntity.JobUuid, models.JOB_FAILED_STATUS)
 		logs.GetLogger().Errorf("failed to check job resource, error: %+v", err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
 		return
@@ -200,7 +183,6 @@ func ReceiveJob(c *gin.Context) {
 
 	if !available {
 		NewJobService().UpdateJobEntityStatusByJobUuid(jobEntity.JobUuid, models.JOB_REJECTED_STATUS)
-
 		if gpuProductName != "" {
 			logs.GetLogger().Warnf("job_uuid: %s, name: %s, gpu_name: %s, not found a resources available", jobData.UUID, jobData.Name, gpuProductName)
 		} else {
@@ -296,25 +278,6 @@ func ReceiveJob(c *gin.Context) {
 	}()
 
 	c.JSON(http.StatusOK, util.CreateSuccessResponse(jobData))
-}
-
-func getChainBlockNumber() (uint64, error) {
-	var currentBlockNumber uint64
-	chainUrl, err := conf.GetRpcByNetWorkName()
-	if err != nil {
-		return 0, err
-	}
-	client, err := contract.GetEthClient(chainUrl)
-	if err != nil {
-		return 0, err
-	}
-	defer client.Close()
-
-	currentBlockNumber, err = client.BlockNumber(context.Background())
-	if err != nil {
-		return 0, err
-	}
-	return currentBlockNumber, nil
 }
 
 func submitJob(jobData *models.JobData) error {
@@ -479,8 +442,6 @@ func CancelJob(c *gin.Context) {
 			}
 		}()
 		k8sNameSpace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(jobEntity.WalletAddress)
-		//Compatible with old versions
-		DeleteJob(k8sNameSpace, jobEntity.SpaceUuid, "compatible with old versions, terminated job form hub")
 		DeleteJob(k8sNameSpace, jobEntity.JobUuid, "terminated job form hub")
 		NewJobService().DeleteJobEntityByJobUuId(jobEntity.JobUuid, models.JOB_TERMINATED_STATUS)
 	}()
@@ -878,89 +839,6 @@ func DeployImage(c *gin.Context) {
 	}
 	logs.GetLogger().Infof("Image Job received Data: %+v", deployJob)
 
-	if !CheckWalletWhiteList(deployJob.WalletAddress) {
-		logs.GetLogger().Errorf("%s is not in the white list", deployJob.WalletAddress)
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SpaceCheckWhiteListError))
-		return
-	}
-
-	if CheckWalletBlackList(deployJob.WalletAddress) {
-		logs.GetLogger().Errorf("%s is in the black list", deployJob.WalletAddress)
-		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SpaceCheckBlackListError))
-		return
-	}
-
-	if conf.GetConfig().HUB.VerifySign {
-		if len(deployJob.Sign) == 0 {
-			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BadParamError, "missing node_id_job_source_uri_signature field"))
-			return
-		}
-		cpAccountAddress, err := contract.GetCpAccountAddress()
-		if err != nil {
-			logs.GetLogger().Errorf("failed to get cp account contract address, error: %v", err)
-			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.GetCpAccountError))
-			return
-		}
-
-		signature, err := verifySignatureForHub(deployJob.WalletAddress, fmt.Sprintf("%s%s", cpAccountAddress, deployJob.Uuid), deployJob.Sign)
-		if err != nil {
-			logs.GetLogger().Errorf("failed to verify signature for space job, error: %+v", err)
-			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
-			return
-		}
-
-		if !signature {
-			logs.GetLogger().Errorf("space job sign verifing, job_uuid: %s, verify: %v", deployJob.Uuid, signature)
-			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "signature verify failed"))
-			return
-		}
-	}
-
-	var resource models.SpaceHardware
-	resource.Vcpu = int64(deployJob.Resource.Cpu)
-	resource.Memory = int64(deployJob.Resource.Memory)
-	resource.Storage = int64(deployJob.Resource.Storage)
-
-	if deployJob.Resource.Gpu > 0 && deployJob.Resource.GpuModel != "" {
-		resource.HardwareType = "GPU"
-		resource.Hardware = deployJob.Resource.GpuModel
-		resource.Gpu = int64(deployJob.Resource.Gpu)
-	} else {
-		resource.HardwareType = "CPU"
-	}
-
-	if !conf.GetConfig().API.Pricing {
-		checkPriceFlag, totalCost, err := checkPrice(deployJob.BidPrice, deployJob.Duration, resource)
-		if err != nil {
-			logs.GetLogger().Errorf("failed to check price, job_uuid: %s, error: %v", deployJob.Uuid, err)
-			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
-			return
-		}
-
-		if !checkPriceFlag {
-			logs.GetLogger().Warnf("the price is too low, job_uuid: %s, paid: %s, required: %0.4f", deployJob.Uuid, deployJob.BidPrice, totalCost)
-			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BelowPriceError))
-			return
-		}
-	}
-
-	available, gpuProductName, gpuIndex, err := checkResourceAvailableForSpace(deployJob.Uuid, 1, resource)
-	if err != nil {
-		logs.GetLogger().Errorf("failed to check job resource, error: %+v", err)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
-		return
-	}
-
-	if !available {
-		if gpuProductName != "" {
-			logs.GetLogger().Warnf("job_uuid: %s, name: %s, gpu_name: %s, not found a resources available", deployJob.Uuid, deployJob.Name, gpuProductName)
-		} else {
-			logs.GetLogger().Warnf("job_uuid: %s, name: %s, not found a resources available", deployJob.Uuid, deployJob.Name)
-		}
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError))
-		return
-	}
-
 	var hostName string
 	var logHost string
 	prefixStr := generateString(10)
@@ -1054,6 +932,7 @@ func DeployImage(c *gin.Context) {
 		}
 		cpAccountAddress, err := contract.GetCpAccountAddress()
 		if err != nil {
+			NewJobService().UpdateJobEntityStatusByJobUuid(jobEntity.JobUuid, models.JOB_FAILED_STATUS)
 			logs.GetLogger().Errorf("failed to get cp account contract address, error: %v", err)
 			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.GetCpAccountError))
 			return
@@ -1061,6 +940,7 @@ func DeployImage(c *gin.Context) {
 
 		signature, err := verifySignatureForHub(deployJob.WalletAddress, fmt.Sprintf("%s%s", cpAccountAddress, deployJob.Uuid), deployJob.Sign)
 		if err != nil {
+			NewJobService().UpdateJobEntityStatusByJobUuid(jobEntity.JobUuid, models.JOB_FAILED_STATUS)
 			logs.GetLogger().Errorf("failed to verify signature for space job, error: %+v", err)
 			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
 			return
@@ -1083,20 +963,23 @@ func DeployImage(c *gin.Context) {
 		}
 
 		if !checkPriceFlag {
+			NewJobService().UpdateJobEntityStatusByJobUuid(jobEntity.JobUuid, models.JOB_REJECTED_STATUS)
 			logs.GetLogger().Warnf("the price is too low, job_uuid: %s, paid: %s, required: %0.4f", deployJob.Uuid, deployJob.BidPrice, totalCost)
 			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BelowPriceError))
 			return
 		}
 	}
 
-	available, gpuProductName, gpuIndex, err := checkResourceAvailableForSpace(1, resource)
+	available, gpuProductName, gpuIndex, err := checkResourceAvailableForSpace(deployJob.Uuid, 1, resource)
 	if err != nil {
+		NewJobService().UpdateJobEntityStatusByJobUuid(jobEntity.JobUuid, models.JOB_FAILED_STATUS)
 		logs.GetLogger().Errorf("failed to check job resource, error: %+v", err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
 		return
 	}
 
 	if !available {
+		NewJobService().UpdateJobEntityStatusByJobUuid(jobEntity.JobUuid, models.JOB_REJECTED_STATUS)
 		if gpuProductName != "" {
 			logs.GetLogger().Warnf("job_uuid: %s, name: %s, gpu_name: %s, not found a resources available", deployJob.Uuid, deployJob.Name, gpuProductName)
 		} else {
