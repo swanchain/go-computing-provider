@@ -212,6 +212,7 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 			taskEntity.Status = models.TASK_REJECTED_STATUS
 			NewTaskService().SaveTaskEntity(taskEntity)
 		}
+		logs.GetLogger().Warnf("job_uuid: %s, name: %s, msg: %s", job.Uuid, job.Name, strings.Join(noAvailableMsgs, ";"))
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError, strings.Join(noAvailableMsgs, ";")))
 		return
 	}
