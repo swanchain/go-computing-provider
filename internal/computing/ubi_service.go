@@ -631,6 +631,8 @@ func DoUbiTaskForDocker(c *gin.Context) {
 	}
 
 	if len(noAvailableMsgs) > 0 {
+		taskEntity.Status = models.TASK_REJECTED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
 		logs.GetLogger().Warnf(" task_id: %d, msg: %s", ubiTask.ID, strings.Join(noAvailableMsgs, ";"))
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError, strings.Join(noAvailableMsgs, ";")))
 		return
