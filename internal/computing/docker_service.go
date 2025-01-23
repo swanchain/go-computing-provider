@@ -334,7 +334,7 @@ func (ds *DockerService) PullImage(imageName string) error {
 }
 
 func (ds *DockerService) CheckRunningContainer(containerName string) (bool, error) {
-	containers, err := ds.c.ContainerList(context.Background(), container.ListOptions{})
+	containers, err := ds.c.ContainerList(context.Background(), container.ListOptions{All: true})
 	if err != nil {
 		logs.GetLogger().Errorf("listing containers failed, error: %v", err)
 		return false, err

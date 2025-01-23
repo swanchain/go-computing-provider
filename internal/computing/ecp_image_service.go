@@ -61,7 +61,7 @@ func (*ImageJobService) CheckJobCondition(c *gin.Context) {
 		}
 	}
 
-	receive, _, _, _, _, err := checkResourceForImage(job.Resource)
+	receive, _, _, _, _, err := checkResourceForImage(job.Uuid, job.Resource)
 	if receive {
 		c.JSON(http.StatusOK, util.CreateSuccessResponse(map[string]interface{}{
 			"price": totalCost,
@@ -198,7 +198,7 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		}
 	}
 
-	isReceive, _, needCpu, _, indexs, err := checkResourceForImage(job.Resource)
+	isReceive, _, needCpu, _, indexs, err := checkResourceForImage(job.Uuid, job.Resource)
 	if err != nil {
 		if job.Price == "-1" && job.JobType == models.MiningJobType {
 			taskEntity.Status = models.TASK_FAILED_STATUS
@@ -768,7 +768,7 @@ func checkPriceForDocker(userPrice string, duration int, resource *models.Hardwa
 	return userPayPrice >= totalCost, totalCost, nil
 }
 
-func checkResourceForImage(resource *models.HardwareResource) (bool, string, int64, int64, []string, error) {
+func checkResourceForImage(jobUud string, resource *models.HardwareResource) (bool, string, int64, int64, []string, error) {
 	list, err := NewEcpJobService().GetEcpJobList([]string{models.CreatedStatus, models.RunningStatus})
 	if err != nil {
 		return false, "", 0, 0, nil, err
@@ -846,24 +846,44 @@ func checkResourceForImage(resource *models.HardwareResource) (bool, string, int
 
 	logs.GetLogger().Infof("checkResourceForImage: needCpu: %d, needMemory: %.2f, needStorage: %.2f, needGpu: %d, gpuName: %s", needCpu, needMemory, needStorage, resource.GPU, resource.GPUModel)
 	logs.GetLogger().Infof("checkResourceForImage: remainingCpu: %d, remainingMemory: %.2f, remainingStorage: %.2f, remainingGpu: %+v", remainderCpu, remainderMemory, remainderStorage, gpuMap)
-	if needCpu <= remainderCpu && needMemory <= remainderMemory && needStorage <= remainderStorage {
-		if resource.GPUModel != "" {
-			var flag bool
-			for k, gd := range gpuMap {
-				if strings.ToUpper(k) == resource.GPUModel && gd.num > 0 {
-					indexs = gd.indexs
-					flag = true
-					break
-				}
-			}
-			if flag {
-				return true, nodeResource.CpuName, needCpu, int64(needMemory), indexs, nil
-			} else {
-				return false, nodeResource.CpuName, needCpu, int64(needMemory), indexs, nil
+
+	var noAvailableStr []string
+	if remainderCpu < needCpu {
+		noAvailableStr = append(noAvailableStr, fmt.Sprintf("cpu need: %d, remainder: %d", needCpu, remainderCpu))
+	}
+	if remainderMemory < needMemory {
+		noAvailableStr = append(noAvailableStr, fmt.Sprintf("memory need: %f, remainder: %f", needMemory, remainderMemory))
+	}
+	if remainderStorage < needStorage {
+		noAvailableStr = append(noAvailableStr, fmt.Sprintf("storage need: %f, remainder: %f", needStorage, remainderStorage))
+	}
+
+	if resource.GPUModel != "" {
+		var newGpuIndex []string
+		var flag bool
+		for k, gd := range gpuMap {
+			if strings.ToUpper(k) == resource.GPUModel && gd.num > 0 {
+				newGpuIndex = gd.indexs
+				flag = true
+				break
 			}
 		}
+		if flag {
+			return true, nodeResource.CpuName, needCpu, int64(needMemory), newGpuIndex, nil
+		} else {
+			noAvailableStr = append(noAvailableStr, fmt.Sprintf("gpu need name:%s, num:%d, remainder:%d", resource.GPUModel, resource.GPU, len(newGpuIndex)))
+			logs.GetLogger().Warnf("the task_uuid: %s resource is not available. Reason: %s",
+				jobUud, strings.Join(noAvailableStr, ";"))
+			return false, nodeResource.CpuName, needCpu, int64(needMemory), newGpuIndex, nil
+		}
+	}
+
+	if len(noAvailableStr) == 0 {
 		return true, nodeResource.CpuName, needCpu, int64(needMemory), indexs, nil
 	}
+
+	logs.GetLogger().Warnf("the task_uuid: %s resource is not available. Reason: %s",
+		jobUud, strings.Join(noAvailableStr, ";"))
 	return false, nodeResource.CpuName, needCpu, int64(needMemory), indexs, nil
 }
 
