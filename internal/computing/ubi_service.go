@@ -163,7 +163,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 	c2GpuConfig := envVars["RUST_GPU_TOOLS_CUSTOM_GPU"]
 	c2GpuName := convertGpuName(strings.TrimSpace(c2GpuConfig))
 	c2GpuName = strings.ToUpper(c2GpuName)
-	nodeName, architecture, needCpu, needMemory, needStorage, gpuIndex, err := checkResourceAvailableForUbi(ubiTask.ResourceType, c2GpuName, ubiTask.Resource)
+	nodeName, architecture, needCpu, needMemory, needStorage, gpuIndex, noAvailableMsgs, err := checkResourceAvailableForUbi(ubiTask.ID, ubiTask.ResourceType, c2GpuName, ubiTask.Resource)
 	if err != nil {
 		taskEntity.Status = models.TASK_FAILED_STATUS
 		NewTaskService().SaveTaskEntity(taskEntity)
@@ -177,7 +177,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 		taskEntity.Error = "No resources available"
 		NewTaskService().SaveTaskEntity(taskEntity)
 		logs.GetLogger().Warnf("ubi task id: %d, type: %s, not found a resources available", ubiTask.ID, models.GetResourceTypeStr(ubiTask.ResourceType))
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError))
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError, strings.Join(noAvailableMsgs, ";")))
 		return
 	}
 
@@ -622,7 +622,7 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		gpuName = convertGpuName(strings.TrimSpace(gpuConfig))
 	}
 
-	_, architecture, _, needMemory, indexs, err := checkResourceForUbi(ubiTask.ID, ubiTask.Resource, gpuName, ubiTask.ResourceType)
+	_, architecture, _, needMemory, indexs, noAvailableMsgs, err := checkResourceForUbi(ubiTask.ID, ubiTask.Resource, gpuName, ubiTask.ResourceType)
 	if err != nil {
 		taskEntity.Status = models.TASK_FAILED_STATUS
 		NewTaskService().SaveTaskEntity(taskEntity)
@@ -688,6 +688,8 @@ func DoUbiTaskForDocker(c *gin.Context) {
 				taskEntity.Status = models.TASK_REJECTED_STATUS
 				NewTaskService().SaveTaskEntity(taskEntity)
 				logs.GetLogger().Warnf("not resources available, task_id: %d", ubiTask.ID)
+
+				c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError, strings.Join(noAvailableMsgs, ";")))
 				return
 			}
 			needResource = container.Resources{
@@ -767,7 +769,7 @@ func DoUbiTaskForDocker(c *gin.Context) {
 	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
 }
 
-func checkResourceForUbi(taskId int, resource *models.TaskResource, gpuName string, resourceType int) (bool, string, int64, int64, []string, error) {
+func checkResourceForUbi(taskId int, resource *models.TaskResource, gpuName string, resourceType int) (bool, string, int64, int64, []string, []string, error) {
 	var needGpuNum int64
 	if resource.Gpu != "" {
 		needGpuNum, _ = strconv.ParseInt(resource.Gpu, 10, 64)
@@ -776,12 +778,12 @@ func checkResourceForUbi(taskId int, resource *models.TaskResource, gpuName stri
 	dockerService := NewDockerService()
 	containerLogStr, err := dockerService.ContainerLogs("resource-exporter")
 	if err != nil {
-		return false, "", 0, 0, nil, err
+		return false, "", 0, 0, nil, nil, err
 	}
 
 	var nodeResource models.NodeResource
 	if err := json.Unmarshal([]byte(containerLogStr), &nodeResource); err != nil {
-		return false, "", 0, 0, nil, err
+		return false, "", 0, 0, nil, nil, err
 	}
 
 	needCpu, _ := strconv.ParseInt(resource.CPU, 10, 64)
@@ -858,12 +860,12 @@ func checkResourceForUbi(taskId int, resource *models.TaskResource, gpuName stri
 				}
 			}
 			if flag {
-				return true, nodeResource.CpuName, needCpu, int64(needMemory), newGpuNum, nil
+				return true, nodeResource.CpuName, needCpu, int64(needMemory), newGpuNum, nil, nil
 			} else {
 				noAvailableStr = append(noAvailableStr, fmt.Sprintf("gpu need name:%s, num:%d, remainder:%d", gpuName, needGpuNum, len(newGpuNum)))
 				logs.GetLogger().Warnf("the task_id: %d resource is not available. Reason: %s",
 					taskId, strings.Join(noAvailableStr, ";"))
-				return false, nodeResource.CpuName, needCpu, int64(needMemory), newGpuNum, nil
+				return false, nodeResource.CpuName, needCpu, int64(needMemory), newGpuNum, noAvailableStr, nil
 			}
 		}
 	} else {
@@ -871,31 +873,10 @@ func checkResourceForUbi(taskId int, resource *models.TaskResource, gpuName stri
 			logs.GetLogger().Warnf("the task_id: %d resource is not available. Reason: %s",
 				taskId, strings.Join(noAvailableStr, ";"))
 		} else {
-			return true, nodeResource.CpuName, needCpu, int64(needMemory), indexs, nil
+			return true, nodeResource.CpuName, needCpu, int64(needMemory), indexs, nil, nil
 		}
 	}
-
-	//if needCpu <= remainderCpu && needMemory <= remainderMemory && needStorage <= remainderStorage {
-	//	if resourceType == 1 {
-	//		if gpuName != "" {
-	//			var flag bool
-	//			for k, gm := range gpuMap {
-	//				if strings.ToUpper(k) == gpuName && gm.num > 0 {
-	//					indexs = gm.indexs
-	//					flag = true
-	//					break
-	//				}
-	//			}
-	//			if flag {
-	//				return true, nodeResource.CpuName, needCpu, int64(needMemory), indexs, nil
-	//			} else {
-	//				return false, nodeResource.CpuName, needCpu, int64(needMemory), indexs, nil
-	//			}
-	//		}
-	//	}
-	//	return true, nodeResource.CpuName, needCpu, int64(needMemory), indexs, nil
-	//}
-	return false, nodeResource.CpuName, needCpu, int64(needMemory), indexs, nil
+	return false, nodeResource.CpuName, needCpu, int64(needMemory), indexs, noAvailableStr, nil
 }
 
 func GetCpResource(c *gin.Context) {
