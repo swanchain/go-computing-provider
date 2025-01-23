@@ -970,7 +970,7 @@ func DeployImage(c *gin.Context) {
 		}
 	}
 
-	available, gpuProductName, gpuIndex, err := checkResourceAvailableForSpace(deployJob.Uuid, 1, resource)
+	available, gpuProductName, gpuIndex, noAvailableMsgs, err := checkResourceAvailableForSpace(deployJob.Uuid, 1, resource)
 	if err != nil {
 		NewJobService().UpdateJobEntityStatusByJobUuid(jobEntity.JobUuid, models.JOB_FAILED_STATUS)
 		logs.GetLogger().Errorf("failed to check job resource, error: %+v", err)
@@ -985,7 +985,7 @@ func DeployImage(c *gin.Context) {
 		} else {
 			logs.GetLogger().Warnf("job_uuid: %s, name: %s, not found a resources available", deployJob.Uuid, deployJob.Name)
 		}
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError))
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError, strings.Join(noAvailableMsgs, ";")))
 		return
 	}
 
