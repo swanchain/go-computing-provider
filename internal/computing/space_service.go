@@ -183,11 +183,7 @@ func ReceiveJob(c *gin.Context) {
 
 	if !available {
 		NewJobService().UpdateJobEntityStatusByJobUuid(jobEntity.JobUuid, models.JOB_REJECTED_STATUS)
-		if gpuProductName != "" {
-			logs.GetLogger().Warnf("job_uuid: %s, name: %s, gpu_name: %s, not found a resources available", jobData.UUID, jobData.Name, gpuProductName)
-		} else {
-			logs.GetLogger().Warnf("job_uuid: %s, name: %s, not found a resources available", jobData.UUID, jobData.Name)
-		}
+		logs.GetLogger().Warnf("job_uuid: %s, name: %s, msg: %s", jobData.UUID, jobData.Name, strings.Join(noAvailableMsgs, ";"))
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError, strings.Join(noAvailableMsgs, ";")))
 		return
 	}
@@ -980,11 +976,7 @@ func DeployImage(c *gin.Context) {
 
 	if !available {
 		NewJobService().UpdateJobEntityStatusByJobUuid(jobEntity.JobUuid, models.JOB_REJECTED_STATUS)
-		if gpuProductName != "" {
-			logs.GetLogger().Warnf("job_uuid: %s, name: %s, gpu_name: %s, not found a resources available", deployJob.Uuid, deployJob.Name, gpuProductName)
-		} else {
-			logs.GetLogger().Warnf("job_uuid: %s, name: %s, not found a resources available", deployJob.Uuid, deployJob.Name)
-		}
+		logs.GetLogger().Warnf("job_uuid: %s, name: %s, msg: %s", jobData.UUID, jobData.Name, strings.Join(noAvailableMsgs, ";"))
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError, strings.Join(noAvailableMsgs, ";")))
 		return
 	}
@@ -1570,7 +1562,7 @@ func checkResourceAvailableForSpace(jobUuid string, jobType int, resourceConfig 
 		if hardwareDetail.Gpu.Quantity >= 1 {
 			noAvailableSummary = append(noAvailableSummary, fmt.Sprintf("gpu need name:%s, num:%d,", hardwareDetail.Gpu.Unit, hardwareDetail.Gpu.Quantity))
 		}
-		noAvailableSummary = append(noAvailableStr, "not found available node")
+		noAvailableSummary = append(noAvailableSummary, "not found available node")
 		return false, "", nil, noAvailableSummary, nil
 	} else {
 		return false, "", nil, noAvailableStr, nil

@@ -176,7 +176,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 		taskEntity.Status = models.TASK_REJECTED_STATUS
 		taskEntity.Error = "No resources available"
 		NewTaskService().SaveTaskEntity(taskEntity)
-		logs.GetLogger().Warnf("ubi task id: %d, type: %s, not found a resources available", ubiTask.ID, models.GetResourceTypeStr(ubiTask.ResourceType))
+		logs.GetLogger().Warnf("ubi task id: %d, msg: %s", ubiTask.ID, strings.Join(noAvailableMsgs, ";"))
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError, strings.Join(noAvailableMsgs, ";")))
 		return
 	}
@@ -629,6 +629,13 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
 		return
 	}
+
+	if len(noAvailableMsgs) > 0 {
+		logs.GetLogger().Warnf(" task_id: %d, msg: %s", ubiTask.ID, strings.Join(noAvailableMsgs, ";"))
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError, strings.Join(noAvailableMsgs, ";")))
+		return
+	}
+
 	var ubiTaskImage string
 	if architecture == constants.CPU_AMD {
 		ubiTaskImage = build.UBITaskImageAmdCpu
@@ -687,8 +694,6 @@ func DoUbiTaskForDocker(c *gin.Context) {
 			} else {
 				taskEntity.Status = models.TASK_REJECTED_STATUS
 				NewTaskService().SaveTaskEntity(taskEntity)
-				logs.GetLogger().Warnf("not resources available, task_id: %d", ubiTask.ID)
-
 				c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError, strings.Join(noAvailableMsgs, ";")))
 				return
 			}
