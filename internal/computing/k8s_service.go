@@ -413,17 +413,17 @@ func (s *K8sService) StatisticalSources(ctx context.Context) ([]*models.NodeReso
 		return nil, err
 	}
 
-	nodeGpuInfoMap, err := s.GetResourceExporterPodLog(ctx)
+	nodeGpuInfoMap, err := s.GetResourceExporterPodLogForNode(ctx)
 	if err != nil {
 		logs.GetLogger().Errorf("failed to collect cluster gpu info, if have available gpu, please check resource-exporter. error: %+v", err)
 	}
 
 	for _, node := range nodes.Items {
-		nodeUsedGpu, _, nodeResource := GetNodeResource(activePods, &node)
+		nodeUsedGpu := GetNodeGpuResource(activePods, &node)
 		if nodeGpuInfoMap != nil {
-			if gpu, ok := nodeGpuInfoMap[node.Name]; ok {
+			if nodeRes, ok := nodeGpuInfoMap[node.Name]; ok {
 				var newDetails []models.GpuDetail
-				for _, detail := range gpu.Gpu.Details {
+				for _, detail := range nodeRes.Gpu.Details {
 					gName := strings.ReplaceAll(detail.ProductName, " ", "-")
 					if useData, ok := nodeUsedGpu[gName]; ok {
 						if existValue(detail.Index, useData.UsedIndex) {
@@ -432,13 +432,8 @@ func (s *K8sService) StatisticalSources(ctx context.Context) ([]*models.NodeReso
 					}
 					newDetails = append(newDetails, detail)
 				}
-				nodeResource.Gpu = models.Gpu{
-					DriverVersion: gpu.Gpu.DriverVersion,
-					CudaVersion:   gpu.Gpu.CudaVersion,
-					AttachedGpus:  gpu.Gpu.AttachedGpus,
-					Details:       newDetails,
-				}
-				nodeList = append(nodeList, nodeResource)
+				nodeRes.Gpu.Details = newDetails
+				nodeList = append(nodeList, &nodeRes)
 			}
 		}
 	}
@@ -499,6 +494,40 @@ func (s *K8sService) GetResourceExporterPodLog(ctx context.Context) (map[string]
 		}
 
 		var nodeInfo models.CollectNodeInfo
+		if err := json.Unmarshal([]byte(podLog), &nodeInfo); err != nil {
+			s.k8sClient.CoreV1().Pods("kube-system").Delete(ctx, pod.Name, metaV1.DeleteOptions{})
+			continue
+		}
+		result[pod.Spec.NodeName] = nodeInfo
+	}
+	return result, nil
+}
+
+func (s *K8sService) GetResourceExporterPodLogForNode(ctx context.Context) (map[string]models.NodeResource, error) {
+	var num int64 = 1
+	podLogOptions := coreV1.PodLogOptions{
+		Container:  "",
+		TailLines:  &num,
+		Timestamps: false,
+	}
+
+	podList, err := s.k8sClient.CoreV1().Pods("kube-system").List(ctx, metaV1.ListOptions{
+		LabelSelector: "app=resource-exporter",
+	})
+	if err != nil {
+		logs.GetLogger().Error(err)
+		return nil, err
+	}
+
+	result := make(map[string]models.NodeResource)
+	for _, pod := range podList.Items {
+		podLog, err := s.GetPodLogByPodName("kube-system", pod.Name, &podLogOptions)
+		if err != nil {
+			logs.GetLogger().Errorf("collect gpu deatil info, nodeName: %s, error: %+v", pod.Spec.NodeName, err)
+			continue
+		}
+
+		var nodeInfo models.NodeResource
 		if err := json.Unmarshal([]byte(podLog), &nodeInfo); err != nil {
 			s.k8sClient.CoreV1().Pods("kube-system").Delete(ctx, pod.Name, metaV1.DeleteOptions{})
 			continue

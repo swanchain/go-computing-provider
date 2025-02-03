@@ -22,6 +22,29 @@ type CpResourceSummary struct {
 	ClusterInfo []*models.NodeResource
 }
 
+func GetNodeGpuResource(allPods []corev1.Pod, node *corev1.Node) map[string]GpuData {
+	nodeGpu := make(map[string]GpuData)
+	for _, pod := range getPodsFromNode(allPods, node) {
+		// used gpu info
+		gpuName, usedCount, usedIndexs := gpuInPod(&pod)
+		if gpuName == "kubernetes.io/os" || gpuName == "" {
+			continue
+		}
+		if v, ok := nodeGpu[gpuName]; ok {
+			v.UsedIndex = append(v.UsedIndex, usedIndexs...)
+			v.Used += usedCount
+			nodeGpu[gpuName] = v
+		} else {
+			nodeGpu[gpuName] = GpuData{
+				Used:      usedCount,
+				UsedIndex: usedIndexs,
+			}
+		}
+	}
+
+	return nodeGpu
+}
+
 func GetNodeResource(allPods []corev1.Pod, node *corev1.Node) (map[string]GpuData, map[string]int64, *models.NodeResource) {
 	var (
 		usedCpu     int64

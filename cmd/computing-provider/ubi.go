@@ -219,6 +219,7 @@ var daemonCmd = &cli.Command{
 		router.GET("/cp/job/status", ecpImageService.GetJobStatus)
 		router.GET("/cp/job/log", ecpImageService.DockerLogsHandler)
 		router.DELETE("/cp/job/:job_uuid", ecpImageService.DeleteJob)
+		router.POST("/cp/zk_task", computing.DoZkTask)
 
 		shutdownChan := make(chan struct{})
 		httpStopper, err := util.ServeHttp(r, "cp-api", ":"+strconv.Itoa(conf.GetConfig().API.Port), false)

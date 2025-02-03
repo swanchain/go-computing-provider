@@ -776,6 +776,10 @@ func DoUbiTaskForDocker(c *gin.Context) {
 	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
 }
 
+func DoZkTask(c *gin.Context) {
+
+}
+
 func checkResourceForUbi(taskId int, resource *models.TaskResource, gpuName string, resourceType int) (bool, string, int64, int64, []string, []string, error) {
 	var needGpuNum int64
 	if resource.Gpu != "" {

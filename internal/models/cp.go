@@ -252,3 +252,15 @@ type FcpDeployImageResp struct {
 	ContainerLog       string    `json:"container_log"`
 	BuildLog           string    `json:"build_log"`
 }
+
+// =========
+
+type ResourceInfo struct {
+	CPU     int64 `json:"cpu"`
+	Memory  int64 `json:"memory"`
+	Storage int64 `json:"storage"`
+	Gpu     []struct {
+		GPU      int    `json:"gpu"`
+		GPUModel string `json:"gpu_model"`
+	}
+}
