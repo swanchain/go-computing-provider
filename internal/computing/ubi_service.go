@@ -1107,8 +1107,13 @@ func checkResourceForUbiAndMutilGpu(taskId int, resource *models.ResourceInfo, g
 	}
 
 	var needCpu = resource.CPU
-	var needMemory = float64(resource.Memory)
-	var needStorage = float64(resource.Storage)
+	var needMemory, needStorage float64
+	if resource.Memory > 0 {
+		needMemory = formatGiB(resource.Memory)
+	}
+	if resource.Storage > 0 {
+		needStorage = formatGiB(resource.Storage)
+	}
 
 	remainderCpu, _ := strconv.ParseInt(nodeResource.Cpu.Free, 10, 64)
 	var remainderMemory, remainderStorage float64

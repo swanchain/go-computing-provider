@@ -995,7 +995,7 @@ func checkResourceForImageAndMutilGpu(jobUud string, resource *models.ResourceIn
 
 	}
 	if resource.Storage > 0 {
-		needMemory = formatGiB(resource.Storage)
+		needStorage = formatGiB(resource.Storage)
 	}
 
 	remainderCpu, _ := strconv.ParseInt(nodeResource.Cpu.Free, 10, 64)
@@ -1067,7 +1067,7 @@ func checkResourceForImageAndMutilGpu(jobUud string, resource *models.ResourceIn
 				if strings.ToUpper(k) == reqG.GPUModel && reqG.GPU < gd.num {
 					newGpuIndex = append(newGpuIndex, gd.indexs[:reqG.GPU]...)
 					flags = true
-					count++
+					count += reqG.GPU
 					break
 				}
 			}
