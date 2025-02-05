@@ -1077,7 +1077,7 @@ func checkResourceForImageAndMutilGpu(jobUud string, resource *models.ResourceIn
 		}
 	}
 
-	if len(resource.Gpus) > 0 && count == len(resource.Gpus) {
+	if len(resource.Gpus) > 0 && count == len(newGpuIndex) {
 		return true, nodeResource.CpuName, needCpu, int64(needMemory), newGpuIndex, nil, nil
 	}
 
