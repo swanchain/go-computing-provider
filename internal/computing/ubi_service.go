@@ -821,10 +821,10 @@ func DoZkTask(c *gin.Context) {
 		taskEntity.Id = int64(zkTask.Id)
 		taskEntity.InputParam = zkTask.InputParam
 		taskEntity.VerifyParam = zkTask.VerifyParam
-		taskEntity.CreateTime = time.Now().Unix()
 		taskEntity.Deadline = zkTask.DeadLine
 		taskEntity.CheckCode = zkTask.CheckCode
 	}
+	taskEntity.CreateTime = time.Now().Unix()
 	taskEntity.Type = zkTask.TaskType
 	taskEntity.Name = zkTask.Name
 	taskEntity.ResourceType = resourceType
