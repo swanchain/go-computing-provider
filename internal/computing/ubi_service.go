@@ -819,16 +819,16 @@ func DoZkTask(c *gin.Context) {
 		taskEntity.Sequencer = 0
 	} else {
 		taskEntity.Id = int64(zkTask.Id)
-		taskEntity.Type = zkTask.TaskType
-		taskEntity.Name = zkTask.Name
-		taskEntity.ResourceType = resourceType
 		taskEntity.InputParam = zkTask.InputParam
 		taskEntity.VerifyParam = zkTask.VerifyParam
-		taskEntity.Status = models.TASK_RECEIVED_STATUS
 		taskEntity.CreateTime = time.Now().Unix()
 		taskEntity.Deadline = zkTask.DeadLine
 		taskEntity.CheckCode = zkTask.CheckCode
 	}
+	taskEntity.Type = zkTask.TaskType
+	taskEntity.Name = zkTask.Name
+	taskEntity.ResourceType = resourceType
+	taskEntity.Status = models.TASK_RECEIVED_STATUS
 	err := NewTaskService().SaveTaskEntity(taskEntity)
 	if err != nil {
 		logs.GetLogger().Errorf("failed to save task entity, error: %v", err)
