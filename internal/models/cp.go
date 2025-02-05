@@ -278,8 +278,8 @@ type ResourceInfo struct {
 	Memory  int64 `json:"memory"`
 	Storage int64 `json:"storage"`
 	GpuNum  int64 `json:"gpu_num"` // fil-c2
-	Gpu     []struct {
+	Gpus    []struct {
 		GPU      int    `json:"gpu"`
 		GPUModel string `json:"gpu_model"`
-	}
+	} `json:"gpus"`
 }

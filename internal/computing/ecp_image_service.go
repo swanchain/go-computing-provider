@@ -387,7 +387,7 @@ func doMiningTask(c *gin.Context, zkTask models.ZkTaskReq, taskEntity *models.Ta
 	var envs []string
 	var needResource container.Resources
 	var useIndexs []string
-	if len(zkTask.Resource.Gpu) > 0 {
+	if len(zkTask.Resource.Gpus) > 0 {
 		envs = append(envs, fmt.Sprintf("CUDA_VISIBLE_DEVICES=%s", strings.Join(indexs, ",")))
 		needResource = container.Resources{
 			CPUQuota: needCpu * 100000,
@@ -1040,7 +1040,7 @@ func checkResourceForImageAndMutilGpu(jobUud string, resource *models.ResourceIn
 	}
 
 	var reqGpuMap = make(map[string]int)
-	for _, g := range resource.Gpu {
+	for _, g := range resource.Gpus {
 		reqGpuMap[g.GPUModel] = g.GPU
 	}
 
@@ -1061,7 +1061,7 @@ func checkResourceForImageAndMutilGpu(jobUud string, resource *models.ResourceIn
 	var newGpuIndex []string
 	var flags bool
 	var count int
-	for _, reqG := range resource.Gpu {
+	for _, reqG := range resource.Gpus {
 		if reqG.GPUModel != "" {
 			for k, gd := range gpuMap {
 				if strings.ToUpper(k) == reqG.GPUModel && reqG.GPU < gd.num {
@@ -1077,7 +1077,7 @@ func checkResourceForImageAndMutilGpu(jobUud string, resource *models.ResourceIn
 		}
 	}
 
-	if len(resource.Gpu) > 0 && count == len(resource.Gpu) {
+	if len(resource.Gpus) > 0 && count == len(resource.Gpus) {
 		return true, nodeResource.CpuName, needCpu, int64(needMemory), newGpuIndex, nil, nil
 	}
 

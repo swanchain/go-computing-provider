@@ -39,11 +39,6 @@ import (
 )
 
 func DoUbiTaskForK8s(c *gin.Context) {
-	if !conf.GetConfig().UBI.EnableSequencer && !conf.GetConfig().UBI.AutoChainProof {
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.RejectZkTaskError))
-		return
-	}
-
 	var ubiTask models.UBITaskReq
 	if err := c.ShouldBindJSON(&ubiTask); err != nil {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
@@ -65,6 +60,13 @@ func DoUbiTaskForK8s(c *gin.Context) {
 	err := NewTaskService().SaveTaskEntity(taskEntity)
 	if err != nil {
 		logs.GetLogger().Errorf("save task entity failed, error: %v", err)
+		return
+	}
+
+	if !conf.GetConfig().UBI.EnableSequencer && !conf.GetConfig().UBI.AutoChainProof {
+		taskEntity.Status = models.TASK_REJECTED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.RejectZkTaskError))
 		return
 	}
 
@@ -503,10 +505,6 @@ func ReceiveUbiProof(c *gin.Context) {
 }
 
 func DoUbiTaskForDocker(c *gin.Context) {
-	if !conf.GetConfig().UBI.EnableSequencer && !conf.GetConfig().UBI.AutoChainProof {
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.RejectZkTaskError))
-		return
-	}
 
 	var ubiTask models.UBITaskReq
 	if err := c.ShouldBindJSON(&ubiTask); err != nil {
@@ -533,6 +531,13 @@ func DoUbiTaskForDocker(c *gin.Context) {
 	if err != nil {
 		logs.GetLogger().Errorf("save task entity failed, error: %v", err)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SaveTaskEntityError))
+		return
+	}
+
+	if !conf.GetConfig().UBI.EnableSequencer && !conf.GetConfig().UBI.AutoChainProof {
+		taskEntity.Status = models.TASK_REJECTED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.RejectZkTaskError))
 		return
 	}
 
@@ -796,7 +801,7 @@ func DoZkTask(c *gin.Context) {
 
 	if zkTask.TaskType < models.Mining && zkTask.Resource.GpuNum > 0 {
 		resourceType = models.RESOURCE_TYPE_GPU
-	} else if zkTask.TaskType == models.Mining && len(zkTask.Resource.Gpu) > 0 {
+	} else if zkTask.TaskType == models.Mining && len(zkTask.Resource.Gpus) > 0 {
 		resourceType = models.RESOURCE_TYPE_GPU
 	}
 
