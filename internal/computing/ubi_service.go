@@ -999,14 +999,16 @@ func doFilC2Task(c *gin.Context, zkTask models.ZkTaskReq, taskEntity *models.Tas
 				Memory: needMemory * 1024 * 1024 * 1024,
 			}
 		} else {
-			gpuEnv, ok := os.LookupEnv("RUST_GPU_TOOLS_CUSTOM_GPU")
-			if ok {
-				env = append(env, "RUST_GPU_TOOLS_CUSTOM_GPU="+gpuEnv)
-			}
+			//gpuEnv, ok := os.LookupEnv("RUST_GPU_TOOLS_CUSTOM_GPU")
+			//if ok {
+			//	env = append(env, "RUST_GPU_TOOLS_CUSTOM_GPU="+gpuEnv)
+			//}
 
 			var useIndexs []string
 			if len(indexs) > 0 {
-				useIndexs = append(useIndexs, indexs[0])
+				for i := 0; i < int(zkTask.Resource.GpuNum); i++ {
+					useIndexs = append(useIndexs, indexs[i])
+				}
 				env = append(env, fmt.Sprintf("CUDA_VISIBLE_DEVICES=%s", strings.Join(useIndexs, ",")))
 			} else {
 				taskEntity.Status = models.TASK_REJECTED_STATUS
@@ -1160,30 +1162,38 @@ func checkResourceForUbiAndMutilGpu(taskId int, resource *models.ResourceInfo, g
 	}
 
 	if resourceType == models.RESOURCE_TYPE_GPU {
-		var total int
+		var newGpuNum []string
 		for _, gm := range gpuMap {
-			total += gm.num
+			newGpuNum = append(newGpuNum, gm.indexs...)
+		}
+		if needGpuNum <= int64(len(newGpuNum)) {
+			return true, nodeResource.CpuName, needCpu, int64(needMemory), newGpuNum, nil, nil
+		} else {
+			noAvailableStr = append(noAvailableStr, fmt.Sprintf("gpu need name:%s, num:%d, remainder:%d", gpuName, needGpuNum, len(newGpuNum)))
+			logs.GetLogger().Warnf("the task_id: %d resource is not available. Reason: %s",
+				taskId, strings.Join(noAvailableStr, ";"))
+			return false, nodeResource.CpuName, needCpu, int64(needMemory), newGpuNum, noAvailableStr, nil
 		}
 
-		if gpuName != "" {
-			var flag bool
-			var newGpuNum []string
-			for k, gm := range gpuMap {
-				if strings.ToUpper(k) == gpuName && gm.num > 0 {
-					newGpuNum = gm.indexs
-					flag = true
-					break
-				}
-			}
-			if flag && needGpuNum <= int64(total) {
-				return true, nodeResource.CpuName, needCpu, int64(needMemory), newGpuNum, nil, nil
-			} else {
-				noAvailableStr = append(noAvailableStr, fmt.Sprintf("gpu need name:%s, num:%d, remainder:%d", gpuName, needGpuNum, len(newGpuNum)))
-				logs.GetLogger().Warnf("the task_id: %d resource is not available. Reason: %s",
-					taskId, strings.Join(noAvailableStr, ";"))
-				return false, nodeResource.CpuName, needCpu, int64(needMemory), newGpuNum, noAvailableStr, nil
-			}
-		}
+		//if gpuName != "" {
+		//	var flag bool
+		//	var newGpuNum []string
+		//	for k, gm := range gpuMap {
+		//		if strings.ToUpper(k) == gpuName && gm.num > 0 {
+		//			newGpuNum = gm.indexs
+		//			flag = true
+		//			break
+		//		}
+		//	}
+		//	if flag && needGpuNum <= int64(total) {
+		//		return true, nodeResource.CpuName, needCpu, int64(needMemory), newGpuNum, nil, nil
+		//	} else {
+		//		noAvailableStr = append(noAvailableStr, fmt.Sprintf("gpu need name:%s, num:%d, remainder:%d", gpuName, needGpuNum, len(newGpuNum)))
+		//		logs.GetLogger().Warnf("the task_id: %d resource is not available. Reason: %s",
+		//			taskId, strings.Join(noAvailableStr, ";"))
+		//		return false, nodeResource.CpuName, needCpu, int64(needMemory), newGpuNum, noAvailableStr, nil
+		//	}
+		//}
 	} else {
 		if len(noAvailableStr) > 0 {
 			logs.GetLogger().Warnf("the task_id: %d resource is not available. Reason: %s",
