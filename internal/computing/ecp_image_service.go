@@ -413,6 +413,12 @@ func doMiningTask(c *gin.Context, zkTask models.ZkTaskReq, taskEntity *models.Ta
 	deployJob.JobType = models.MiningJobType
 	deployJob.NeedResource = needResource
 
+	for k, v := range zkTask.Envs {
+		envs = append(envs, fmt.Sprintf("%s=%s", k, v))
+	}
+	deployJob.Envs = envs
+	deployJob.Image = zkTask.Image
+
 	var logUrl string
 	multiAddressSplit := strings.Split(conf.GetConfig().API.MultiAddress, "/")
 	if len(multiAddressSplit) >= 4 {
