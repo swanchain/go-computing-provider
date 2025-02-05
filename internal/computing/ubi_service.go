@@ -853,19 +853,21 @@ func DoZkTask(c *gin.Context) {
 		return
 	}
 
-	signature, err := verifySignature(conf.GetConfig().UBI.UbiEnginePk, fmt.Sprintf("%s%v", cpAccountAddress, taskId), zkTask.Signature)
-	if err != nil {
-		logs.GetLogger().Errorf("verifySignature for ubi task failed, error: %+v", err)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
-		return
-	}
+	if conf.GetConfig().UBI.VerifySign {
+		signature, err := verifySignature(conf.GetConfig().UBI.UbiEnginePk, fmt.Sprintf("%s%v", cpAccountAddress, taskId), zkTask.Signature)
+		if err != nil {
+			logs.GetLogger().Errorf("verifySignature for ubi task failed, error: %+v", err)
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
+			return
+		}
 
-	logs.GetLogger().Infof("ubi task sign verifing, task_id: %d, verify: %v", zkTask.Id, signature)
-	if !signature {
-		taskEntity.Status = models.TASK_REJECTED_STATUS
-		NewTaskService().SaveTaskEntity(taskEntity)
-		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "signature verify failed"))
-		return
+		logs.GetLogger().Infof("ubi task sign verifing, task_id: %d, verify: %v", zkTask.Id, signature)
+		if !signature {
+			taskEntity.Status = models.TASK_REJECTED_STATUS
+			NewTaskService().SaveTaskEntity(taskEntity)
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "signature verify failed"))
+			return
+		}
 	}
 
 	if zkTask.TaskType < models.Mining {
