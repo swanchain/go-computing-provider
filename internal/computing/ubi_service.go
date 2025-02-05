@@ -777,7 +777,415 @@ func DoUbiTaskForDocker(c *gin.Context) {
 }
 
 func DoZkTask(c *gin.Context) {
+	var zkTask models.ZkTaskReq
+	if err := c.ShouldBindJSON(&zkTask); err != nil {
+		logs.GetLogger().Error("failed to parse json, error: %v", err)
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
+		return
+	}
 
+	var taskId any
+	if zkTask.Id != 0 {
+		taskId = zkTask.Id
+	} else {
+		taskId = zkTask.Uuid
+	}
+	logs.GetLogger().Infof("ubi task received: task_id: %v, task_type: %s", taskId, models.UbiTaskTypeStr(zkTask.TaskType))
+
+	var resourceType = models.RESOURCE_TYPE_CPU
+
+	if zkTask.TaskType < models.Mining && zkTask.Resource.GpuNum > 0 {
+		resourceType = models.RESOURCE_TYPE_GPU
+	} else if zkTask.TaskType == models.Mining && len(zkTask.Resource.Gpu) > 0 {
+		resourceType = models.RESOURCE_TYPE_GPU
+	}
+
+	var taskEntity = new(models.TaskEntity)
+	var maxID int64
+	if zkTask.TaskType == models.Mining {
+		result := NewTaskService().Model(&models.TaskEntity{}).Select("MAX(id)").Scan(&maxID)
+		if result.Error != nil {
+			logs.GetLogger().Error("failed to fetch max task id")
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SaveTaskEntityError))
+			return
+		}
+		taskEntity.Id = maxID + 1
+		taskEntity.Uuid = zkTask.Uuid
+		taskEntity.Sequencer = 0
+	} else {
+		taskEntity.Id = int64(zkTask.Id)
+		taskEntity.Type = zkTask.TaskType
+		taskEntity.Name = zkTask.Name
+		taskEntity.ResourceType = resourceType
+		taskEntity.InputParam = zkTask.InputParam
+		taskEntity.VerifyParam = zkTask.VerifyParam
+		taskEntity.Status = models.TASK_RECEIVED_STATUS
+		taskEntity.CreateTime = time.Now().Unix()
+		taskEntity.Deadline = zkTask.DeadLine
+		taskEntity.CheckCode = zkTask.CheckCode
+	}
+	err := NewTaskService().SaveTaskEntity(taskEntity)
+	if err != nil {
+		logs.GetLogger().Errorf("failed to save task entity, error: %v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SaveTaskEntityError))
+		return
+	}
+
+	if strings.TrimSpace(zkTask.Name) == "" {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: name"))
+		return
+	}
+
+	if zkTask.TaskType == 0 {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: type"))
+		return
+	}
+
+	cpAccountAddress, err := contract.GetCpAccountAddress()
+	if err != nil {
+		logs.GetLogger().Errorf("get cp account contract address failed, error: %v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.GetCpAccountError))
+		return
+	}
+
+	signature, err := verifySignature(conf.GetConfig().UBI.UbiEnginePk, fmt.Sprintf("%s%v", cpAccountAddress, taskId), zkTask.Signature)
+	if err != nil {
+		logs.GetLogger().Errorf("verifySignature for ubi task failed, error: %+v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
+		return
+	}
+
+	logs.GetLogger().Infof("ubi task sign verifing, task_id: %d, verify: %v", zkTask.Id, signature)
+	if !signature {
+		taskEntity.Status = models.TASK_REJECTED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "signature verify failed"))
+		return
+	}
+
+	if zkTask.TaskType < models.Mining {
+		// do fil-c2
+		if !conf.GetConfig().UBI.EnableSequencer && !conf.GetConfig().UBI.AutoChainProof {
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.RejectZkTaskError))
+			return
+		}
+
+		balance, err := checkBalance(cpAccountAddress)
+		if err != nil || !balance {
+			taskEntity.Status = models.TASK_REJECTED_STATUS
+			NewTaskService().SaveTaskEntity(taskEntity)
+
+			logs.GetLogger().Errorf("failed check cp account balance, error: %v", err)
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckBalanceError))
+			return
+		}
+		doFilC2Task(c, zkTask, taskEntity)
+	}
+
+	if zkTask.TaskType == models.Mining {
+		// do mining
+		doMiningTask(c, zkTask, taskEntity)
+	}
+}
+
+func doFilC2Task(c *gin.Context, zkTask models.ZkTaskReq, taskEntity *models.TaskEntity) {
+	if zkTask.Id == 0 {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: id"))
+		return
+	}
+
+	if strings.TrimSpace(zkTask.InputParam) == "" {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: input_param"))
+		return
+	}
+
+	if strings.TrimSpace(zkTask.VerifyParam) == "" {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: verify_param"))
+		return
+	}
+
+	if strings.TrimSpace(zkTask.CheckCode) == "" {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: check_code"))
+		return
+	}
+
+	if strings.TrimSpace(zkTask.Signature) == "" {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: signature"))
+		return
+	}
+
+	if zkTask.DeadLine == 0 {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: deadline"))
+		return
+	}
+
+	var gpuFlag = "0"
+	if taskEntity.ResourceType == models.RESOURCE_TYPE_GPU {
+		gpuFlag = "1"
+	}
+
+	var gpuName string
+	gpuConfig, ok := os.LookupEnv("RUST_GPU_TOOLS_CUSTOM_GPU")
+	if ok {
+		gpuName = convertGpuName(strings.TrimSpace(gpuConfig))
+	}
+
+	_, architecture, _, needMemory, indexs, noAvailableMsgs, err := checkResourceForUbiAndMutilGpu(zkTask.Id, zkTask.Resource, gpuName, taskEntity.ResourceType)
+	if err != nil {
+		taskEntity.Status = models.TASK_FAILED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
+		return
+	}
+
+	if len(noAvailableMsgs) > 0 {
+		taskEntity.Status = models.TASK_REJECTED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
+		logs.GetLogger().Warnf(" task_id: %d, msg: %s", zkTask.Id, strings.Join(noAvailableMsgs, ";"))
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError, strings.Join(noAvailableMsgs, ";")))
+		return
+	}
+
+	var ubiTaskImage string
+	if architecture == constants.CPU_AMD {
+		ubiTaskImage = build.UBITaskImageAmdCpu
+		if gpuFlag == "1" {
+			ubiTaskImage = build.UBITaskImageAmdGpu
+		}
+	} else if architecture == constants.CPU_INTEL {
+		ubiTaskImage = build.UBITaskImageIntelCpu
+		if gpuFlag == "1" {
+			ubiTaskImage = build.UBITaskImageIntelGpu
+		}
+	}
+
+	go func() {
+		defer func() {
+			if err := recover(); err != nil {
+				logs.GetLogger().Errorf("do zk task painc, error: %+v", err)
+				return
+			}
+		}()
+
+		if ubiTaskImage == "" {
+			logs.GetLogger().Errorf("please check the log output of the resource-exporter container to see if cpu_name is intel or amd")
+			return
+		}
+
+		if err := NewDockerService().PullImage(ubiTaskImage); err != nil {
+			logs.GetLogger().Errorf("failed to pull %s image, error: %v", ubiTaskImage, err)
+			return
+		}
+
+		receiveUrl := fmt.Sprintf("http://127.0.0.1:%d/api/v1/computing/cp/docker/receive/ubi", conf.GetConfig().API.Port)
+		execCommand := []string{"ubi-bench", "c2"}
+		JobName := strings.ToLower(models.UbiTaskTypeStr(zkTask.TaskType)) + "-" + strconv.Itoa(zkTask.Id)
+
+		var env = []string{"RECEIVE_PROOF_URL=" + receiveUrl}
+		env = append(env, "TASKID="+strconv.Itoa(zkTask.Id))
+		env = append(env, "PARAM_URL="+zkTask.InputParam)
+
+		var needResource container.Resources
+		if gpuFlag == "0" {
+			env = append(env, "BELLMAN_NO_GPU=1")
+			needResource = container.Resources{
+				Memory: needMemory * 1024 * 1024 * 1024,
+			}
+		} else {
+			gpuEnv, ok := os.LookupEnv("RUST_GPU_TOOLS_CUSTOM_GPU")
+			if ok {
+				env = append(env, "RUST_GPU_TOOLS_CUSTOM_GPU="+gpuEnv)
+			}
+
+			var useIndexs []string
+			if len(indexs) > 0 {
+				useIndexs = append(useIndexs, indexs[0])
+				env = append(env, fmt.Sprintf("CUDA_VISIBLE_DEVICES=%s", strings.Join(useIndexs, ",")))
+			} else {
+				taskEntity.Status = models.TASK_REJECTED_STATUS
+				NewTaskService().SaveTaskEntity(taskEntity)
+				c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError, strings.Join(noAvailableMsgs, ";")))
+				return
+			}
+			needResource = container.Resources{
+				Memory: needMemory * 1024 * 1024 * 1024,
+				DeviceRequests: []container.DeviceRequest{
+					{
+						Driver:       "nvidia",
+						DeviceIDs:    useIndexs,
+						Capabilities: [][]string{{"gpu", "compute", "utility"}},
+					},
+				},
+			}
+		}
+
+		filC2Param, ok := os.LookupEnv("FIL_PROOFS_PARAMETER_CACHE")
+		if !ok {
+			filC2Param = "/var/tmp/filecoin-proof-parameters"
+		}
+		if len(strings.TrimSpace(filC2Param)) == 0 {
+			logs.GetLogger().Warnf("task_id: %d, `FIL_PROOFS_PARAMETER_CACHE` variable is not configured", zkTask.Id)
+			return
+		}
+
+		hostConfig := &container.HostConfig{
+			Binds:       []string{fmt.Sprintf("%s:/var/tmp/filecoin-proof-parameters", filC2Param)},
+			Resources:   needResource,
+			NetworkMode: network.NetworkHost,
+			Privileged:  true,
+		}
+		containerConfig := &container.Config{
+			Image:        ubiTaskImage,
+			Cmd:          execCommand,
+			Env:          env,
+			AttachStdout: true,
+			AttachStderr: true,
+			Tty:          true,
+		}
+
+		containerName := JobName + generateString(5)
+		logs.GetLogger().Warnf("task_id: %d, starting container, container name: %s", zkTask.Id, containerName)
+
+		dockerService := NewDockerService()
+		if err = dockerService.ContainerCreateAndStart(containerConfig, hostConfig, nil, containerName); err != nil {
+			logs.GetLogger().Errorf("failed to create ubi task container, task_id: %d, error: %v", zkTask.Id, err)
+			return
+		}
+
+		time.Sleep(3 * time.Second)
+		if !dockerService.IsExistContainer(containerName) {
+			logs.GetLogger().Warnf("task_id: %d, not found container", zkTask.Id)
+			return
+		}
+		logs.GetLogger().Warnf("task_id: %d, started container, container name: %s", zkTask.Id, containerName)
+		NewTaskService().UpdateTaskStatusById(zkTask.Id, models.TASK_RUNNING_STATUS)
+
+		containerLogStream, err := dockerService.GetContainerLogStream(context.TODO(), containerName)
+		if err != nil {
+			logs.GetLogger().Errorf("get docker container log stream failed, error: %v", err)
+			return
+		}
+		defer containerLogStream.Close()
+
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
+		ubiLogFileName := filepath.Join(cpRepoPath, "ubi-ecp.log")
+		logFile, err := os.OpenFile(ubiLogFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			logs.GetLogger().Errorf("opening ubi-ecp log file failed, error: %v", err)
+			return
+		}
+		defer logFile.Close()
+
+		if _, err = io.Copy(logFile, containerLogStream); err != nil {
+			logs.GetLogger().Errorf("write ubi-ecp log to file failed, error: %v", err)
+			return
+		}
+	}()
+	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
+}
+
+func checkResourceForUbiAndMutilGpu(taskId int, resource *models.ResourceInfo, gpuName string, resourceType int) (bool, string, int64, int64, []string, []string, error) {
+	var needGpuNum = resource.GpuNum
+
+	dockerService := NewDockerService()
+	containerLogStr, err := dockerService.ContainerLogs("resource-exporter")
+	if err != nil {
+		return false, "", 0, 0, nil, nil, err
+	}
+	var nodeResource models.NodeResource
+	if err := json.Unmarshal([]byte(containerLogStr), &nodeResource); err != nil {
+		return false, "", 0, 0, nil, nil, err
+	}
+
+	var needCpu = resource.CPU
+	var needMemory = float64(resource.Memory)
+	var needStorage = float64(resource.Storage)
+
+	remainderCpu, _ := strconv.ParseInt(nodeResource.Cpu.Free, 10, 64)
+	var remainderMemory, remainderStorage float64
+	if len(strings.Split(strings.TrimSpace(nodeResource.Memory.Free), " ")) > 0 {
+		remainderMemory, _ = strconv.ParseFloat(strings.Split(strings.TrimSpace(nodeResource.Memory.Free), " ")[0], 64)
+	}
+	if len(strings.Split(strings.TrimSpace(nodeResource.Storage.Free), " ")) > 0 {
+		remainderStorage, err = strconv.ParseFloat(strings.Split(strings.TrimSpace(nodeResource.Storage.Free), " ")[0], 64)
+	}
+
+	type gpuData struct {
+		num    int
+		indexs []string
+	}
+
+	var indexs []string
+	var gpuMap = make(map[string]gpuData)
+	if nodeResource.Gpu.AttachedGpus > 0 {
+		for _, detail := range nodeResource.Gpu.Details {
+			if detail.Status == models.Available {
+				data, ok := gpuMap[detail.ProductName]
+				if ok {
+					data.num += 1
+					data.indexs = append(data.indexs, detail.Index)
+					gpuMap[detail.ProductName] = data
+				} else {
+					indexs = make([]string, 0)
+					indexs = append(indexs, detail.Index)
+					var dataNew = gpuData{
+						num:    1,
+						indexs: indexs,
+					}
+					gpuMap[detail.ProductName] = dataNew
+				}
+			}
+		}
+	}
+
+	logs.GetLogger().Infof("checkResourceForUbi: needCpu: %d, needMemory: %.2f, needStorage: %.2f, needGpu: %d", needCpu, needMemory, needStorage, resource.GpuNum)
+	logs.GetLogger().Infof("checkResourceForUbi: remainingCpu: %d, remainingMemory: %.2f, remainingStorage: %.2f, remainingGpu: %+v", remainderCpu, remainderMemory, remainderStorage, gpuMap)
+
+	var noAvailableStr []string
+	if remainderCpu < needCpu {
+		noAvailableStr = append(noAvailableStr, fmt.Sprintf("cpu need: %d, remainder: %d", needCpu, remainderCpu))
+	}
+	if remainderMemory < needMemory {
+		noAvailableStr = append(noAvailableStr, fmt.Sprintf("memory need: %f, remainder: %f", needMemory, remainderMemory))
+	}
+	if remainderStorage < needStorage {
+		noAvailableStr = append(noAvailableStr, fmt.Sprintf("storage need: %f, remainder: %f", needStorage, remainderStorage))
+	}
+
+	if resourceType == models.RESOURCE_TYPE_GPU {
+		var total int
+		for _, gm := range gpuMap {
+			total += gm.num
+		}
+
+		if gpuName != "" {
+			var flag bool
+			var newGpuNum []string
+			for k, gm := range gpuMap {
+				if strings.ToUpper(k) == gpuName && gm.num > 0 {
+					newGpuNum = gm.indexs
+					flag = true
+					break
+				}
+			}
+			if flag && needGpuNum <= int64(total) {
+				return true, nodeResource.CpuName, needCpu, int64(needMemory), newGpuNum, nil, nil
+			} else {
+				noAvailableStr = append(noAvailableStr, fmt.Sprintf("gpu need name:%s, num:%d, remainder:%d", gpuName, needGpuNum, len(newGpuNum)))
+				logs.GetLogger().Warnf("the task_id: %d resource is not available. Reason: %s",
+					taskId, strings.Join(noAvailableStr, ";"))
+				return false, nodeResource.CpuName, needCpu, int64(needMemory), newGpuNum, noAvailableStr, nil
+			}
+		}
+	} else {
+		if len(noAvailableStr) > 0 {
+			logs.GetLogger().Warnf("the task_id: %d resource is not available. Reason: %s",
+				taskId, strings.Join(noAvailableStr, ";"))
+		} else {
+			return true, nodeResource.CpuName, needCpu, int64(needMemory), indexs, nil, nil
+		}
+	}
+	return false, nodeResource.CpuName, needCpu, int64(needMemory), indexs, noAvailableStr, nil
 }
 
 func checkResourceForUbi(taskId int, resource *models.TaskResource, gpuName string, resourceType int) (bool, string, int64, int64, []string, []string, error) {
