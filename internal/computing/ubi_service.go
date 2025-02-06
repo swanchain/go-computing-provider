@@ -799,7 +799,7 @@ func DoZkTask(c *gin.Context) {
 
 	var resourceType = models.RESOURCE_TYPE_CPU
 
-	if zkTask.TaskType < models.Mining && zkTask.Resource.GpuNum > 0 {
+	if zkTask.TaskType < models.Mining {
 		resourceType = models.RESOURCE_TYPE_GPU
 	} else if zkTask.TaskType == models.Mining && len(zkTask.Resource.Gpus) > 0 {
 		resourceType = models.RESOURCE_TYPE_GPU
@@ -937,6 +937,11 @@ func doFilC2Task(c *gin.Context, zkTask models.ZkTaskReq, taskEntity *models.Tas
 		gpuName = convertGpuName(strings.TrimSpace(gpuConfig))
 	}
 
+	var needGpuNum int
+	for _, gpus := range zkTask.Resource.Gpus {
+		needGpuNum += gpus.GPU
+	}
+
 	_, architecture, _, needMemory, indexs, noAvailableMsgs, err := checkResourceForUbiAndMutilGpu(zkTask.Id, zkTask.Resource, gpuName, taskEntity.ResourceType)
 	if err != nil {
 		taskEntity.Status = models.TASK_FAILED_STATUS
@@ -1006,7 +1011,7 @@ func doFilC2Task(c *gin.Context, zkTask models.ZkTaskReq, taskEntity *models.Tas
 
 			var useIndexs []string
 			if len(indexs) > 0 {
-				for i := 0; i < int(zkTask.Resource.GpuNum); i++ {
+				for i := 0; i < needGpuNum; i++ {
 					useIndexs = append(useIndexs, indexs[i])
 				}
 				env = append(env, fmt.Sprintf("CUDA_VISIBLE_DEVICES=%s", strings.Join(useIndexs, ",")))
@@ -1094,7 +1099,10 @@ func doFilC2Task(c *gin.Context, zkTask models.ZkTaskReq, taskEntity *models.Tas
 }
 
 func checkResourceForUbiAndMutilGpu(taskId int, resource *models.ResourceInfo, gpuName string, resourceType int) (bool, string, int64, int64, []string, []string, error) {
-	var needGpuNum = resource.GpuNum
+	var needGpuNum int
+	for _, gpus := range resource.Gpus {
+		needGpuNum += gpus.GPU
+	}
 
 	dockerService := NewDockerService()
 	containerLogStr, err := dockerService.ContainerLogs("resource-exporter")
@@ -1152,7 +1160,7 @@ func checkResourceForUbiAndMutilGpu(taskId int, resource *models.ResourceInfo, g
 		}
 	}
 
-	logs.GetLogger().Infof("checkResourceForUbi: needCpu: %d, needMemory: %.2f, needStorage: %.2f, needGpu: %d", needCpu, needMemory, needStorage, resource.GpuNum)
+	logs.GetLogger().Infof("checkResourceForUbi: needCpu: %d, needMemory: %.2f, needStorage: %.2f, needGpu: %d", needCpu, needMemory, needStorage, needGpuNum)
 	logs.GetLogger().Infof("checkResourceForUbi: remainingCpu: %d, remainingMemory: %.2f, remainingStorage: %.2f, remainingGpu: %+v", remainderCpu, remainderMemory, remainderStorage, gpuMap)
 
 	var noAvailableStr []string
@@ -1171,10 +1179,10 @@ func checkResourceForUbiAndMutilGpu(taskId int, resource *models.ResourceInfo, g
 		for _, gm := range gpuMap {
 			newGpuNum = append(newGpuNum, gm.indexs...)
 		}
-		if needGpuNum <= int64(len(newGpuNum)) {
+		if needGpuNum <= len(newGpuNum) {
 			return true, nodeResource.CpuName, needCpu, int64(needMemory), newGpuNum, nil, nil
 		} else {
-			noAvailableStr = append(noAvailableStr, fmt.Sprintf("gpu need name:%s, num:%d, remainder:%d", gpuName, needGpuNum, len(newGpuNum)))
+			noAvailableStr = append(noAvailableStr, fmt.Sprintf("gpu need num:%d, remainder:%d", needGpuNum, len(newGpuNum)))
 			logs.GetLogger().Warnf("the task_id: %d resource is not available. Reason: %s",
 				taskId, strings.Join(noAvailableStr, ";"))
 			return false, nodeResource.CpuName, needCpu, int64(needMemory), newGpuNum, noAvailableStr, nil
