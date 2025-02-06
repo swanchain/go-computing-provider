@@ -599,7 +599,7 @@ COMMANDS:
    changeOwnerAddress        Update OwnerAddress of CP
    changeWorkerAddress       Update workerAddress of CP
    changeBeneficiaryAddress  Update beneficiaryAddress of CP
-   changeTaskTypes           Update taskTypes of CP (1:Fil-C2, 2:Mining, 3: AI, 4:Inference, 5:NodePort), separated by commas
+   changeTaskTypes           Update taskTypes of CP (1:Fil-C2, 2:Mining, 3: AI, 4:Inference, 5:NodePort, 100:Exit), separated by commas
    help, h                   Show a list of commands or help for one command
 
 OPTIONS:

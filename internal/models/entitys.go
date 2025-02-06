@@ -248,6 +248,7 @@ const (
 	Task_TYPE_AI
 	Task_TYPE_INFERENCE
 	Task_TYPE_NODE_PORT
+	Task_TYPE_EXIT = 100
 )
 
 func TaskTypeStr(taskType int) string {
@@ -263,6 +264,9 @@ func TaskTypeStr(taskType int) string {
 		typeStr = "Inference"
 	case Task_TYPE_NODE_PORT:
 		typeStr = "NodePort"
+	case Task_TYPE_EXIT:
+		typeStr = "Exit"
+
 	}
 	return typeStr
 }
@@ -280,7 +284,7 @@ type CpInfoEntity struct {
 	CreateAt           string   `json:"create_at" gorm:"create_at"`
 	UpdateAt           string   `json:"update_at" gorm:"update_at"`
 	MultiAddresses     []string `json:"multi_addresses" gorm:"-"`
-	TaskTypes          []uint8  `json:"task_types" gorm:"-"` // 1:Fil-C2-512M, 2:mining, 3: AI, 4:Fil-C2-32G
+	TaskTypes          []uint8  `json:"task_types" gorm:"-"` // 1:Fil-C2-512M, 2:mining, 3: AI, 4:Fil-C2-32G, 5:NodePort, 100:Exit
 
 }
 

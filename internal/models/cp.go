@@ -114,7 +114,7 @@ type Account struct {
 	OwnerAddress   string
 	NodeId         string
 	MultiAddresses []string
-	TaskTypes      []uint8 // 1:Fil-C2-512M, 2:mining, 3: AI, 4:Fil-C2-32G
+	TaskTypes      []uint8 // 1:Fil-C2-512M, 2:mining, 3: AI, 4:Fil-C2-32G 5:NodePort 100:Exit
 	Beneficiary    string
 	WorkerAddress  string
 	Version        string
@@ -259,7 +259,7 @@ type ZkTaskReq struct {
 	Id          int           `json:"id"`
 	Uuid        string        `json:"uuid,omitempty"`
 	Name        string        `json:"name,omitempty"`
-	TaskType    int           `json:"task_type"` // 1: fil-c2-512-cpu; 2:fil-c2-32-cpu; 3: fil-c2-512-gpu; 4: fil-c2-32-gpu  5: mining
+	TaskType    int           `json:"task_type"` // 1: fil-c2-512-cpu; 2:fil-c2-32-cpu; 3: fil-c2-512-gpu; 4: fil-c2-32-gpu; 5: mining
 	InputParam  string        `json:"input_param"`
 	VerifyParam string        `json:"verify_param"`
 	Signature   string        `json:"signature"`
@@ -275,8 +275,8 @@ type ZkTaskReq struct {
 
 type ResourceInfo struct {
 	CPU     int64 `json:"cpu"`
-	Memory  int64 `json:"memory"`
-	Storage int64 `json:"storage"`
+	Memory  int64 `json:"memory"`  // bytes
+	Storage int64 `json:"storage"` // bytes
 	Gpus    []struct {
 		GPU      int    `json:"gpu"`
 		GPUModel string `json:"gpu_model"`
