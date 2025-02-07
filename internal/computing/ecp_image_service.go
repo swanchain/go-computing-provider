@@ -1046,8 +1046,10 @@ func checkResourceForImageAndMutilGpu(jobUud string, resource *models.ResourceIn
 	}
 
 	var reqGpuMap = make(map[string]int)
+	var needGpu int
 	for _, g := range resource.Gpus {
 		reqGpuMap[g.GPUModel] = g.GPU
+		needGpu += g.GPU
 	}
 
 	logs.GetLogger().Infof("checkResourceForImage: needCpu: %d, needMemory: %.2f, needStorage: %.2f, needGpu: %v", needCpu, needMemory, needStorage, reqGpuMap)
@@ -1065,10 +1067,10 @@ func checkResourceForImageAndMutilGpu(jobUud string, resource *models.ResourceIn
 	}
 
 	var newGpuIndex []string
-	var flags bool
 	var count int
 	for _, reqG := range resource.Gpus {
 		if reqG.GPUModel != "" {
+			var flags bool
 			for k, gd := range gpuMap {
 				if strings.ToUpper(k) == reqG.GPUModel && reqG.GPU < gd.num {
 					newGpuIndex = append(newGpuIndex, gd.indexs[:reqG.GPU]...)
@@ -1083,7 +1085,7 @@ func checkResourceForImageAndMutilGpu(jobUud string, resource *models.ResourceIn
 		}
 	}
 
-	if len(resource.Gpus) > 0 && count == len(newGpuIndex) {
+	if len(resource.Gpus) > 0 && count == needGpu {
 		return true, nodeResource.CpuName, needCpu, int64(needMemory), newGpuIndex, nil, nil
 	}
 
