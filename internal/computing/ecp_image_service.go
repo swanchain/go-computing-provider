@@ -1072,7 +1072,7 @@ func checkResourceForImageAndMutilGpu(jobUud string, resource *models.ResourceIn
 		if reqG.GPUModel != "" {
 			var flags bool
 			for k, gd := range gpuMap {
-				if strings.ToUpper(k) == reqG.GPUModel && reqG.GPU < gd.num {
+				if strings.ToUpper(k) == reqG.GPUModel && reqG.GPU <= gd.num {
 					newGpuIndex = append(newGpuIndex, gd.indexs[:reqG.GPU]...)
 					flags = true
 					count += reqG.GPU
