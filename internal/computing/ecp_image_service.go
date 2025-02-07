@@ -262,6 +262,7 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 	deployJob.JobType = job.JobType
 	deployJob.HealthPath = job.HealthPath
 	deployJob.NeedResource = needResource
+	deployJob.IpWhiteList = job.IpWhiteList
 
 	if len(job.RunCommands) == 0 {
 		deployJob.Image = job.Image
@@ -640,6 +641,15 @@ func (*ImageJobService) DeployInference(c *gin.Context, deployJob models.DeployJ
 			"traefik.enable": "true",
 			fmt.Sprintf("traefik.http.routers.%s.entrypoints", containerName): "web",
 			fmt.Sprintf("traefik.http.routers.%s.rule", containerName):        fmt.Sprintf("Host(`%s`)", apiUrl),
+		}
+
+		if len(deployJob.IpWhiteList) > 0 {
+			whiteListName := fmt.Sprintf("%s-ipallowlist", prefixStr)
+			whiteListKey := fmt.Sprintf("traefik.http.middlewares.%s.ipallowlist.sourcerange", whiteListName)
+			labelMap[whiteListKey] = strings.Join(deployJob.IpWhiteList, ",")
+
+			whiteRuleName := fmt.Sprintf("traefik.http.routers.%s.middlewares", containerName)
+			labelMap[whiteRuleName] = whiteListName
 		}
 		apiUrl += fmt.Sprintf(":%d", traefikListenPortMapHost)
 	}
@@ -1069,18 +1079,20 @@ func checkResourceForImageAndMutilGpu(jobUud string, resource *models.ResourceIn
 	var newGpuIndex []string
 	var count int
 	for _, reqG := range resource.Gpus {
+		var gIndex []string
 		if reqG.GPUModel != "" {
 			var flags bool
 			for k, gd := range gpuMap {
 				if strings.ToUpper(k) == reqG.GPUModel && reqG.GPU <= gd.num {
-					newGpuIndex = append(newGpuIndex, gd.indexs[:reqG.GPU]...)
+					gIndex = gd.indexs[:reqG.GPU]
+					newGpuIndex = append(newGpuIndex, gIndex...)
 					flags = true
 					count += reqG.GPU
 					break
 				}
 			}
 			if !flags {
-				noAvailableStr = append(noAvailableStr, fmt.Sprintf("gpu need name:%s, num:%d, remainder:%d", reqG.GPUModel, reqG.GPU, len(newGpuIndex)))
+				noAvailableStr = append(noAvailableStr, fmt.Sprintf("gpu need name:%s, num:%d, remainder:%d", reqG.GPUModel, reqG.GPU, len(gIndex)))
 			}
 		}
 	}

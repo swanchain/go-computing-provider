@@ -19,6 +19,7 @@ type EcpImageJobReq struct {
 	RunCommands   []string          `json:"run_commands,omitempty"`
 	ResourceUrl   string            `json:"resource_url,omitempty"`
 	WorkDir       string            `json:"work_dir,omitempty"`
+	IpWhiteList   []string          `json:"ip_white_list"`
 }
 
 type HardwareResource struct {
@@ -42,6 +43,7 @@ type DeployJobParam struct {
 
 	BuildImagePath string
 	BuildImageName string
+	IpWhiteList    []string `json:"ip_white_list"`
 }
 
 type EcpImageResp struct {
