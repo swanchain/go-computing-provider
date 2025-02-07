@@ -32,6 +32,7 @@ import (
 	"github.com/swanchain/go-computing-provider/internal/contract/fcp"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"github.com/swanchain/go-computing-provider/util"
+	yaml2 "gopkg.in/yaml.v2"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -876,16 +877,37 @@ func DeployImage(c *gin.Context) {
 	}
 
 	var resource models.SpaceHardware
-	resource.Vcpu = int64(deployJob.Resource.Cpu)
-	resource.Memory = int64(deployJob.Resource.Memory)
-	resource.Storage = int64(deployJob.Resource.Storage)
+	if deployJob.DeployType == 2 {
+		yamlStruct, err := handlerYamlStr(deployJob.YamlContent)
+		if err != nil {
+			NewJobService().UpdateJobEntityStatusByJobUuid(deployJob.Uuid, models.JOB_FAILED_STATUS)
+			logs.GetLogger().Errorf("failed to parse yaml content, job_uuid: %s, error: %v", deployJob.Uuid, err)
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.ServerError))
+			return
+		}
 
-	if deployJob.Resource.Gpu > 0 && deployJob.Resource.GpuModel != "" {
-		resource.HardwareType = "GPU"
-		resource.Hardware = deployJob.Resource.GpuModel
-		resource.Gpu = int64(deployJob.Resource.Gpu)
+		resource.Vcpu = int64(yamlStruct.Resource.Cpu)
+		resource.Memory = int64(yamlStruct.Resource.Memory)
+		resource.Storage = int64(yamlStruct.Resource.Storage)
+		if yamlStruct.Resource.Gpu > 0 && yamlStruct.Resource.GpuModel != "" {
+			resource.HardwareType = "GPU"
+			resource.Hardware = yamlStruct.Resource.GpuModel
+			resource.Gpu = int64(yamlStruct.Resource.Gpu)
+		} else {
+			resource.HardwareType = "CPU"
+		}
+
 	} else {
-		resource.HardwareType = "CPU"
+		resource.Vcpu = int64(deployJob.Resource.Cpu)
+		resource.Memory = int64(deployJob.Resource.Memory)
+		resource.Storage = int64(deployJob.Resource.Storage)
+		if deployJob.Resource.Gpu > 0 && deployJob.Resource.GpuModel != "" {
+			resource.HardwareType = "GPU"
+			resource.Hardware = deployJob.Resource.GpuModel
+			resource.Gpu = int64(deployJob.Resource.Gpu)
+		} else {
+			resource.HardwareType = "CPU"
+		}
 	}
 
 	cpRepoPath, _ := os.LookupEnv("CP_PATH")
@@ -960,6 +982,7 @@ func DeployImage(c *gin.Context) {
 	if !conf.GetConfig().API.Pricing {
 		checkPriceFlag, totalCost, err := checkPrice(deployJob.BidPrice, deployJob.Duration, resource)
 		if err != nil {
+			NewJobService().UpdateJobEntityStatusByJobUuid(jobEntity.JobUuid, models.JOB_FAILED_STATUS)
 			logs.GetLogger().Errorf("failed to check price, job_uuid: %s, error: %v", deployJob.Uuid, err)
 			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
 			return
@@ -1174,52 +1197,62 @@ func DeployImageSpaceTask(jobData models.JobData, job models.FcpDeployImageReq, 
 	var deployJob models.DeployJobParam
 	deployJob.Uuid = job.Uuid
 	deployJob.Name = job.Name
-	deployJob.JobType = job.JobType
-	deployJob.HealthPath = job.DeployConfig.HealthPath
+	deployJob.HealthPath = job.HealthPath
 
-	var envs []string
-	if len(job.DeployConfig.RunCommands) == 0 { // build images
-		deployJob.Image = job.DeployConfig.Image
-		deployJob.Cmd = job.DeployConfig.Cmd
-		var ports []int
-		for _, p := range job.DeployConfig.Ports {
-			ports = append(ports, p...)
-		}
-		deployJob.Ports = ports
+	if job.DeployType == 0 {
+		deployJob.HealthPath = job.DeployConfig.HealthPath
+		var envs []string
+		if len(job.DeployConfig.RunCommands) == 0 {
+			deployJob.Image = job.DeployConfig.Image
+			deployJob.Cmd = job.DeployConfig.Cmd
+			var ports []int
+			for _, p := range job.DeployConfig.Ports {
+				ports = append(ports, p...)
+			}
+			deployJob.Ports = ports
 
-		for k, v := range job.DeployConfig.Envs {
-			envs = append(envs, fmt.Sprintf("%s=%s", k, v))
+			for k, v := range job.DeployConfig.Envs {
+				envs = append(envs, fmt.Sprintf("%s=%s", k, v))
+			}
+			deployJob.Envs = envs
+		} else {
+			// build images
+			buildParams, err := parseDockerfileConfigForFcp(job)
+			if err != nil {
+				logs.GetLogger().Errorln(err)
+				return
+			}
+			deployJob.Image = buildParams.Image
+			deployJob.Ports = buildParams.Ports
+			deployJob.Envs = buildParams.Envs
+			compatibleContainerd(deployJob.Image)
 		}
-		deployJob.Envs = envs
-	} else {
-		buildParams, err := parseDockerfileConfigForFcp(job)
+	} else if job.DeployType == 1 {
+		buildParams, err := parseDockerfileContentForFcp(job.Uuid, job.DockerContent)
 		if err != nil {
 			logs.GetLogger().Errorln(err)
 			return
 		}
 		deployJob.Image = buildParams.Image
-		deployJob.Cmd = buildParams.Cmd
 		deployJob.Ports = buildParams.Ports
 		deployJob.Envs = buildParams.Envs
-
-		clusterRuntime, err := NewK8sService().GetClusterRuntime()
+		compatibleContainerd(deployJob.Image)
+	} else if job.DeployType == 2 {
+		yamlStruct, err := handlerYamlStr(job.YamlContent)
 		if err != nil {
-			logs.GetLogger().Errorf("failed to get cluster runtime, error: %v", err)
-		} else {
-			logs.GetLogger().Infof("cluster runtime: %s", clusterRuntime)
-			if strings.Contains(strings.ToLower(clusterRuntime), "containerd") {
-				imageTar, err := NewDockerService().SaveDockerImage(deployJob.Image)
-				if err != nil {
-					logs.GetLogger().Errorf("failed to save image, imageName: %s error: %v", deployJob.Image, err)
-					return
-				}
-				if err = ImportImageToContainerd(imageTar); err != nil {
-					logs.GetLogger().Errorf("failed to load image into containerd, imageName: %s error: %v", deployJob.Image, err)
-					return
-				}
-			}
-
+			logs.GetLogger().Errorf("failed to parse yaml content, job_uuid: %s, error: %v", deployJob.Uuid, err)
+			return
 		}
+
+		var envs []string
+		deployJob.Image = job.DeployConfig.Image
+		deployJob.Cmd = job.DeployConfig.Cmd
+		deployJob.Ports = yamlStruct.Services.ExposePort
+
+		for k, v := range yamlStruct.Services.Envs {
+			envs = append(envs, fmt.Sprintf("%s=%s", k, v))
+		}
+		deployJob.Envs = envs
 	}
 
 	jobUuid = strings.ToLower(job.Uuid)
@@ -1246,6 +1279,76 @@ func DeployImageSpaceTask(jobData models.JobData, job models.FcpDeployImageReq, 
 	success = true
 }
 
+func compatibleContainerd(imageName string) {
+	clusterRuntime, err := NewK8sService().GetClusterRuntime()
+	if err != nil {
+		logs.GetLogger().Errorf("failed to get cluster runtime, error: %v", err)
+	} else {
+		logs.GetLogger().Infof("cluster runtime: %s", clusterRuntime)
+		if strings.Contains(strings.ToLower(clusterRuntime), "containerd") {
+			imageTar, err := NewDockerService().SaveDockerImage(imageName)
+			if err != nil {
+				logs.GetLogger().Errorf("failed to save image, imageName: %s error: %v", imageName, err)
+				return
+			}
+			if err = ImportImageToContainerd(imageTar); err != nil {
+				logs.GetLogger().Errorf("failed to load image into containerd, imageName: %s error: %v", imageName, err)
+				return
+			}
+		}
+
+	}
+}
+
+func handlerYamlStr(content string) (*models.YamlContent, error) {
+	var yamlContent models.YamlContent
+	if err := yaml2.Unmarshal([]byte(content), &yamlContent); err != nil {
+		return nil, err
+	}
+	return &yamlContent, nil
+}
+
+func parseDockerfileContentForFcp(jobUuid, dockerfileContent string) (*models.DeployJobParam, error) {
+	var deployParam *models.DeployJobParam
+	cpRepoPath, _ := os.LookupEnv("CP_PATH")
+	buildFolder := filepath.Join(cpRepoPath, "build/fcp", jobUuid)
+	if err := os.MkdirAll(buildFolder, os.ModePerm); err != nil {
+		return nil, fmt.Errorf("failed to create dir, error: %v", err)
+	}
+	dockerfileFile := filepath.Join(buildFolder, "Dockerfile")
+	err := os.WriteFile(dockerfileFile, []byte(dockerfileContent), 0644)
+	if err != nil {
+		return nil, fmt.Errorf("failed to save Dockerfile: %v", err)
+	}
+
+	imageName := fmt.Sprintf("fcp-image/%s:%d", jobUuid, time.Now().Unix())
+	if conf.GetConfig().Registry.ServerAddress != "" {
+		imageName = fmt.Sprintf("%s/%s:%d",
+			strings.TrimSpace(conf.GetConfig().Registry.ServerAddress), jobUuid, time.Now().Unix())
+	}
+	imageName = strings.ToLower(imageName)
+
+	if _, err := os.Stat(dockerfileFile); err != nil {
+		return nil, fmt.Errorf("failed not found Dockerfile, path: %s", dockerfileFile)
+	}
+
+	ports, envVars, err := parseDockerfile(dockerfileFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse dockerfile, path: %s", dockerfileFile)
+	}
+
+	if err = NewDockerService().BuildImage(jobUuid, buildFolder, imageName); err != nil {
+		logs.GetLogger().Errorf("failed to building %s image, job_uuid: %s, error: %v", imageName, jobUuid, err)
+		NewJobService().UpdateJobEntityStatusByJobUuid(jobUuid, models.JOB_FAILED_STATUS)
+	}
+
+	deployParam.BuildImagePath = buildFolder
+	deployParam.BuildImageName = imageName
+	deployParam.Ports = ports
+	deployParam.Envs = envVars
+	return deployParam, nil
+}
+
 func parseDockerfileConfigForFcp(job models.FcpDeployImageReq) (*models.DeployJobParam, error) {
 	var deployParam *models.DeployJobParam
 	if len(job.DeployConfig.RunCommands) != 0 {
@@ -1261,7 +1364,7 @@ func parseDockerfileConfigForFcp(job models.FcpDeployImageReq) (*models.DeployJo
 			return nil, fmt.Errorf("failed to save Dockerfile: %v", err)
 		}
 
-		imageName := fmt.Sprintf("ecp-image/%s:%d", job.Uuid, time.Now().Unix())
+		imageName := fmt.Sprintf("fcp-image/%s:%d", job.Uuid, time.Now().Unix())
 		if conf.GetConfig().Registry.ServerAddress != "" {
 			imageName = fmt.Sprintf("%s/%s:%d",
 				strings.TrimSpace(conf.GetConfig().Registry.ServerAddress), job.Uuid, time.Now().Unix())
@@ -1270,6 +1373,11 @@ func parseDockerfileConfigForFcp(job models.FcpDeployImageReq) (*models.DeployJo
 
 		if _, err := os.Stat(dockerfileFile); err != nil {
 			return nil, fmt.Errorf("failed not found Dockerfile, path: %s", dockerfileFile)
+		}
+
+		if err = NewDockerService().BuildImage(job.Uuid, buildFolder, imageName); err != nil {
+			logs.GetLogger().Errorf("failed to building %s image, job_uuid: %s, error: %v", imageName, job.Uuid, err)
+			NewJobService().UpdateJobEntityStatusByJobUuid(job.Uuid, models.JOB_FAILED_STATUS)
 		}
 		deployParam.BuildImagePath = buildFolder
 		deployParam.BuildImageName = imageName

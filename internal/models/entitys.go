@@ -379,6 +379,8 @@ const (
 )
 
 const (
+	FailedStatus     = "failed"
+	RejectStatus     = "rejected"
 	CreatedStatus    = "created"
 	RunningStatus    = "running"
 	TerminatedStatus = "terminated"

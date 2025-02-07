@@ -219,10 +219,31 @@ type FcpDeployImageReq struct {
 	IpWhitelist   []string       `json:"ip_whitelist"`
 	DeployConfig  DeployConfig   `json:"deploy_config"`
 	Resource      DeployResource `json:"resource"`
-	JobType       int            `json:"job_type"`
-	ResourceUrl   string         `json:"resource_url"`
 	IpWhiteList   []string       `json:"ip_white_list"`
 	BidPrice      string         `json:"bid_price"` // Amount users are willing to pay
+	JobType       int            `json:"job_type"`
+	DeployType    int            `json:"deploy_type"` // 0: field; 1: docker; 2: yaml
+	DockerContent string         `json:"docker_content"`
+	YamlContent   string         `json:"yaml_content"`
+	HealthPath    string         `json:"health_path"` // deploy_type=1 or 2, used
+}
+
+type YamlContent struct {
+	Version  string `json:"version"`
+	Services struct {
+		Image       string   `json:"image"`
+		Cmd         []string `json:"cmd"`
+		RunCommands []string `json:"run_commands"`
+		Envs        []string `json:"envs"`
+		ExposePort  []int    `json:"expose_port"`
+	} `json:"services"`
+	Resource struct {
+		Cpu      int    `json:"cpu"`
+		Memory   int    `json:"memory"`
+		Storage  int    `json:"storage"`
+		GpuModel string `json:"gpu_model"`
+		Gpu      int    `json:"gpu"`
+	} `json:"resource"`
 }
 
 type DeployConfig struct {

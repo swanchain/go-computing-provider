@@ -2,6 +2,7 @@ package computing
 
 import "C"
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -11,6 +12,7 @@ import (
 	"github.com/docker/go-connections/nat"
 	"github.com/filswan/go-swan-lib/logs"
 	"github.com/gin-gonic/gin"
+	"github.com/moby/buildkit/frontend/dockerfile/parser"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/contract"
 	"github.com/swanchain/go-computing-provider/internal/models"
@@ -111,12 +113,14 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 	}
 
 	if !CheckWalletWhiteListForEcp(job.WalletAddress) {
+		NewEcpJobService().UpdateEcpJobEntity(job.Uuid, models.RejectStatus)
 		logs.GetLogger().Errorf("This cp does not accept tasks from wallet addresses outside the whitelist")
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SpaceCheckWhiteListError))
 		return
 	}
 
 	if CheckWalletBlackListForEcp(job.WalletAddress) {
+		NewEcpJobService().UpdateEcpJobEntity(job.Uuid, models.RejectStatus)
 		logs.GetLogger().Errorf("This cp does not accept tasks from wallet addresses inside the blacklist")
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SpaceCheckBlackListError))
 		return
@@ -164,6 +168,8 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 			if job.Price == "-1" && job.JobType == models.MiningJobType {
 				taskEntity.Status = models.TASK_FAILED_STATUS
 				NewTaskService().SaveTaskEntity(taskEntity)
+			} else {
+				NewEcpJobService().UpdateEcpJobEntity(job.Uuid, models.RejectStatus)
 			}
 			logs.GetLogger().Errorf("failed to verifySignature for ecp job, error: %+v", err)
 			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
@@ -175,6 +181,8 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 			if job.Price == "-1" && job.JobType == models.MiningJobType {
 				taskEntity.Status = models.TASK_REJECTED_STATUS
 				NewTaskService().SaveTaskEntity(taskEntity)
+			} else {
+				NewEcpJobService().UpdateEcpJobEntity(job.Uuid, models.RejectStatus)
 			}
 			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "signature verify failed"))
 			return
@@ -192,14 +200,29 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		}
 
 		if !checkPriceFlag {
-			if job.Price == "-1" && job.JobType == models.MiningJobType {
-				taskEntity.Status = models.TASK_REJECTED_STATUS
-				NewTaskService().SaveTaskEntity(taskEntity)
-			}
+			NewEcpJobService().UpdateEcpJobEntity(job.Uuid, models.RejectStatus)
 			logs.GetLogger().Errorf("bid below the set price, job_uuid: %s, pid: %s, need: %0.4f", job.Uuid, job.Price, totalCost)
 			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BelowPriceError))
 			return
 		}
+	}
+
+	if job.DeployType == 2 {
+		var resource *models.HardwareResource
+		yamlStruct, err := handlerYamlStr(job.YamlContent)
+		if err != nil {
+			NewJobService().UpdateJobEntityStatusByJobUuid(job.Uuid, models.JOB_FAILED_STATUS)
+			logs.GetLogger().Errorf("failed to parse yaml content, job_uuid: %s, error: %v", job.Uuid, err)
+			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.ServerError))
+			return
+		}
+
+		resource.CPU = int64(yamlStruct.Resource.Cpu)
+		resource.Memory = int64(yamlStruct.Resource.Memory)
+		resource.Storage = int64(yamlStruct.Resource.Storage)
+		resource.GPU = yamlStruct.Resource.Gpu
+		resource.GPUModel = yamlStruct.Resource.GpuModel
+		job.Resource = resource
 	}
 
 	isReceive, _, needCpu, _, indexs, noAvailableMsgs, err := checkResourceForImage(job.Uuid, job.Resource)
@@ -207,6 +230,8 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		if job.Price == "-1" && job.JobType == models.MiningJobType {
 			taskEntity.Status = models.TASK_FAILED_STATUS
 			NewTaskService().SaveTaskEntity(taskEntity)
+		} else {
+			NewEcpJobService().UpdateEcpJobEntity(job.Uuid, models.FailedStatus)
 		}
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
 		return
@@ -215,6 +240,8 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		if job.Price == "-1" && job.JobType == models.MiningJobType {
 			taskEntity.Status = models.TASK_REJECTED_STATUS
 			NewTaskService().SaveTaskEntity(taskEntity)
+		} else {
+			NewEcpJobService().UpdateEcpJobEntity(job.Uuid, models.RejectStatus)
 		}
 		logs.GetLogger().Warnf("job_uuid: %s, name: %s, msg: %s", job.Uuid, job.Name, strings.Join(noAvailableMsgs, ";"))
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError, strings.Join(noAvailableMsgs, ";")))
@@ -264,21 +291,33 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 	deployJob.NeedResource = needResource
 	deployJob.IpWhiteList = job.IpWhiteList
 
-	if len(job.RunCommands) == 0 {
-		deployJob.Image = job.Image
-		deployJob.Cmd = job.Cmd
-		var ports []int
-		for _, p := range job.Ports {
-			ports = append(ports, p...)
-		}
-		deployJob.Ports = ports
+	if job.DeployType == 0 {
+		if len(job.RunCommands) == 0 {
+			deployJob.Image = job.Image
+			deployJob.Cmd = job.Cmd
+			var ports []int
+			for _, p := range job.Ports {
+				ports = append(ports, p...)
+			}
+			deployJob.Ports = ports
 
-		for k, v := range job.Envs {
-			envs = append(envs, fmt.Sprintf("%s=%s", k, v))
+			for k, v := range job.Envs {
+				envs = append(envs, fmt.Sprintf("%s=%s", k, v))
+			}
+			deployJob.Envs = envs
+		} else {
+			buildParams, err := parseDockerfileConfigForEcp(job)
+			if err != nil {
+				logs.GetLogger().Errorln(err)
+				return
+			}
+			deployJob.Image = buildParams.Image
+			deployJob.Cmd = buildParams.Cmd
+			deployJob.Ports = buildParams.Ports
+			deployJob.Envs = buildParams.Envs
 		}
-		deployJob.Envs = envs
-	} else {
-		buildParams, err := parseDockerfileConfigForEcp(job)
+	} else if job.DeployType == 1 {
+		buildParams, err := parseDockerfileContentForEcp(job.Uuid, job.DockerContent)
 		if err != nil {
 			logs.GetLogger().Errorln(err)
 			return
@@ -287,6 +326,24 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		deployJob.Cmd = buildParams.Cmd
 		deployJob.Ports = buildParams.Ports
 		deployJob.Envs = buildParams.Envs
+
+	} else if job.DeployType == 2 {
+		yamlStruct, err := handlerYamlStr(job.YamlContent)
+		if err != nil {
+			logs.GetLogger().Errorf("failed to parse yaml content, job_uuid: %s, error: %v", deployJob.Uuid, err)
+			return
+		}
+
+		deployJob.Image = yamlStruct.Services.Image
+		deployJob.Cmd = yamlStruct.Services.Cmd
+		deployJob.Ports = yamlStruct.Services.ExposePort
+		for k, v := range yamlStruct.Services.Envs {
+			envs = append(envs, fmt.Sprintf("%s=%s", k, v))
+		}
+		deployJob.Envs = envs
+	} else {
+		logs.GetLogger().Errorf("not support deploy type")
+		return
 	}
 
 	if job.Price == "-1" {
@@ -1194,6 +1251,76 @@ func CheckWalletBlackListForEcp(walletAddress string) bool {
 		}
 	}
 	return false
+}
+
+func parseDockerfileContentForEcp(jobUuid, dockerfileContent string) (*models.DeployJobParam, error) {
+	var deployParam *models.DeployJobParam
+
+	cpRepoPath, _ := os.LookupEnv("CP_PATH")
+	buildFolder := filepath.Join(cpRepoPath, "build/ecp", jobUuid)
+	if err := os.MkdirAll(buildFolder, os.ModePerm); err != nil {
+		return nil, fmt.Errorf("failed to create dir, error: %v", err)
+	}
+	dockerfileFile := filepath.Join(buildFolder, "Dockerfile")
+	err := os.WriteFile(dockerfileFile, []byte(dockerfileContent), 0644)
+	if err != nil {
+		return nil, fmt.Errorf("failed to save Dockerfile: %v", err)
+	}
+
+	imageName := fmt.Sprintf("ecp-image/%s:%d", jobUuid, time.Now().Unix())
+	if conf.GetConfig().Registry.ServerAddress != "" {
+		imageName = fmt.Sprintf("%s/%s:%d",
+			strings.TrimSpace(conf.GetConfig().Registry.ServerAddress), jobUuid, time.Now().Unix())
+	}
+	imageName = strings.ToLower(imageName)
+
+	if _, err := os.Stat(dockerfileFile); err != nil {
+		return nil, fmt.Errorf("failed not found Dockerfile, path: %s", dockerfileFile)
+	}
+
+	ports, envVars, err := parseDockerfile(dockerfileFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse dockerfile, path: %s", dockerfileFile)
+	}
+
+	deployParam.BuildImagePath = buildFolder
+	deployParam.BuildImageName = imageName
+	deployParam.Ports = ports
+	deployParam.Envs = envVars
+	return deployParam, nil
+}
+
+func parseDockerfile(filePath string) (exposedPorts []int, envVars []string, err error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer file.Close()
+
+	result, err := parser.Parse(file)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	for _, child := range result.AST.Children {
+		switch strings.ToUpper(child.Value) {
+		case "EXPOSE":
+			parseInt, err := strconv.ParseInt(child.Next.Value, 10, 64)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to parse expose, error: %v", err)
+			}
+			exposedPorts = append(exposedPorts, int(parseInt))
+		case "ENV":
+			scanner := bufio.NewScanner(strings.NewReader(child.Next.Value))
+			for scanner.Scan() {
+				parts := strings.SplitN(scanner.Text(), " ", 2)
+				if len(parts) == 2 {
+					envVars = append(envVars, fmt.Sprintf("%s=%s", parts[0], parts[1]))
+				}
+			}
+		}
+	}
+	return exposedPorts, envVars, nil
 }
 
 func parseDockerfileConfigForEcp(job models.EcpImageJobReq) (*models.DeployJobParam, error) {

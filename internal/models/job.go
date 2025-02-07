@@ -20,6 +20,9 @@ type EcpImageJobReq struct {
 	ResourceUrl   string            `json:"resource_url,omitempty"`
 	WorkDir       string            `json:"work_dir,omitempty"`
 	IpWhiteList   []string          `json:"ip_white_list"`
+	DeployType    int               `json:"deploy_type"` // 0: field; 1: dockerfile; 2: yaml
+	DockerContent string            `json:"docker_content"`
+	YamlContent   string            `json:"yaml_content"`
 }
 
 type HardwareResource struct {
