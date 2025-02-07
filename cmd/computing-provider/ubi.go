@@ -172,8 +172,7 @@ var daemonCmd = &cli.Command{
 		if err != nil {
 			return fmt.Errorf("check %s container failed, error: %v", resourceExporterContainerName, err)
 		}
-
-		if !strings.Contains(build.ResourceExporterVersion, version) {
+		if version != "" && !strings.Contains(version, build.ResourceExporterVersion) {
 			logs.GetLogger().Fatalf("resource-exporter current version: %s too low, please upgrade the version to v12.0.0", version)
 		}
 
