@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	cors "github.com/itsjamie/gin-cors"
 	"github.com/olekukonko/tablewriter"
+	"github.com/swanchain/go-computing-provider/build"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/computing"
 	"github.com/swanchain/go-computing-provider/internal/models"
@@ -16,6 +17,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -166,10 +168,15 @@ var daemonCmd = &cli.Command{
 		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 
 		resourceExporterContainerName := "resource-exporter"
-		rsExist, err := computing.NewDockerService().CheckRunningContainer(resourceExporterContainerName)
+		rsExist, version, err := computing.NewDockerService().CheckRunningContainer(resourceExporterContainerName)
 		if err != nil {
 			return fmt.Errorf("check %s container failed, error: %v", resourceExporterContainerName, err)
 		}
+
+		if !strings.Contains(build.ResourceExporterVersion, version) {
+			logs.GetLogger().Fatalf("resource-exporter version too low, please upgrade the version to v12.0.0")
+		}
+
 		if !rsExist {
 			if err = computing.RestartResourceExporter(); err != nil {
 				logs.GetLogger().Errorf("restartResourceExporter failed, error: %v", err)
@@ -177,7 +184,7 @@ var daemonCmd = &cli.Command{
 		}
 
 		traefikServiceContainerName := "traefik-service"
-		tsExist, err := computing.NewDockerService().CheckRunningContainer(traefikServiceContainerName)
+		tsExist, _, err := computing.NewDockerService().CheckRunningContainer(traefikServiceContainerName)
 		if err != nil {
 			return fmt.Errorf("check %s container failed, error: %v", traefikServiceContainerName, err)
 		}

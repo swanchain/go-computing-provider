@@ -332,27 +332,32 @@ func (ds *DockerService) PullImage(imageName string) error {
 	}
 }
 
-func (ds *DockerService) CheckRunningContainer(containerName string) (bool, error) {
+func (ds *DockerService) CheckRunningContainer(containerName string) (bool, string, error) {
 	containers, err := ds.c.ContainerList(context.Background(), container.ListOptions{All: true})
 	if err != nil {
 		logs.GetLogger().Errorf("listing containers failed, error: %v", err)
-		return false, err
+		return false, "", err
 	}
+
+	var imageName string
 	containerRunning := false
 	for _, c := range containers {
 		for _, name := range c.Names {
 			if name == "/"+containerName {
 				if c.State == "running" {
 					containerRunning = true
+					imageName = c.Image
 					break
 				}
 			}
 		}
 	}
 	if containerRunning {
-		return true, nil
+		index := strings.Index(imageName, ":")
+		version := imageName[index+1:]
+		return true, version, nil
 	}
-	return false, nil
+	return false, "", nil
 }
 
 func (ds *DockerService) ContainerCreateAndStart(config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, containerName string) error {

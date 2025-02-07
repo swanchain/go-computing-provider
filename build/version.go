@@ -19,6 +19,8 @@ const UBITaskImageAmdGpu = "filswan/ubi-worker-gpu-amd:latest"
 const UBIResourceExporterDockerImage = "filswan/resource-exporter:v12.0.0-beta"
 const TraefikServerDockerImage = "traefik:v2.10"
 
+const ResourceExporterVersion = "v12.0.0"
+
 func UserVersion() string {
 	return BuildVersion + "+" + NetWorkTag + CurrentCommit
 }
