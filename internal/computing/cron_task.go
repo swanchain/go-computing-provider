@@ -41,7 +41,7 @@ func (task *CronTask) RunTask() {
 	task.cleanAbnormalDeployment()
 	task.setFailedUbiTaskStatus()
 	task.watchNameSpaceForDeleted()
-	task.reportClusterResource()
+	//task.reportClusterResource()
 	task.watchExpiredTask()
 	task.getUbiTaskReward()
 	task.checkJobReward()
