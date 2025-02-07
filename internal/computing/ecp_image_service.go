@@ -1089,6 +1089,8 @@ func checkResourceForImageAndMutilGpu(jobUud string, resource *models.ResourceIn
 					flags = true
 					count += reqG.GPU
 					break
+				} else {
+					gIndex = gd.indexs
 				}
 			}
 			if !flags {

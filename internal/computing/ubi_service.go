@@ -1967,6 +1967,13 @@ func RestartResourceExporter() error {
 			MaximumRetryCount: 3,
 		},
 		Privileged: true,
+		Resources: container.Resources{
+			DeviceRequests: []container.DeviceRequest{
+				{
+					Capabilities: [][]string{{"gpu"}},
+				},
+			},
+		},
 	}, nil, resourceExporterContainerName)
 	if err != nil {
 		return fmt.Errorf("create resource-exporter container failed, error: %v", err)
