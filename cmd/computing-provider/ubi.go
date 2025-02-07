@@ -174,7 +174,7 @@ var daemonCmd = &cli.Command{
 		}
 
 		if !strings.Contains(build.ResourceExporterVersion, version) {
-			logs.GetLogger().Fatalf("resource-exporter version too low, please upgrade the version to v12.0.0")
+			logs.GetLogger().Fatalf("resource-exporter current version: %s too low, please upgrade the version to v12.0.0", version)
 		}
 
 		if !rsExist {
