@@ -155,6 +155,8 @@ const (
 func GetJobStatus(status int) string {
 	var statusStr string
 	switch status {
+	case JOB_FAILED_STATUS:
+		statusStr = "failed"
 	case JOB_REJECTED_STATUS:
 		statusStr = "rejected"
 	case JOB_RECEIVED_STATUS:

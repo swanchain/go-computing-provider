@@ -148,7 +148,7 @@ func ReceiveJob(c *gin.Context) {
 
 		signature, err := verifySignatureForHub(conf.GetConfig().HUB.OrchestratorPk, fmt.Sprintf("%s%s%s", cpAccountAddress, nodeID, jobData.JobSourceURI), jobData.NodeIdJobSourceUriSignature)
 		if err != nil {
-			NewJobService().UpdateJobEntityStatusByJobUuid(jobEntity.JobUuid, models.JOB_FAILED_STATUS)
+			NewJobService().UpdateJobEntityStatusByJobUuid(jobEntity.JobUuid, models.JOB_REJECTED_STATUS)
 			logs.GetLogger().Errorf("failed to verify signature for space job, error: %+v", err)
 			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
 			return
