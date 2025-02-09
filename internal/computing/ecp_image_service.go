@@ -63,7 +63,7 @@ func (*ImageJobService) CheckJobCondition(c *gin.Context) {
 		}
 	}
 
-	receive, _, _, _, _, _, err := checkResourceForImage(job.Uuid, job.Resource)
+	receive, _, _, _, _, _, _, err := checkResourceForImageAndMutilGpu(job.Uuid, job.Resource)
 	if receive {
 		c.JSON(http.StatusOK, util.CreateSuccessResponse(map[string]interface{}{
 			"price": totalCost,
@@ -207,25 +207,7 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		}
 	}
 
-	if job.DeployType == 2 {
-		var resource *models.HardwareResource
-		yamlStruct, err := handlerYamlStr(job.YamlContent)
-		if err != nil {
-			NewJobService().UpdateJobEntityStatusByJobUuid(job.Uuid, models.JOB_FAILED_STATUS)
-			logs.GetLogger().Errorf("failed to parse yaml content, job_uuid: %s, error: %v", job.Uuid, err)
-			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.ServerError))
-			return
-		}
-
-		resource.CPU = int64(yamlStruct.Resource.Cpu)
-		resource.Memory = int64(yamlStruct.Resource.Memory)
-		resource.Storage = int64(yamlStruct.Resource.Storage)
-		resource.GPU = yamlStruct.Resource.Gpu
-		resource.GPUModel = yamlStruct.Resource.GpuModel
-		job.Resource = resource
-	}
-
-	isReceive, _, needCpu, _, indexs, noAvailableMsgs, err := checkResourceForImage(job.Uuid, job.Resource)
+	isReceive, _, needCpu, _, indexs, gIndexStr, noAvailableMsgs, err := checkResourceForImageAndMutilGpu(job.Uuid, job.Resource)
 	if err != nil {
 		if job.Price == "-1" && job.JobType == models.MiningJobType {
 			taskEntity.Status = models.TASK_FAILED_STATUS
@@ -251,14 +233,8 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 	var envs []string
 	var needResource container.Resources
 	var useIndexs []string
-	if job.Resource.GPUModel != "" && job.Resource.GPU > 0 {
-		for i := 0; i < job.Resource.GPU; i++ {
-			if i >= len(indexs) {
-				break
-			}
-			useIndexs = append(useIndexs, indexs[i])
-		}
-		envs = append(envs, fmt.Sprintf("CUDA_VISIBLE_DEVICES=%s", strings.Join(useIndexs, ",")))
+	if len(job.Resource.Gpus) > 0 {
+		envs = append(envs, fmt.Sprintf("CUDA_VISIBLE_DEVICES=%s", strings.Join(indexs, ",")))
 		needResource = container.Resources{
 			CPUQuota: needCpu * 100000,
 			Memory:   job.Resource.Memory,
@@ -373,6 +349,11 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 			}
 		}
 	} else {
+		var gNameStr string
+		for _, g := range job.Resource.Gpus {
+			gNameStr += g.GPUModel
+		}
+
 		if err = NewEcpJobService().SaveEcpJobEntity(&models.EcpJobEntity{
 			Uuid:          job.Uuid,
 			Name:          job.Name,
@@ -383,8 +364,8 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 			Cpu:           job.Resource.CPU,
 			Memory:        job.Resource.Memory,
 			Storage:       job.Resource.Storage,
-			GpuName:       job.Resource.GPUModel,
-			GpuIndex:      strings.Join(useIndexs, ","),
+			GpuName:       gNameStr,
+			GpuIndex:      gIndexStr,
 			Status:        models.CreatedStatus,
 			HealthUrlPath: job.HealthPath,
 			CreateTime:    time.Now().Unix(),
@@ -427,7 +408,7 @@ func doMiningTask(c *gin.Context, zkTask models.ZkTaskReq, taskEntity *models.Ta
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [image]"))
 	}
 
-	isReceive, _, needCpu, _, indexs, noAvailableMsgs, err := checkResourceForImageAndMutilGpu(zkTask.Uuid, zkTask.Resource)
+	isReceive, _, needCpu, _, indexs, _, noAvailableMsgs, err := checkResourceForImageAndMutilGpu(zkTask.Uuid, zkTask.Resource)
 	if err != nil {
 		taskEntity.Status = models.TASK_FAILED_STATUS
 		NewTaskService().SaveTaskEntity(taskEntity)
@@ -871,7 +852,7 @@ func parsePortRanges(portRanges []string) ([]int, error) {
 	return ports, nil
 }
 
-func checkPriceForDocker(userPrice string, duration int, resource *models.HardwareResource) (bool, float64, error) {
+func checkPriceForDocker(userPrice string, duration int, resource *models.ResourceInfo) (bool, float64, error) {
 	priceConfig, err := ReadPriceConfig()
 	if err != nil {
 		return false, 0, err
@@ -895,16 +876,33 @@ func checkPriceForDocker(userPrice string, duration int, resource *models.Hardwa
 	if err != nil {
 		return false, 0, fmt.Errorf("failed to converting Storage price: %v", err)
 	}
-	gpuPrice, err := parsePrice(priceConfig.TARGET_GPU_DEFAULT)
-	if err != nil {
-		return false, 0, fmt.Errorf("failed to converting GPU price: %v", err)
+
+	var gpuPriceStr string
+	var gpuPrice float64
+	var gpuCost float64
+	for _, g := range resource.Gpus {
+		if len(priceConfig.GpusPrice) != 0 {
+			gpuName := strings.ReplaceAll(g.GPUModel, "NVIDIA ", "")
+			gpuName = strings.ReplaceAll(gpuName, " ", "_")
+			key := "TARGET_GPU_" + gpuName
+			if price, ok := priceConfig.GpusPrice[key]; ok {
+				gpuPriceStr = price
+			}
+		}
+		if gpuPriceStr == "" {
+			gpuPriceStr = priceConfig.TARGET_GPU_DEFAULT
+		}
+		gpuPrice, err = parsePrice(priceConfig.TARGET_GPU_DEFAULT)
+		if err != nil {
+			return false, 0, fmt.Errorf("failed to converting GPU price: %v", err)
+		}
+		gpuCost += float64(g.GPU) * gpuPrice * float64(duration/3600)
 	}
 
 	// Calculate total cost
 	cpuCost := float64(resource.CPU) * cpuPrice
 	memoryCost := formatGiB(resource.Memory) * memoryPrice
 	storageCost := formatGiB(resource.Storage) * storagePrice
-	gpuCost := float64(resource.GPU) * gpuPrice
 
 	totalCost := cpuCost + memoryCost + storageCost + gpuCost
 
@@ -917,147 +915,32 @@ func checkPriceForDocker(userPrice string, duration int, resource *models.Hardwa
 	return userPayPrice >= totalCost, totalCost, nil
 }
 
-func checkResourceForImage(jobUud string, resource *models.HardwareResource) (bool, string, int64, int64, []string, []string, error) {
+func checkResourceForImageAndMutilGpu(jobUud string, resource *models.ResourceInfo) (bool, string, int64, int64, []string, string, []string, error) {
 	list, err := NewEcpJobService().GetEcpJobList([]string{models.CreatedStatus, models.RunningStatus})
 	if err != nil {
-		return false, "", 0, 0, nil, nil, err
+		return false, "", 0, 0, nil, "", nil, err
 	}
 
 	var taskGpuMap = make(map[string][]string)
-	for _, g := range list {
-		if len(strings.TrimSpace(g.GpuIndex)) > 0 {
-			taskGpuMap[g.GpuName] = append(taskGpuMap[g.GpuName], strings.Split(strings.TrimSpace(g.GpuIndex), ",")...)
+	for i, g := range list {
+		if strings.Contains(g.Name, "=") {
+			splitG := strings.Split(g.Name, "=")
+			splitGIndex := strings.Split(g.GpuIndex, "=")
+			for _, sg := range splitG {
+				taskGpuMap[sg] = append(taskGpuMap[sg], strings.Split(strings.TrimSpace(splitGIndex[i]), ",")...)
+			}
 		}
 	}
 
 	dockerService := NewDockerService()
 	containerLogStr, err := dockerService.ContainerLogs("resource-exporter")
 	if err != nil {
-		return false, "", 0, 0, nil, nil, err
+		return false, "", 0, 0, nil, "", nil, err
 	}
 
 	var nodeResource models.NodeResource
 	if err := json.Unmarshal([]byte(containerLogStr), &nodeResource); err != nil {
-		return false, "", 0, 0, nil, nil, err
-	}
-
-	needCpu := resource.CPU
-	var needMemory, needStorage float64
-	var indexs []string
-	if resource.Memory > 0 {
-		needMemory = formatGiB(resource.Memory)
-
-	}
-	if resource.Storage > 0 {
-		needMemory = formatGiB(resource.Storage)
-	}
-
-	remainderCpu, _ := strconv.ParseInt(nodeResource.Cpu.Free, 10, 64)
-
-	var remainderMemory, remainderStorage float64
-	if len(strings.Split(strings.TrimSpace(nodeResource.Memory.Free), " ")) > 0 {
-		remainderMemory, _ = strconv.ParseFloat(strings.Split(strings.TrimSpace(nodeResource.Memory.Free), " ")[0], 64)
-	}
-	if len(strings.Split(strings.TrimSpace(nodeResource.Storage.Free), " ")) > 0 {
-		remainderStorage, err = strconv.ParseFloat(strings.Split(strings.TrimSpace(nodeResource.Storage.Free), " ")[0], 64)
-	}
-
-	type gpuData struct {
-		num    int
-		indexs []string
-	}
-
-	var gpuMap = make(map[string]gpuData)
-	if nodeResource.Gpu.AttachedGpus > 0 {
-		for _, detail := range nodeResource.Gpu.Details {
-			if detail.Status == models.Available {
-				if checkGpu(detail.ProductName, detail.Index, taskGpuMap) {
-					continue
-				}
-
-				data, ok := gpuMap[detail.ProductName]
-				if ok {
-					data.num += 1
-					data.indexs = append(data.indexs, detail.Index)
-					gpuMap[detail.ProductName] = data
-				} else {
-					indexs = make([]string, 0)
-					indexs = append(indexs, detail.Index)
-					var dataNew = gpuData{
-						num:    1,
-						indexs: indexs,
-					}
-					gpuMap[detail.ProductName] = dataNew
-				}
-			}
-		}
-	}
-
-	logs.GetLogger().Infof("checkResourceForImage: needCpu: %d, needMemory: %.2f, needStorage: %.2f, needGpu: %d, gpuName: %s", needCpu, needMemory, needStorage, resource.GPU, resource.GPUModel)
-	logs.GetLogger().Infof("checkResourceForImage: remainingCpu: %d, remainingMemory: %.2f, remainingStorage: %.2f, remainingGpu: %+v", remainderCpu, remainderMemory, remainderStorage, gpuMap)
-
-	var noAvailableStr []string
-	if remainderCpu < needCpu {
-		noAvailableStr = append(noAvailableStr, fmt.Sprintf("cpu need: %d, remainder: %d", needCpu, remainderCpu))
-	}
-	if remainderMemory < needMemory {
-		noAvailableStr = append(noAvailableStr, fmt.Sprintf("memory need: %f, remainder: %f", needMemory, remainderMemory))
-	}
-	if remainderStorage < needStorage {
-		noAvailableStr = append(noAvailableStr, fmt.Sprintf("storage need: %f, remainder: %f", needStorage, remainderStorage))
-	}
-
-	if resource.GPUModel != "" {
-		var newGpuIndex []string
-		var flag bool
-		for k, gd := range gpuMap {
-			if strings.ToUpper(k) == resource.GPUModel && gd.num > 0 {
-				newGpuIndex = gd.indexs
-				flag = true
-				break
-			}
-		}
-		if flag {
-			return true, nodeResource.CpuName, needCpu, int64(needMemory), newGpuIndex, nil, nil
-		} else {
-			noAvailableStr = append(noAvailableStr, fmt.Sprintf("gpu need name:%s, num:%d, remainder:%d", resource.GPUModel, resource.GPU, len(newGpuIndex)))
-			logs.GetLogger().Warnf("the task_uuid: %s resource is not available. Reason: %s",
-				jobUud, strings.Join(noAvailableStr, ";"))
-			return false, nodeResource.CpuName, needCpu, int64(needMemory), newGpuIndex, noAvailableStr, nil
-		}
-	}
-
-	if len(noAvailableStr) == 0 {
-		return true, nodeResource.CpuName, needCpu, int64(needMemory), indexs, nil, nil
-	}
-
-	logs.GetLogger().Warnf("the task_uuid: %s resource is not available. Reason: %s",
-		jobUud, strings.Join(noAvailableStr, ";"))
-	return false, nodeResource.CpuName, needCpu, int64(needMemory), indexs, noAvailableStr, nil
-}
-
-func checkResourceForImageAndMutilGpu(jobUud string, resource *models.ResourceInfo) (bool, string, int64, int64, []string, []string, error) {
-	list, err := NewEcpJobService().GetEcpJobList([]string{models.CreatedStatus, models.RunningStatus})
-	if err != nil {
-		return false, "", 0, 0, nil, nil, err
-	}
-
-	var taskGpuMap = make(map[string][]string)
-	for _, g := range list {
-		if len(strings.TrimSpace(g.GpuIndex)) > 0 {
-			taskGpuMap[g.GpuName] = append(taskGpuMap[g.GpuName], strings.Split(strings.TrimSpace(g.GpuIndex), ",")...)
-		}
-	}
-
-	dockerService := NewDockerService()
-	containerLogStr, err := dockerService.ContainerLogs("resource-exporter")
-	if err != nil {
-		return false, "", 0, 0, nil, nil, err
-	}
-
-	var nodeResource models.NodeResource
-	if err := json.Unmarshal([]byte(containerLogStr), &nodeResource); err != nil {
-		return false, "", 0, 0, nil, nil, err
+		return false, "", 0, 0, nil, "", nil, err
 	}
 
 	needCpu := resource.CPU
@@ -1135,6 +1018,7 @@ func checkResourceForImageAndMutilGpu(jobUud string, resource *models.ResourceIn
 
 	var newGpuIndex []string
 	var count int
+	var gStr string
 	for _, reqG := range resource.Gpus {
 		var gIndex []string
 		if reqG.GPUModel != "" {
@@ -1145,6 +1029,7 @@ func checkResourceForImageAndMutilGpu(jobUud string, resource *models.ResourceIn
 					newGpuIndex = append(newGpuIndex, gIndex...)
 					flags = true
 					count += reqG.GPU
+					gStr += strings.Join(gIndex, ",") + "="
 					break
 				} else {
 					gIndex = gd.indexs
@@ -1157,16 +1042,16 @@ func checkResourceForImageAndMutilGpu(jobUud string, resource *models.ResourceIn
 	}
 
 	if len(resource.Gpus) > 0 && count == needGpu {
-		return true, nodeResource.CpuName, needCpu, int64(needMemory), newGpuIndex, nil, nil
+		return true, nodeResource.CpuName, needCpu, int64(needMemory), newGpuIndex, gStr, nil, nil
 	}
 
 	if len(noAvailableStr) == 0 {
-		return true, nodeResource.CpuName, needCpu, int64(needMemory), newGpuIndex, nil, nil
+		return true, nodeResource.CpuName, needCpu, int64(needMemory), newGpuIndex, gStr, nil, nil
 	}
 
 	logs.GetLogger().Warnf("the task_uuid: %s resource is not available. Reason: %s",
 		jobUud, strings.Join(noAvailableStr, ";"))
-	return false, nodeResource.CpuName, needCpu, int64(needMemory), indexs, noAvailableStr, nil
+	return false, nodeResource.CpuName, needCpu, int64(needMemory), indexs, "", noAvailableStr, nil
 }
 
 func parsePrice(priceStr string) (float64, error) {

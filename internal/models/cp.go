@@ -210,22 +210,21 @@ func JobOnChainStatus(status int) string {
 }
 
 type FcpDeployImageReq struct {
-	Uuid          string         `json:"uuid"`
-	Name          string         `json:"name"`
-	InstanceName  string         `json:"instance_name"`
-	Duration      int            `json:"duration"`
-	Sign          string         `json:"sign"`
-	WalletAddress string         `json:"wallet_address"`
-	IpWhitelist   []string       `json:"ip_whitelist"`
-	DeployConfig  DeployConfig   `json:"deploy_config"`
-	Resource      DeployResource `json:"resource"`
-	IpWhiteList   []string       `json:"ip_white_list"`
-	BidPrice      string         `json:"bid_price"` // Amount users are willing to pay
-	JobType       int            `json:"job_type"`
-	DeployType    int            `json:"deploy_type"` // 0: field; 1: docker; 2: yaml
-	DockerContent string         `json:"docker_content"`
-	YamlContent   string         `json:"yaml_content"`
-	HealthPath    string         `json:"health_path"` // deploy_type=1 or 2, used
+	Uuid          string              `json:"uuid"`
+	Name          string              `json:"name"`
+	InstanceName  string              `json:"instance_name"`
+	Duration      int                 `json:"duration"`
+	Sign          string              `json:"sign"`
+	WalletAddress string              `json:"wallet_address"`
+	IpWhitelist   []string            `json:"ip_whitelist"`
+	DeployConfig  DeployConfig        `json:"deploy_config"`
+	Resource      K8sResourceForImage `json:"resource"`
+	IpWhiteList   []string            `json:"ip_white_list"`
+	BidPrice      string              `json:"bid_price"` // Amount users are willing to pay
+	JobType       int                 `json:"job_type"`
+	DeployType    int                 `json:"deploy_type"` // 0: field; 1: docker; 2: yaml
+	DeployContent string              `json:"DeployContent"`
+	HealthPath    string              `json:"health_path"` // deploy_type=1 or 2, used
 }
 
 type YamlContent struct {
@@ -237,13 +236,6 @@ type YamlContent struct {
 		Envs        []string `json:"envs"`
 		ExposePort  []int    `json:"expose_port"`
 	} `json:"services"`
-	Resource struct {
-		Cpu      int    `json:"cpu"`
-		Memory   int    `json:"memory"`
-		Storage  int    `json:"storage"`
-		GpuModel string `json:"gpu_model"`
-		Gpu      int    `json:"gpu"`
-	} `json:"resource"`
 }
 
 type DeployConfig struct {
@@ -256,12 +248,14 @@ type DeployConfig struct {
 	WorkDir     string            `json:"work_dir"`
 }
 
-type DeployResource struct {
-	Cpu      int    `json:"cpu"`
-	Gpu      int    `json:"gpu"`
-	GpuModel string `json:"gpu_model"`
-	Memory   int    `json:"memory"`
-	Storage  int    `json:"storage"`
+type K8sResourceForImage struct {
+	Cpu     int64
+	Memory  float64
+	Storage float64
+	Gpus    []struct {
+		GpuModel string `json:"gpu_model"`
+		GPU      int    `json:"gpu"`
+	} `json:"gpus"`
 }
 
 type FcpDeployImageResp struct {

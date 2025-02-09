@@ -181,7 +181,7 @@ func ReceiveJob(c *gin.Context) {
 		}
 	}
 
-	available, gpuProductName, gpuIndex, noAvailableMsgs, err := checkResourceAvailableForSpace(jobData.UUID, jobData.JobType, spaceDetail.Data.Space.ActiveOrder.Config)
+	available, gpuProductName, gpuIndex, gpuNum, noAvailableMsgs, err := checkResourceAvailableForSpace(jobData.UUID, jobData.JobType, spaceDetail.Data.Space.ActiveOrder.Config)
 	if err != nil {
 		NewJobService().UpdateJobEntityStatusByJobUuid(jobEntity.JobUuid, models.JOB_FAILED_STATUS)
 		logs.GetLogger().Errorf("failed to check job resource, error: %+v", err)
@@ -277,7 +277,7 @@ func ReceiveJob(c *gin.Context) {
 			logs.GetLogger().Infof("successfully uploaded to MCS, jobuuid: %s", jobData.UUID)
 		}()
 
-		DeploySpaceTask(jobData, deployParam, hostName, gpuProductName, serviceNodePort, jobData.JobType, jobData.IpWhiteList, gpuIndex)
+		DeploySpaceTask(jobData, deployParam, hostName, gpuProductName, serviceNodePort, jobData.JobType, jobData.IpWhiteList, gpuIndex, int(gpuNum))
 	}()
 
 	jobData.NodeIdJobSourceUriSignature = ""
@@ -876,38 +876,9 @@ func DeployImage(c *gin.Context) {
 		jobData.JobRealUri = ""
 	}
 
-	var resource models.SpaceHardware
-	if deployJob.DeployType == 2 {
-		yamlStruct, err := handlerYamlStr(deployJob.YamlContent)
-		if err != nil {
-			NewJobService().UpdateJobEntityStatusByJobUuid(deployJob.Uuid, models.JOB_FAILED_STATUS)
-			logs.GetLogger().Errorf("failed to parse yaml content, job_uuid: %s, error: %v", deployJob.Uuid, err)
-			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.ServerError))
-			return
-		}
-
-		resource.Vcpu = int64(yamlStruct.Resource.Cpu)
-		resource.Memory = int64(yamlStruct.Resource.Memory)
-		resource.Storage = int64(yamlStruct.Resource.Storage)
-		if yamlStruct.Resource.Gpu > 0 && yamlStruct.Resource.GpuModel != "" {
-			resource.HardwareType = "GPU"
-			resource.Hardware = yamlStruct.Resource.GpuModel
-			resource.Gpu = int64(yamlStruct.Resource.Gpu)
-		} else {
-			resource.HardwareType = "CPU"
-		}
-
-	} else {
-		resource.Vcpu = int64(deployJob.Resource.Cpu)
-		resource.Memory = int64(deployJob.Resource.Memory)
-		resource.Storage = int64(deployJob.Resource.Storage)
-		if deployJob.Resource.Gpu > 0 && deployJob.Resource.GpuModel != "" {
-			resource.HardwareType = "GPU"
-			resource.Hardware = deployJob.Resource.GpuModel
-			resource.Gpu = int64(deployJob.Resource.Gpu)
-		} else {
-			resource.HardwareType = "CPU"
-		}
+	var hardwareType = "CPU"
+	if len(deployJob.Resource.Gpus) > 0 {
+		hardwareType = "GPU"
 	}
 
 	cpRepoPath, _ := os.LookupEnv("CP_PATH")
@@ -925,7 +896,7 @@ func DeployImage(c *gin.Context) {
 	jobEntity.WalletAddress = deployJob.WalletAddress
 	jobEntity.Name = deployJob.Name
 	jobEntity.SpaceType = 0
-	jobEntity.ResourceType = resource.HardwareType
+	jobEntity.ResourceType = hardwareType
 	jobEntity.NameSpace = constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(deployJob.WalletAddress)
 	jobEntity.K8sDeployName = constants.K8S_DEPLOY_NAME_PREFIX + strings.ToLower(deployJob.Uuid)
 	jobEntity.Status = models.JOB_RECEIVED_STATUS
@@ -980,7 +951,7 @@ func DeployImage(c *gin.Context) {
 	}
 
 	if !conf.GetConfig().API.Pricing {
-		checkPriceFlag, totalCost, err := checkPrice(deployJob.BidPrice, deployJob.Duration, resource)
+		checkPriceFlag, totalCost, err := checkPriceForImage(deployJob.BidPrice, deployJob.Duration, deployJob.Resource)
 		if err != nil {
 			NewJobService().UpdateJobEntityStatusByJobUuid(jobEntity.JobUuid, models.JOB_FAILED_STATUS)
 			logs.GetLogger().Errorf("failed to check price, job_uuid: %s, error: %v", deployJob.Uuid, err)
@@ -996,7 +967,7 @@ func DeployImage(c *gin.Context) {
 		}
 	}
 
-	available, gpuProductName, gpuIndex, noAvailableMsgs, err := checkResourceAvailableForSpace(deployJob.Uuid, 1, resource)
+	available, nodeName, gpuIndex, noAvailableMsgs, err := checkResourceAvailableForImage(deployJob.Uuid, hardwareType, deployJob.Resource)
 	if err != nil {
 		NewJobService().UpdateJobEntityStatusByJobUuid(jobEntity.JobUuid, models.JOB_FAILED_STATUS)
 		logs.GetLogger().Errorf("failed to check job resource, error: %+v", err)
@@ -1020,7 +991,7 @@ func DeployImage(c *gin.Context) {
 			logs.GetLogger().Infof("successfully uploaded to MCS, jobuuid: %s", jobData.UUID)
 		}()
 
-		DeployImageSpaceTask(jobData, deployJob, hostName, resource, gpuProductName, gpuIndex)
+		DeployImageSpaceTask(jobData, deployJob, hostName, nodeName, gpuIndex)
 
 	}()
 
@@ -1075,14 +1046,14 @@ func handleConnection(conn *websocket.Conn, jobDetail models.JobEntity, logType 
 	}
 }
 
-func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName string, gpuProductName string, nodePort int32, jobType int, ipWhiteList []string, gpuIndex []string) {
-	saveGpuCache(gpuProductName)
+func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName string, gpuProductName string, nodePort int32, jobType int, ipWhiteList []string, gpuIndex []string, gpuNum int) {
+	saveGpuCache(gpuProductName, gpuNum)
 	updateJobStatus(jobData.UUID, models.DEPLOY_UPLOAD_RESULT)
 	var success bool
 	var jobUuid string
 	var walletAddress string
 	defer func() {
-		deleteGpuCache(gpuProductName)
+		deleteGpuCache(gpuProductName, gpuNum)
 		if !success {
 			k8sNameSpace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(walletAddress)
 			DeleteJob(k8sNameSpace, jobUuid, "failed to deploy space")
@@ -1173,18 +1144,24 @@ func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName s
 	return
 }
 
-func DeployImageSpaceTask(jobData models.JobData, job models.FcpDeployImageReq, hostName string, resource models.SpaceHardware, gpuProductName string, gpuIndex []string) {
-	saveGpuCache(gpuProductName)
+func DeployImageSpaceTask(jobData models.JobData, job models.FcpDeployImageReq, hostName string, nodeName string, gpuIndex []string) {
+	for _, g := range job.Resource.Gpus {
+		saveGpuCache(g.GpuModel, g.GPU)
+	}
+
 	updateJobStatus(job.Uuid, models.DEPLOY_UPLOAD_RESULT)
 
 	var success bool
-	var jobUuid string
+	var jobUuid = strings.ToLower(job.Uuid)
 	var walletAddress string
 	defer func() {
-		deleteGpuCache(gpuProductName)
+		for _, g := range job.Resource.Gpus {
+			deleteGpuCache(g.GpuModel, g.GPU)
+		}
+
 		if !success {
 			k8sNameSpace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(walletAddress)
-			DeleteJob(k8sNameSpace, jobUuid, "failed to deploy space")
+			DeleteJob(k8sNameSpace, jobUuid, "failed to deploy job")
 			NewJobService().DeleteJobEntityByJobUuId(job.Uuid, models.JOB_TERMINATED_STATUS)
 		}
 
@@ -1228,7 +1205,7 @@ func DeployImageSpaceTask(jobData models.JobData, job models.FcpDeployImageReq, 
 			compatibleContainerd(deployJob.Image)
 		}
 	} else if job.DeployType == 1 {
-		buildParams, err := parseDockerfileContentForFcp(job.Uuid, job.DockerContent)
+		buildParams, err := parseDockerfileContentForFcp(job.Uuid, job.DeployContent)
 		if err != nil {
 			logs.GetLogger().Errorln(err)
 			return
@@ -1238,7 +1215,7 @@ func DeployImageSpaceTask(jobData models.JobData, job models.FcpDeployImageReq, 
 		deployJob.Envs = buildParams.Envs
 		compatibleContainerd(deployJob.Image)
 	} else if job.DeployType == 2 {
-		yamlStruct, err := handlerYamlStr(job.YamlContent)
+		yamlStruct, err := handlerYamlStr(job.DeployContent)
 		if err != nil {
 			logs.GetLogger().Errorf("failed to parse yaml content, job_uuid: %s, error: %v", deployJob.Uuid, err)
 			return
@@ -1254,18 +1231,16 @@ func DeployImageSpaceTask(jobData models.JobData, job models.FcpDeployImageReq, 
 		}
 		deployJob.Envs = envs
 	}
-
-	jobUuid = strings.ToLower(job.Uuid)
-	deploy := NewDeploy(job.Uuid, jobUuid, hostName, job.WalletAddress, "", int64(job.Duration), constants.SPACE_TYPE_PUBLIC, resource, 1)
+	deploy := NewDeploy(job.Uuid, jobUuid, hostName, job.WalletAddress, "", int64(job.Duration), constants.SPACE_TYPE_PUBLIC, models.SpaceHardware{}, 1)
 	deploy.WithIpWhiteList(job.IpWhiteList)
 	deploy.WithSpaceName(job.Name)
-	deploy.WithGpuProductName(gpuProductName)
+	deploy.WithGpuProductName(nodeName)
 	deploy.WithGpuIndex(gpuIndex)
 	deploy.WithImage(deployJob.Image)
 
 	err := deploy.DeployImageToK8s(deployJob)
 	if err != nil {
-		logs.GetLogger().Errorf("failed to use yaml to deploy job, error: %v", err)
+		logs.GetLogger().Errorf("failed to deploy job, error: %v", err)
 		return
 	}
 	if deploy.nodePortUrl != "" {
@@ -1432,13 +1407,13 @@ func DeleteJob(namespace, jobUuid string, msg string) error {
 			logs.GetLogger().Errorf("Failed delete ingress, ingressName: %s, error: %+v", ingressName, err)
 			return err
 		}
-		logs.GetLogger().Infof(" deleted ingress, job_uuid: %s, ingressName: %s", jobUuid, ingressName)
+		logs.GetLogger().Infof("deleted ingress, job_uuid: %s, ingressName: %s", jobUuid, ingressName)
 
 		if err := k8sService.DeleteService(context.TODO(), namespace, serviceName); err != nil && !errors.IsNotFound(err) {
 			logs.GetLogger().Errorf("Failed delete service, serviceName: %s, error: %+v", serviceName, err)
 			return err
 		}
-		logs.GetLogger().Infof(" deleted service, job_uuid: %s, serviceName: %s", jobUuid, serviceName)
+		logs.GetLogger().Infof("deleted service, job_uuid: %s, serviceName: %s", jobUuid, serviceName)
 
 		dockerService := NewDockerService()
 		deployImageIds, err := k8sService.GetDeploymentImages(context.TODO(), namespace, deployName)
@@ -1455,20 +1430,20 @@ func DeleteJob(namespace, jobUuid string, msg string) error {
 			logs.GetLogger().Errorf("Failed delete deployment, deployName: %s, error: %+v", deployName, err)
 			return err
 		}
-		logs.GetLogger().Infof(" deleted deployment, job_uuid: %s, deployName: %s", jobUuid, deployName)
+		logs.GetLogger().Infof("deleted deployment, job_uuid: %s, deployName: %s", jobUuid, deployName)
 		time.Sleep(6 * time.Second)
 
 		if err := k8sService.DeleteDeployRs(context.TODO(), namespace, jobUuid); err != nil && !errors.IsNotFound(err) {
 			logs.GetLogger().Errorf("Failed delete ReplicaSetsController, job_uuid: %s, error: %+v", jobUuid, err)
 			return err
 		}
-		logs.GetLogger().Infof(" deleted ReplicaSetsController, job_uuid: %s", jobUuid)
+		logs.GetLogger().Infof("deleted ReplicaSetsController, job_uuid: %s", jobUuid)
 
 		if err := k8sService.DeletePod(context.TODO(), namespace, jobUuid); err != nil && !errors.IsNotFound(err) {
 			logs.GetLogger().Errorf("Failed delete pods, job_uuid: %s, error: %+v", jobUuid, err)
 			return err
 		}
-		logs.GetLogger().Infof(" deleted pod, jobUuid: %s", jobUuid)
+		logs.GetLogger().Infof("deleted pod, jobUuid: %s", jobUuid)
 	}
 
 	ticker := time.NewTicker(3 * time.Second)
@@ -1567,7 +1542,7 @@ func getSpaceDetail(jobSourceURI string) (models.SpaceJSON, error) {
 	return spaceJson, nil
 }
 
-func checkResourceAvailableForSpace(jobUuid string, jobType int, resourceConfig models.SpaceHardware) (bool, string, []string, []string, error) {
+func checkResourceAvailableForSpace(jobUuid string, jobType int, resourceConfig models.SpaceHardware) (bool, string, []string, int64, []string, error) {
 	var taskType string
 	var hardwareDetail models.Resource
 	if jobType == 1 {
@@ -1580,18 +1555,18 @@ func checkResourceAvailableForSpace(jobUuid string, jobType int, resourceConfig 
 
 	activePods, err := k8sService.GetAllActivePod(context.TODO())
 	if err != nil {
-		return false, "", nil, nil, err
+		return false, "", nil, 0, nil, err
 	}
 
 	nodes, err := k8sService.k8sClient.CoreV1().Nodes().List(context.TODO(), metaV1.ListOptions{})
 	if err != nil {
-		return false, "", nil, nil, err
+		return false, "", nil, 0, nil, err
 	}
 
 	nodeGpuSummary, err := k8sService.GetNodeGpuSummary(context.TODO())
 	if err != nil {
 		logs.GetLogger().Errorf("Failed collect k8s gpu, error: %+v", err)
-		return false, "", nil, nil, err
+		return false, "", nil, 0, nil, err
 	}
 
 	gpuName := strings.ToUpper(strings.ReplaceAll(hardwareDetail.Gpu.Unit, " ", "-"))
@@ -1639,7 +1614,7 @@ func checkResourceAvailableForSpace(jobUuid string, jobType int, resourceConfig 
 
 		if taskType == "CPU" {
 			if len(noAvailableStr) == 0 {
-				return true, "", nil, nil, nil
+				return true, "", nil, 0, nil, nil
 			} else {
 				logs.GetLogger().Warnf("the job_uuid: %s is not available for this node=%s resource. Reason: %s",
 					jobUuid, node.Name, strings.Join(noAvailableStr, ";"))
@@ -1656,7 +1631,7 @@ func checkResourceAvailableForSpace(jobUuid string, jobType int, resourceConfig 
 					}
 
 					if len(noAvailableStr) == 0 {
-						return true, gpuName, remainingGpu, nil, nil
+						return true, gpuName, remainingGpu, gpuNum, nil, nil
 					} else {
 						logs.GetLogger().Warnf("the job_uuid: %s is not available for this node=%s resource. Reason: %s",
 							jobUuid, node.Name, strings.Join(noAvailableStr, ";"))
@@ -1674,6 +1649,138 @@ func checkResourceAvailableForSpace(jobUuid string, jobType int, resourceConfig 
 		noAvailableSummary = append(noAvailableSummary, fmt.Sprintf("storage need: %f", needStorage))
 		if hardwareDetail.Gpu.Quantity >= 1 {
 			noAvailableSummary = append(noAvailableSummary, fmt.Sprintf("gpu need name:%s, num:%d,", hardwareDetail.Gpu.Unit, hardwareDetail.Gpu.Quantity))
+		}
+		noAvailableSummary = append(noAvailableSummary, "not found available node")
+		return false, "", nil, 0, noAvailableSummary, nil
+	} else {
+		return false, "", nil, 0, noAvailableStr, nil
+	}
+}
+
+func checkResourceAvailableForImage(jobUuid string, hardwareType string, resourceConfig models.K8sResourceForImage) (bool, string, []string, []string, error) {
+	k8sService := NewK8sService()
+	activePods, err := k8sService.GetAllActivePod(context.TODO())
+	if err != nil {
+		return false, "", nil, nil, err
+	}
+
+	nodes, err := k8sService.k8sClient.CoreV1().Nodes().List(context.TODO(), metaV1.ListOptions{})
+	if err != nil {
+		return false, "", nil, nil, err
+	}
+
+	nodeGpuSummary, err := k8sService.GetNodeGpuSummary(context.TODO())
+	if err != nil {
+		logs.GetLogger().Errorf("Failed collect k8s gpu, error: %+v", err)
+		return false, "", nil, nil, err
+	}
+
+	var reqGpuMap = make(map[string]int)
+	var needGpu int
+	for _, g := range resourceConfig.Gpus {
+		reqGpuMap[g.GpuModel] = g.GPU
+		needGpu += g.GPU
+	}
+
+	needCpu := resourceConfig.Cpu
+	needMemory := resourceConfig.Memory
+	needStorage := resourceConfig.Storage
+	logs.GetLogger().Infof("checkResourceForSpace: needCpu: %d, needMemory: %.2f, needStorage: %.2f, needGpu: %v", needCpu, needMemory, needStorage, needGpu)
+
+	type gpuData struct {
+		Total     int
+		Free      int
+		FreeIndex []string
+	}
+
+	var noAvailableStr []string
+	for _, node := range nodes.Items {
+		var nodeName = node.Name
+		var nodeGpuInfo = nodeGpuSummary[nodeName]
+		nodeGpu, remainderResource, _ := GetNodeResource(activePods, &node)
+		remainderCpu := remainderResource[ResourceCpu]
+		remainderMemory := float64(remainderResource[ResourceMem] / 1024 / 1024 / 1024)
+		remainderStorage := float64(remainderResource[ResourceStorage] / 1024 / 1024 / 1024)
+
+		freeGpuMap := make(map[string]gpuData)
+		for gn, gd := range nodeGpuInfo {
+			freeGpuMap[gn] = gpuData{
+				Total:     gd.Total,
+				Free:      gd.Free,
+				FreeIndex: gd.FreeIndex,
+			}
+		}
+
+		logs.GetLogger().Infof("checkResourceForSpace: nodeName: %s,remainingCpu: %d, remainingMemory: %.2f, remainingStorage: %.2f, remainingGpu: %+v", node.Name, remainderCpu, remainderMemory, remainderStorage, freeGpuMap)
+
+		if remainderCpu < needCpu {
+			noAvailableStr = append(noAvailableStr, fmt.Sprintf("cpu need: %d, remainder: %d", needCpu, remainderCpu))
+		}
+		if remainderMemory < needMemory {
+			noAvailableStr = append(noAvailableStr, fmt.Sprintf("memory need: %f, remainder: %f", needMemory, remainderMemory))
+		}
+		if remainderStorage < needStorage {
+			noAvailableStr = append(noAvailableStr, fmt.Sprintf("storage need: %f, remainder: %f", needStorage, remainderStorage))
+		}
+
+		if hardwareType == "CPU" {
+			if len(noAvailableStr) == 0 {
+				return true, "", nil, nil, nil
+			} else {
+				logs.GetLogger().Warnf("the job_uuid: %s is not available for this node=%s resource. Reason: %s",
+					jobUuid, node.Name, strings.Join(noAvailableStr, ";"))
+			}
+		} else if hardwareType == "GPU" {
+			var newGpuIndex []string
+			var flag bool
+
+			var gpuNoAvailableStr []string
+			for gname, gData := range nodeGpuInfo {
+				logs.GetLogger().Infof("useGpuSummaryOnNode: %+v, useGpuSummaryInK8SOn: %+v", gData.UsedIndex, nodeGpu[gname].UsedIndex)
+				var count int
+				var gIndex []string
+				remainingGpu := difference(gData.FreeIndex, nodeGpu[gname].UsedIndex)
+				for _, reqG := range resourceConfig.Gpus {
+					if strings.ToUpper(reqG.GpuModel) == gname {
+						if reqG.GPU <= len(remainingGpu) {
+							gIndex = remainingGpu[:reqG.GPU]
+							newGpuIndex = append(newGpuIndex, gIndex...)
+							count += reqG.GPU
+						} else {
+							gpuNoAvailableStr = append(gpuNoAvailableStr,
+								fmt.Sprintf("gpu need name:%s, num:%d, remainder: %d", gname, reqG.GPU, len(gIndex)))
+							break
+						}
+					}
+				}
+
+				if count == needGpu {
+					gpuNoAvailableStr = nil
+					flag = true
+					break
+				} else {
+					logs.GetLogger().Warnf("the job_uuid: %s is not available for this node=%s resource. Reason: %s",
+						jobUuid, node.Name, strings.Join(gpuNoAvailableStr, ";"))
+				}
+			}
+
+			if flag {
+				return true, nodeName, newGpuIndex, nil, nil
+			} else {
+				if gpuNoAvailableStr != nil {
+					noAvailableStr = append(gpuNoAvailableStr, gpuNoAvailableStr...)
+				}
+			}
+		}
+	}
+
+	if len(nodes.Items) > 1 {
+		var noAvailableSummary []string
+		noAvailableSummary = append(noAvailableSummary, fmt.Sprintf("cpu need: %d", needCpu))
+		noAvailableSummary = append(noAvailableSummary, fmt.Sprintf("memory need: %f", needMemory))
+		noAvailableSummary = append(noAvailableSummary, fmt.Sprintf("storage need: %f", needStorage))
+		if len(resourceConfig.Gpus) >= 1 {
+			noAvailableSummary = append(noAvailableSummary, fmt.Sprintf("needGpu: %v", needGpu))
 		}
 		noAvailableSummary = append(noAvailableSummary, "not found available node")
 		return false, "", nil, noAvailableSummary, nil
@@ -2117,21 +2224,24 @@ type DeployParam struct {
 	ModelsSettingFilePath string
 }
 
-func saveGpuCache(gpuProductName string) {
+func saveGpuCache(gpuProductName string, num int) {
 	value, ok := gpuResourceCache.Load(gpuProductName)
 	if ok {
-		value = value.(int) + 1
+		value = value.(int) + num
 	} else {
-		value = 1
+		value = num
 	}
 	gpuResourceCache.Store(gpuProductName, value)
 
 }
 
-func deleteGpuCache(gpuProductName string) {
+func deleteGpuCache(gpuProductName string, num int) {
 	value, ok := gpuResourceCache.Load(gpuProductName)
 	if ok {
-		value = value.(int) - 1
+		value = value.(int) - num
+		if value.(int) < 0 {
+			value = 0
+		}
 	}
 	gpuResourceCache.Store(gpuProductName, value)
 
@@ -2185,7 +2295,65 @@ func checkPrice(userPrice string, duration int, resource models.SpaceHardware) (
 	cpuCost := float64(resource.Vcpu) * cpuPrice * float64(duration/3600)
 	memoryCost := float64(resource.Memory/1024/1024/1024) * memoryPrice * float64(duration/3600)
 	storageCost := float64(resource.Storage/1024/1024/1024) * storagePrice * float64(duration/3600)
-	gpuCost := float64(1) * gpuPrice * float64(duration/3600)
+	gpuCost := float64(resource.Gpu) * gpuPrice * float64(duration/3600)
+
+	totalCost := cpuCost + memoryCost + storageCost + gpuCost
+
+	// Compare user's price with total cost
+	return userPayPrice >= totalCost, totalCost, nil
+}
+
+func checkPriceForImage(userPrice string, duration int, resource models.K8sResourceForImage) (bool, float64, error) {
+	priceConfig, err := ReadPriceConfig()
+	if err != nil {
+		return false, 0, err
+	}
+
+	userPayPrice, err := parsePrice(userPrice)
+	if err != nil {
+		return false, 0, fmt.Errorf("failed to converting user price: %v", err)
+	}
+
+	// Convert price strings to float64
+	cpuPrice, err := parsePrice(priceConfig.TARGET_CPU)
+	if err != nil {
+		return false, 0, fmt.Errorf("failed to converting CPU price: %v", err)
+	}
+	memoryPrice, err := parsePrice(priceConfig.TARGET_MEMORY)
+	if err != nil {
+		return false, 0, fmt.Errorf("failed to converting Memory price: %v", err)
+	}
+	storagePrice, err := parsePrice(priceConfig.TARGET_HD_EPHEMERAL)
+	if err != nil {
+		return false, 0, fmt.Errorf("failed to converting Storage price: %v", err)
+	}
+
+	var gpuPriceStr string
+	var gpuPrice float64
+	var gpuCost float64
+	for _, g := range resource.Gpus {
+		if len(priceConfig.GpusPrice) != 0 {
+			gpuName := strings.ReplaceAll(g.GpuModel, "NVIDIA ", "")
+			gpuName = strings.ReplaceAll(gpuName, " ", "_")
+			key := "TARGET_GPU_" + gpuName
+			if price, ok := priceConfig.GpusPrice[key]; ok {
+				gpuPriceStr = price
+			}
+		}
+		if gpuPriceStr == "" {
+			gpuPriceStr = priceConfig.TARGET_GPU_DEFAULT
+		}
+		gpuPrice, err = parsePrice(priceConfig.TARGET_GPU_DEFAULT)
+		if err != nil {
+			return false, 0, fmt.Errorf("failed to converting GPU price: %v", err)
+		}
+		gpuCost += float64(g.GPU) * gpuPrice * float64(duration/3600)
+	}
+
+	// Calculate total cost
+	cpuCost := float64(resource.Cpu) * cpuPrice * float64(duration/3600)
+	memoryCost := resource.Memory * memoryPrice * float64(duration/3600)
+	storageCost := resource.Storage * storagePrice * float64(duration/3600)
 
 	totalCost := cpuCost + memoryCost + storageCost + gpuCost
 

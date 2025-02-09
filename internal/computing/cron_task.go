@@ -218,7 +218,7 @@ func (task *CronTask) watchNameSpaceForDeleted() {
 func (task *CronTask) cleanImageResource() {
 	if conf.GetConfig().API.AutoDeleteImage {
 		c := cron.New(cron.WithSeconds())
-		c.AddFunc("* 0/30 * * * ?", func() {
+		c.AddFunc("0 0/30 * * * ?", func() {
 			defer func() {
 				if err := recover(); err != nil {
 					logs.GetLogger().Errorf("cleanImageResource catch panic error: %+v", err)
@@ -232,7 +232,7 @@ func (task *CronTask) cleanImageResource() {
 
 func (task *CronTask) watchExpiredTask() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("* 0/10 * * * ?", func() {
+	c.AddFunc("0 0/10 * * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("watchExpiredTask catch panic error: %+v", err)
@@ -549,7 +549,7 @@ func (task *CronTask) CheckCpBalance() {
 
 func (task *CronTask) UpdateContainerLog() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("* 0/10 * * * ?", func() {
+	c.AddFunc("0 0/10 * * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("update container log catch panic error: %+v", err)
