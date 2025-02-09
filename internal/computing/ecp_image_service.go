@@ -1167,11 +1167,12 @@ func parseDockerfileContentForEcp(jobUuid, dockerfileContent string) (*models.De
 		return nil, fmt.Errorf("failed not found Dockerfile, path: %s", dockerfileFile)
 	}
 
-	ports, envVars, err := parseDockerfile(dockerfileFile)
+	ports, envVars, cmds, err := parseDockerfile(dockerfileFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse dockerfile, path: %s", dockerfileFile)
 	}
 
+	deployParam.Cmd = cmds
 	deployParam.BuildImagePath = buildFolder
 	deployParam.BuildImageName = imageName
 	deployParam.Ports = ports
@@ -1179,37 +1180,67 @@ func parseDockerfileContentForEcp(jobUuid, dockerfileContent string) (*models.De
 	return deployParam, nil
 }
 
-func parseDockerfile(filePath string) (exposedPorts []int, envVars []string, err error) {
+func parseDockerfile(filePath string) (exposedPorts []int, envVars []string, cmd []string, err error) {
 	file, err := os.Open(filePath)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	defer file.Close()
 
 	result, err := parser.Parse(file)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	for _, child := range result.AST.Children {
 		switch strings.ToUpper(child.Value) {
 		case "EXPOSE":
-			parseInt, err := strconv.ParseInt(child.Next.Value, 10, 64)
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to parse expose, error: %v", err)
+			if child.Next == nil {
+				continue
 			}
-			exposedPorts = append(exposedPorts, int(parseInt))
+			ports := strings.Fields(child.Next.Value)
+			for _, port := range ports {
+				parseInt, err := strconv.Atoi(port)
+				if err != nil {
+					return nil, nil, nil, fmt.Errorf("failed to parse EXPOSE port: %v", err)
+				}
+				exposedPorts = append(exposedPorts, parseInt)
+			}
+
 		case "ENV":
+			if child.Next == nil {
+				continue
+			}
 			scanner := bufio.NewScanner(strings.NewReader(child.Next.Value))
 			for scanner.Scan() {
-				parts := strings.SplitN(scanner.Text(), " ", 2)
-				if len(parts) == 2 {
-					envVars = append(envVars, fmt.Sprintf("%s=%s", parts[0], parts[1]))
+				line := scanner.Text()
+				parts := strings.Fields(line)
+				if len(parts) < 2 {
+					continue
 				}
+				key := parts[0]
+				value := strings.Join(parts[1:], " ")
+				envVars = append(envVars, fmt.Sprintf("%s=%s", key, value))
+			}
+
+		case "CMD":
+			if child.Next == nil {
+				continue
+			}
+			cmdStr := child.Next.Value
+			if strings.HasPrefix(cmdStr, "[") && strings.HasSuffix(cmdStr, "]") {
+				cmdStr = strings.Trim(cmdStr, "[]")
+				parts := strings.Split(cmdStr, ",")
+				for i, part := range parts {
+					parts[i] = strings.Trim(part, " \"")
+				}
+				cmd = parts
+			} else {
+				cmd = strings.Fields(cmdStr)
 			}
 		}
 	}
-	return exposedPorts, envVars, nil
+	return exposedPorts, envVars, cmd, nil
 }
 
 func parseDockerfileConfigForEcp(job models.EcpImageJobReq) (*models.DeployJobParam, error) {

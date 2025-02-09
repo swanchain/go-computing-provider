@@ -1307,7 +1307,7 @@ func parseDockerfileContentForFcp(jobUuid, dockerfileContent string) (*models.De
 		return nil, fmt.Errorf("failed not found Dockerfile, path: %s", dockerfileFile)
 	}
 
-	ports, envVars, err := parseDockerfile(dockerfileFile)
+	ports, envVars, cmds, err := parseDockerfile(dockerfileFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse dockerfile, path: %s", dockerfileFile)
 	}
@@ -1317,6 +1317,7 @@ func parseDockerfileContentForFcp(jobUuid, dockerfileContent string) (*models.De
 		NewJobService().UpdateJobEntityStatusByJobUuid(jobUuid, models.JOB_FAILED_STATUS)
 	}
 
+	deployParam.Cmd = cmds
 	deployParam.BuildImagePath = buildFolder
 	deployParam.BuildImageName = imageName
 	deployParam.Ports = ports
