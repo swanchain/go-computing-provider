@@ -711,13 +711,16 @@ func (*ImageJobService) DeployInference(c *gin.Context, deployJob models.DeployJ
 			Resources:  deployJob.NeedResource,
 			Privileged: true,
 		}
-		containerConfig := &container.Config{
+
+		var containerConfig = &container.Config{
 			Image:        deployJob.Image,
 			Env:          deployJob.Envs,
-			Cmd:          deployJob.Cmd,
 			AttachStdout: true,
 			AttachStderr: true,
 			Tty:          true,
+		}
+		if len(deployJob.Cmd) != 0 {
+			containerConfig.Cmd = deployJob.Cmd
 		}
 
 		var networkConfig *network.NetworkingConfig
