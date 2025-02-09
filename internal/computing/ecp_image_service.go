@@ -298,8 +298,9 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 			logs.GetLogger().Errorln(err)
 			return
 		}
-		deployJob.Image = buildParams.Image
-		deployJob.Cmd = buildParams.Cmd
+
+		deployJob.BuildImagePath = buildParams.BuildImagePath
+		deployJob.BuildImageName = buildParams.BuildImageName
 		deployJob.Ports = buildParams.Ports
 		deployJob.Envs = buildParams.Envs
 
