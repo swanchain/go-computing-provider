@@ -293,7 +293,7 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 			deployJob.Envs = buildParams.Envs
 		}
 	} else if job.DeployType == 1 {
-		buildParams, err := parseDockerfileContentForEcp(job.Uuid, job.DockerContent)
+		buildParams, err := parseDockerfileContentForEcp(job.Uuid, job.DeployContent)
 		if err != nil {
 			logs.GetLogger().Errorln(err)
 			return
@@ -304,7 +304,7 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		deployJob.Envs = buildParams.Envs
 
 	} else if job.DeployType == 2 {
-		yamlStruct, err := handlerYamlStr(job.YamlContent)
+		yamlStruct, err := handlerYamlStr(job.DeployContent)
 		if err != nil {
 			logs.GetLogger().Errorf("failed to parse yaml content, job_uuid: %s, error: %v", deployJob.Uuid, err)
 			return

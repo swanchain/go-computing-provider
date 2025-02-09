@@ -223,7 +223,7 @@ type FcpDeployImageReq struct {
 	BidPrice      string              `json:"bid_price"` // Amount users are willing to pay
 	JobType       int                 `json:"job_type"`
 	DeployType    int                 `json:"deploy_type"` // 0: field; 1: docker; 2: yaml
-	DeployContent string              `json:"DeployContent"`
+	DeployContent string              `json:"deploy_content"`
 	HealthPath    string              `json:"health_path"` // deploy_type=1 or 2, used
 }
 
@@ -254,7 +254,7 @@ type K8sResourceForImage struct {
 	Storage float64
 	Gpus    []struct {
 		GpuModel string `json:"gpu_model"`
-		GPU      int    `json:"gpu"`
+		GPU      int    `json:"count"`
 	} `json:"gpus"`
 }
 
@@ -293,7 +293,7 @@ type ResourceInfo struct {
 	Memory  int64 `json:"memory"`  // bytes
 	Storage int64 `json:"storage"` // bytes
 	Gpus    []struct {
-		GPU      int    `json:"gpu"`
+		GPU      int    `json:"count"`
 		GPUModel string `json:"gpu_model"`
 	} `json:"gpus"`
 }

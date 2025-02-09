@@ -21,8 +21,7 @@ type EcpImageJobReq struct {
 	WorkDir       string            `json:"work_dir,omitempty"`
 	IpWhiteList   []string          `json:"ip_white_list"`
 	DeployType    int               `json:"deploy_type"` // 0: field; 1: dockerfile; 2: yaml
-	DockerContent string            `json:"docker_content"`
-	YamlContent   string            `json:"yaml_content"`
+	DeployContent string            `json:"deploy_content"`
 }
 
 type DeployJobParam struct {
