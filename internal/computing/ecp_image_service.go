@@ -303,6 +303,7 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		deployJob.BuildImageName = buildParams.BuildImageName
 		deployJob.Ports = buildParams.Ports
 		deployJob.Envs = buildParams.Envs
+		deployJob.Cmd = buildParams.Cmd
 
 	} else if job.DeployType == 2 {
 		yamlStruct, err := handlerYamlStr(job.DeployContent)
@@ -715,12 +716,10 @@ func (*ImageJobService) DeployInference(c *gin.Context, deployJob models.DeployJ
 		var containerConfig = &container.Config{
 			Image:        deployJob.Image,
 			Env:          deployJob.Envs,
+			Cmd:          deployJob.Cmd,
 			AttachStdout: true,
 			AttachStderr: true,
 			Tty:          true,
-		}
-		if len(deployJob.Cmd) != 0 {
-			containerConfig.Cmd = deployJob.Cmd
 		}
 
 		var networkConfig *network.NetworkingConfig
