@@ -142,7 +142,7 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "invalidate value: [job_type], support: 1 or 2"))
 		return
 	}
-	if job.Image == "" {
+	if job.Image == "" && job.DeployType != 1 && job.DeployType != 2 {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [image]"))
 	}
 
