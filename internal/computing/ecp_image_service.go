@@ -1139,7 +1139,7 @@ func CheckWalletBlackListForEcp(walletAddress string) bool {
 }
 
 func parseDockerfileContentForEcp(jobUuid, dockerfileContent string) (*models.DeployJobParam, error) {
-	var deployParam *models.DeployJobParam
+	var deployParam = new(models.DeployJobParam)
 
 	cpRepoPath, _ := os.LookupEnv("CP_PATH")
 	buildFolder := filepath.Join(cpRepoPath, "build/ecp", jobUuid)
