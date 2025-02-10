@@ -944,7 +944,7 @@ func doFilC2Task(c *gin.Context, zkTask models.ZkTaskReq, taskEntity *models.Tas
 		needGpuNum += gpus.GPU
 	}
 
-	_, architecture, _, needMemory, indexs, noAvailableMsgs, err := checkResourceForUbiAndMutilGpu(zkTask.Id, zkTask.Resource, gpuName, taskEntity.ResourceType)
+	_, architecture, _, needMemory, defaultIndex, indexs, noAvailableMsgs, err := checkResourceForUbiAndMutilGpu(zkTask.Id, zkTask.Resource, gpuName, taskEntity.ResourceType)
 	if err != nil {
 		taskEntity.Status = models.TASK_FAILED_STATUS
 		NewTaskService().SaveTaskEntity(taskEntity)
@@ -1013,8 +1013,12 @@ func doFilC2Task(c *gin.Context, zkTask models.ZkTaskReq, taskEntity *models.Tas
 
 			var useIndexs []string
 			if len(indexs) > 0 {
-				for i := 0; i < needGpuNum; i++ {
-					useIndexs = append(useIndexs, indexs[i])
+				if gpuName != "" {
+					useIndexs = append(useIndexs, defaultIndex)
+				} else {
+					for i := 0; i < needGpuNum; i++ {
+						useIndexs = append(useIndexs, indexs[i])
+					}
 				}
 				env = append(env, fmt.Sprintf("CUDA_VISIBLE_DEVICES=%s", strings.Join(useIndexs, ",")))
 			} else {
@@ -1100,7 +1104,7 @@ func doFilC2Task(c *gin.Context, zkTask models.ZkTaskReq, taskEntity *models.Tas
 	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
 }
 
-func checkResourceForUbiAndMutilGpu(taskId int, resource *models.ResourceInfo, gpuName string, resourceType int) (bool, string, int64, int64, []string, []string, error) {
+func checkResourceForUbiAndMutilGpu(taskId int, resource *models.ResourceInfo, gpuName string, resourceType int) (bool, string, int64, int64, string, []string, []string, error) {
 	var needGpuNum int
 	for _, gpus := range resource.Gpus {
 		needGpuNum += gpus.GPU
@@ -1109,11 +1113,11 @@ func checkResourceForUbiAndMutilGpu(taskId int, resource *models.ResourceInfo, g
 	dockerService := NewDockerService()
 	containerLogStr, err := dockerService.ContainerLogs("resource-exporter")
 	if err != nil {
-		return false, "", 0, 0, nil, nil, err
+		return false, "", 0, 0, "", nil, nil, err
 	}
 	var nodeResource models.NodeResource
 	if err := json.Unmarshal([]byte(containerLogStr), &nodeResource); err != nil {
-		return false, "", 0, 0, nil, nil, err
+		return false, "", 0, 0, "", nil, nil, err
 	}
 
 	var needCpu = resource.CPU
@@ -1178,16 +1182,20 @@ func checkResourceForUbiAndMutilGpu(taskId int, resource *models.ResourceInfo, g
 
 	if resourceType == models.RESOURCE_TYPE_GPU {
 		var newGpuNum []string
-		for _, gm := range gpuMap {
+		var defaultGpu string
+		for k, gm := range gpuMap {
 			newGpuNum = append(newGpuNum, gm.indexs...)
+			if strings.ToUpper(k) == gpuName && gm.num > 0 {
+				defaultGpu = gm.indexs[0]
+			}
 		}
 		if needGpuNum <= len(newGpuNum) {
-			return true, nodeResource.CpuName, needCpu, int64(needMemory), newGpuNum, nil, nil
+			return true, nodeResource.CpuName, needCpu, int64(needMemory), defaultGpu, newGpuNum, nil, nil
 		} else {
 			noAvailableStr = append(noAvailableStr, fmt.Sprintf("gpu need num:%d, remainder:%d", needGpuNum, len(newGpuNum)))
 			logs.GetLogger().Warnf("the task_id: %d resource is not available. Reason: %s",
 				taskId, strings.Join(noAvailableStr, ";"))
-			return false, nodeResource.CpuName, needCpu, int64(needMemory), newGpuNum, noAvailableStr, nil
+			return false, nodeResource.CpuName, needCpu, int64(needMemory), "", newGpuNum, noAvailableStr, nil
 		}
 
 		//if gpuName != "" {
@@ -1214,10 +1222,10 @@ func checkResourceForUbiAndMutilGpu(taskId int, resource *models.ResourceInfo, g
 			logs.GetLogger().Warnf("the task_id: %d resource is not available. Reason: %s",
 				taskId, strings.Join(noAvailableStr, ";"))
 		} else {
-			return true, nodeResource.CpuName, needCpu, int64(needMemory), indexs, nil, nil
+			return true, nodeResource.CpuName, needCpu, int64(needMemory), "", indexs, nil, nil
 		}
 	}
-	return false, nodeResource.CpuName, needCpu, int64(needMemory), indexs, noAvailableStr, nil
+	return false, nodeResource.CpuName, needCpu, int64(needMemory), "", indexs, noAvailableStr, nil
 }
 
 func checkResourceForUbi(taskId int, resource *models.TaskResource, gpuName string, resourceType int) (bool, string, int64, int64, []string, []string, error) {
