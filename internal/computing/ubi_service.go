@@ -856,6 +856,8 @@ func DoZkTask(c *gin.Context) {
 	if conf.GetConfig().UBI.VerifySign {
 		signature, err := verifySignature(conf.GetConfig().UBI.UbiEnginePk, fmt.Sprintf("%s%v", cpAccountAddress, taskId), zkTask.Signature)
 		if err != nil {
+			taskEntity.Status = models.TASK_FAILED_STATUS
+			NewTaskService().SaveTaskEntity(taskEntity)
 			logs.GetLogger().Errorf("verifySignature for ubi task failed, error: %+v", err)
 			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
 			return
@@ -865,7 +867,7 @@ func DoZkTask(c *gin.Context) {
 		if !signature {
 			taskEntity.Status = models.TASK_REJECTED_STATUS
 			NewTaskService().SaveTaskEntity(taskEntity)
-			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "signature verify failed"))
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "failed to verify signature"))
 			return
 		}
 	}
