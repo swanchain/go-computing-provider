@@ -152,17 +152,11 @@ func memInPod(pod *corev1.Pod) (memCount int64) {
 	return memCount
 }
 
-type PodGpu struct {
-	Gname  string
-	Guse   int
-	Gindex []string
-}
-
-func gpuInPod(pod *corev1.Pod) []PodGpu {
-	var podGpus []PodGpu
+func gpuInPod(pod *corev1.Pod) []models.PodGpu {
+	var podGpus []models.PodGpu
 	for k, v := range pod.Annotations {
 		gIndex := strings.Split(v, ",")
-		podGpus = append(podGpus, PodGpu{
+		podGpus = append(podGpus, models.PodGpu{
 			Gname:  k,
 			Guse:   len(gIndex),
 			Gindex: gIndex,

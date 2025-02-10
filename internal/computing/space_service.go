@@ -967,7 +967,7 @@ func DeployImage(c *gin.Context) {
 		}
 	}
 
-	available, nodeName, gpuIndex, noAvailableMsgs, err := checkResourceAvailableForImage(deployJob.Uuid, hardwareType, deployJob.Resource)
+	available, nodeName, gpuIndex, prepareGpu, noAvailableMsgs, err := checkResourceAvailableForImage(deployJob.Uuid, hardwareType, deployJob.Resource)
 	if err != nil {
 		NewJobService().UpdateJobEntityStatusByJobUuid(jobEntity.JobUuid, models.JOB_FAILED_STATUS)
 		logs.GetLogger().Errorf("failed to check job resource, error: %+v", err)
@@ -991,7 +991,7 @@ func DeployImage(c *gin.Context) {
 			logs.GetLogger().Infof("successfully uploaded to MCS, jobuuid: %s", jobData.UUID)
 		}()
 
-		DeployImageSpaceTask(jobData, deployJob, hostName, nodeName, gpuIndex)
+		DeployImageSpaceTask(jobData, deployJob, hostName, nodeName, gpuIndex, prepareGpu)
 
 	}()
 
@@ -1144,7 +1144,7 @@ func DeploySpaceTask(jobData models.JobData, deployParam DeployParam, hostName s
 	return
 }
 
-func DeployImageSpaceTask(jobData models.JobData, job models.FcpDeployImageReq, hostName string, nodeName string, gpuIndex []string) {
+func DeployImageSpaceTask(jobData models.JobData, job models.FcpDeployImageReq, hostName string, nodeName string, gpuIndex []string, prepareGpu []models.PodGpu) {
 	for _, g := range job.Resource.Gpus {
 		saveGpuCache(g.GpuModel, g.GPU)
 	}
@@ -1176,6 +1176,7 @@ func DeployImageSpaceTask(jobData models.JobData, job models.FcpDeployImageReq, 
 	deployJob.Name = job.Name
 	deployJob.HealthPath = job.HealthPath
 	deployJob.K8sResourceForImage = job.Resource
+	deployJob.PrepareG = prepareGpu
 
 	if job.DeployType == 0 {
 		deployJob.HealthPath = job.DeployConfig.HealthPath
@@ -1659,22 +1660,22 @@ func checkResourceAvailableForSpace(jobUuid string, jobType int, resourceConfig 
 	}
 }
 
-func checkResourceAvailableForImage(jobUuid string, hardwareType string, resourceConfig models.K8sResourceForImage) (bool, string, []string, []string, error) {
+func checkResourceAvailableForImage(jobUuid string, hardwareType string, resourceConfig models.K8sResourceForImage) (bool, string, []string, []models.PodGpu, []string, error) {
 	k8sService := NewK8sService()
 	activePods, err := k8sService.GetAllActivePod(context.TODO())
 	if err != nil {
-		return false, "", nil, nil, err
+		return false, "", nil, nil, nil, err
 	}
 
 	nodes, err := k8sService.k8sClient.CoreV1().Nodes().List(context.TODO(), metaV1.ListOptions{})
 	if err != nil {
-		return false, "", nil, nil, err
+		return false, "", nil, nil, nil, err
 	}
 
 	nodeGpuSummary, err := k8sService.GetNodeGpuSummary(context.TODO())
 	if err != nil {
 		logs.GetLogger().Errorf("Failed collect k8s gpu, error: %+v", err)
-		return false, "", nil, nil, err
+		return false, "", nil, nil, nil, err
 	}
 
 	var reqGpuMap = make(map[string]int)
@@ -1727,7 +1728,7 @@ func checkResourceAvailableForImage(jobUuid string, hardwareType string, resourc
 
 		if hardwareType == "CPU" {
 			if len(noAvailableStr) == 0 {
-				return true, nodeName, nil, nil, nil
+				return true, nodeName, nil, nil, nil, nil
 			} else {
 				logs.GetLogger().Warnf("the job_uuid: %s is not available for this node=%s resource. Reason: %s",
 					jobUuid, node.Name, strings.Join(noAvailableStr, ";"))
@@ -1735,6 +1736,7 @@ func checkResourceAvailableForImage(jobUuid string, hardwareType string, resourc
 		} else if hardwareType == "GPU" {
 			var newGpuIndex []string
 			var flag bool
+			var prepare []models.PodGpu
 
 			var gpuNoAvailableStr []string
 			for gname, gData := range nodeGpuInfo {
@@ -1748,6 +1750,11 @@ func checkResourceAvailableForImage(jobUuid string, hardwareType string, resourc
 							gIndex = remainingGpu[:reqG.GPU]
 							newGpuIndex = append(newGpuIndex, gIndex...)
 							count += reqG.GPU
+							prepare = append(prepare, models.PodGpu{
+								Gname:  reqG.GpuModel,
+								Guse:   len(gIndex),
+								Gindex: gIndex,
+							})
 						} else {
 							gpuNoAvailableStr = append(gpuNoAvailableStr,
 								fmt.Sprintf("gpu need name:%s, num:%d, remainder: %d", gname, reqG.GPU, len(gIndex)))
@@ -1767,7 +1774,7 @@ func checkResourceAvailableForImage(jobUuid string, hardwareType string, resourc
 			}
 
 			if flag {
-				return true, nodeName, newGpuIndex, nil, nil
+				return true, nodeName, newGpuIndex, prepare, nil, nil
 			} else {
 				if gpuNoAvailableStr != nil {
 					noAvailableStr = append(gpuNoAvailableStr, gpuNoAvailableStr...)
@@ -1785,9 +1792,9 @@ func checkResourceAvailableForImage(jobUuid string, hardwareType string, resourc
 			noAvailableSummary = append(noAvailableSummary, fmt.Sprintf("needGpu: %v", reqGpuMap))
 		}
 		noAvailableSummary = append(noAvailableSummary, "not found available node")
-		return false, "", nil, noAvailableSummary, nil
+		return false, "", nil, nil, noAvailableSummary, nil
 	} else {
-		return false, "", nil, noAvailableStr, nil
+		return false, "", nil, nil, noAvailableStr, nil
 	}
 }
 

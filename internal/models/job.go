@@ -39,6 +39,14 @@ type DeployJobParam struct {
 	BuildImagePath string
 	BuildImageName string
 	IpWhiteList    []string `json:"ip_white_list"`
+
+	PrepareG []PodGpu
+}
+
+type PodGpu struct {
+	Gname  string
+	Guse   int
+	Gindex []string
 }
 
 type EcpImageResp struct {

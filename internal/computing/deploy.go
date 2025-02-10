@@ -645,7 +645,7 @@ func (d *Deploy) DeployImageToK8s(containerResource models.DeployJobParam) error
 				ObjectMeta: metaV1.ObjectMeta{
 					Labels:      map[string]string{"lad_app": d.jobUuid},
 					Namespace:   d.k8sNameSpace,
-					Annotations: generateGpuAnnotation(containerResource.K8sResourceForImage.Gpus),
+					Annotations: generateGpuAnnotation(containerResource.PrepareG),
 				},
 				Spec: coreV1.PodSpec{
 					Hostname: d.spaceName + "-" + generateString(4),
@@ -694,10 +694,10 @@ func (d *Deploy) DeployImageToK8s(containerResource models.DeployJobParam) error
 	return nil
 }
 
-func generateGpuAnnotation(gpus []models.ReqGpu) map[string]string {
+func generateGpuAnnotation(gpus []models.PodGpu) map[string]string {
 	var annotationMap = make(map[string]string)
 	for _, g := range gpus {
-		annotationMap[strings.ReplaceAll(g.GpuModel, " ", "_")] = fmt.Sprintf("%d", g.GPU)
+		annotationMap[strings.ReplaceAll(g.Gname, " ", "_")] = strings.Join(g.Gindex, ",")
 	}
 	return annotationMap
 }
