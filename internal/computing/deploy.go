@@ -835,13 +835,13 @@ func (d *Deploy) createEnvForImage(envs ...coreV1.EnvVar) []coreV1.EnvVar {
 }
 
 func (d *Deploy) createK8sResourcesForImage(k8sResourceImage models.K8sResourceForImage) coreV1.ResourceRequirements {
-	memQuantity, err := resource.ParseQuantity(fmt.Sprintf("%dGi", k8sResourceImage.Memory))
+	memQuantity, err := resource.ParseQuantity(fmt.Sprintf("%.fGi", k8sResourceImage.Memory))
 	if err != nil {
 		logs.GetLogger().Error("failed to parse memory, error: %+v", err)
 		return coreV1.ResourceRequirements{}
 	}
 
-	storageQuantity, err := resource.ParseQuantity(fmt.Sprintf("%dGi", k8sResourceImage.Storage))
+	storageQuantity, err := resource.ParseQuantity(fmt.Sprintf("%.fGi", k8sResourceImage.Storage))
 	if err != nil {
 		logs.GetLogger().Error("failed to parse storage, error: %+v", err)
 		return coreV1.ResourceRequirements{}
