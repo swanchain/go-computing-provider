@@ -1743,7 +1743,7 @@ func checkResourceAvailableForImage(jobUuid string, hardwareType string, resourc
 				var gIndex []string
 				remainingGpu := difference(gData.FreeIndex, nodeGpu[gname].UsedIndex)
 				for _, reqG := range resourceConfig.Gpus {
-					if strings.ToUpper(reqG.GpuModel) == gname {
+					if strings.ToUpper(strings.ReplaceAll(reqG.GpuModel, " ", "-")) == gname {
 						if reqG.GPU <= len(remainingGpu) {
 							gIndex = remainingGpu[:reqG.GPU]
 							newGpuIndex = append(newGpuIndex, gIndex...)
