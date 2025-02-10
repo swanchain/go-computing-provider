@@ -870,7 +870,7 @@ func DeployImage(c *gin.Context) {
 	for _, p := range deployJob.DeployConfig.Ports {
 		ports = append(ports, p...)
 	}
-	if len(ports) == 1 {
+	if len(ports) == 1 || (deployJob.DeployType == 1 || deployJob.DeployType == 2) {
 		jobData.JobRealUri = fmt.Sprintf("https://%s", hostName)
 	} else {
 		jobData.JobRealUri = ""
