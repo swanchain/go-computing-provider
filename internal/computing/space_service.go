@@ -1165,10 +1165,10 @@ func DeployImageSpaceTask(jobData models.JobData, job models.FcpDeployImageReq, 
 			NewJobService().DeleteJobEntityByJobUuId(job.Uuid, models.JOB_TERMINATED_STATUS)
 		}
 
-		if err := recover(); err != nil {
-			logs.GetLogger().Errorf("deploy space task painc, error: %+v", err)
-			return
-		}
+		//if err := recover(); err != nil {
+		//	logs.GetLogger().Errorf("deploy space task painc, error: %+v", err)
+		//	return
+		//}
 	}()
 
 	var deployJob models.DeployJobParam
