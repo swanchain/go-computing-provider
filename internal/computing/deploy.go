@@ -643,10 +643,10 @@ func (d *Deploy) DeployImageToK8s(containerResource models.DeployJobParam) error
 
 			Template: coreV1.PodTemplateSpec{
 				ObjectMeta: metaV1.ObjectMeta{
-					Labels:    map[string]string{"lad_app": d.jobUuid},
-					Namespace: d.k8sNameSpace,
+					Labels:      map[string]string{"lad_app": d.jobUuid},
+					Namespace:   d.k8sNameSpace,
+					Annotations: generateGpuAnnotation(containerResource.K8sResourceForImage.Gpus),
 				},
-
 				Spec: coreV1.PodSpec{
 					Hostname: d.spaceName + "-" + generateString(4),
 					NodeSelector: map[string]string{
@@ -692,6 +692,14 @@ func (d *Deploy) DeployImageToK8s(containerResource models.DeployJobParam) error
 	}
 	d.watchContainerRunningTime()
 	return nil
+}
+
+func generateGpuAnnotation(gpus []models.ReqGpu) map[string]string {
+	var annotationMap = make(map[string]string)
+	for _, g := range gpus {
+		annotationMap[strings.ReplaceAll(g.GpuModel, " ", "_")] = fmt.Sprintf("%d", g.GPU)
+	}
+	return annotationMap
 }
 
 func (d *Deploy) deployNamespace() error {

@@ -252,10 +252,12 @@ type K8sResourceForImage struct {
 	Cpu     int64
 	Memory  float64
 	Storage float64
-	Gpus    []struct {
-		GpuModel string `json:"gpu_model"`
-		GPU      int    `json:"count"`
-	} `json:"gpus"`
+	Gpus    []ReqGpu `json:"gpus"`
+}
+
+type ReqGpu struct {
+	GpuModel string `json:"gpu_model"`
+	GPU      int    `json:"count"`
 }
 
 type FcpDeployImageResp struct {

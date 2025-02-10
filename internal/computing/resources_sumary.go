@@ -26,18 +26,19 @@ func GetNodeGpuResource(allPods []corev1.Pod, node *corev1.Node) map[string]GpuD
 	nodeGpu := make(map[string]GpuData)
 	for _, pod := range getPodsFromNode(allPods, node) {
 		// used gpu info
-		gpuName, usedCount, usedIndexs := gpuInPod(&pod)
-		if gpuName == "kubernetes.io/os" || gpuName == "" {
-			continue
-		}
-		if v, ok := nodeGpu[gpuName]; ok {
-			v.UsedIndex = append(v.UsedIndex, usedIndexs...)
-			v.Used += usedCount
-			nodeGpu[gpuName] = v
-		} else {
-			nodeGpu[gpuName] = GpuData{
-				Used:      usedCount,
-				UsedIndex: usedIndexs,
+		for _, g := range gpuInPod(&pod) {
+			if g.Gname == "kubernetes.io/os" || g.Gname == "" {
+				continue
+			}
+			if v, ok := nodeGpu[g.Gname]; ok {
+				v.UsedIndex = append(v.UsedIndex, g.Gindex...)
+				v.Used += g.Guse
+				nodeGpu[g.Gname] = v
+			} else {
+				nodeGpu[g.Gname] = GpuData{
+					Used:      g.Guse,
+					UsedIndex: g.Gindex,
+				}
 			}
 		}
 	}
@@ -62,19 +63,19 @@ func GetNodeResource(allPods []corev1.Pod, node *corev1.Node) (map[string]GpuDat
 		usedMem += memInPod(&pod)
 		usedStorage += storageInPod(&pod)
 
-		// used gpu info
-		gpuName, usedCount, usedIndexs := gpuInPod(&pod)
-		if gpuName == "kubernetes.io/os" || gpuName == "" {
-			continue
-		}
-		if v, ok := nodeGpu[gpuName]; ok {
-			v.UsedIndex = append(v.UsedIndex, usedIndexs...)
-			v.Used += usedCount
-			nodeGpu[gpuName] = v
-		} else {
-			nodeGpu[gpuName] = GpuData{
-				Used:      usedCount,
-				UsedIndex: usedIndexs,
+		for _, g := range gpuInPod(&pod) {
+			if g.Gname == "kubernetes.io/os" || g.Gname == "" {
+				continue
+			}
+			if v, ok := nodeGpu[g.Gname]; ok {
+				v.UsedIndex = append(v.UsedIndex, g.Gindex...)
+				v.Used += g.Guse
+				nodeGpu[g.Gname] = v
+			} else {
+				nodeGpu[g.Gname] = GpuData{
+					Used:      g.Guse,
+					UsedIndex: g.Gindex,
+				}
 			}
 		}
 	}
@@ -151,30 +152,23 @@ func memInPod(pod *corev1.Pod) (memCount int64) {
 	return memCount
 }
 
-func gpuInPod(pod *corev1.Pod) (gpuName string, gpuCount int, indexs []string) {
-	containers := pod.Spec.Containers
-	for _, container := range containers {
-		var gIndex string
-		for _, envVaule := range container.Env {
-			if envVaule.Name == "NVIDIA_VISIBLE_DEVICES" {
-				gIndex = envVaule.Value
-				indexs = append(indexs, strings.Split(gIndex, ",")...)
-				break
-			}
-		}
-		if gIndex != "" {
-			gpuCount += len(strings.Split(gIndex, ","))
-		}
-	}
+type PodGpu struct {
+	Gname  string
+	Guse   int
+	Gindex []string
+}
 
-	if pod.Spec.NodeSelector != nil {
-		for k := range pod.Spec.NodeSelector {
-			if k != "" {
-				gpuName = k
-			}
-		}
+func gpuInPod(pod *corev1.Pod) []PodGpu {
+	var podGpus []PodGpu
+	for k, v := range pod.Annotations {
+		gIndex := strings.Split(v, ",")
+		podGpus = append(podGpus, PodGpu{
+			Gname:  k,
+			Guse:   len(gIndex),
+			Gindex: gIndex,
+		})
 	}
-	return gpuName, gpuCount, indexs
+	return podGpus
 }
 
 func checkClusterProviderStatus(nodeResources []*models.NodeResource) {
