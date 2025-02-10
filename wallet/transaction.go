@@ -44,7 +44,7 @@ func BalanceNumber(client *ethclient.Client, addr string) (float64, error) {
 	return balanceFloat64, nil
 }
 
-func sendTransaction(client *ethclient.Client, privateK string, to string, amount *big.Int) (string, error) {
+func sendTransaction(client *ethclient.Client, privateK string, to string, amount *big.Int, nonce uint64) (string, error) {
 	privateKey, err := crypto.HexToECDSA(privateK)
 	if err != nil {
 		log.Fatal(err)
@@ -57,9 +57,11 @@ func sendTransaction(client *ethclient.Client, privateK string, to string, amoun
 	}
 
 	fromAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
-	nonce, err := client.PendingNonceAt(context.Background(), fromAddress)
-	if err != nil {
-		log.Fatal(err)
+	if nonce == 0 {
+		nonce, err = client.PendingNonceAt(context.Background(), fromAddress)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	gasLimit := uint64(21000) // in units

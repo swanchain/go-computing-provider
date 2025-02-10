@@ -284,6 +284,8 @@ var walletSend = &cli.Command{
 			return fmt.Errorf("failed to parse target address: %s", to)
 		}
 
+		nonce := cctx.Uint64("nonce")
+
 		amount := cctx.Args().Get(1)
 		if strings.TrimSpace(amount) == "" {
 			return fmt.Errorf("failed to get amount: %s", amount)
@@ -292,7 +294,7 @@ var walletSend = &cli.Command{
 		if err != nil {
 			return err
 		}
-		txHash, err := localWallet.WalletSend(ctx, from, to, amount)
+		txHash, err := localWallet.WalletSend(ctx, from, to, amount, nonce)
 		if err != nil {
 			return err
 		}
