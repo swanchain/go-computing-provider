@@ -127,11 +127,19 @@ func (s *CpStub) ChangeTaskTypes(newTaskTypes []uint8) (string, error) {
 		return "", fmt.Errorf("address: %s, cpAccount client create transaction, error: %+v", publicAddress, err)
 	}
 
-	transaction, err := s.account.ChangeTaskTypes(txOptions, newTaskTypes)
-	if err != nil {
-		return "", fmt.Errorf("address: %s, cpAccount client create ChangeTaskTypes tx error: %+v", publicAddress, err)
+	for i := 0; i < 3; i++ {
+		transaction, err := s.account.ChangeTaskTypes(txOptions, newTaskTypes)
+		if err != nil {
+			if strings.Contains(err.Error(), "nonce too low") {
+				txOptions.Nonce = big.NewInt(txOptions.Nonce.Int64() + 1)
+				continue
+			}
+			return "", fmt.Errorf("address: %s, cpAccount client create ChangeTaskTypes tx error: %+v", publicAddress, err)
+		} else {
+			return transaction.Hash().String(), nil
+		}
 	}
-	return transaction.Hash().String(), nil
+	return "", fmt.Errorf("unknow error")
 }
 
 func (s *CpStub) ChangeWorkerAddress(newWorkerAddress common.Address) (string, error) {
