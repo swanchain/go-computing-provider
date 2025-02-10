@@ -143,16 +143,20 @@ const (
 )
 
 const (
+	JOB_REJECTED_STATUS   = -1
 	JOB_RECEIVED_STATUS   = 0
 	JOB_DEPLOY_STATUS     = 1
 	JOB_RUNNING_STATUS    = 2
 	JOB_TERMINATED_STATUS = 3
 	JOB_COMPLETED_STATUS  = 4
+	JOB_FAILED_STATUS     = 5
 )
 
 func GetJobStatus(status int) string {
 	var statusStr string
 	switch status {
+	case JOB_REJECTED_STATUS:
+		statusStr = "rejected"
 	case JOB_RECEIVED_STATUS:
 		statusStr = "received"
 	case JOB_DEPLOY_STATUS:

@@ -631,6 +631,8 @@ func DoUbiTaskForDocker(c *gin.Context) {
 	}
 
 	if len(noAvailableMsgs) > 0 {
+		taskEntity.Status = models.TASK_REJECTED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
 		logs.GetLogger().Warnf(" task_id: %d, msg: %s", ubiTask.ID, strings.Join(noAvailableMsgs, ";"))
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError, strings.Join(noAvailableMsgs, ";")))
 		return
@@ -1517,6 +1519,7 @@ func RestartResourceExporter() error {
 		AttachStderr: true,
 		Tty:          true,
 	}, &container.HostConfig{
+		Binds: []string{"/etc/machine-id:/etc/machine-id"},
 		RestartPolicy: container.RestartPolicy{
 			Name:              container.RestartPolicyOnFailure,
 			MaximumRetryCount: 3,
@@ -1784,14 +1787,13 @@ func RetryFn(fn func() error, maxRetries int, delay time.Duration) error {
 }
 
 func RestartTraefikService() error {
+	traefikServiceContainerName := "traefik-service"
 	dockerService := NewDockerService()
+	dockerService.RemoveContainerByName(traefikServiceContainerName)
 	if err := dockerService.CreateNetwork("traefik-net"); err != nil {
 		return err
 	}
 
-	traefikServiceContainerName := "traefik-service"
-
-	dockerService.RemoveContainerByName(traefikServiceContainerName)
 	err := dockerService.PullImage(build.TraefikServerDockerImage)
 	if err != nil {
 		return fmt.Errorf("pull %s image failed, error: %v", build.UBIResourceExporterDockerImage, err)
