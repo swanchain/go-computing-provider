@@ -372,7 +372,7 @@ make install
 	
        [HUB]
        BalanceThreshold= 10                                                    # The cp’s collateral balance threshold
-       OrchestratorPk = "0xE2F887D4Ed3E4E5179C2f30c6Fdb2344cCbB21b6"           # Orchestrator's public key, CP only accept the task from this Orchestrator
+       OrchestratorPk = "0xd875bD44158208fD0FDD46729Aab6709f62C7821"           # Orchestrator's public key, CP only accept the task from this Orchestrator
        VerifySign = true                                                       # Verify that the task signature is from Orchestrator
 	
        [MCS]
