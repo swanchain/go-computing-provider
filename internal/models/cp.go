@@ -295,7 +295,7 @@ type ResourceInfo struct {
 	Memory  int64 `json:"memory"`  // bytes
 	Storage int64 `json:"storage"` // bytes
 	Gpus    []struct {
-		GPU      int    `json:"count"`
+		GPU      int    `json:"gpu"`
 		GPUModel string `json:"gpu_model"`
 	} `json:"gpus"`
 }
