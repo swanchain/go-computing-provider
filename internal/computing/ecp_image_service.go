@@ -1223,19 +1223,12 @@ func parseDockerfile(filePath string) (exposedPorts []int, envVars []string, cmd
 			}
 
 		case "CMD":
-			if child.Next == nil {
+			cmdStr := child.Original
+			cmdStr = cmdStr[strings.Index(cmdStr, "["):]
+			err := json.Unmarshal([]byte(cmdStr), &cmd)
+			if err != nil {
+				logs.GetLogger().Errorf("%v", err)
 				continue
-			}
-			cmdStr := child.Next.Value
-			if strings.HasPrefix(cmdStr, "[") && strings.HasSuffix(cmdStr, "]") {
-				cmdStr = strings.Trim(cmdStr, "[]")
-				parts := strings.Split(cmdStr, ",")
-				for i, part := range parts {
-					parts[i] = strings.Trim(part, " \"")
-				}
-				cmd = parts
-			} else {
-				cmd = strings.Fields(cmdStr)
 			}
 		}
 	}
