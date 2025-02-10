@@ -167,6 +167,8 @@ var daemonCmd = &cli.Command{
 		logs.GetLogger().Info("Starting a computing-provider client.")
 		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 
+		computing.NewDockerService().CleanResourceForDocker(true)
+
 		resourceExporterContainerName := "resource-exporter"
 		rsExist, version, err := computing.NewDockerService().CheckRunningContainer(resourceExporterContainerName)
 		if err != nil {

@@ -271,7 +271,13 @@ func (ds *DockerService) CleanResourceForK8s() {
 	ds.c.ContainersPrune(ctx, filters.NewArgs())
 }
 
-func (ds *DockerService) CleanResourceForDocker() {
+func (ds *DockerService) CleanResourceForDocker(onlyClearContainer bool) {
+	ctx := context.Background()
+	if onlyClearContainer {
+		ds.c.ContainersPrune(ctx, filters.NewArgs())
+		return
+	}
+
 	imagesToKeep := []string{
 		build.UBITaskImageIntelCpu,
 		build.UBITaskImageIntelGpu,
@@ -301,7 +307,6 @@ func (ds *DockerService) CleanResourceForDocker() {
 		}
 	}
 
-	ctx := context.Background()
 	danglingFilters := filters.NewArgs()
 	danglingFilters.Add("dangling", "true")
 	ds.c.ImagesPrune(ctx, danglingFilters)
