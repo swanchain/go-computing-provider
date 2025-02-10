@@ -3,6 +3,7 @@ package computing
 import (
 	"context"
 	"fmt"
+	"github.com/swanchain/go-computing-provider/build"
 	"github.com/swanchain/go-computing-provider/internal/contract"
 	"os"
 	"path/filepath"
@@ -50,6 +51,14 @@ func (task *CronTask) RunTask() {
 	task.UpdateContainerLog()
 	task.DeleteSpaceLog()
 
+	resourceExporterVersion, err := NewK8sService().GetResourceExporterVersion()
+	if err != nil {
+		logs.GetLogger().Fatalf("failed to get resource-exporter version, error: %v", err)
+	}
+
+	if resourceExporterVersion != "" && !strings.Contains(resourceExporterVersion, build.ResourceExporterVersion) {
+		logs.GetLogger().Fatalf("resource-exporter current version: %s too low, please upgrade the version to v12.0.0", version)
+	}
 }
 
 func CheckClusterNetworkPolicy() {

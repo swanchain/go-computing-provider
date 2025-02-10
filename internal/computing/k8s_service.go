@@ -537,6 +537,24 @@ func (s *K8sService) GetResourceExporterPodLogForNode(ctx context.Context) (map[
 	return result, nil
 }
 
+func (s *K8sService) GetResourceExporterVersion() (string, error) {
+	podList, err := s.k8sClient.CoreV1().Pods("kube-system").List(context.TODO(), metaV1.ListOptions{
+		LabelSelector: "app=resource-exporter",
+	})
+	if err != nil {
+		logs.GetLogger().Error(err)
+		return "", err
+	}
+	var version string
+	if len(podList.Items) > 0 {
+		for _, c := range podList.Items[0].Spec.Containers {
+			if strings.Contains(c.Image, "filswan/resource-exporter") {
+				version = strings.Split(c.Image, ":")[1]
+			}
+		}
+	}
+	return version, nil
+}
 func (s *K8sService) GetPodLogByPodName(namespace, podName string, podLogOptions *coreV1.PodLogOptions) (string, error) {
 	req := s.k8sClient.CoreV1().Pods(namespace).GetLogs(podName, podLogOptions)
 	buf, err := readLog(req)
