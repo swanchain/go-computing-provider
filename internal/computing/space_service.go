@@ -1212,7 +1212,7 @@ func DeployImageSpaceTask(jobData models.JobData, job models.FcpDeployImageReq, 
 			logs.GetLogger().Errorln(err)
 			return
 		}
-		deployJob.Image = buildParams.Image
+		deployJob.Image = buildParams.BuildImageName
 		deployJob.Ports = buildParams.Ports
 		deployJob.Envs = buildParams.Envs
 		compatibleContainerd(deployJob.Image)
