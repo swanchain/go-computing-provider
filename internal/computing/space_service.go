@@ -1284,7 +1284,7 @@ func handlerYamlStr(content string) (*models.YamlContent, error) {
 }
 
 func parseDockerfileContentForFcp(jobUuid, dockerfileContent string) (*models.DeployJobParam, error) {
-	var deployParam *models.DeployJobParam
+	var deployParam = new(models.DeployJobParam)
 	cpRepoPath, _ := os.LookupEnv("CP_PATH")
 	buildFolder := filepath.Join(cpRepoPath, "build/fcp", jobUuid)
 	if err := os.MkdirAll(buildFolder, os.ModePerm); err != nil {
