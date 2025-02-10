@@ -266,6 +266,7 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 	deployJob.HealthPath = job.HealthPath
 	deployJob.NeedResource = needResource
 	deployJob.IpWhiteList = job.IpWhiteList
+	deployJob.Envs = append(deployJob.Envs, envs...)
 
 	if job.DeployType == 0 {
 		if len(job.RunCommands) == 0 {
@@ -278,9 +279,8 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 			deployJob.Ports = ports
 
 			for k, v := range job.Envs {
-				envs = append(envs, fmt.Sprintf("%s=%s", k, v))
+				deployJob.Envs = append(deployJob.Envs, fmt.Sprintf("%s=%s", k, v))
 			}
-			deployJob.Envs = envs
 		} else {
 			buildParams, err := parseDockerfileConfigForEcp(job)
 			if err != nil {
