@@ -290,7 +290,7 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 			deployJob.Image = buildParams.Image
 			deployJob.Cmd = buildParams.Cmd
 			deployJob.Ports = buildParams.Ports
-			deployJob.Envs = buildParams.Envs
+			deployJob.Envs = append(deployJob.Envs, buildParams.Envs...)
 		}
 	} else if job.DeployType == 1 {
 		buildParams, err := parseDockerfileContentForEcp(job.Uuid, job.DeployContent)
@@ -302,7 +302,7 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		deployJob.BuildImagePath = buildParams.BuildImagePath
 		deployJob.BuildImageName = buildParams.BuildImageName
 		deployJob.Ports = buildParams.Ports
-		deployJob.Envs = buildParams.Envs
+		deployJob.Envs = append(deployJob.Envs, buildParams.Envs...)
 		deployJob.Cmd = buildParams.Cmd
 
 	} else if job.DeployType == 2 {
@@ -318,7 +318,7 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		for k, v := range yamlStruct.Services.Envs {
 			envs = append(envs, fmt.Sprintf("%s=%s", k, v))
 		}
-		deployJob.Envs = envs
+		deployJob.Envs = append(deployJob.Envs, envs...)
 	} else {
 		logs.GetLogger().Errorf("not support deploy type")
 		return
