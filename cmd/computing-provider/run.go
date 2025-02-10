@@ -153,7 +153,6 @@ var infoCmd = &cli.Command{
 				err = fmt.Errorf("get cpAccount info on the chain failed, error: %v", err)
 			}
 
-			fmt.Printf("task-type: %v", cpAccount.TaskTypes)
 			for _, taskType := range cpAccount.TaskTypes {
 				taskTypes += models.TaskTypeStr(int(taskType)) + ", "
 			}
