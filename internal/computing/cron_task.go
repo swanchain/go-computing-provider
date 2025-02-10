@@ -3,6 +3,7 @@ package computing
 import (
 	"context"
 	"fmt"
+	"github.com/swanchain/go-computing-provider/build"
 	"github.com/swanchain/go-computing-provider/internal/contract"
 	"os"
 	"path/filepath"
@@ -41,7 +42,7 @@ func (task *CronTask) RunTask() {
 	task.cleanAbnormalDeployment()
 	task.setFailedUbiTaskStatus()
 	task.watchNameSpaceForDeleted()
-	task.reportClusterResource()
+	//task.reportClusterResource()
 	task.watchExpiredTask()
 	task.getUbiTaskReward()
 	task.checkJobReward()
@@ -50,6 +51,14 @@ func (task *CronTask) RunTask() {
 	task.UpdateContainerLog()
 	task.DeleteSpaceLog()
 
+	resourceExporterVersion, err := NewK8sService().GetResourceExporterVersion()
+	if err != nil {
+		logs.GetLogger().Fatalf("failed to get resource-exporter version, error: %v", err)
+	}
+
+	if resourceExporterVersion != "" && !strings.Contains(resourceExporterVersion, build.ResourceExporterVersion) {
+		logs.GetLogger().Fatalf("resource-exporter current version: %s too low, please upgrade the version to v12.0.0", version)
+	}
 }
 
 func CheckClusterNetworkPolicy() {
@@ -218,7 +227,7 @@ func (task *CronTask) watchNameSpaceForDeleted() {
 func (task *CronTask) cleanImageResource() {
 	if conf.GetConfig().API.AutoDeleteImage {
 		c := cron.New(cron.WithSeconds())
-		c.AddFunc("* 0/30 * * * ?", func() {
+		c.AddFunc("0 0/30 * * * ?", func() {
 			defer func() {
 				if err := recover(); err != nil {
 					logs.GetLogger().Errorf("cleanImageResource catch panic error: %+v", err)
@@ -232,7 +241,7 @@ func (task *CronTask) cleanImageResource() {
 
 func (task *CronTask) watchExpiredTask() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("* 0/10 * * * ?", func() {
+	c.AddFunc("0 0/10 * * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("watchExpiredTask catch panic error: %+v", err)
@@ -549,7 +558,7 @@ func (task *CronTask) CheckCpBalance() {
 
 func (task *CronTask) UpdateContainerLog() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("* 0/10 * * * ?", func() {
+	c.AddFunc("0 0/10 * * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("update container log catch panic error: %+v", err)

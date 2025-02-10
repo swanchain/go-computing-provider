@@ -105,7 +105,7 @@ func (jobServ JobService) UpdateJobEntityByJobUuid(job *models.JobEntity) (err e
 }
 
 func (jobServ JobService) UpdateJobEntityStatusByJobUuid(jobUuid string, status int) (err error) {
-	return jobServ.Where("job_uuid=?", jobUuid).Updates(map[string]interface{}{
+	return jobServ.Model(&models.JobEntity{}).Where("job_uuid=?", jobUuid).Updates(map[string]interface{}{
 		"status": status,
 	}).Error
 }

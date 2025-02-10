@@ -11,7 +11,7 @@ type EcpImageJobReq struct {
 	HealthPath    string            `json:"health_path,omitempty"`
 	Sign          string            `json:"sign,omitempty"`
 	WalletAddress string            `json:"wallet_address,omitempty"`
-	Resource      *HardwareResource `json:"resource,omitempty"`
+	Resource      *ResourceInfo     `json:"resource,omitempty"`
 	Image         string            `json:"image,omitempty"`
 	Cmd           []string          `json:"cmd,omitempty"`
 	Ports         map[string][]int  `json:"ports,omitempty"`
@@ -19,29 +19,34 @@ type EcpImageJobReq struct {
 	RunCommands   []string          `json:"run_commands,omitempty"`
 	ResourceUrl   string            `json:"resource_url,omitempty"`
 	WorkDir       string            `json:"work_dir,omitempty"`
-}
-
-type HardwareResource struct {
-	CPU      int64  `json:"cpu"`
-	Memory   int64  `json:"memory"`
-	Storage  int64  `json:"storage"`
-	GPU      int    `json:"gpu"`
-	GPUModel string `json:"gpu_model"`
+	IpWhiteList   []string          `json:"ip_white_list"`
+	DeployType    int               `json:"deploy_type"` // 0: field; 1: dockerfile; 2: yaml
+	DeployContent string            `json:"deploy_content"`
 }
 
 type DeployJobParam struct {
-	JobType      int // 1 mining; 2: inference
-	Uuid         string
-	Name         string
-	Image        string
-	Cmd          []string
-	Ports        []int
-	HealthPath   string
-	Envs         []string
-	NeedResource container.Resources
+	JobType             int // 1 mining; 2: inference
+	Uuid                string
+	Name                string
+	Image               string
+	Cmd                 []string
+	Ports               []int
+	HealthPath          string
+	Envs                []string
+	NeedResource        container.Resources
+	K8sResourceForImage K8sResourceForImage
 
 	BuildImagePath string
 	BuildImageName string
+	IpWhiteList    []string `json:"ip_white_list"`
+
+	PrepareG []PodGpu
+}
+
+type PodGpu struct {
+	Gname  string
+	Guse   int
+	Gindex []string
 }
 
 type EcpImageResp struct {

@@ -615,7 +615,7 @@ func (d *Deploy) DeployImageToK8s(containerResource models.DeployJobParam) error
 		portArray = append(portArray, int32(p))
 	}
 
-	var envs = d.createEnv()
+	var envs = d.createEnvForImage()
 	for _, v := range containerResource.Envs {
 		splits := strings.Split(v, "=")
 		envs = append(envs, coreV1.EnvVar{
@@ -643,20 +643,22 @@ func (d *Deploy) DeployImageToK8s(containerResource models.DeployJobParam) error
 
 			Template: coreV1.PodTemplateSpec{
 				ObjectMeta: metaV1.ObjectMeta{
-					Labels:    map[string]string{"lad_app": d.jobUuid},
-					Namespace: d.k8sNameSpace,
+					Labels:      map[string]string{"lad_app": d.jobUuid},
+					Namespace:   d.k8sNameSpace,
+					Annotations: generateGpuAnnotation(containerResource.PrepareG),
 				},
-
 				Spec: coreV1.PodSpec{
-					Hostname:     d.spaceName + "-" + generateString(4),
-					NodeSelector: generateLabel(d.gpuProductName),
+					Hostname: d.spaceName + "-" + generateString(4),
+					NodeSelector: map[string]string{
+						"kubernetes.io/hostname": d.gpuProductName,
+					},
 					Containers: []coreV1.Container{
 						{
 							Name:            constants.K8S_PRIVATE_CONTAINER_PREFIX + d.jobUuid,
 							Image:           d.image,
 							ImagePullPolicy: coreV1.PullIfNotPresent,
 							Ports:           ports,
-							Resources:       d.createResources(),
+							Resources:       d.createK8sResourcesForImage(containerResource.K8sResourceForImage),
 							Env:             envs,
 							VolumeMounts:    volumeMounts,
 						},
@@ -690,6 +692,14 @@ func (d *Deploy) DeployImageToK8s(containerResource models.DeployJobParam) error
 	}
 	d.watchContainerRunningTime()
 	return nil
+}
+
+func generateGpuAnnotation(gpus []models.PodGpu) map[string]string {
+	var annotationMap = make(map[string]string)
+	for _, g := range gpus {
+		annotationMap[strings.ReplaceAll(g.Gname, " ", "_")] = strings.Join(g.Gindex, ",")
+	}
+	return annotationMap
 }
 
 func (d *Deploy) deployNamespace() error {
@@ -787,6 +797,73 @@ func (d *Deploy) createResources() coreV1.ResourceRequirements {
 			coreV1.ResourceMemory:           memQuantity,
 			coreV1.ResourceEphemeralStorage: storageQuantity,
 			"nvidia.com/gpu":                resource.MustParse(fmt.Sprintf("%d", d.hardwareResource.Gpu.Quantity)),
+		},
+	}
+}
+
+func (d *Deploy) createEnvForImage(envs ...coreV1.EnvVar) []coreV1.EnvVar {
+	defaultEnv := []coreV1.EnvVar{
+		{
+			Name:  "job_uuid",
+			Value: d.jobUuid,
+		},
+	}
+
+	if d.spaceName != "" {
+		defaultEnv = append(defaultEnv, coreV1.EnvVar{
+			Name:  "space_name",
+			Value: d.spaceName,
+		})
+	}
+
+	if d.hostName != "" {
+		defaultEnv = append(defaultEnv, coreV1.EnvVar{
+			Name:  "result_url",
+			Value: d.hostName,
+		})
+	}
+
+	if len(d.gpuIndex) > 0 {
+		defaultEnv = append(defaultEnv, coreV1.EnvVar{
+			Name:  "NVIDIA_VISIBLE_DEVICES",
+			Value: strings.Join(d.gpuIndex, ","),
+		})
+	}
+
+	defaultEnv = append(defaultEnv, envs...)
+	return defaultEnv
+}
+
+func (d *Deploy) createK8sResourcesForImage(k8sResourceImage models.K8sResourceForImage) coreV1.ResourceRequirements {
+	memQuantity, err := resource.ParseQuantity(fmt.Sprintf("%.fGi", k8sResourceImage.Memory))
+	if err != nil {
+		logs.GetLogger().Error("failed to parse memory, error: %+v", err)
+		return coreV1.ResourceRequirements{}
+	}
+
+	storageQuantity, err := resource.ParseQuantity(fmt.Sprintf("%.fGi", k8sResourceImage.Storage))
+	if err != nil {
+		logs.GetLogger().Error("failed to parse storage, error: %+v", err)
+		return coreV1.ResourceRequirements{}
+	}
+
+	var total int
+	for _, g := range k8sResourceImage.Gpus {
+		total += g.GPU
+	}
+
+	return coreV1.ResourceRequirements{
+		Limits: coreV1.ResourceList{
+			coreV1.ResourceCPU:              *resource.NewQuantity(k8sResourceImage.Cpu, resource.DecimalSI),
+			coreV1.ResourceMemory:           memQuantity,
+			coreV1.ResourceEphemeralStorage: storageQuantity,
+			"nvidia.com/gpu":                resource.MustParse(fmt.Sprintf("%d", total)),
+		},
+		Requests: coreV1.ResourceList{
+			coreV1.ResourceCPU:              *resource.NewQuantity(k8sResourceImage.Cpu, resource.DecimalSI),
+			coreV1.ResourceMemory:           memQuantity,
+			coreV1.ResourceEphemeralStorage: storageQuantity,
+			"nvidia.com/gpu":                resource.MustParse(fmt.Sprintf("%d", total)),
 		},
 	}
 }

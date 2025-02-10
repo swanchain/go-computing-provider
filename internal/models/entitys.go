@@ -155,6 +155,8 @@ const (
 func GetJobStatus(status int) string {
 	var statusStr string
 	switch status {
+	case JOB_FAILED_STATUS:
+		statusStr = "failed"
 	case JOB_REJECTED_STATUS:
 		statusStr = "rejected"
 	case JOB_RECEIVED_STATUS:
@@ -248,6 +250,7 @@ const (
 	Task_TYPE_AI
 	Task_TYPE_INFERENCE
 	Task_TYPE_NODE_PORT
+	Task_TYPE_EXIT = 100
 )
 
 func TaskTypeStr(taskType int) string {
@@ -263,6 +266,9 @@ func TaskTypeStr(taskType int) string {
 		typeStr = "Inference"
 	case Task_TYPE_NODE_PORT:
 		typeStr = "NodePort"
+	case Task_TYPE_EXIT:
+		typeStr = "Exit"
+
 	}
 	return typeStr
 }
@@ -280,7 +286,7 @@ type CpInfoEntity struct {
 	CreateAt           string   `json:"create_at" gorm:"create_at"`
 	UpdateAt           string   `json:"update_at" gorm:"update_at"`
 	MultiAddresses     []string `json:"multi_addresses" gorm:"-"`
-	TaskTypes          []uint8  `json:"task_types" gorm:"-"` // 1:Fil-C2-512M, 2:mining, 3: AI, 4:Fil-C2-32G
+	TaskTypes          []uint8  `json:"task_types" gorm:"-"` // 1:Fil-C2-512M, 2:mining, 3: AI, 4:Fil-C2-32G, 5:NodePort, 100:Exit
 
 }
 
@@ -359,8 +365,8 @@ type EcpJobEntity struct {
 	Memory          int64   `json:"memory"`
 	Storage         int64   `json:"storage"`
 	GpuName         string  `json:"gpu_name"`
-	GpuIndex        string  `json:"gpu_index"  gorm:"type:json"`
-	ContainerName   string  `json:"container_name" gorm:"container_name"`
+	GpuIndex        string  `json:"gpu_index"  gorm:"type:json"`          // =
+	ContainerName   string  `json:"container_name" gorm:"container_name"` // =
 	HealthUrlPath   string  `json:"health_url_path"`
 	ServiceUrl      string  `json:"service_url" gorm:"service_url"`
 	PortMap         string  `json:"port_map" gorm:"port_map"`
@@ -375,6 +381,8 @@ const (
 )
 
 const (
+	FailedStatus     = "failed"
+	RejectStatus     = "rejected"
 	CreatedStatus    = "created"
 	RunningStatus    = "running"
 	TerminatedStatus = "terminated"

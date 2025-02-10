@@ -2,6 +2,7 @@ package computing
 
 import "C"
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -11,6 +12,7 @@ import (
 	"github.com/docker/go-connections/nat"
 	"github.com/filswan/go-swan-lib/logs"
 	"github.com/gin-gonic/gin"
+	"github.com/moby/buildkit/frontend/dockerfile/parser"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/contract"
 	"github.com/swanchain/go-computing-provider/internal/models"
@@ -61,7 +63,7 @@ func (*ImageJobService) CheckJobCondition(c *gin.Context) {
 		}
 	}
 
-	receive, _, _, _, _, _, err := checkResourceForImage(job.Uuid, job.Resource)
+	receive, _, _, _, _, _, _, err := checkResourceForImageAndMutilGpu(job.Uuid, job.Resource)
 	if receive {
 		c.JSON(http.StatusOK, util.CreateSuccessResponse(map[string]interface{}{
 			"price": totalCost,
@@ -111,12 +113,14 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 	}
 
 	if !CheckWalletWhiteListForEcp(job.WalletAddress) {
+		NewEcpJobService().UpdateEcpJobEntity(job.Uuid, models.RejectStatus)
 		logs.GetLogger().Errorf("This cp does not accept tasks from wallet addresses outside the whitelist")
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SpaceCheckWhiteListError))
 		return
 	}
 
 	if CheckWalletBlackListForEcp(job.WalletAddress) {
+		NewEcpJobService().UpdateEcpJobEntity(job.Uuid, models.RejectStatus)
 		logs.GetLogger().Errorf("This cp does not accept tasks from wallet addresses inside the blacklist")
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.SpaceCheckBlackListError))
 		return
@@ -138,7 +142,7 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "invalidate value: [job_type], support: 1 or 2"))
 		return
 	}
-	if job.Image == "" {
+	if job.Image == "" && job.DeployType != 1 && job.DeployType != 2 {
 		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [image]"))
 	}
 
@@ -164,6 +168,8 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 			if job.Price == "-1" && job.JobType == models.MiningJobType {
 				taskEntity.Status = models.TASK_FAILED_STATUS
 				NewTaskService().SaveTaskEntity(taskEntity)
+			} else {
+				NewEcpJobService().UpdateEcpJobEntity(job.Uuid, models.RejectStatus)
 			}
 			logs.GetLogger().Errorf("failed to verifySignature for ecp job, error: %+v", err)
 			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
@@ -175,6 +181,8 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 			if job.Price == "-1" && job.JobType == models.MiningJobType {
 				taskEntity.Status = models.TASK_REJECTED_STATUS
 				NewTaskService().SaveTaskEntity(taskEntity)
+			} else {
+				NewEcpJobService().UpdateEcpJobEntity(job.Uuid, models.RejectStatus)
 			}
 			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "signature verify failed"))
 			return
@@ -192,21 +200,20 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		}
 
 		if !checkPriceFlag {
-			if job.Price == "-1" && job.JobType == models.MiningJobType {
-				taskEntity.Status = models.TASK_REJECTED_STATUS
-				NewTaskService().SaveTaskEntity(taskEntity)
-			}
+			NewEcpJobService().UpdateEcpJobEntity(job.Uuid, models.RejectStatus)
 			logs.GetLogger().Errorf("bid below the set price, job_uuid: %s, pid: %s, need: %0.4f", job.Uuid, job.Price, totalCost)
 			c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.BelowPriceError))
 			return
 		}
 	}
 
-	isReceive, _, needCpu, _, indexs, noAvailableMsgs, err := checkResourceForImage(job.Uuid, job.Resource)
+	isReceive, _, needCpu, _, indexs, gIndexStr, noAvailableMsgs, err := checkResourceForImageAndMutilGpu(job.Uuid, job.Resource)
 	if err != nil {
 		if job.Price == "-1" && job.JobType == models.MiningJobType {
 			taskEntity.Status = models.TASK_FAILED_STATUS
 			NewTaskService().SaveTaskEntity(taskEntity)
+		} else {
+			NewEcpJobService().UpdateEcpJobEntity(job.Uuid, models.FailedStatus)
 		}
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
 		return
@@ -215,6 +222,8 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		if job.Price == "-1" && job.JobType == models.MiningJobType {
 			taskEntity.Status = models.TASK_REJECTED_STATUS
 			NewTaskService().SaveTaskEntity(taskEntity)
+		} else {
+			NewEcpJobService().UpdateEcpJobEntity(job.Uuid, models.RejectStatus)
 		}
 		logs.GetLogger().Warnf("job_uuid: %s, name: %s, msg: %s", job.Uuid, job.Name, strings.Join(noAvailableMsgs, ";"))
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError, strings.Join(noAvailableMsgs, ";")))
@@ -224,14 +233,8 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 	var envs []string
 	var needResource container.Resources
 	var useIndexs []string
-	if job.Resource.GPUModel != "" && job.Resource.GPU > 0 {
-		for i := 0; i < job.Resource.GPU; i++ {
-			if i >= len(indexs) {
-				break
-			}
-			useIndexs = append(useIndexs, indexs[i])
-		}
-		envs = append(envs, fmt.Sprintf("CUDA_VISIBLE_DEVICES=%s", strings.Join(useIndexs, ",")))
+	if len(job.Resource.Gpus) > 0 {
+		envs = append(envs, fmt.Sprintf("CUDA_VISIBLE_DEVICES=%s", strings.Join(indexs, ",")))
 		needResource = container.Resources{
 			CPUQuota: needCpu * 100000,
 			Memory:   job.Resource.Memory,
@@ -262,30 +265,63 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 	deployJob.JobType = job.JobType
 	deployJob.HealthPath = job.HealthPath
 	deployJob.NeedResource = needResource
+	deployJob.IpWhiteList = job.IpWhiteList
+	deployJob.Envs = append(deployJob.Envs, envs...)
 
-	if len(job.RunCommands) == 0 {
-		deployJob.Image = job.Image
-		deployJob.Cmd = job.Cmd
-		var ports []int
-		for _, p := range job.Ports {
-			ports = append(ports, p...)
-		}
-		deployJob.Ports = ports
+	if job.DeployType == 0 {
+		if len(job.RunCommands) == 0 {
+			deployJob.Image = job.Image
+			deployJob.Cmd = job.Cmd
+			var ports []int
+			for _, p := range job.Ports {
+				ports = append(ports, p...)
+			}
+			deployJob.Ports = ports
 
-		for k, v := range job.Envs {
-			envs = append(envs, fmt.Sprintf("%s=%s", k, v))
+			for k, v := range job.Envs {
+				deployJob.Envs = append(deployJob.Envs, fmt.Sprintf("%s=%s", k, v))
+			}
+		} else {
+			buildParams, err := parseDockerfileConfigForEcp(job)
+			if err != nil {
+				logs.GetLogger().Errorln(err)
+				return
+			}
+			deployJob.Image = buildParams.Image
+			deployJob.Cmd = buildParams.Cmd
+			deployJob.Ports = buildParams.Ports
+			deployJob.Envs = append(deployJob.Envs, buildParams.Envs...)
 		}
-		deployJob.Envs = envs
-	} else {
-		buildParams, err := parseDockerfileConfigForEcp(job)
+	} else if job.DeployType == 1 {
+		buildParams, err := parseDockerfileContentForEcp(job.Uuid, job.DeployContent)
 		if err != nil {
 			logs.GetLogger().Errorln(err)
 			return
 		}
-		deployJob.Image = buildParams.Image
-		deployJob.Cmd = buildParams.Cmd
+		deployJob.Image = buildParams.BuildImageName
+		deployJob.BuildImagePath = buildParams.BuildImagePath
+		deployJob.BuildImageName = buildParams.BuildImageName
 		deployJob.Ports = buildParams.Ports
-		deployJob.Envs = buildParams.Envs
+		deployJob.Envs = append(deployJob.Envs, buildParams.Envs...)
+		deployJob.Cmd = buildParams.Cmd
+
+	} else if job.DeployType == 2 {
+		yamlStruct, err := handlerYamlStr(job.DeployContent)
+		if err != nil {
+			logs.GetLogger().Errorf("failed to parse yaml content, job_uuid: %s, error: %v", deployJob.Uuid, err)
+			return
+		}
+
+		deployJob.Image = yamlStruct.Services.Image
+		deployJob.Cmd = yamlStruct.Services.Cmd
+		deployJob.Ports = yamlStruct.Services.ExposePort
+		for k, v := range yamlStruct.Services.Envs {
+			envs = append(envs, fmt.Sprintf("%s=%s", k, v))
+		}
+		deployJob.Envs = append(deployJob.Envs, envs...)
+	} else {
+		logs.GetLogger().Errorf("not support deploy type")
+		return
 	}
 
 	if job.Price == "-1" {
@@ -315,6 +351,11 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 			}
 		}
 	} else {
+		var gNameStr string
+		for _, g := range job.Resource.Gpus {
+			gNameStr += g.GPUModel + "="
+		}
+
 		if err = NewEcpJobService().SaveEcpJobEntity(&models.EcpJobEntity{
 			Uuid:          job.Uuid,
 			Name:          job.Name,
@@ -325,8 +366,8 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 			Cpu:           job.Resource.CPU,
 			Memory:        job.Resource.Memory,
 			Storage:       job.Resource.Storage,
-			GpuName:       job.Resource.GPUModel,
-			GpuIndex:      strings.Join(useIndexs, ","),
+			GpuName:       gNameStr,
+			GpuIndex:      gIndexStr,
 			Status:        models.CreatedStatus,
 			HealthUrlPath: job.HealthPath,
 			CreateTime:    time.Now().Unix(),
@@ -350,6 +391,83 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		imageJob.DeployInference(c, deployJob, totalCost, logUrl)
 		return
 	}
+}
+
+func doMiningTask(c *gin.Context, zkTask models.ZkTaskReq, taskEntity *models.TaskEntity) {
+	if strings.TrimSpace(zkTask.Uuid) == "" {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [uuid]"))
+		return
+	}
+	if strings.TrimSpace(zkTask.Name) == "" {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [name]"))
+		return
+	}
+	if zkTask.Resource == nil {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [resource]"))
+		return
+	}
+	if zkTask.Image == "" {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: [image]"))
+	}
+
+	isReceive, _, needCpu, _, indexs, _, noAvailableMsgs, err := checkResourceForImageAndMutilGpu(zkTask.Uuid, zkTask.Resource)
+	if err != nil {
+		taskEntity.Status = models.TASK_FAILED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
+		return
+	}
+	if !isReceive {
+		taskEntity.Status = models.TASK_REJECTED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
+		logs.GetLogger().Warnf("job_uuid: %s, name: %s, msg: %s", zkTask.Uuid, zkTask.Name, strings.Join(noAvailableMsgs, ";"))
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError, strings.Join(noAvailableMsgs, ";")))
+		return
+	}
+
+	var envs []string
+	var needResource container.Resources
+	var useIndexs []string
+	if len(zkTask.Resource.Gpus) > 0 {
+		envs = append(envs, fmt.Sprintf("CUDA_VISIBLE_DEVICES=%s", strings.Join(indexs, ",")))
+		needResource = container.Resources{
+			CPUQuota: needCpu * 100000,
+			Memory:   zkTask.Resource.Memory,
+			DeviceRequests: []container.DeviceRequest{
+				{
+					Driver:       "nvidia",
+					DeviceIDs:    useIndexs,
+					Capabilities: [][]string{{"compute", "utility"}},
+				},
+			},
+		}
+	} else {
+		needResource = container.Resources{
+			CPUQuota: needCpu * 100000,
+			Memory:   zkTask.Resource.Memory,
+		}
+	}
+
+	var deployJob models.DeployJobParam
+	deployJob.Uuid = zkTask.Uuid
+	deployJob.Name = zkTask.Name
+	deployJob.JobType = models.MiningJobType
+	deployJob.NeedResource = needResource
+
+	for k, v := range zkTask.Envs {
+		envs = append(envs, fmt.Sprintf("%s=%s", k, v))
+	}
+	deployJob.Envs = envs
+	deployJob.Image = zkTask.Image
+
+	var logUrl string
+	multiAddressSplit := strings.Split(conf.GetConfig().API.MultiAddress, "/")
+	if len(multiAddressSplit) >= 4 {
+		logUrl = fmt.Sprintf("http://%s:%s/api/v1/computing/cp/job/log?job_uuid=%s&expire_time=60", multiAddressSplit[2], multiAddressSplit[4], zkTask.Uuid)
+	}
+
+	NewImageJobService().DeployMining(c, deployJob, 0, logUrl, "-1")
+	return
 }
 
 func (*ImageJobService) GetJobStatus(c *gin.Context) {
@@ -564,6 +682,15 @@ func (*ImageJobService) DeployInference(c *gin.Context, deployJob models.DeployJ
 			fmt.Sprintf("traefik.http.routers.%s.entrypoints", containerName): "web",
 			fmt.Sprintf("traefik.http.routers.%s.rule", containerName):        fmt.Sprintf("Host(`%s`)", apiUrl),
 		}
+
+		if len(deployJob.IpWhiteList) > 0 {
+			whiteListName := fmt.Sprintf("%s-ipallowlist", prefixStr)
+			whiteListKey := fmt.Sprintf("traefik.http.middlewares.%s.ipallowlist.sourcerange", whiteListName)
+			labelMap[whiteListKey] = strings.Join(deployJob.IpWhiteList, ",")
+
+			whiteRuleName := fmt.Sprintf("traefik.http.routers.%s.middlewares", containerName)
+			labelMap[whiteRuleName] = whiteListName
+		}
 		apiUrl += fmt.Sprintf(":%d", traefikListenPortMapHost)
 	}
 
@@ -585,7 +712,8 @@ func (*ImageJobService) DeployInference(c *gin.Context, deployJob models.DeployJ
 			Resources:  deployJob.NeedResource,
 			Privileged: true,
 		}
-		containerConfig := &container.Config{
+
+		var containerConfig = &container.Config{
 			Image:        deployJob.Image,
 			Env:          deployJob.Envs,
 			Cmd:          deployJob.Cmd,
@@ -727,7 +855,7 @@ func parsePortRanges(portRanges []string) ([]int, error) {
 	return ports, nil
 }
 
-func checkPriceForDocker(userPrice string, duration int, resource *models.HardwareResource) (bool, float64, error) {
+func checkPriceForDocker(userPrice string, duration int, resource *models.ResourceInfo) (bool, float64, error) {
 	priceConfig, err := ReadPriceConfig()
 	if err != nil {
 		return false, 0, err
@@ -751,16 +879,33 @@ func checkPriceForDocker(userPrice string, duration int, resource *models.Hardwa
 	if err != nil {
 		return false, 0, fmt.Errorf("failed to converting Storage price: %v", err)
 	}
-	gpuPrice, err := parsePrice(priceConfig.TARGET_GPU_DEFAULT)
-	if err != nil {
-		return false, 0, fmt.Errorf("failed to converting GPU price: %v", err)
+
+	var gpuPriceStr string
+	var gpuPrice float64
+	var gpuCost float64
+	for _, g := range resource.Gpus {
+		if len(priceConfig.GpusPrice) != 0 {
+			gpuName := strings.ReplaceAll(g.GPUModel, "NVIDIA ", "")
+			gpuName = strings.ReplaceAll(gpuName, " ", "_")
+			key := "TARGET_GPU_" + gpuName
+			if price, ok := priceConfig.GpusPrice[key]; ok {
+				gpuPriceStr = price
+			}
+		}
+		if gpuPriceStr == "" {
+			gpuPriceStr = priceConfig.TARGET_GPU_DEFAULT
+		}
+		gpuPrice, err = parsePrice(priceConfig.TARGET_GPU_DEFAULT)
+		if err != nil {
+			return false, 0, fmt.Errorf("failed to converting GPU price: %v", err)
+		}
+		gpuCost += float64(g.GPU) * gpuPrice * float64(duration/3600)
 	}
 
 	// Calculate total cost
 	cpuCost := float64(resource.CPU) * cpuPrice
 	memoryCost := formatGiB(resource.Memory) * memoryPrice
 	storageCost := formatGiB(resource.Storage) * storagePrice
-	gpuCost := float64(resource.GPU) * gpuPrice
 
 	totalCost := cpuCost + memoryCost + storageCost + gpuCost
 
@@ -773,28 +918,36 @@ func checkPriceForDocker(userPrice string, duration int, resource *models.Hardwa
 	return userPayPrice >= totalCost, totalCost, nil
 }
 
-func checkResourceForImage(jobUud string, resource *models.HardwareResource) (bool, string, int64, int64, []string, []string, error) {
+func checkResourceForImageAndMutilGpu(jobUud string, resource *models.ResourceInfo) (bool, string, int64, int64, []string, string, []string, error) {
 	list, err := NewEcpJobService().GetEcpJobList([]string{models.CreatedStatus, models.RunningStatus})
 	if err != nil {
-		return false, "", 0, 0, nil, nil, err
+		return false, "", 0, 0, nil, "", nil, err
 	}
 
 	var taskGpuMap = make(map[string][]string)
 	for _, g := range list {
-		if len(strings.TrimSpace(g.GpuIndex)) > 0 {
-			taskGpuMap[g.GpuName] = append(taskGpuMap[g.GpuName], strings.Split(strings.TrimSpace(g.GpuIndex), ",")...)
+		if strings.Contains(g.GpuName, "=") {
+			splitG := strings.Split(g.GpuName, "=")
+			splitGIndex := strings.Split(g.GpuIndex, "=")
+			for i, sg := range splitG {
+				if strings.Contains(strings.TrimSpace(splitGIndex[i]), ",") {
+					taskGpuMap[sg] = append(taskGpuMap[sg], strings.Split(strings.TrimSpace(splitGIndex[i]), ",")...)
+				} else {
+					taskGpuMap[sg] = append(taskGpuMap[sg], strings.TrimSpace(splitGIndex[i]))
+				}
+			}
 		}
 	}
 
 	dockerService := NewDockerService()
 	containerLogStr, err := dockerService.ContainerLogs("resource-exporter")
 	if err != nil {
-		return false, "", 0, 0, nil, nil, err
+		return false, "", 0, 0, nil, "", nil, err
 	}
 
 	var nodeResource models.NodeResource
 	if err := json.Unmarshal([]byte(containerLogStr), &nodeResource); err != nil {
-		return false, "", 0, 0, nil, nil, err
+		return false, "", 0, 0, nil, "", nil, err
 	}
 
 	needCpu := resource.CPU
@@ -805,7 +958,7 @@ func checkResourceForImage(jobUud string, resource *models.HardwareResource) (bo
 
 	}
 	if resource.Storage > 0 {
-		needMemory = formatGiB(resource.Storage)
+		needStorage = formatGiB(resource.Storage)
 	}
 
 	remainderCpu, _ := strconv.ParseInt(nodeResource.Cpu.Free, 10, 64)
@@ -849,7 +1002,14 @@ func checkResourceForImage(jobUud string, resource *models.HardwareResource) (bo
 		}
 	}
 
-	logs.GetLogger().Infof("checkResourceForImage: needCpu: %d, needMemory: %.2f, needStorage: %.2f, needGpu: %d, gpuName: %s", needCpu, needMemory, needStorage, resource.GPU, resource.GPUModel)
+	var reqGpuMap = make(map[string]int)
+	var needGpu int
+	for _, g := range resource.Gpus {
+		reqGpuMap[g.GPUModel] = g.GPU
+		needGpu += g.GPU
+	}
+
+	logs.GetLogger().Infof("checkResourceForImage: needCpu: %d, needMemory: %.2f, needStorage: %.2f, needGpu: %v", needCpu, needMemory, needStorage, reqGpuMap)
 	logs.GetLogger().Infof("checkResourceForImage: remainingCpu: %d, remainingMemory: %.2f, remainingStorage: %.2f, remainingGpu: %+v", remainderCpu, remainderMemory, remainderStorage, gpuMap)
 
 	var noAvailableStr []string
@@ -863,33 +1023,42 @@ func checkResourceForImage(jobUud string, resource *models.HardwareResource) (bo
 		noAvailableStr = append(noAvailableStr, fmt.Sprintf("storage need: %f, remainder: %f", needStorage, remainderStorage))
 	}
 
-	if resource.GPUModel != "" {
-		var newGpuIndex []string
-		var flag bool
-		for k, gd := range gpuMap {
-			if strings.ToUpper(k) == resource.GPUModel && gd.num > 0 {
-				newGpuIndex = gd.indexs
-				flag = true
-				break
+	var newGpuIndex []string
+	var count int
+	var gStr string
+	for _, reqG := range resource.Gpus {
+		var gIndex []string
+		if reqG.GPUModel != "" {
+			var flags bool
+			for k, gd := range gpuMap {
+				if strings.ToUpper(k) == reqG.GPUModel && reqG.GPU <= gd.num {
+					gIndex = gd.indexs[:reqG.GPU]
+					newGpuIndex = append(newGpuIndex, gIndex...)
+					flags = true
+					count += reqG.GPU
+					gStr += strings.Join(gIndex, ",") + "="
+					break
+				} else {
+					gIndex = gd.indexs
+				}
 			}
-		}
-		if flag {
-			return true, nodeResource.CpuName, needCpu, int64(needMemory), newGpuIndex, nil, nil
-		} else {
-			noAvailableStr = append(noAvailableStr, fmt.Sprintf("gpu need name:%s, num:%d, remainder:%d", resource.GPUModel, resource.GPU, len(newGpuIndex)))
-			logs.GetLogger().Warnf("the task_uuid: %s resource is not available. Reason: %s",
-				jobUud, strings.Join(noAvailableStr, ";"))
-			return false, nodeResource.CpuName, needCpu, int64(needMemory), newGpuIndex, noAvailableStr, nil
+			if !flags {
+				noAvailableStr = append(noAvailableStr, fmt.Sprintf("gpu need name:%s, num:%d, remainder:%d", reqG.GPUModel, reqG.GPU, len(gIndex)))
+			}
 		}
 	}
 
+	if len(resource.Gpus) > 0 && count == needGpu {
+		return true, nodeResource.CpuName, needCpu, int64(needMemory), newGpuIndex, gStr, nil, nil
+	}
+
 	if len(noAvailableStr) == 0 {
-		return true, nodeResource.CpuName, needCpu, int64(needMemory), indexs, nil, nil
+		return true, nodeResource.CpuName, needCpu, int64(needMemory), newGpuIndex, gStr, nil, nil
 	}
 
 	logs.GetLogger().Warnf("the task_uuid: %s resource is not available. Reason: %s",
 		jobUud, strings.Join(noAvailableStr, ";"))
-	return false, nodeResource.CpuName, needCpu, int64(needMemory), indexs, noAvailableStr, nil
+	return false, nodeResource.CpuName, needCpu, int64(needMemory), indexs, "", noAvailableStr, nil
 }
 
 func parsePrice(priceStr string) (float64, error) {
@@ -974,6 +1143,100 @@ func CheckWalletBlackListForEcp(walletAddress string) bool {
 		}
 	}
 	return false
+}
+
+func parseDockerfileContentForEcp(jobUuid, dockerfileContent string) (*models.DeployJobParam, error) {
+	var deployParam = new(models.DeployJobParam)
+
+	cpRepoPath, _ := os.LookupEnv("CP_PATH")
+	buildFolder := filepath.Join(cpRepoPath, "build/ecp", jobUuid)
+	if err := os.MkdirAll(buildFolder, os.ModePerm); err != nil {
+		return nil, fmt.Errorf("failed to create dir, error: %v", err)
+	}
+	dockerfileFile := filepath.Join(buildFolder, "Dockerfile")
+	err := os.WriteFile(dockerfileFile, []byte(dockerfileContent), 0644)
+	if err != nil {
+		return nil, fmt.Errorf("failed to save Dockerfile: %v", err)
+	}
+
+	imageName := fmt.Sprintf("ecp-image/%s:%d", jobUuid, time.Now().Unix())
+	if conf.GetConfig().Registry.ServerAddress != "" {
+		imageName = fmt.Sprintf("%s/%s:%d",
+			strings.TrimSpace(conf.GetConfig().Registry.ServerAddress), jobUuid, time.Now().Unix())
+	}
+	imageName = strings.ToLower(imageName)
+
+	if _, err := os.Stat(dockerfileFile); err != nil {
+		return nil, fmt.Errorf("failed not found Dockerfile, path: %s", dockerfileFile)
+	}
+
+	ports, envVars, cmds, err := parseDockerfile(dockerfileFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse dockerfile, path: %s", dockerfileFile)
+	}
+
+	deployParam.Cmd = cmds
+	deployParam.BuildImagePath = buildFolder
+	deployParam.BuildImageName = imageName
+	deployParam.Ports = ports
+	deployParam.Envs = envVars
+	return deployParam, nil
+}
+
+func parseDockerfile(filePath string) (exposedPorts []int, envVars []string, cmd []string, err error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	defer file.Close()
+
+	result, err := parser.Parse(file)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	for _, child := range result.AST.Children {
+		switch strings.ToUpper(child.Value) {
+		case "EXPOSE":
+			if child.Next == nil {
+				continue
+			}
+			ports := strings.Fields(child.Next.Value)
+			for _, port := range ports {
+				parseInt, err := strconv.Atoi(port)
+				if err != nil {
+					return nil, nil, nil, fmt.Errorf("failed to parse EXPOSE port: %v", err)
+				}
+				exposedPorts = append(exposedPorts, parseInt)
+			}
+
+		case "ENV":
+			if child.Next == nil {
+				continue
+			}
+			scanner := bufio.NewScanner(strings.NewReader(child.Next.Value))
+			for scanner.Scan() {
+				line := scanner.Text()
+				parts := strings.Fields(line)
+				if len(parts) < 2 {
+					continue
+				}
+				key := parts[0]
+				value := strings.Join(parts[1:], " ")
+				envVars = append(envVars, fmt.Sprintf("%s=%s", key, value))
+			}
+
+		case "CMD":
+			cmdStr := child.Original
+			cmdStr = cmdStr[strings.Index(cmdStr, "["):]
+			err := json.Unmarshal([]byte(cmdStr), &cmd)
+			if err != nil {
+				logs.GetLogger().Errorf("%v", err)
+				continue
+			}
+		}
+	}
+	return exposedPorts, envVars, cmd, nil
 }
 
 func parseDockerfileConfigForEcp(job models.EcpImageJobReq) (*models.DeployJobParam, error) {

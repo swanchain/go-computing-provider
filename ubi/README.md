@@ -29,7 +29,7 @@ curl -fsSL https://raw.githubusercontent.com/swanchain/go-computing-provider/rel
 ## Install ECP and Init CP Account
 - Download `computing-provider`
 ```bash
-wget https://github.com/swanchain/go-computing-provider/releases/download/v1.0.2/computing-provider
+wget https://github.com/swanchain/go-computing-provider/releases/download/v1.1.0/computing-provider
 ```
 
 - Initialize ECP repo
@@ -66,7 +66,7 @@ Output:
                     --beneficiaryAddress <YOUR_BENEFICIAERY_ADDRESS>  \
                     --task-types 1,2,4
 ```
-**Note:** `--task-types`: Supports 5 task types (1: Fil-C2, 2: Mining, 3: AI, 4: Inference, 5: NodePort), separated by commas. For ECP, it needs to be set to 1,2,4.
+**Note:** `--task-types`: Supports 5 task types (1: Fil-C2, 2: Mining, 3: AI, 4: Inference, 5: NodePort, 100: Exit), separated by commas. For ECP, it needs to be set to 1,2,4.
 - Collateral `SWAN` for ECP
 ```bash
 computing-provider collateral add --ecp --from <YOUR_WALLET_ADDRESS>  <AMOUNT>   
