@@ -1361,16 +1361,15 @@ func GetCpResource(c *gin.Context) {
 	}
 
 	var taskGpuMap = make(map[string][]string)
-	for i, g := range list {
-		fmt.Printf("GpuName: %s, GpuIndex: %s \n", g.GpuName, g.GpuIndex)
+	for _, g := range list {
 		if strings.Contains(g.GpuName, "=") {
 			splitG := strings.Split(g.GpuName, "=")
 			splitGIndex := strings.Split(g.GpuIndex, "=")
-			for _, sg := range splitG {
-				if strings.Contains(strings.TrimSpace(splitGIndex[i]), ",") {
-					taskGpuMap[sg] = append(taskGpuMap[sg], strings.Split(strings.TrimSpace(splitGIndex[i]), ",")...)
+			for j, sg := range splitG {
+				if strings.Contains(strings.TrimSpace(splitGIndex[j]), ",") {
+					taskGpuMap[sg] = append(taskGpuMap[sg], strings.Split(strings.TrimSpace(splitGIndex[j]), ",")...)
 				} else {
-					taskGpuMap[sg] = append(taskGpuMap[sg], strings.TrimSpace(splitGIndex[i]))
+					taskGpuMap[sg] = append(taskGpuMap[sg], strings.TrimSpace(splitGIndex[j]))
 				}
 			}
 		}

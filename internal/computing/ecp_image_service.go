@@ -925,11 +925,11 @@ func checkResourceForImageAndMutilGpu(jobUud string, resource *models.ResourceIn
 	}
 
 	var taskGpuMap = make(map[string][]string)
-	for i, g := range list {
+	for _, g := range list {
 		if strings.Contains(g.GpuName, "=") {
 			splitG := strings.Split(g.GpuName, "=")
 			splitGIndex := strings.Split(g.GpuIndex, "=")
-			for _, sg := range splitG {
+			for i, sg := range splitG {
 				if strings.Contains(strings.TrimSpace(splitGIndex[i]), ",") {
 					taskGpuMap[sg] = append(taskGpuMap[sg], strings.Split(strings.TrimSpace(splitGIndex[i]), ",")...)
 				} else {
