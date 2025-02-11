@@ -4,6 +4,7 @@ go 1.22.3
 
 require (
 	github.com/BurntSushi/toml v1.3.2
+	github.com/Masterminds/semver v1.4.2
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d
 	github.com/containerd/containerd v1.7.23
 	github.com/docker/docker v27.5.0+incompatible

@@ -17,7 +17,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -174,8 +173,11 @@ var daemonCmd = &cli.Command{
 		if err != nil {
 			return fmt.Errorf("check %s container failed, error: %v", resourceExporterContainerName, err)
 		}
-		if version != "" && !strings.Contains(version, build.ResourceExporterVersion) {
-			logs.GetLogger().Fatalf("resource-exporter current version: %s too low, please upgrade the version to v12.0.0", version)
+
+		if version != "" {
+			if errMsg := util.CheckVersion(build.ResourceExporterVersion, version); errMsg != nil {
+				logs.GetLogger().Fatalf("resource-exporter %s", errMsg)
+			}
 		}
 
 		if !rsExist {
