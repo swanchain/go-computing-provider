@@ -232,7 +232,6 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 
 	var envs []string
 	var needResource container.Resources
-	var useIndexs []string
 	if len(job.Resource.Gpus) > 0 {
 		envs = append(envs, fmt.Sprintf("CUDA_VISIBLE_DEVICES=%s", strings.Join(indexs, ",")))
 		needResource = container.Resources{
@@ -241,7 +240,7 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 			DeviceRequests: []container.DeviceRequest{
 				{
 					Driver:       "nvidia",
-					DeviceIDs:    useIndexs,
+					DeviceIDs:    indexs,
 					Capabilities: [][]string{{"compute", "utility"}},
 				},
 			},
@@ -427,7 +426,6 @@ func doMiningTask(c *gin.Context, zkTask models.ZkTaskReq, taskEntity *models.Ta
 
 	var envs []string
 	var needResource container.Resources
-	var useIndexs []string
 	if len(zkTask.Resource.Gpus) > 0 {
 		envs = append(envs, fmt.Sprintf("CUDA_VISIBLE_DEVICES=%s", strings.Join(indexs, ",")))
 		needResource = container.Resources{
@@ -436,7 +434,7 @@ func doMiningTask(c *gin.Context, zkTask models.ZkTaskReq, taskEntity *models.Ta
 			DeviceRequests: []container.DeviceRequest{
 				{
 					Driver:       "nvidia",
-					DeviceIDs:    useIndexs,
+					DeviceIDs:    indexs,
 					Capabilities: [][]string{{"compute", "utility"}},
 				},
 			},
