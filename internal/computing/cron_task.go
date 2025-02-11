@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/swanchain/go-computing-provider/build"
 	"github.com/swanchain/go-computing-provider/internal/contract"
+	"github.com/swanchain/go-computing-provider/util"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -55,9 +56,10 @@ func (task *CronTask) RunTask() {
 	if err != nil {
 		logs.GetLogger().Fatalf("failed to get resource-exporter version, error: %v", err)
 	}
-
-	if resourceExporterVersion != "" && !strings.Contains(resourceExporterVersion, build.ResourceExporterVersion) {
-		logs.GetLogger().Fatalf("resource-exporter current version: %s too low, please upgrade the version to v12.0.0", version)
+	if resourceExporterVersion != "" {
+		if errMsg := util.CheckVersion(build.ResourceExporterVersion, resourceExporterVersion); errMsg != nil {
+			logs.GetLogger().Fatalf("resource-exporter %s", errMsg)
+		}
 	}
 }
 

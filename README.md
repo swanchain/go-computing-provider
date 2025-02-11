@@ -283,25 +283,34 @@ cat <<EOF | kubectl apply -f -
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  namespace: kube-system
-  name: resource-exporter-ds
-  labels:
-    app: resource-exporter
+namespace: kube-system
+name: resource-exporter-ds
+labels:
+  app: resource-exporter
 spec:
-  selector:
-    matchLabels:
-      app: resource-exporter
-  template:
-    metadata:
-      labels:
-       app: resource-exporter
-    spec:
-      containers:
-      - name: resource-exporter
-        image: filswan/resource-exporter:v12.0.0
-        imagePullPolicy: IfNotPresent
-        securityContext:
-          privileged: true
+selector:
+  matchLabels:
+	app: resource-exporter
+template:
+  metadata:
+	labels:
+	  app: resource-exporter
+  spec:
+	containers:
+	  - name: resource-exporter
+		image: filswan/resource-exporter:v12.0.0
+		imagePullPolicy: IfNotPresent
+		securityContext:
+		  privileged: true
+		volumeMounts:
+		  - name: machine-id
+			mountPath: /etc/machine-id
+			readOnly: true
+	volumes:
+	  - name: machine-id
+		hostPath:
+		  path: /etc/machine-id
+		  type: File
 EOF
 ```
 If you have installed it correctly, you can see the result shown in the figure by the command:

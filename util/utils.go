@@ -2,6 +2,7 @@ package util
 
 import (
 	"fmt"
+	"github.com/Masterminds/semver"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -57,4 +58,16 @@ func IsPortAvailable(port int) bool {
 		return false
 	}
 	return true
+}
+
+func CheckVersion(targetVersionStr, versionStr string) error {
+	version, err := semver.NewVersion(versionStr)
+	if err != nil {
+		return fmt.Errorf("invalid version format: %v", err)
+	}
+	targetVersion := semver.MustParse(targetVersionStr)
+	if version.LessThan(targetVersion) {
+		return fmt.Errorf("version is too low: %s (required >= %s)", version, targetVersionStr)
+	}
+	return nil
 }
