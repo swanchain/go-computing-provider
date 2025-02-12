@@ -1566,7 +1566,7 @@ func checkResourceAvailableForSpace(jobUuid string, jobType int, resourceConfig 
 		return false, "", nil, 0, nil, err
 	}
 
-	nodeGpuSummary, err := k8sService.GetNodeGpuSummary(context.TODO())
+	nodeGpuSummary, nodeNameMachineId, err := k8sService.GetNodeGpuSummary(context.TODO())
 	if err != nil {
 		logs.GetLogger().Errorf("Failed collect k8s gpu, error: %+v", err)
 		return false, "", nil, 0, nil, err
@@ -1577,7 +1577,7 @@ func checkResourceAvailableForSpace(jobUuid string, jobType int, resourceConfig 
 	needCpu := hardwareDetail.Cpu.Quantity
 	needMemory := float64(hardwareDetail.Memory.Quantity)
 	needStorage := float64(hardwareDetail.Storage.Quantity)
-	logs.GetLogger().Infof("checkResourceForSpace: needCpu: %d, needMemory: %.2f, needStorage: %.2f, needGpu: %s, gpuNum: %d", needCpu, needMemory, needStorage, gpuName, gpuNum)
+	logs.GetLogger().Infof("job_uuid: %s, checkResourceForSpace: needCpu: %d, needMemory: %.2f, needStorage: %.2f, needGpu: %s, gpuNum: %d", jobUuid, needCpu, needMemory, needStorage, gpuName, gpuNum)
 
 	type gpuData struct {
 		Total     int
@@ -1603,7 +1603,7 @@ func checkResourceAvailableForSpace(jobUuid string, jobType int, resourceConfig 
 			}
 		}
 
-		logs.GetLogger().Infof("checkResourceForSpace: nodeName: %s,remainingCpu: %d, remainingMemory: %.2f, remainingStorage: %.2f, remainingGpu: %+v", node.Name, remainderCpu, remainderMemory, remainderStorage, freeGpuMap)
+		logs.GetLogger().Infof("nodeName: %s, machineId&productUuid: %s, remainingCpu: %d, remainingMemory: %.2f, remainingStorage: %.2f, remainingGpu: %+v", node.Name, nodeNameMachineId[node.Name], remainderCpu, remainderMemory, remainderStorage, freeGpuMap)
 
 		if remainderCpu < needCpu {
 			noAvailableStr = append(noAvailableStr, fmt.Sprintf("cpu need: %d, remainder: %d", needCpu, remainderCpu))
@@ -1672,7 +1672,7 @@ func checkResourceAvailableForImage(jobUuid string, hardwareType string, resourc
 		return false, "", nil, nil, nil, err
 	}
 
-	nodeGpuSummary, err := k8sService.GetNodeGpuSummary(context.TODO())
+	nodeGpuSummary, nodeNameMachineId, err := k8sService.GetNodeGpuSummary(context.TODO())
 	if err != nil {
 		logs.GetLogger().Errorf("Failed collect k8s gpu, error: %+v", err)
 		return false, "", nil, nil, nil, err
@@ -1714,7 +1714,7 @@ func checkResourceAvailableForImage(jobUuid string, hardwareType string, resourc
 			}
 		}
 
-		logs.GetLogger().Infof("checkResourceForSpace: nodeName: %s,remainingCpu: %d, remainingMemory: %.2f, remainingStorage: %.2f, remainingGpu: %+v", node.Name, remainderCpu, remainderMemory, remainderStorage, freeGpuMap)
+		logs.GetLogger().Infof("nodeName: %s, machineId&productUuid: %s, remainingCpu: %d, remainingMemory: %.2f, remainingStorage: %.2f, remainingGpu: %+v", node.Name, nodeNameMachineId[node.Name], remainderCpu, remainderMemory, remainderStorage, freeGpuMap)
 
 		if remainderCpu < needCpu {
 			noAvailableStr = append(noAvailableStr, fmt.Sprintf("cpu need: %d, remainder: %d", needCpu, remainderCpu))
@@ -1810,7 +1810,7 @@ func checkResourceAvailableForUbi(taskId, taskType int, gpuName string, resource
 		return "", "", 0, 0, 0, nil, nil, err
 	}
 
-	nodeGpuSummary, err := k8sService.GetNodeGpuSummary(context.TODO())
+	nodeGpuSummary, nodeNameMachineId, err := k8sService.GetNodeGpuSummary(context.TODO())
 	if err != nil {
 		logs.GetLogger().Errorf("Failed collect k8s gpu, error: %+v", err)
 		return "", "", 0, 0, 0, nil, nil, err
@@ -1842,7 +1842,7 @@ func checkResourceAvailableForUbi(taskId, taskType int, gpuName string, resource
 		remainderStorage := float64(remainderResource[ResourceStorage] / 1024 / 1024 / 1024)
 
 		logs.GetLogger().Infof("checkResourceAvailableForUbi: needCpu: %d, needMemory: %.2f, needStorage: %.2f", needCpu, needMemory, needStorage)
-		logs.GetLogger().Infof("checkResourceAvailableForUbi: remainingCpu: %d, remainingMemory: %.2f, remainingStorage: %.2f", remainderCpu, remainderMemory, remainderStorage)
+		logs.GetLogger().Infof("nodeName: %s, machineId&productUuid: %s, remainingCpu: %d, remainingMemory: %.2f, remainingStorage: %.2f", node.Name, nodeNameMachineId[node.Name], remainderCpu, remainderMemory, remainderStorage)
 
 		if remainderCpu < needCpu {
 			noAvailableStr = append(noAvailableStr, fmt.Sprintf("cpu need: %d, remainder: %d", needCpu, remainderCpu))
