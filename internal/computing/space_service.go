@@ -190,6 +190,7 @@ func ReceiveJob(c *gin.Context) {
 	}
 
 	if !available {
+		NewJobService().UpdateJobEntityStatusByJobUuid(jobEntity.JobUuid, models.JOB_REJECTED_STATUS)
 		logs.GetLogger().Warnf("job_uuid: %s, name: %s, msg: %s", jobData.UUID, jobData.Name, strings.Join(noAvailableMsgs, ";"))
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError, strings.Join(noAvailableMsgs, ";")))
 		return
@@ -1585,8 +1586,9 @@ func checkResourceAvailableForSpace(jobUuid string, jobType int, resourceConfig 
 		FreeIndex []string
 	}
 
-	var noAvailableStr []string
+	var noAvailableStrMap = make(map[string][]string)
 	for _, node := range nodes.Items {
+		var noAvailableStr []string
 		var nodeName = node.Name
 		var nodeGpuInfo = nodeGpuSummary[nodeName]
 		nodeGpu, remainderResource, _ := GetNodeResource(activePods, &node)
@@ -1619,6 +1621,7 @@ func checkResourceAvailableForSpace(jobUuid string, jobType int, resourceConfig 
 			if len(noAvailableStr) == 0 {
 				return true, "", nil, 0, nil, nil
 			} else {
+				noAvailableStrMap[nodeName] = noAvailableStr
 				logs.GetLogger().Warnf("the job_uuid: %s is not available for this node=%s resource. Reason: %s",
 					jobUuid, node.Name, strings.Join(noAvailableStr, ";"))
 			}
@@ -1632,16 +1635,14 @@ func checkResourceAvailableForSpace(jobUuid string, jobType int, resourceConfig 
 					if int64(len(remainingGpu)) < gpuNum {
 						noAvailableStr = append(noAvailableStr, fmt.Sprintf("gpu need name:%s, num:%d, remainder: %d", hardwareDetail.Gpu.Unit, hardwareDetail.Gpu.Quantity, len(remainingGpu)))
 					}
-
 					if len(noAvailableStr) == 0 {
 						return true, gpuName, remainingGpu, gpuNum, nil, nil
-					} else {
-						logs.GetLogger().Warnf("the job_uuid: %s is not available for this node=%s resource. Reason: %s",
-							jobUuid, node.Name, strings.Join(noAvailableStr, ";"))
 					}
 				}
 			}
-			continue
+			noAvailableStrMap[nodeName] = noAvailableStr
+			logs.GetLogger().Warnf("the job_uuid: %s is not available for this node=%s resource. Reason: %s",
+				jobUuid, node.Name, strings.Join(noAvailableStr, ";"))
 		}
 	}
 
@@ -1656,7 +1657,8 @@ func checkResourceAvailableForSpace(jobUuid string, jobType int, resourceConfig 
 		noAvailableSummary = append(noAvailableSummary, "not found available node")
 		return false, "", nil, 0, noAvailableSummary, nil
 	} else {
-		return false, "", nil, 0, noAvailableStr, nil
+		nodeName := nodes.Items[0].Name
+		return false, "", nil, 0, noAvailableStrMap[nodeName], nil
 	}
 }
 
@@ -1696,8 +1698,9 @@ func checkResourceAvailableForImage(jobUuid string, hardwareType string, resourc
 		FreeIndex []string
 	}
 
-	var noAvailableStr []string
+	var noAvailableStrMap = make(map[string][]string)
 	for _, node := range nodes.Items {
+		var noAvailableStr []string
 		var nodeName = node.Name
 		var nodeGpuInfo = nodeGpuSummary[nodeName]
 		nodeGpu, remainderResource, _ := GetNodeResource(activePods, &node)
@@ -1730,6 +1733,7 @@ func checkResourceAvailableForImage(jobUuid string, hardwareType string, resourc
 			if len(noAvailableStr) == 0 {
 				return true, nodeName, nil, nil, nil, nil
 			} else {
+				noAvailableStrMap[nodeName] = noAvailableStr
 				logs.GetLogger().Warnf("the job_uuid: %s is not available for this node=%s resource. Reason: %s",
 					jobUuid, node.Name, strings.Join(noAvailableStr, ";"))
 			}
@@ -1778,6 +1782,7 @@ func checkResourceAvailableForImage(jobUuid string, hardwareType string, resourc
 			} else {
 				if gpuNoAvailableStr != nil {
 					noAvailableStr = append(gpuNoAvailableStr, gpuNoAvailableStr...)
+					noAvailableStrMap[node.Name] = noAvailableStr
 				}
 			}
 		}
@@ -1794,7 +1799,8 @@ func checkResourceAvailableForImage(jobUuid string, hardwareType string, resourc
 		noAvailableSummary = append(noAvailableSummary, "not found available node")
 		return false, "", nil, nil, noAvailableSummary, nil
 	} else {
-		return false, "", nil, nil, noAvailableStr, nil
+		nodeName := nodes.Items[0].Name
+		return false, "", nil, nil, noAvailableStrMap[nodeName], nil
 	}
 }
 
