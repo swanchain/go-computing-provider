@@ -64,7 +64,9 @@ func (taskServ TaskService) UpdateTaskEntityByTaskId(task *models.TaskEntity) (e
 }
 
 func (taskServ TaskService) UpdateTaskEntityByTaskUuId(task *models.TaskEntity) (err error) {
-	return taskServ.Model(&models.TaskEntity{}).Where("uuid=?", task.Uuid).Updates(task).Error
+	return taskServ.Model(&models.TaskEntity{}).Where("uuid=?", task.Uuid).Updates(map[string]interface{}{
+		"status": task.Status,
+	}).Error
 }
 
 func (taskServ TaskService) GetTaskEntity(taskId int64) (*models.TaskEntity, error) {
@@ -100,6 +102,12 @@ func (jobServ JobService) SaveJobEntity(job *models.JobEntity) (err error) {
 
 func (jobServ JobService) UpdateJobEntityByJobUuid(job *models.JobEntity) (err error) {
 	return jobServ.Where("job_uuid=? and delete_at=?", job.JobUuid, models.UN_DELETEED_FLAG).Updates(job).Error
+}
+
+func (jobServ JobService) UpdateJobEntityStatusByJobUuid(jobUuid string, status int) (err error) {
+	return jobServ.Model(&models.JobEntity{}).Where("job_uuid=?", jobUuid).Updates(map[string]interface{}{
+		"status": status,
+	}).Error
 }
 
 func (jobServ JobService) UpdateJobResultUrlByJobUuid(jobUuid string, resultUrl string) (err error) {

@@ -11,13 +11,15 @@ type ClusterResource struct {
 }
 
 type NodeResource struct {
-	MachineId string `json:"machine_id"`
-	CpuName   string `json:"cpu_name"`
-	Cpu       Common `json:"cpu"`
-	Vcpu      Common `json:"vcpu"`
-	Memory    Common `json:"memory"`
-	Gpu       Gpu    `json:"gpu"`
-	Storage   Common `json:"storage"`
+	ProductUuid string `json:"product_uuid"`
+	MachineId   string `json:"machine_id"`
+	CpuName     string `json:"cpu_name"`
+	Cpu         Common `json:"cpu"`
+	Vcpu        Common `json:"vcpu"`
+	Memory      Common `json:"memory"`
+	Gpu         Gpu    `json:"gpu"`
+	Storage     Common `json:"storage"`
+	Code        string `json:"code"`
 }
 
 type CollectNodeInfo struct {

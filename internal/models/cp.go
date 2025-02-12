@@ -114,7 +114,7 @@ type Account struct {
 	OwnerAddress   string
 	NodeId         string
 	MultiAddresses []string
-	TaskTypes      []uint8 // 1:Fil-C2-512M, 2:mining, 3: AI, 4:Fil-C2-32G
+	TaskTypes      []uint8 // 1:Fil-C2-512M, 2:mining, 3: AI, 4:Fil-C2-32G 5:NodePort 100:Exit
 	Beneficiary    string
 	WorkerAddress  string
 	Version        string
@@ -210,19 +210,32 @@ func JobOnChainStatus(status int) string {
 }
 
 type FcpDeployImageReq struct {
-	Uuid          string         `json:"uuid"`
-	Name          string         `json:"name"`
-	InstanceName  string         `json:"instance_name"`
-	Duration      int            `json:"duration"`
-	Sign          string         `json:"sign"`
-	WalletAddress string         `json:"wallet_address"`
-	IpWhitelist   []string       `json:"ip_whitelist"`
-	DeployConfig  DeployConfig   `json:"deploy_config"`
-	Resource      DeployResource `json:"resource"`
-	JobType       int            `json:"job_type"`
-	ResourceUrl   string         `json:"resource_url"`
-	IpWhiteList   []string       `json:"ip_white_list"`
-	BidPrice      string         `json:"bid_price"` // Amount users are willing to pay
+	Uuid          string              `json:"uuid"`
+	Name          string              `json:"name"`
+	InstanceName  string              `json:"instance_name"`
+	Duration      int                 `json:"duration"`
+	Sign          string              `json:"sign"`
+	WalletAddress string              `json:"wallet_address"`
+	IpWhitelist   []string            `json:"ip_whitelist"`
+	DeployConfig  DeployConfig        `json:"deploy_config"`
+	Resource      K8sResourceForImage `json:"resource"`
+	IpWhiteList   []string            `json:"ip_white_list"`
+	BidPrice      string              `json:"bid_price"` // Amount users are willing to pay
+	JobType       int                 `json:"job_type"`
+	DeployType    int                 `json:"deploy_type"` // 0: field; 1: docker; 2: yaml
+	DeployContent string              `json:"deploy_content"`
+	HealthPath    string              `json:"health_path"` // deploy_type=1 or 2, used
+}
+
+type YamlContent struct {
+	Version  string `json:"version"`
+	Services struct {
+		Image       string   `json:"image"`
+		Cmd         []string `json:"cmd"`
+		RunCommands []string `json:"run_commands"`
+		Envs        []string `json:"envs"`
+		ExposePort  []int    `json:"expose_port"`
+	} `json:"services"`
 }
 
 type DeployConfig struct {
@@ -235,12 +248,16 @@ type DeployConfig struct {
 	WorkDir     string            `json:"work_dir"`
 }
 
-type DeployResource struct {
-	Cpu      int    `json:"cpu"`
-	Gpu      int    `json:"gpu"`
+type K8sResourceForImage struct {
+	Cpu     int64
+	Memory  float64
+	Storage float64
+	Gpus    []ReqGpu `json:"gpus"`
+}
+
+type ReqGpu struct {
 	GpuModel string `json:"gpu_model"`
-	Memory   int    `json:"memory"`
-	Storage  int    `json:"storage"`
+	GPU      int    `json:"count"`
 }
 
 type FcpDeployImageResp struct {
@@ -251,4 +268,34 @@ type FcpDeployImageResp struct {
 	ServicePortMapping []PortMap `json:"service_port_mapping,omitempty"`
 	ContainerLog       string    `json:"container_log"`
 	BuildLog           string    `json:"build_log"`
+}
+
+// =========
+
+type ZkTaskReq struct {
+	Id          int           `json:"id"`
+	Uuid        string        `json:"uuid,omitempty"`
+	Name        string        `json:"name,omitempty"`
+	TaskType    int           `json:"task_type"` // 1: fil-c2-512-cpu; 2:fil-c2-32-cpu; 3: fil-c2-512-gpu; 4: fil-c2-32-gpu; 5: mining
+	InputParam  string        `json:"input_param"`
+	VerifyParam string        `json:"verify_param"`
+	Signature   string        `json:"signature"`
+	Resource    *ResourceInfo `json:"resource"`
+	DeadLine    int64         `json:"deadline"`
+	CheckCode   string        `json:"check_code"`
+
+	Image string            `json:"image,omitempty"`
+	Cmd   []string          `json:"cmd,omitempty"`
+	Ports map[string][]int  `json:"ports,omitempty"`
+	Envs  map[string]string `json:"envs,omitempty"`
+}
+
+type ResourceInfo struct {
+	CPU     int64 `json:"cpu"`
+	Memory  int64 `json:"memory"`  // bytes
+	Storage int64 `json:"storage"` // bytes
+	Gpus    []struct {
+		GPU      int    `json:"gpu"`
+		GPUModel string `json:"gpu_model"`
+	} `json:"gpus"`
 }

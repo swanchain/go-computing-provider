@@ -277,6 +277,8 @@ func getColor(status int) []tablewriter.Colors {
 		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiMagentaColor}}
 	case models.JOB_RECEIVED_STATUS:
 		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiBlueColor}}
+	case models.JOB_REJECTED_STATUS:
+		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgRedColor}}
 	default:
 		rowColor = []tablewriter.Colors{{tablewriter.Bold, tablewriter.FgHiCyanColor}}
 	}

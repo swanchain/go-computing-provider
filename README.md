@@ -294,14 +294,23 @@ spec:
   template:
     metadata:
       labels:
-       app: resource-exporter
+        app: resource-exporter
     spec:
       containers:
-      - name: resource-exporter
-        image: filswan/resource-exporter:v11.3.2
-        imagePullPolicy: IfNotPresent
-        securityContext:
-          privileged: true
+        - name: resource-exporter
+          image: filswan/resource-exporter:v12.0.0
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: machine-id
+              mountPath: /etc/machine-id
+              readOnly: true
+      volumes:
+        - name: machine-id
+          hostPath:
+            path: /etc/machine-id
+            type: File
 EOF
 ```
 If you have installed it correctly, you can see the result shown in the figure by the command:
@@ -372,7 +381,7 @@ make install
 	
        [HUB]
        BalanceThreshold= 10                                                    # The cp’s collateral balance threshold
-       OrchestratorPk = "0xE2F887D4Ed3E4E5179C2f30c6Fdb2344cCbB21b6"           # Orchestrator's public key, CP only accept the task from this Orchestrator
+       OrchestratorPk = "0xd875bD44158208fD0FDD46729Aab6709f62C7821"           # Orchestrator's public key, CP only accept the task from this Orchestrator
        VerifySign = true                                                       # Verify that the task signature is from Orchestrator
 	
        [MCS]
@@ -599,7 +608,7 @@ COMMANDS:
    changeOwnerAddress        Update OwnerAddress of CP
    changeWorkerAddress       Update workerAddress of CP
    changeBeneficiaryAddress  Update beneficiaryAddress of CP
-   changeTaskTypes           Update taskTypes of CP (1:Fil-C2, 2:Mining, 3: AI, 4:Inference, 5:NodePort), separated by commas
+   changeTaskTypes           Update taskTypes of CP (1:Fil-C2, 2:Mining, 3: AI, 4:Inference, 5:NodePort, 100:Exit), separated by commas
    help, h                   Show a list of commands or help for one command
 
 OPTIONS:

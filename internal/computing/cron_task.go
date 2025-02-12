@@ -3,7 +3,9 @@ package computing
 import (
 	"context"
 	"fmt"
+	"github.com/swanchain/go-computing-provider/build"
 	"github.com/swanchain/go-computing-provider/internal/contract"
+	"github.com/swanchain/go-computing-provider/util"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -41,7 +43,7 @@ func (task *CronTask) RunTask() {
 	task.cleanAbnormalDeployment()
 	task.setFailedUbiTaskStatus()
 	task.watchNameSpaceForDeleted()
-	task.reportClusterResource()
+	//task.reportClusterResource()
 	task.watchExpiredTask()
 	task.getUbiTaskReward()
 	task.checkJobReward()
@@ -50,6 +52,15 @@ func (task *CronTask) RunTask() {
 	task.UpdateContainerLog()
 	task.DeleteSpaceLog()
 
+	resourceExporterVersion, err := NewK8sService().GetResourceExporterVersion()
+	if err != nil {
+		logs.GetLogger().Fatalf("failed to get resource-exporter version, error: %v", err)
+	}
+	if resourceExporterVersion != "" {
+		if errMsg := util.CheckVersion(build.ResourceExporterVersion, resourceExporterVersion); errMsg != nil {
+			logs.GetLogger().Fatalf("resource-exporter %s", errMsg)
+		}
+	}
 }
 
 func CheckClusterNetworkPolicy() {
@@ -218,7 +229,7 @@ func (task *CronTask) watchNameSpaceForDeleted() {
 func (task *CronTask) cleanImageResource() {
 	if conf.GetConfig().API.AutoDeleteImage {
 		c := cron.New(cron.WithSeconds())
-		c.AddFunc("* 0/30 * * * ?", func() {
+		c.AddFunc("0 0/30 * * * ?", func() {
 			defer func() {
 				if err := recover(); err != nil {
 					logs.GetLogger().Errorf("cleanImageResource catch panic error: %+v", err)
@@ -232,7 +243,7 @@ func (task *CronTask) cleanImageResource() {
 
 func (task *CronTask) watchExpiredTask() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("* 0/10 * * * ?", func() {
+	c.AddFunc("0 0/10 * * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("watchExpiredTask catch panic error: %+v", err)
@@ -278,37 +289,6 @@ func (task *CronTask) watchExpiredTask() {
 						logs.GetLogger().Errorf("failed to use jobUuid: %s delete job, error: %v", job.JobUuid, err)
 					}
 					continue
-				}
-			} else {
-				// compatible with space_uuid
-				spaceUuidDeployName := constants.K8S_DEPLOY_NAME_PREFIX + strings.ToLower(job.SpaceUuid)
-				if _, ok = deployOnK8s[spaceUuidDeployName]; ok {
-					if NewJobService().GetJobEntityBySpaceUuid(job.SpaceUuid) > 0 && time.Now().Unix() < job.ExpireTime {
-						if job.Status != models.JOB_RUNNING_STATUS {
-							foundDeployment, err := k8sService.k8sClient.AppsV1().Deployments(job.NameSpace).Get(context.TODO(), job.K8sDeployName, metav1.GetOptions{})
-							if err != nil {
-								continue
-							}
-							if foundDeployment.Status.AvailableReplicas > 0 {
-								job.PodStatus = models.POD_RUNNING_STATUS
-								job.Status = models.JOB_RUNNING_STATUS
-								NewJobService().UpdateJobEntityByJobUuid(job)
-							}
-						}
-						continue
-					}
-
-					var nameSpace = job.NameSpace
-					if job.Status == models.JOB_TERMINATED_STATUS || job.Status == models.JOB_COMPLETED_STATUS {
-						if strings.TrimSpace(nameSpace) == "" {
-							nameSpace = constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(job.WalletAddress)
-						}
-
-						if err = DeleteJob(nameSpace, job.SpaceUuid, "cron-task abnormal state, compatible with space_uuid"); err != nil {
-							logs.GetLogger().Errorf("failed to use spaceUuid: %s delete job, error: %v", job.SpaceUuid, err)
-						}
-						continue
-					}
 				}
 			}
 
@@ -359,10 +339,6 @@ func (task *CronTask) watchExpiredTask() {
 					continue
 				}
 
-				if err = DeleteJob(job.NameSpace, job.SpaceUuid, "compatible with old versions, cron-task abnormal state"); err != nil {
-					logs.GetLogger().Errorf("failed to use spaceUuid: %s delete job, error: %v", job.SpaceUuid, err)
-					continue
-				}
 				deleteSpaceIdAndJobUuid[job.JobUuid] = job.SpaceUuid + "_" + job.JobUuid
 			}
 		}
@@ -584,7 +560,7 @@ func (task *CronTask) CheckCpBalance() {
 
 func (task *CronTask) UpdateContainerLog() {
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("* 0/10 * * * ?", func() {
+	c.AddFunc("0 0/10 * * * ?", func() {
 		defer func() {
 			if err := recover(); err != nil {
 				logs.GetLogger().Errorf("update container log catch panic error: %+v", err)

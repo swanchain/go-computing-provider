@@ -20,7 +20,6 @@ import (
 	"github.com/swanchain/go-computing-provider/constants"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -272,7 +271,13 @@ func (ds *DockerService) CleanResourceForK8s() {
 	ds.c.ContainersPrune(ctx, filters.NewArgs())
 }
 
-func (ds *DockerService) CleanResourceForDocker() {
+func (ds *DockerService) CleanResourceForDocker(onlyClearContainer bool) {
+	ctx := context.Background()
+	if onlyClearContainer {
+		ds.c.ContainersPrune(ctx, filters.NewArgs())
+		return
+	}
+
 	imagesToKeep := []string{
 		build.UBITaskImageIntelCpu,
 		build.UBITaskImageIntelGpu,
@@ -302,11 +307,10 @@ func (ds *DockerService) CleanResourceForDocker() {
 		}
 	}
 
-	cmd := exec.Command("docker", "system", "prune", "-f")
-	if err = cmd.Run(); err != nil {
-		logs.GetLogger().Errorf("failed to clean resource, error: %+v", err)
-		return
-	}
+	danglingFilters := filters.NewArgs()
+	danglingFilters.Add("dangling", "true")
+	ds.c.ImagesPrune(ctx, danglingFilters)
+	ds.c.ContainersPrune(ctx, filters.NewArgs())
 }
 
 func (ds *DockerService) PullImage(imageName string) error {
@@ -333,27 +337,32 @@ func (ds *DockerService) PullImage(imageName string) error {
 	}
 }
 
-func (ds *DockerService) CheckRunningContainer(containerName string) (bool, error) {
-	containers, err := ds.c.ContainerList(context.Background(), container.ListOptions{})
+func (ds *DockerService) CheckRunningContainer(containerName string) (bool, string, error) {
+	containers, err := ds.c.ContainerList(context.Background(), container.ListOptions{All: true})
 	if err != nil {
 		logs.GetLogger().Errorf("listing containers failed, error: %v", err)
-		return false, err
+		return false, "", err
 	}
+
+	var imageName string
 	containerRunning := false
 	for _, c := range containers {
 		for _, name := range c.Names {
 			if name == "/"+containerName {
 				if c.State == "running" {
 					containerRunning = true
+					imageName = c.Image
 					break
 				}
 			}
 		}
 	}
 	if containerRunning {
-		return true, nil
+		index := strings.Index(imageName, ":")
+		version := imageName[index+1:]
+		return true, version, nil
 	}
-	return false, nil
+	return false, "", nil
 }
 
 func (ds *DockerService) ContainerCreateAndStart(config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, containerName string) error {

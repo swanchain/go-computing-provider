@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	cors "github.com/itsjamie/gin-cors"
 	"github.com/olekukonko/tablewriter"
+	"github.com/swanchain/go-computing-provider/build"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/internal/computing"
 	"github.com/swanchain/go-computing-provider/internal/models"
@@ -165,11 +166,20 @@ var daemonCmd = &cli.Command{
 		logs.GetLogger().Info("Starting a computing-provider client.")
 		cpRepoPath, _ := os.LookupEnv("CP_PATH")
 
+		computing.NewDockerService().CleanResourceForDocker(true)
+
 		resourceExporterContainerName := "resource-exporter"
-		rsExist, err := computing.NewDockerService().CheckRunningContainer(resourceExporterContainerName)
+		rsExist, version, err := computing.NewDockerService().CheckRunningContainer(resourceExporterContainerName)
 		if err != nil {
 			return fmt.Errorf("check %s container failed, error: %v", resourceExporterContainerName, err)
 		}
+
+		if version != "" {
+			if errMsg := util.CheckVersion(build.ResourceExporterVersion, version); errMsg != nil {
+				logs.GetLogger().Fatalf("resource-exporter %s", errMsg)
+			}
+		}
+
 		if !rsExist {
 			if err = computing.RestartResourceExporter(); err != nil {
 				logs.GetLogger().Errorf("restartResourceExporter failed, error: %v", err)
@@ -177,7 +187,7 @@ var daemonCmd = &cli.Command{
 		}
 
 		traefikServiceContainerName := "traefik-service"
-		tsExist, err := computing.NewDockerService().CheckRunningContainer(traefikServiceContainerName)
+		tsExist, _, err := computing.NewDockerService().CheckRunningContainer(traefikServiceContainerName)
 		if err != nil {
 			return fmt.Errorf("check %s container failed, error: %v", traefikServiceContainerName, err)
 		}
@@ -219,6 +229,7 @@ var daemonCmd = &cli.Command{
 		router.GET("/cp/job/status", ecpImageService.GetJobStatus)
 		router.GET("/cp/job/log", ecpImageService.DockerLogsHandler)
 		router.DELETE("/cp/job/:job_uuid", ecpImageService.DeleteJob)
+		router.POST("/cp/zk_task", computing.DoZkTask)
 
 		shutdownChan := make(chan struct{})
 		httpStopper, err := util.ServeHttp(r, "cp-api", ":"+strconv.Itoa(conf.GetConfig().API.Port), false)

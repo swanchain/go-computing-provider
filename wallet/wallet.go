@@ -239,7 +239,7 @@ func (w *LocalWallet) WalletDelete(ctx context.Context, addr string) error {
 	return nil
 }
 
-func (w *LocalWallet) WalletSend(ctx context.Context, from, to string, amount string) (string, error) {
+func (w *LocalWallet) WalletSend(ctx context.Context, from, to string, amount string, nonce uint64) (string, error) {
 	chainUrl, err := conf.GetRpcByNetWorkName()
 	if err != nil {
 		return "", err
@@ -263,7 +263,7 @@ func (w *LocalWallet) WalletSend(ctx context.Context, from, to string, amount st
 		return "", err
 	}
 
-	txHash, err := sendTransaction(client, ki.PrivateKey, to, sendAmount)
+	txHash, err := sendTransaction(client, ki.PrivateKey, to, sendAmount, nonce)
 	if err != nil {
 		return "", err
 	}

@@ -130,8 +130,9 @@ func (s *CpStub) ChangeTaskTypes(newTaskTypes []uint8) (string, error) {
 	transaction, err := s.account.ChangeTaskTypes(txOptions, newTaskTypes)
 	if err != nil {
 		return "", fmt.Errorf("address: %s, cpAccount client create ChangeTaskTypes tx error: %+v", publicAddress, err)
+	} else {
+		return transaction.Hash().String(), nil
 	}
-	return transaction.Hash().String(), nil
 }
 
 func (s *CpStub) ChangeWorkerAddress(newWorkerAddress common.Address) (string, error) {
