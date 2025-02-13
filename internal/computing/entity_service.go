@@ -84,8 +84,8 @@ func (taskServ TaskService) GetTaskListNoRewardForFilC2() (list []*models.TaskEn
 }
 
 func (taskServ TaskService) GetTaskListNoRewardForMining() (list []*models.TaskEntity, err error) {
-	err = taskServ.Model(&models.TaskEntity{}).Where("uuid !='' and (status !=? or status !=? or status !=?) ", models.TASK_TIMEOUT_STATUS,
-		models.TASK_VERIFYFAILED_STATUS, models.TASK_VERIFIED_STATUS).Find(&list).Error
+	err = taskServ.Model(&models.TaskEntity{}).Where("uuid !='' and (status !=? or status !=? or status !=? or status !=?) ", models.TASK_TIMEOUT_STATUS,
+		models.TASK_VERIFYFAILED_STATUS, models.TASK_VERIFIED_STATUS, models.TASK_REJECTED_STATUS).Find(&list).Error
 	if err != nil {
 		return nil, err
 	}
@@ -162,6 +162,18 @@ func (jobServ JobService) GetJobList(status int, tailNum int) (list []*models.Jo
 			err = jobServ.Model(&models.JobEntity{}).Find(&list).Error
 		}
 	}
+	if err != nil {
+		return nil, err
+	}
+
+	for i, j := 0, len(list)-1; i < j; i, j = i+1, j-1 {
+		list[i], list[j] = list[j], list[i]
+	}
+	return
+}
+
+func (jobServ JobService) GetJobListByNoRejectStatus() (list []*models.JobEntity, err error) {
+	err = jobServ.Model(&models.JobEntity{}).Where("delete_at=? and status >=0", models.UN_DELETEED_FLAG).Find(&list).Error
 	if err != nil {
 		return nil, err
 	}
