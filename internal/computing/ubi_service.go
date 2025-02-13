@@ -1809,6 +1809,9 @@ func syncTaskStatusForSequencerService() error {
 		}
 
 		for _, item := range group.Items {
+			if item.Status == models.TASK_REJECTED_STATUS {
+				continue
+			}
 			var taskAddress = item.SequenceTaskAddr
 			if t, ok := taskMap[item.Id]; ok {
 				item.Reward = "0.00"
