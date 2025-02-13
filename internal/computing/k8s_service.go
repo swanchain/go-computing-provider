@@ -717,15 +717,17 @@ type GpuData struct {
 	UsedIndex []string
 }
 
-func (s *K8sService) GetNodeGpuSummary(ctx context.Context) (map[string]map[string]GpuData, error) {
+func (s *K8sService) GetNodeGpuSummary(ctx context.Context) (map[string]map[string]GpuData, map[string]string, error) {
 	nodeGpuInfoMap, err := s.GetResourceExporterPodLog(ctx)
 	if err != nil {
 		logs.GetLogger().Errorf("Collect cluster gpu info Failed, if have available gpu, please check resource-exporter. error: %+v", err)
-		return nil, err
+		return nil, nil, err
 	}
 
+	var nodeMachineId = make(map[string]string)
 	var nodeGpuSummary = make(map[string]map[string]GpuData)
 	for nodeName, gpu := range nodeGpuInfoMap {
+		nodeMachineId[nodeName] = gpu.MachineId + "&" + gpu.ProductUuid
 		if gpu.Gpu.AttachedGpus > 0 {
 			var nodeGpu = make(map[string]GpuData)
 			for _, g := range gpu.Gpu.Details {
@@ -756,7 +758,7 @@ func (s *K8sService) GetNodeGpuSummary(ctx context.Context) (map[string]map[stri
 			nodeGpuSummary[nodeName] = nodeGpu
 		}
 	}
-	return nodeGpuSummary, nil
+	return nodeGpuSummary, nodeMachineId, nil
 }
 
 func (s *K8sService) GetAllActivePod(ctx context.Context) ([]coreV1.Pod, error) {
