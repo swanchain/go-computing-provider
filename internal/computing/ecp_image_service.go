@@ -353,6 +353,9 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		var gNameStr string
 		if len(job.Resource.Gpus) > 0 {
 			for _, g := range job.Resource.Gpus {
+				if g.GPUModel == "" || g.GPU == 0 {
+					continue
+				}
 				gNameStr += g.GPUModel + "="
 			}
 		}
