@@ -233,7 +233,7 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 	var envs []string
 	var needResource container.Resources
 	if len(job.Resource.Gpus) > 0 {
-		envs = append(envs, fmt.Sprintf("CUDA_VISIBLE_DEVICES=%s", strings.Join(indexs, ",")))
+		envs = append(envs, fmt.Sprintf("NVIDIA_VISIBLE_DEVICES=%s", strings.Join(indexs, ",")))
 		needResource = container.Resources{
 			CPUQuota: needCpu * 100000,
 			Memory:   job.Resource.Memory,
