@@ -351,8 +351,10 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		}
 	} else {
 		var gNameStr string
-		for _, g := range job.Resource.Gpus {
-			gNameStr += g.GPUModel + "="
+		if len(job.Resource.Gpus) > 0 {
+			for _, g := range job.Resource.Gpus {
+				gNameStr += g.GPUModel + "="
+			}
 		}
 
 		if err = NewEcpJobService().SaveEcpJobEntity(&models.EcpJobEntity{
