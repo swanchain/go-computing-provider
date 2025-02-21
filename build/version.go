@@ -10,7 +10,7 @@ var CurrentCommit string
 
 var NetWorkTag string
 
-const BuildVersion = "1.1.1"
+const BuildVersion = "1.1.2"
 
 const UBITaskImageIntelCpu = "filswan/ubi-worker-cpu-intel:latest"
 const UBITaskImageIntelGpu = "filswan/ubi-worker-gpu-intel:latest"

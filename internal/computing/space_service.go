@@ -1162,12 +1162,14 @@ func doMiningTaskForK8s(c *gin.Context, zkTask models.ZkTaskReq, taskEntity *mod
 
 		job := &batchv1.Job{
 			ObjectMeta: metaV1.ObjectMeta{
-				Name:        JobName,
-				Namespace:   namespace,
-				Annotations: generateGpuAnnotation(prepareGpu),
+				Name:      JobName,
+				Namespace: namespace,
 			},
 			Spec: batchv1.JobSpec{
 				Template: v1.PodTemplateSpec{
+					ObjectMeta: metaV1.ObjectMeta{
+						Annotations: generateGpuAnnotation(prepareGpu),
+					},
 					Spec: v1.PodSpec{
 						NodeName: nodeName,
 						NodeSelector: map[string]string{
