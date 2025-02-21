@@ -233,7 +233,7 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 	var envs []string
 	var needResource container.Resources
 	if len(job.Resource.Gpus) > 0 {
-		envs = append(envs, fmt.Sprintf("CUDA_VISIBLE_DEVICES=%s", strings.Join(indexs, ",")))
+		envs = append(envs, fmt.Sprintf("NVIDIA_VISIBLE_DEVICES=%s", strings.Join(indexs, ",")))
 		needResource = container.Resources{
 			CPUQuota: needCpu * 100000,
 			Memory:   job.Resource.Memory,
@@ -351,8 +351,13 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		}
 	} else {
 		var gNameStr string
-		for _, g := range job.Resource.Gpus {
-			gNameStr += g.GPUModel + "="
+		if len(job.Resource.Gpus) > 0 {
+			for _, g := range job.Resource.Gpus {
+				if g.GPUModel == "" || g.GPU == 0 {
+					continue
+				}
+				gNameStr += g.GPUModel + "="
+			}
 		}
 
 		if err = NewEcpJobService().SaveEcpJobEntity(&models.EcpJobEntity{

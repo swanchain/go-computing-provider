@@ -1006,14 +1006,13 @@ func doFilC2Task(c *gin.Context, zkTask models.ZkTaskReq, taskEntity *models.Tas
 				Memory: needMemory * 1024 * 1024 * 1024,
 			}
 		} else {
-			//gpuEnv, ok := os.LookupEnv("RUST_GPU_TOOLS_CUSTOM_GPU")
-			//if ok {
-			//	env = append(env, "RUST_GPU_TOOLS_CUSTOM_GPU="+gpuEnv)
-			//}
-
 			var useIndexs []string
 			if len(indexs) > 0 {
 				if gpuName != "" {
+					gpuEnv, ok := os.LookupEnv("RUST_GPU_TOOLS_CUSTOM_GPU")
+					if ok {
+						env = append(env, "RUST_GPU_TOOLS_CUSTOM_GPU="+gpuEnv)
+					}
 					useIndexs = append(useIndexs, defaultIndex)
 				} else {
 					for i := 0; i < needGpuNum; i++ {
@@ -1809,6 +1808,9 @@ func syncTaskStatusForSequencerService() error {
 		}
 
 		for _, item := range group.Items {
+			if item.Status == models.TASK_REJECTED_STATUS {
+				continue
+			}
 			var taskAddress = item.SequenceTaskAddr
 			if t, ok := taskMap[item.Id]; ok {
 				item.Reward = "0.00"
