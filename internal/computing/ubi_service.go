@@ -38,6 +38,522 @@ import (
 	"time"
 )
 
+func DoZkTaskForK8s(c *gin.Context) {
+	var zkTask models.ZkTaskReq
+	if err := c.ShouldBindJSON(&zkTask); err != nil {
+		logs.GetLogger().Error("failed to parse json, error: %v", err)
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.JsonError))
+		return
+	}
+
+	var taskId any
+	if zkTask.Id != 0 {
+		taskId = zkTask.Id
+	} else {
+		taskId = zkTask.Uuid
+	}
+	logs.GetLogger().Infof("ubi task received: task_id: %v, task_type: %s", taskId, models.UbiTaskTypeStr(zkTask.TaskType))
+
+	var resourceType = models.RESOURCE_TYPE_CPU
+	if zkTask.TaskType == models.FIL_C2_GPU512 || zkTask.TaskType == models.FIL_C2_GPU32G {
+		resourceType = models.RESOURCE_TYPE_GPU
+	} else if zkTask.TaskType == models.Mining && len(zkTask.Resource.Gpus) > 0 {
+		resourceType = models.RESOURCE_TYPE_GPU
+	}
+
+	var taskEntity = new(models.TaskEntity)
+	var maxID int64
+	if zkTask.TaskType == models.Mining {
+		result := NewTaskService().Model(&models.TaskEntity{}).Select("MAX(id)").Scan(&maxID)
+		if result.Error != nil {
+			logs.GetLogger().Error("failed to fetch max task id")
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SaveTaskEntityError))
+			return
+		}
+		taskEntity.Id = maxID + 1
+		taskEntity.Uuid = zkTask.Uuid
+		taskEntity.Sequencer = 0
+	} else {
+		taskEntity.Id = int64(zkTask.Id)
+		taskEntity.InputParam = zkTask.InputParam
+		taskEntity.VerifyParam = zkTask.VerifyParam
+		taskEntity.Deadline = zkTask.DeadLine
+		taskEntity.CheckCode = zkTask.CheckCode
+	}
+	taskEntity.CreateTime = time.Now().Unix()
+	taskEntity.Type = zkTask.TaskType
+	taskEntity.Name = zkTask.Name
+	taskEntity.ResourceType = resourceType
+	taskEntity.Status = models.TASK_RECEIVED_STATUS
+	err := NewTaskService().SaveTaskEntity(taskEntity)
+	if err != nil {
+		logs.GetLogger().Errorf("failed to save task entity, error: %v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SaveTaskEntityError))
+		return
+	}
+
+	if strings.TrimSpace(zkTask.Name) == "" {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: name"))
+		return
+	}
+
+	if zkTask.TaskType == 0 {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: type"))
+		return
+	}
+
+	cpAccountAddress, err := contract.GetCpAccountAddress()
+	if err != nil {
+		logs.GetLogger().Errorf("get cp account contract address failed, error: %v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.GetCpAccountError))
+		return
+	}
+
+	if conf.GetConfig().UBI.VerifySign {
+		signature, err := verifySignature(conf.GetConfig().UBI.UbiEnginePk, fmt.Sprintf("%s%v", cpAccountAddress, taskId), zkTask.Signature)
+		if err != nil {
+			taskEntity.Status = models.TASK_FAILED_STATUS
+			NewTaskService().SaveTaskEntity(taskEntity)
+			logs.GetLogger().Errorf("verifySignature for ubi task failed, error: %+v", err)
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "verify sign data occur error"))
+			return
+		}
+
+		logs.GetLogger().Infof("ubi task sign verifing, task_id: %d, verify: %v", zkTask.Id, signature)
+		if !signature {
+			taskEntity.Status = models.TASK_REJECTED_STATUS
+			NewTaskService().SaveTaskEntity(taskEntity)
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "failed to verify signature"))
+			return
+		}
+	}
+
+	if zkTask.TaskType < models.Mining {
+		// do fil-c2
+		if !conf.GetConfig().UBI.EnableSequencer && !conf.GetConfig().UBI.AutoChainProof {
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.RejectZkTaskError))
+			return
+		}
+
+		balance, err := checkBalance(cpAccountAddress)
+		if err != nil || !balance {
+			taskEntity.Status = models.TASK_REJECTED_STATUS
+			NewTaskService().SaveTaskEntity(taskEntity)
+
+			logs.GetLogger().Errorf("failed check cp account balance, error: %v", err)
+			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckBalanceError))
+			return
+		}
+		doFilC2TaskForK8s(c, zkTask, taskEntity)
+	}
+
+	if zkTask.TaskType == models.Mining {
+		// do mining
+		doMiningTaskForK8s(c, zkTask, taskEntity)
+	}
+}
+
+func doFilC2TaskForK8s(c *gin.Context, zkTask models.ZkTaskReq, taskEntity *models.TaskEntity) {
+	if zkTask.Id == 0 {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: id"))
+		return
+	}
+
+	if strings.TrimSpace(zkTask.InputParam) == "" {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: input_param"))
+		return
+	}
+
+	if strings.TrimSpace(zkTask.VerifyParam) == "" {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: verify_param"))
+		return
+	}
+
+	if strings.TrimSpace(zkTask.CheckCode) == "" {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: check_code"))
+		return
+	}
+
+	if strings.TrimSpace(zkTask.Signature) == "" {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: signature"))
+		return
+	}
+
+	if zkTask.DeadLine == 0 {
+		c.JSON(http.StatusBadRequest, util.CreateErrorResponse(util.UbiTaskParamError, "missing required field: deadline"))
+		return
+	}
+
+	var envFilePath string
+	envFilePath = filepath.Join(os.Getenv("CP_PATH"), "fil-c2.env")
+	envVars, err := godotenv.Read(envFilePath)
+	if err != nil {
+		logs.GetLogger().Errorf("reading fil-c2-env.env failed, error: %v", err)
+		return
+	}
+
+	c2GpuConfig := envVars["RUST_GPU_TOOLS_CUSTOM_GPU"]
+	c2GpuName := convertGpuName(strings.TrimSpace(c2GpuConfig))
+	c2GpuName = strings.ToUpper(c2GpuName)
+
+	var hardwareType = "CPU"
+	if taskEntity.ResourceType == models.RESOURCE_TYPE_GPU {
+		hardwareType = "GPU"
+	}
+
+	var taskId string
+	if zkTask.TaskType < models.Mining {
+		taskId = fmt.Sprintf("%d", zkTask.Id)
+	} else {
+		taskId = zkTask.Uuid
+	}
+
+	var k8sResource models.K8sResourceForImage
+	k8sResource.Memory = formatGiB(zkTask.Resource.Memory)
+	k8sResource.Cpu = zkTask.Resource.CPU
+	k8sResource.Storage = formatGiB(zkTask.Resource.Storage)
+	var reqGpus []models.ReqGpu
+	for _, g := range zkTask.Resource.Gpus {
+		reqGpus = append(reqGpus, models.ReqGpu{
+			GpuModel: g.GPUModel,
+			GPU:      g.GPU,
+		})
+	}
+	k8sResource.Gpus = reqGpus
+
+	architecture, available, nodeName, gpuIndex, prepareGpu, noAvailableMsgs, err := checkResourceAvailableForImage(taskId, hardwareType, k8sResource)
+	if err != nil {
+		taskEntity.Status = models.TASK_FAILED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
+		logs.GetLogger().Errorf("check resource failed, error: %v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.CheckResourcesError))
+		return
+	}
+	if !available {
+		taskEntity.Status = models.TASK_REJECTED_STATUS
+		taskEntity.Error = "No resources available"
+		NewTaskService().SaveTaskEntity(taskEntity)
+		logs.GetLogger().Warnf("ubi task id: %d, msg: %s", zkTask.Id, strings.Join(noAvailableMsgs, ";"))
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.NoAvailableResourcesError, strings.Join(noAvailableMsgs, ";")))
+		return
+	}
+
+	var ubiTaskImage string
+	if architecture == constants.CPU_AMD {
+		ubiTaskImage = build.UBITaskImageAmdCpu
+		if hardwareType == "GPU" {
+			ubiTaskImage = build.UBITaskImageAmdGpu
+		}
+	} else if architecture == constants.CPU_INTEL {
+		ubiTaskImage = build.UBITaskImageIntelCpu
+		if hardwareType == "GPU" {
+			ubiTaskImage = build.UBITaskImageIntelGpu
+		}
+	}
+
+	needMemory := k8sResource.Memory
+	needStorage := k8sResource.Storage
+	memQuantity, err := resource.ParseQuantity(fmt.Sprintf("%.fGi", needMemory))
+	if err != nil {
+		taskEntity.Status = models.TASK_FAILED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
+		logs.GetLogger().Error("get memory failed, error: %+v", err)
+		return
+	}
+
+	storageQuantity, err := resource.ParseQuantity(fmt.Sprintf("%.fGi", needStorage))
+	if err != nil {
+		taskEntity.Status = models.TASK_FAILED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
+		logs.GetLogger().Error("get storage failed, error: %+v", err)
+		return
+	}
+
+	maxMemQuantity, err := resource.ParseQuantity(fmt.Sprintf("%.fGi", needMemory*2))
+	if err != nil {
+		taskEntity.Status = models.TASK_FAILED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
+		logs.GetLogger().Error("get memory failed, error: %+v", err)
+		return
+	}
+
+	maxStorageQuantity, err := resource.ParseQuantity(fmt.Sprintf("%.fGi", needStorage*2))
+	if err != nil {
+		taskEntity.Status = models.TASK_FAILED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
+		logs.GetLogger().Error("get storage failed, error: %+v", err)
+		return
+	}
+
+	var gpuResourceQuantity resource.Quantity
+	var waitUseGpu string
+	if c2GpuConfig == "" {
+		var total int
+		for _, g := range zkTask.Resource.Gpus {
+			total += g.GPU
+		}
+		gpuResourceQuantity = resource.MustParse(fmt.Sprintf("%d", total))
+		waitUseGpu = strings.Join(gpuIndex, ",")
+	} else {
+		var index string
+		for _, g := range prepareGpu {
+			if strings.ReplaceAll(c2GpuName, " ", "-") == g.Gname {
+				index = g.Gindex[0]
+				prepareGpu = []models.PodGpu{
+					{
+						Gname:  g.Gname,
+						Gindex: []string{index},
+					},
+				}
+				break
+			}
+		}
+		gpuResourceQuantity = resource.MustParse(fmt.Sprintf("1"))
+		waitUseGpu = index
+	}
+
+	resourceRequirements := coreV1.ResourceRequirements{
+		Limits: coreV1.ResourceList{
+			coreV1.ResourceCPU:              *resource.NewQuantity(zkTask.Resource.CPU*2, resource.DecimalSI),
+			coreV1.ResourceMemory:           maxMemQuantity,
+			coreV1.ResourceEphemeralStorage: maxStorageQuantity,
+			"nvidia.com/gpu":                gpuResourceQuantity,
+		},
+		Requests: coreV1.ResourceList{
+			coreV1.ResourceCPU:              *resource.NewQuantity(zkTask.Resource.CPU, resource.DecimalSI),
+			coreV1.ResourceMemory:           memQuantity,
+			coreV1.ResourceEphemeralStorage: storageQuantity,
+			"nvidia.com/gpu":                gpuResourceQuantity,
+		},
+	}
+
+	go func() {
+		var namespace = "ubi-task-" + strconv.Itoa(zkTask.Id)
+		var err error
+		defer func() {
+			if err := recover(); err != nil {
+				logs.GetLogger().Errorf("do zk task painc, error: %+v", err)
+				return
+			}
+
+			ubiTaskRun, err := NewTaskService().GetTaskEntity(int64(zkTask.Id))
+			if err != nil {
+				logs.GetLogger().Errorf("get ubi task detail from db failed, ubiTaskId: %d, error: %+v", zkTask.Id, err)
+				return
+			}
+
+			if ubiTaskRun.Contract != "" || ubiTaskRun.BlockHash != "" {
+				ubiTaskRun.Status = models.TASK_SUBMITTED_STATUS
+			} else {
+				ubiTaskRun.Status = models.TASK_FAILED_STATUS
+				k8sService := NewK8sService()
+				k8sService.k8sClient.CoreV1().Namespaces().Delete(context.TODO(), namespace, metaV1.DeleteOptions{})
+			}
+			err = NewTaskService().SaveTaskEntity(ubiTaskRun)
+		}()
+
+		if ubiTaskImage == "" {
+			logs.GetLogger().Errorf("please check the log output of the resource-exporter pod to see if cpu_name is intel or amd")
+			return
+		}
+
+		k8sService := NewK8sService()
+		if _, err = k8sService.GetNameSpace(context.TODO(), namespace, metaV1.GetOptions{}); err != nil {
+			if errors.IsNotFound(err) {
+				k8sNamespace := &v1.Namespace{
+					ObjectMeta: metaV1.ObjectMeta{
+						Name: namespace,
+					},
+				}
+				_, err = k8sService.CreateNameSpace(context.TODO(), k8sNamespace, metaV1.CreateOptions{})
+				if err != nil {
+					logs.GetLogger().Errorf("create namespace failed, error: %v", err)
+					return
+				}
+			}
+		}
+
+		receiveUrl := fmt.Sprintf("%s:%d/api/v1/computing/cp/receive/ubi", k8sService.GetAPIServerEndpoint(), conf.GetConfig().API.Port)
+		execCommand := []string{"ubi-bench", "c2"}
+		JobName := strings.ToLower(models.UbiTaskTypeStr(zkTask.TaskType)) + "-" + strconv.Itoa(zkTask.Id)
+		filC2Param := envVars["FIL_PROOFS_PARAMETER_CACHE"]
+
+		if len(strings.TrimSpace(filC2Param)) == 0 {
+			logs.GetLogger().Warnf("task_id: %d, `FIL_PROOFS_PARAMETER_CACHE` variable is not configured", zkTask.Id)
+			return
+		}
+
+		var nodeSelector = make(map[string]string)
+		if hardwareType == "CPU" {
+			delete(envVars, "RUST_GPU_TOOLS_CUSTOM_GPU")
+			envVars["BELLMAN_NO_GPU"] = "1"
+		} else {
+			if c2GpuName == "" {
+				delete(envVars, "RUST_GPU_TOOLS_CUSTOM_GPU")
+			}
+			envVars["CUDA_VISIBLE_DEVICES"] = waitUseGpu
+			nodeSelector = map[string]string{
+				"kubernetes.io/hostname": nodeName,
+			}
+		}
+
+		delete(envVars, "FIL_PROOFS_PARAMETER_CACHE")
+		var useEnvVars []v1.EnvVar
+		for k, v := range envVars {
+			useEnvVars = append(useEnvVars, v1.EnvVar{
+				Name:  k,
+				Value: v,
+			})
+		}
+
+		useEnvVars = append(useEnvVars, v1.EnvVar{
+			Name:  "RECEIVE_PROOF_URL",
+			Value: receiveUrl,
+		},
+			v1.EnvVar{
+				Name:  "TASKID",
+				Value: strconv.Itoa(zkTask.Id),
+			},
+			v1.EnvVar{
+				Name:  "NAME_SPACE",
+				Value: namespace,
+			},
+			v1.EnvVar{
+				Name:  "PARAM_URL",
+				Value: zkTask.InputParam,
+			},
+		)
+
+		job := &batchv1.Job{
+			ObjectMeta: metaV1.ObjectMeta{
+				Name:        JobName,
+				Namespace:   namespace,
+				Annotations: generateGpuAnnotation(prepareGpu),
+			},
+			Spec: batchv1.JobSpec{
+				Template: v1.PodTemplateSpec{
+					Spec: v1.PodSpec{
+						NodeName:     nodeName,
+						NodeSelector: nodeSelector,
+						Containers: []v1.Container{
+							{
+								Name:  JobName + generateString(5),
+								Image: ubiTaskImage,
+								Env:   useEnvVars,
+								VolumeMounts: []v1.VolumeMount{
+									{
+										Name:      "proof-params",
+										MountPath: "/var/tmp/filecoin-proof-parameters",
+									},
+								},
+								Command:         execCommand,
+								Resources:       resourceRequirements,
+								ImagePullPolicy: coreV1.PullIfNotPresent,
+							},
+						},
+						Volumes: []v1.Volume{
+							{
+								Name: "proof-params",
+								VolumeSource: v1.VolumeSource{
+									HostPath: &v1.HostPathVolumeSource{
+										Path: filC2Param,
+									},
+								},
+							},
+						},
+						RestartPolicy: v1.RestartPolicyNever,
+					},
+				},
+				BackoffLimit:            new(int32),
+				TTLSecondsAfterFinished: new(int32),
+			},
+		}
+
+		*job.Spec.BackoffLimit = 1
+		*job.Spec.TTLSecondsAfterFinished = 300
+
+		if _, err = k8sService.k8sClient.BatchV1().Jobs(namespace).Create(context.TODO(), job, metaV1.CreateOptions{}); err != nil {
+			logs.GetLogger().Errorf("Failed creating ubi task job: %v", err)
+			return
+		}
+
+		err = wait.PollImmediate(2*time.Second, 60*time.Second, func() (bool, error) {
+			pods, err := k8sService.k8sClient.CoreV1().Pods(namespace).List(context.TODO(), metaV1.ListOptions{
+				LabelSelector: fmt.Sprintf("job-name=%s", JobName),
+			})
+			if err != nil {
+				logs.GetLogger().Errorf("failed get pod, taskId: %d, error: %v，retrying", zkTask.Id, err)
+				return false, err
+			}
+
+			if len(pods.Items) == 0 {
+				return false, nil
+			}
+
+			for _, p := range pods.Items {
+				for _, condition := range p.Status.Conditions {
+					if condition.Type != coreV1.PodReady && condition.Status != coreV1.ConditionTrue {
+						return false, nil
+					}
+				}
+			}
+			return true, nil
+		})
+		if err != nil {
+			logs.GetLogger().Errorf("Failed waiting pods create: %v", err)
+			return
+		}
+
+		pods, err := k8sService.k8sClient.CoreV1().Pods(namespace).List(context.TODO(), metaV1.ListOptions{
+			LabelSelector: fmt.Sprintf("job-name=%s", JobName),
+		})
+		if err != nil {
+			logs.GetLogger().Errorf("Failed list ubi pods: %v", err)
+			return
+		}
+
+		var podName string
+		for _, pod := range pods.Items {
+			podName = pod.Name
+			break
+		}
+		if podName == "" {
+			logs.GetLogger().Errorf("failed get pod name, taskId: %d", zkTask.Id)
+			return
+		}
+		logs.GetLogger().Infof("successfully get pod name, taskId: %d, podName: %s", zkTask.Id, podName)
+
+		NewTaskService().UpdateTaskStatusById(zkTask.Id, models.TASK_RUNNING_STATUS)
+		req := k8sService.k8sClient.CoreV1().Pods(namespace).GetLogs(podName, &v1.PodLogOptions{
+			Container: "",
+			Follow:    true,
+		})
+
+		podLogs, err := req.Stream(context.Background())
+		if err != nil {
+			logs.GetLogger().Errorf("Error opening log stream: %v", err)
+			return
+		}
+		defer podLogs.Close()
+
+		cpRepoPath, _ := os.LookupEnv("CP_PATH")
+		ubiLogFileName := filepath.Join(cpRepoPath, "ubi-fcp.log")
+		logFile, err := os.OpenFile(ubiLogFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			logs.GetLogger().Errorf("opening ubi-fcp log file failed, error: %v", err)
+			return
+		}
+		defer logFile.Close()
+
+		if _, err = io.Copy(logFile, podLogs); err != nil {
+			logs.GetLogger().Errorf("write ubi-fcp log to file failed, error: %v", err)
+			return
+		}
+	}()
+
+	c.JSON(http.StatusOK, util.CreateSuccessResponse("success"))
+}
+
 func DoUbiTaskForK8s(c *gin.Context) {
 	var ubiTask models.UBITaskReq
 	if err := c.ShouldBindJSON(&ubiTask); err != nil {
@@ -798,8 +1314,7 @@ func DoZkTask(c *gin.Context) {
 	logs.GetLogger().Infof("ubi task received: task_id: %v, task_type: %s", taskId, models.UbiTaskTypeStr(zkTask.TaskType))
 
 	var resourceType = models.RESOURCE_TYPE_CPU
-
-	if zkTask.TaskType < models.Mining {
+	if zkTask.TaskType == models.FIL_C2_GPU512 || zkTask.TaskType == models.FIL_C2_GPU32G {
 		resourceType = models.RESOURCE_TYPE_GPU
 	} else if zkTask.TaskType == models.Mining && len(zkTask.Resource.Gpus) > 0 {
 		resourceType = models.RESOURCE_TYPE_GPU

@@ -91,6 +91,7 @@ func cpManager(router *gin.RouterGroup) {
 
 	router.POST("/cp/ubi", computing.DoUbiTaskForK8s)
 	router.POST("/cp/receive/ubi", computing.ReceiveUbiProof)
+	router.POST("/cp/zk_task", computing.DoZkTaskForK8s)
 
 }
 

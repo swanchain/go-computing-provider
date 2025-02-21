@@ -249,10 +249,11 @@ type DeployConfig struct {
 }
 
 type K8sResourceForImage struct {
-	Cpu     int64
-	Memory  float64
-	Storage float64
-	Gpus    []ReqGpu `json:"gpus"`
+	Cpu       int64
+	Memory    float64
+	Storage   float64
+	Gpus      []ReqGpu `json:"gpus"`
+	FilC2Flag string
 }
 
 type ReqGpu struct {
