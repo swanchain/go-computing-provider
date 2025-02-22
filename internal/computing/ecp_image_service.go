@@ -314,10 +314,7 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		deployJob.Image = yamlStruct.Services.Image
 		deployJob.Cmd = yamlStruct.Services.Cmd
 		deployJob.Ports = yamlStruct.Services.ExposePort
-		for k, v := range yamlStruct.Services.Envs {
-			envs = append(envs, fmt.Sprintf("%s=%s", k, v))
-		}
-		deployJob.Envs = append(deployJob.Envs, envs...)
+		deployJob.Envs = append(deployJob.Envs, yamlStruct.Services.Envs...)
 	} else {
 		logs.GetLogger().Errorf("not support deploy type")
 		return

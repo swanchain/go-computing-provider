@@ -1502,19 +1502,14 @@ func DeployImageSpaceTask(jobData models.JobData, job models.FcpDeployImageReq, 
 			return
 		}
 
-		var envs []string
-		deployJob.Image = job.DeployConfig.Image
-		deployJob.Cmd = job.DeployConfig.Cmd
+		deployJob.Image = yamlStruct.Services.Image
+		deployJob.Cmd = yamlStruct.Services.Cmd
 		deployJob.Ports = yamlStruct.Services.ExposePort
-
-		for k, v := range yamlStruct.Services.Envs {
-			envs = append(envs, fmt.Sprintf("%s=%s", k, v))
-		}
-		deployJob.Envs = envs
+		deployJob.Envs = yamlStruct.Services.Envs
 	}
 	deploy := NewDeploy(job.Uuid, jobUuid, hostName, job.WalletAddress, "", int64(job.Duration), constants.SPACE_TYPE_PUBLIC, models.SpaceHardware{}, 1)
 	deploy.WithIpWhiteList(job.IpWhiteList)
-	deploy.WithSpaceName(job.Name)
+	deploy.WithSpaceName(strings.ToLower(job.Name))
 	deploy.WithGpuProductName(nodeName)
 	deploy.WithGpuIndex(gpuIndex)
 	deploy.WithImage(deployJob.Image)
