@@ -164,6 +164,13 @@ func ReceiveJob(c *gin.Context) {
 		}
 	}
 
+	if checkGpuUsage() > conf.GetConfig().API.GPUUsagePercentage {
+		NewJobService().UpdateJobEntityStatusByJobUuid(jobEntity.JobUuid, models.JOB_REJECTED_STATUS)
+		logs.GetLogger().Errorf("space job gpu occupancy rate exceeds the set threshold, rejecting the task. job_uuid: %s", jobData.UUID)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.RejectTaskError))
+		return
+	}
+
 	if jobData.JobType == 1 {
 		if !conf.GetConfig().API.Pricing {
 			checkPriceFlag, totalCost, err := checkPrice(jobData.BidPrice, jobData.Duration, spaceDetail.Data.Space.ActiveOrder.Config)
@@ -951,6 +958,13 @@ func DeployImage(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "signature verify failed"))
 			return
 		}
+	}
+
+	if checkGpuUsage() > conf.GetConfig().API.GPUUsagePercentage {
+		NewJobService().UpdateJobEntityStatusByJobUuid(jobEntity.JobUuid, models.JOB_REJECTED_STATUS)
+		logs.GetLogger().Errorf("space job gpu occupancy rate exceeds the set threshold, rejecting the task. job_uuid: %s", jobData.UUID)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.RejectTaskError))
+		return
 	}
 
 	if !conf.GetConfig().API.Pricing {
@@ -1938,6 +1952,27 @@ func checkResourceAvailableForSpace(jobUuid string, jobType int, resourceConfig 
 		nodeName := nodes.Items[0].Name
 		return false, "", nil, 0, noAvailableStrMap[nodeName], nil
 	}
+}
+
+func checkGpuUsage() float64 {
+	k8sService := NewK8sService()
+	nodeGpuSummary, _, err := k8sService.GetNodeGpuSummary(context.TODO())
+	if err != nil {
+		logs.GetLogger().Errorf("Failed collect k8s gpu, error: %+v", err)
+		return 0
+	}
+
+	var totalGpu, totalUseGpu int
+	for _, gd := range nodeGpuSummary {
+		for _, g := range gd {
+			totalGpu += g.Total
+			totalUseGpu += g.Used
+		}
+	}
+	if totalGpu == 0 {
+		return 0
+	}
+	return float64(totalUseGpu / totalGpu)
 }
 
 func checkResourceAvailableForImage(jobUuid string, hardwareType string, resourceConfig models.K8sResourceForImage) (string, bool, string, []string, []models.PodGpu, []string, error) {

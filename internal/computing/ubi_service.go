@@ -128,6 +128,14 @@ func DoZkTaskForK8s(c *gin.Context) {
 		}
 	}
 
+	if checkGpuUsage() > conf.GetConfig().API.GPUUsagePercentage {
+		taskEntity.Status = models.TASK_REJECTED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
+		logs.GetLogger().Errorf("ubi task gpu occupancy rate exceeds the set threshold, rejecting the task. job_uuid: %v", taskId)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.RejectTaskError))
+		return
+	}
+
 	if zkTask.TaskType < models.Mining {
 		// do fil-c2
 		if !conf.GetConfig().UBI.EnableSequencer && !conf.GetConfig().UBI.AutoChainProof {
@@ -667,6 +675,14 @@ func DoUbiTaskForK8s(c *gin.Context) {
 		return
 	}
 
+	if checkGpuUsage() > conf.GetConfig().API.GPUUsagePercentage {
+		taskEntity.Status = models.TASK_REJECTED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
+		logs.GetLogger().Errorf("ubi task gpu occupancy rate exceeds the set threshold, rejecting the task. job_uuid: %d", ubiTask.ID)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.RejectTaskError))
+		return
+	}
+
 	var gpuFlag = "0"
 	if ubiTask.ResourceType == 1 {
 		gpuFlag = "1"
@@ -1134,6 +1150,14 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		return
 	}
 
+	if checkGpuUsage() > conf.GetConfig().API.GPUUsagePercentage {
+		taskEntity.Status = models.TASK_REJECTED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
+		logs.GetLogger().Errorf("ubi task gpu occupancy rate exceeds the set threshold, rejecting the task. job_uuid: %v", ubiTask.ID)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.RejectTaskError))
+		return
+	}
+
 	var gpuFlag = "0"
 	if ubiTask.ResourceType == 1 {
 		gpuFlag = "1"
@@ -1387,6 +1411,14 @@ func DoZkTask(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.SignatureError, "failed to verify signature"))
 			return
 		}
+	}
+
+	if checkGpuUsage() > conf.GetConfig().API.GPUUsagePercentage {
+		taskEntity.Status = models.TASK_REJECTED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
+		logs.GetLogger().Errorf("ecp ubi task gpu occupancy rate exceeds the set threshold, rejecting the task. job_uuid: %v", taskId)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.RejectTaskError))
+		return
 	}
 
 	if zkTask.TaskType < models.Mining {
@@ -1852,6 +1884,33 @@ func checkResourceForUbi(taskId int, resource *models.TaskResource, gpuName stri
 		}
 	}
 	return false, nodeResource.CpuName, needCpu, int64(needMemory), indexs, noAvailableStr, nil
+}
+
+func checkGpuUsageForDocker() float64 {
+	dockerService := NewDockerService()
+	containerLogStr, err := dockerService.ContainerLogs("resource-exporter")
+	if err != nil {
+		return 0
+	}
+
+	var nodeResource models.NodeResource
+	if err := json.Unmarshal([]byte(containerLogStr), &nodeResource); err != nil {
+		return 0
+	}
+
+	var totalGpu, totalUseGpu int
+	if nodeResource.Gpu.AttachedGpus > 0 {
+		for _, detail := range nodeResource.Gpu.Details {
+			totalGpu += 1
+			if detail.Status == models.Occupied {
+				totalUseGpu += 1
+			}
+		}
+	}
+	if totalGpu == 0 {
+		return 0
+	}
+	return float64(totalUseGpu / totalGpu)
 }
 
 func GetCpResource(c *gin.Context) {

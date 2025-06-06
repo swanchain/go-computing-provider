@@ -68,6 +68,7 @@ const (
 	BelowPriceError            = 4025
 	ReadPriceError             = 4026
 	ReadLogError               = 4027
+	RejectTaskError            = 4028
 
 	ProofParamError   = 7001
 	ProofReadLogError = 7002
@@ -111,6 +112,7 @@ var codeMsg = map[int]string{
 	RpcConnectError:            "An error occurred while connect rpc",
 	ReadPriceError:             "An error occurred while read price info",
 	ReadLogError:               "failed to read logs",
+	RejectTaskError:            "GPU occupancy rate exceeds the set threshold, rejecting the task",
 
 	ProofReadLogError: "An error occurred while read the log of proof",
 	ProofError:        "An error occurred while executing the calculation task",

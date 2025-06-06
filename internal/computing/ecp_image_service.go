@@ -189,6 +189,14 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		}
 	}
 
+	if checkGpuUsage() > conf.GetConfig().API.GPUUsagePercentage {
+		taskEntity.Status = models.TASK_REJECTED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
+		logs.GetLogger().Errorf("ecp job gpu occupancy rate exceeds the set threshold, rejecting the task. job_uuid: %v", job.Uuid)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.RejectTaskError))
+		return
+	}
+
 	var totalCost float64
 	var checkPriceFlag bool
 	if !conf.GetConfig().API.Pricing && job.Price != "-1" {
