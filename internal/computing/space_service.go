@@ -164,7 +164,7 @@ func ReceiveJob(c *gin.Context) {
 		}
 	}
 
-	if checkGpuUsage() > conf.GetConfig().API.GPUUsagePercentage {
+	if checkGpuUsage() > conf.GetConfig().API.GpuUtilizationRejectThreshold {
 		NewJobService().UpdateJobEntityStatusByJobUuid(jobEntity.JobUuid, models.JOB_REJECTED_STATUS)
 		logs.GetLogger().Errorf("space job gpu occupancy rate exceeds the set threshold, rejecting the task. job_uuid: %s", jobData.UUID)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.RejectTaskError))
@@ -960,7 +960,7 @@ func DeployImage(c *gin.Context) {
 		}
 	}
 
-	if checkGpuUsage() > conf.GetConfig().API.GPUUsagePercentage {
+	if checkGpuUsage() > conf.GetConfig().API.GpuUtilizationRejectThreshold {
 		NewJobService().UpdateJobEntityStatusByJobUuid(jobEntity.JobUuid, models.JOB_REJECTED_STATUS)
 		logs.GetLogger().Errorf("space job gpu occupancy rate exceeds the set threshold, rejecting the task. job_uuid: %s", jobData.UUID)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.RejectTaskError))

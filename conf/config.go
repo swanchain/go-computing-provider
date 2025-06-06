@@ -46,17 +46,17 @@ type ComputeNode struct {
 }
 
 type API struct {
-	Port               int
-	MultiAddress       string
-	Domain             string
-	NodeName           string
-	WalletWhiteList    string
-	WalletBlackList    string
-	Pricing            Pricing  `toml:"pricing"`
-	AutoDeleteImage    bool     `toml:"AutoDeleteImage"`
-	ClearLogDuration   int      `toml:"ClearLogDuration"`
-	PortRange          []string `toml:"PortRange"`
-	GPUUsagePercentage float64  `toml:"GPUUsagePercentage"`
+	Port                          int
+	MultiAddress                  string
+	Domain                        string
+	NodeName                      string
+	WalletWhiteList               string
+	WalletBlackList               string
+	Pricing                       Pricing  `toml:"pricing"`
+	AutoDeleteImage               bool     `toml:"AutoDeleteImage"`
+	ClearLogDuration              int      `toml:"ClearLogDuration"`
+	PortRange                     []string `toml:"PortRange"`
+	GpuUtilizationRejectThreshold float64  `toml:"GpuUtilizationRejectThreshold"`
 }
 type UBI struct {
 	UbiEnginePk     string
@@ -135,6 +135,10 @@ func InitConfig(cpRepoPath string, standalone bool) error {
 
 	if !metaData.IsDefined("Pricing") {
 		config.API.Pricing = true
+	}
+
+	if config.API.GpuUtilizationRejectThreshold == 0 {
+		config.API.GpuUtilizationRejectThreshold = 1.0
 	}
 
 	multiAddressSplit := strings.Split(config.API.MultiAddress, "/")
