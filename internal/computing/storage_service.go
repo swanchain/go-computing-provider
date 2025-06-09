@@ -43,6 +43,10 @@ func NewStorageService() (*StorageService, error) {
 		storage.mcsClient = mcsClient
 	})
 
+	if storage.mcsClient == nil {
+		return nil, fmt.Errorf("failed to create mcsClient, error: %v", err)
+	}
+
 	return storage, err
 }
 

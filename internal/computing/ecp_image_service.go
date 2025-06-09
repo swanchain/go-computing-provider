@@ -189,7 +189,7 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		}
 	}
 
-	if checkGpuUsageForDocker() > conf.GetConfig().API.GpuUtilizationRejectThreshold {
+	if checkGpuUsageForDocker() >= conf.GetConfig().API.GpuUtilizationRejectThreshold {
 		taskEntity.Status = models.TASK_REJECTED_STATUS
 		NewTaskService().SaveTaskEntity(taskEntity)
 		logs.GetLogger().Errorf("ecp job gpu occupancy rate exceeds the set threshold, rejecting the task. job_uuid: %v", job.Uuid)

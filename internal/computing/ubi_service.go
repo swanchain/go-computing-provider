@@ -128,7 +128,7 @@ func DoZkTaskForK8s(c *gin.Context) {
 		}
 	}
 
-	if checkGpuUsage() > conf.GetConfig().API.GpuUtilizationRejectThreshold {
+	if checkGpuUsage() >= conf.GetConfig().API.GpuUtilizationRejectThreshold {
 		taskEntity.Status = models.TASK_REJECTED_STATUS
 		NewTaskService().SaveTaskEntity(taskEntity)
 		logs.GetLogger().Errorf("ubi task gpu occupancy rate exceeds the set threshold, rejecting the task. job_uuid: %v", taskId)
@@ -675,7 +675,7 @@ func DoUbiTaskForK8s(c *gin.Context) {
 		return
 	}
 
-	if checkGpuUsage() > conf.GetConfig().API.GpuUtilizationRejectThreshold {
+	if checkGpuUsage() >= conf.GetConfig().API.GpuUtilizationRejectThreshold {
 		taskEntity.Status = models.TASK_REJECTED_STATUS
 		NewTaskService().SaveTaskEntity(taskEntity)
 		logs.GetLogger().Errorf("ubi task gpu occupancy rate exceeds the set threshold, rejecting the task. job_uuid: %d", ubiTask.ID)
@@ -1150,7 +1150,7 @@ func DoUbiTaskForDocker(c *gin.Context) {
 		return
 	}
 
-	if checkGpuUsageForDocker() > conf.GetConfig().API.GpuUtilizationRejectThreshold {
+	if checkGpuUsageForDocker() >= conf.GetConfig().API.GpuUtilizationRejectThreshold {
 		taskEntity.Status = models.TASK_REJECTED_STATUS
 		NewTaskService().SaveTaskEntity(taskEntity)
 		logs.GetLogger().Errorf("ubi task gpu occupancy rate exceeds the set threshold, rejecting the task. job_uuid: %v", ubiTask.ID)
@@ -1413,7 +1413,7 @@ func DoZkTask(c *gin.Context) {
 		}
 	}
 
-	if checkGpuUsageForDocker() > conf.GetConfig().API.GpuUtilizationRejectThreshold {
+	if checkGpuUsageForDocker() >= conf.GetConfig().API.GpuUtilizationRejectThreshold {
 		taskEntity.Status = models.TASK_REJECTED_STATUS
 		NewTaskService().SaveTaskEntity(taskEntity)
 		logs.GetLogger().Errorf("ecp ubi task gpu occupancy rate exceeds the set threshold, rejecting the task. job_uuid: %v", taskId)
