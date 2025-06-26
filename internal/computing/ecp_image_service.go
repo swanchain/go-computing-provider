@@ -736,6 +736,12 @@ func (*ImageJobService) DeployInference(c *gin.Context, deployJob models.DeployJ
 		var networkConfig *network.NetworkingConfig
 		if len(deployJob.Ports) > 1 {
 			hostConfig.PortBindings = portBinding
+			exposedPorts := nat.PortSet{}
+			for _, port := range deployJob.Ports {
+				portKey := nat.Port(fmt.Sprintf("%d/tcp", port))
+				exposedPorts[portKey] = struct{}{}
+			}
+			containerConfig.ExposedPorts = exposedPorts
 		} else {
 			containerConfig.Labels = labelMap
 			networkConfig = &network.NetworkingConfig{
