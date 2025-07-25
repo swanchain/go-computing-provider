@@ -23,8 +23,10 @@ type NodeResource struct {
 }
 
 type CollectNodeInfo struct {
-	Gpu     Gpu    `json:"gpu"`
-	CpuName string `json:"cpu_name"`
+	Gpu         Gpu    `json:"gpu"`
+	CpuName     string `json:"cpu_name"`
+	ProductUuid string `json:"product_uuid"`
+	MachineId   string `json:"machine_id"`
 }
 type Gpu struct {
 	DriverVersion string      `json:"driver_version"`

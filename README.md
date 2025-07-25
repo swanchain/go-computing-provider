@@ -366,6 +366,7 @@ make install
        AutoDeleteImage = false                        # Default false, automatically delete unused images
        ClearLogDuration = 24                          # The interval for automatically clearing the log, the unit is hours
        PortRange= ["40000-40050","40070"]             # Externally exposed port number for deploying ECP image tasks
+   	   GpuUtilizationRejectThreshold = 1.0            # When the GPU utilization reaches this value, no further tasks will be performed. For example, 0.5 means 50% utilization, while 1.0 means the GPU is fully utilized.
       
        [UBI]
        UbiEnginePk = "0xB5aeb540B4895cd024c1625E146684940A849ED9"              # UBI Engine's public key, CP only accept the task from this UBI engine

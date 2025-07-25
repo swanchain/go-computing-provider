@@ -189,6 +189,14 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		}
 	}
 
+	if checkGpuUsageForDocker() >= conf.GetConfig().API.GpuUtilizationRejectThreshold {
+		taskEntity.Status = models.TASK_REJECTED_STATUS
+		NewTaskService().SaveTaskEntity(taskEntity)
+		logs.GetLogger().Errorf("ecp job gpu occupancy rate exceeds the set threshold, rejecting the task. job_uuid: %v", job.Uuid)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.RejectTaskError))
+		return
+	}
+
 	var totalCost float64
 	var checkPriceFlag bool
 	if !conf.GetConfig().API.Pricing && job.Price != "-1" {
@@ -233,7 +241,7 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 	var envs []string
 	var needResource container.Resources
 	if len(job.Resource.Gpus) > 0 {
-		envs = append(envs, fmt.Sprintf("CUDA_VISIBLE_DEVICES=%s", strings.Join(indexs, ",")))
+		envs = append(envs, fmt.Sprintf("NVIDIA_VISIBLE_DEVICES=%s", strings.Join(indexs, ",")))
 		needResource = container.Resources{
 			CPUQuota: needCpu * 100000,
 			Memory:   job.Resource.Memory,
@@ -351,8 +359,13 @@ func (imageJob *ImageJobService) DeployJob(c *gin.Context) {
 		}
 	} else {
 		var gNameStr string
-		for _, g := range job.Resource.Gpus {
-			gNameStr += g.GPUModel + "="
+		if len(job.Resource.Gpus) > 0 {
+			for _, g := range job.Resource.Gpus {
+				if g.GPUModel == "" || g.GPU == 0 {
+					continue
+				}
+				gNameStr += g.GPUModel + "="
+			}
 		}
 
 		if err = NewEcpJobService().SaveEcpJobEntity(&models.EcpJobEntity{
