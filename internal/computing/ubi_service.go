@@ -4,6 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"math"
+	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/go-connections/nat"
@@ -21,7 +31,6 @@ import (
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"github.com/swanchain/go-computing-provider/util"
 	"github.com/swanchain/go-computing-provider/wallet"
-	"io"
 	batchv1 "k8s.io/api/batch/v1"
 	coreV1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
@@ -29,13 +38,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"math"
-	"net/http"
-	"os"
-	"path/filepath"
-	"strconv"
-	"strings"
-	"time"
 )
 
 func DoZkTaskForK8s(c *gin.Context) {
@@ -2551,30 +2553,45 @@ func RestartResourceExporter() error {
 		return fmt.Errorf("pull %s image failed, error: %v", build.UBIResourceExporterDockerImage, err)
 	}
 
-	err = dockerService.ContainerCreateAndStart(&container.Config{
-		Image:        build.UBIResourceExporterDockerImage,
-		AttachStdout: true,
-		AttachStderr: true,
-		Tty:          true,
-	}, &container.HostConfig{
+	hostConfig := &container.HostConfig{
 		Binds: []string{"/etc/machine-id:/etc/machine-id"},
 		RestartPolicy: container.RestartPolicy{
 			Name:              container.RestartPolicyOnFailure,
 			MaximumRetryCount: 3,
 		},
 		Privileged: true,
-		Resources: container.Resources{
+	}
+
+	if hasGpuCapability() {
+		hostConfig.Resources = container.Resources{
 			DeviceRequests: []container.DeviceRequest{
 				{
 					Capabilities: [][]string{{"gpu"}},
 				},
 			},
-		},
-	}, nil, resourceExporterContainerName)
+		}
+	}
+
+	err = dockerService.ContainerCreateAndStart(&container.Config{
+		Image:        build.UBIResourceExporterDockerImage,
+		AttachStdout: true,
+		AttachStderr: true,
+		Tty:          true,
+	}, hostConfig, nil, resourceExporterContainerName)
 	if err != nil {
 		return fmt.Errorf("create resource-exporter container failed, error: %v", err)
 	}
 	return nil
+}
+
+func hasGpuCapability() bool {
+	cmd := exec.Command("nvidia-smi")
+	err := cmd.Run()
+	if err != nil {
+		logs.GetLogger().Warnf("nvidia-smi command failed, assuming no GPU capability: %v", err)
+		return false
+	}
+	return true
 }
 
 func submitTaskToSequencer(proof string, task *models.TaskEntity, timeOut int64, autoChainProof bool) error {
@@ -2784,6 +2801,8 @@ func GetCpBalance() {
 	sequencerBalanceStr, err := sequencerStub.GetCPBalance()
 	if err != nil {
 		logs.GetLogger().Errorf("failed to get cp sequencer contract, cpAccount: %s, error: %v", cpAccountAddress, err)
+		logs.GetLogger().Errorf("cpAccountAddress = %s, contract addr = %s", cpAccountAddress, conf.GetConfig().CONTRACT.Sequencer)
+
 		return
 	}
 
