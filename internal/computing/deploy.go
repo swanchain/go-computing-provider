@@ -282,23 +282,24 @@ func (d *Deploy) YamlToK8s(nodePort int32) error {
 		}
 
 		const (
-			megabyteInBytes = 1024 * 1024
+			gigabyteInBytes = 1024 * 1024 * 1024
 		)
-		if cr.ShmSizeInMb > 0 {
-			volumeMount = append(volumeMount, coreV1.VolumeMount{
-				Name:      "shm",
-				MountPath: "/dev/shm",
-			})
-			volumes = append(volumes, coreV1.Volume{
-				Name: "shm",
-				VolumeSource: coreV1.VolumeSource{
-					EmptyDir: &coreV1.EmptyDirVolumeSource{
-						Medium:    coreV1.StorageMediumMemory,
-						SizeLimit: resource.NewQuantity(cr.ShmSizeInMb*megabyteInBytes, resource.BinarySI),
-					},
-				},
-			})
+		if cr.ShmSizeInGb == 0 {
+			cr.ShmSizeInGb = 20
 		}
+		volumeMount = append(volumeMount, coreV1.VolumeMount{
+			Name:      "shm",
+			MountPath: "/dev/shm",
+		})
+		volumes = append(volumes, coreV1.Volume{
+			Name: "shm",
+			VolumeSource: coreV1.VolumeSource{
+				EmptyDir: &coreV1.EmptyDirVolumeSource{
+					Medium:    coreV1.StorageMediumMemory,
+					SizeLimit: resource.NewQuantity(cr.ShmSizeInGb*gigabyteInBytes, resource.BinarySI),
+				},
+			},
+		})
 
 		var containers []coreV1.Container
 		for _, depend := range cr.Depends {

@@ -23,7 +23,7 @@ type ContainerResource struct {
 	GpuModel      string
 	Models        []ModelResource
 	ServiceType   string
-	ShmSizeInMb   int64
+	ShmSizeInGb   int64
 }
 
 type ConfigFile struct {
