@@ -2,9 +2,10 @@ package yaml
 
 import (
 	"fmt"
+	"os"
+
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
-	"os"
 )
 
 type ContainerResource struct {
@@ -22,6 +23,7 @@ type ContainerResource struct {
 	GpuModel      string
 	Models        []ModelResource
 	ServiceType   string
+	ShmSizeInMb   int64
 }
 
 type ConfigFile struct {

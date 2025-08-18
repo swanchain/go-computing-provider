@@ -4,6 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/constants"
@@ -15,13 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"math/rand"
-	"os"
-	"path/filepath"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
 )
 
 type Deploy struct {
@@ -278,6 +279,25 @@ func (d *Deploy) YamlToK8s(nodePort int32) error {
 					MountPath: cr.VolumeMounts.Path,
 				},
 			}
+		}
+
+		const (
+			megabyteInBytes = 1024 * 1024
+		)
+		if cr.ShmSizeInMb > 0 {
+			volumeMount = append(volumeMount, coreV1.VolumeMount{
+				Name:      "shm",
+				MountPath: "/dev/shm",
+			})
+			volumes = append(volumes, coreV1.Volume{
+				Name: "shm",
+				VolumeSource: coreV1.VolumeSource{
+					EmptyDir: &coreV1.EmptyDirVolumeSource{
+						Medium:    coreV1.StorageMediumMemory,
+						SizeLimit: resource.NewQuantity(cr.ShmSizeInMb*megabyteInBytes, resource.BinarySI),
+					},
+				},
+			})
 		}
 
 		var containers []coreV1.Container
