@@ -285,7 +285,9 @@ func (d *Deploy) YamlToK8s(nodePort int32) error {
 			gigabyteInBytes = 1024 * 1024 * 1024
 		)
 		if cr.ShmSizeInGb == 0 {
-			cr.ShmSizeInGb = 20
+			// /dev/shm is used for inter-process communication (IPC) and shared memory segments, typically for CPU-bound tasks.
+			// 8GB would be a safe enough buffer since FCP require user to have minimum 64GB RAM
+			cr.ShmSizeInGb = 8
 		}
 		volumeMount = append(volumeMount, coreV1.VolumeMount{
 			Name:      "shm",
