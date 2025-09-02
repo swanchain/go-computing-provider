@@ -3,7 +3,7 @@
     "network": "mainnet",
     "config": {
       "sequencer_url": "https://sequencer.swanchain.io",
-      "zk_engine_pk": "0xB5aeb540B4895cd024c1625E146684940A849ED9",
+      "zk_engine_pk": "0x594A4c5cF8e98E1aA5e9266F913dC74a24Eae0e9",
       "orchestrator_pk": "0x4B98086A20f3C19530AF32D21F85Bc6399358e20",
       "chain_rpc": "https://mainnet-rpc-01.swanchain.org",
       "edge_url": "https://edge-api.swanchain.io/v1",
@@ -39,7 +39,7 @@
     "network": "testnet",
     "config": {
       "sequencer_url": "https://sequencer-testnet.swanchain.io",
-      "zk_engine_pk": "0xB5aeb540B4895cd024c1625E146684940A849ED9",
+      "zk_engine_pk": "0xCb1F2aDf1D6e65111852078b64a51A20B2723503",
       "orchestrator_pk": "0x29eD49c8E973696D07E7927f748F6E5Eacd5516D",
       "chain_rpc": "https://rpc-proxima.swanchain.io",
       "edge_url": "https://edge-testnet.swanchain.io/v1",
@@ -60,10 +60,10 @@
         "orchestrator_collateral_contract": "0xd5716082058871755ca9202838e35f51dFa816D2",
         "job_manager_contract": "0x03214d989CDb90F81a2DB77F700DaBba8dDD1b6d",
         "job_manager_contract_created": 8080000,
-        "register_cp_contract": "0x0c5ff16ecac04d89413aaa3ebf904ac0ea440675",
-        "zk_collateral_contract": "0x061aff8056be4dce6c6603db4cc26e36a75adf74",
-        "register_task_contract": "0xadbea2727cac1d28265cd54eee6a1da652df1d70",
-        "sequencer_contract": "0x65f54e77ac0e0364a0bff99314e2b1f37059acaa",
+        "register_cp_contract": "0x0D94664947c05e95519D25f7183a9D42b9FDbE8E",
+        "zk_collateral_contract": "0x4aA2B8492d5e7c614288EeEcf71cA17872abCFBA",
+        "register_task_contract": "0x62a49c698E7338b0d9D9C4b89F5c174dD3D3AcCd",
+        "sequencer_contract": "0x6bDccc493df284D651814Ef47ad2813E358D4Be7",
         "edge_task_payment": "0x236c46cd8495ca98e407b093a5fe0fa4b1791d91",
         "edge_task_payment_created": 10218600
       }
