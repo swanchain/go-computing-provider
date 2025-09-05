@@ -4,6 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/constants"
@@ -15,13 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"math/rand"
-	"os"
-	"path/filepath"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
 )
 
 type Deploy struct {
@@ -543,6 +544,8 @@ func (d *Deploy) DeploySshTaskToK8s(containerResource yaml.ContainerResource, no
 						{
 							Name:            constants.K8S_PRIVATE_CONTAINER_PREFIX + d.jobUuid,
 							Image:           d.image,
+							Command:         containerResource.Command,
+							Args:            containerResource.Args,
 							ImagePullPolicy: coreV1.PullIfNotPresent,
 							Ports:           containerResource.Ports,
 							Resources:       d.createResources(),
