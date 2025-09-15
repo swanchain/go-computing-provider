@@ -6,11 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/swanchain/go-computing-provider/internal/contract/account"
-	"github.com/swanchain/go-computing-provider/internal/yaml"
 	"io"
-	coreV1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"math/rand"
 	"net/http"
 	"os"
@@ -20,6 +16,11 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/swanchain/go-computing-provider/internal/contract/account"
+	"github.com/swanchain/go-computing-provider/internal/yaml"
+	coreV1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -757,7 +758,7 @@ func DoProof(c *gin.Context) {
 					Containers: []v1.Container{
 						{
 							Name:  "worker-container-" + generateString(5),
-							Image: "filswan/worker-proof:v1.0",
+							Image: "swanhub/worker-proof:v1.0",
 							Env: []v1.EnvVar{
 								{
 									Name:  "METHOD",
