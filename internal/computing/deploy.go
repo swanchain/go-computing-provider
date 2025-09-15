@@ -565,6 +565,8 @@ func (d *Deploy) DeploySshTaskToK8s(containerResource yaml.ContainerResource, no
 						{
 							Name:            constants.K8S_PRIVATE_CONTAINER_PREFIX + d.jobUuid,
 							Image:           d.image,
+							Command:         containerResource.Command,
+							Args:            containerResource.Args,
 							ImagePullPolicy: coreV1.PullIfNotPresent,
 							Ports:           containerResource.Ports,
 							Resources:       d.createResources(),
