@@ -646,11 +646,11 @@ func (s *K8sService) WaitForPodRunningByHttp(namespace, jobUuid, serviceIp strin
 	return podName, nil
 }
 
-func (s *K8sService) WaitForPodRunningByTcp(namespace, jobUuid string) (string, error) {
+func (s *K8sService) WaitForPodRunningByTcp(namespace, jobUuid string, labelSelector string) (string, error) {
 	var podName string
 	err := wait.PollImmediate(time.Second*5, time.Minute*10, func() (done bool, err error) {
 		podList, err := s.k8sClient.CoreV1().Pods(namespace).List(context.TODO(), metaV1.ListOptions{
-			LabelSelector: fmt.Sprintf("hub-private==%s", jobUuid),
+			LabelSelector: labelSelector,
 		})
 		if err != nil {
 			logs.GetLogger().Error(err)
