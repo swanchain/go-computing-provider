@@ -369,7 +369,7 @@ make install
    	   GpuUtilizationRejectThreshold = 1.0            # When the GPU utilization reaches this value, no further tasks will be performed. For example, 0.5 means 50% utilization, while 1.0 means the GPU is fully utilized.
       
        [UBI]
-       UbiEnginePk = "0xB5aeb540B4895cd024c1625E146684940A849ED9"              # UBI Engine's public key, CP only accept the task from this UBI engine
+       UbiEnginePk = "0x594A4c5cF8e98E1aA5e9266F913dC74a24Eae0e9"              # UBI Engine's public key, CP only accept the task from this UBI engine
        EnableSequencer = true                                                  # Submit the proof to Sequencer service(default: true)
        AutoChainProof = true                                                   # When Sequencer doesn't have enough funds or the service is unavailable, automatically submit proof to the Swan chain 
        SequencerUrl = "https://sequencer.swanchain.io"                         # Sequencer service's API address

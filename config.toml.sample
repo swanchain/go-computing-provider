@@ -13,7 +13,7 @@ GpuUtilizationRejectThreshold = 1                                        # When 
 
 
 [UBI]
-UbiEnginePk = "0xB5aeb540B4895cd024c1625E146684940A849ED9"                # UBI Engine's public key, CP only accept the task from this UBI engine
+UbiEnginePk = "0x594A4c5cF8e98E1aA5e9266F913dC74a24Eae0e9"                # UBI Engine's public key, CP only accept the task from this UBI engine
 EnableSequencer = true                                                    # Enable aa Sequencer to receive zk-task proofs
 AutoChainProof = true                                                     # Sequencer insufficient balance or service unavailable, use chain to submit proof
 SequencerUrl = "https://sequencer.swanchain.io"                           # Sequencer service's API address
