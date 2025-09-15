@@ -901,6 +901,7 @@ func DeployImage(c *gin.Context) {
 	jobEntity.ContainerLog = jobData.ContainerLog
 	jobEntity.Duration = deployJob.Duration
 	jobEntity.JobUuid = deployJob.Uuid
+	jobEntity.TaskUuid = deployJob.Uuid
 	jobEntity.DeployStatus = models.DEPLOY_RECEIVE_JOB
 	jobEntity.CreateTime = time.Now().Unix()
 	jobEntity.ExpireTime = time.Now().Unix() + int64(deployJob.Duration)
@@ -1535,7 +1536,7 @@ func DeployImageSpaceTask(jobData models.JobData, job models.FcpDeployImageReq, 
 		return
 	}
 	if deploy.nodePortUrl != "" {
-		jobData.JobRealUri = deploy.nodePortUrl[:len(deploy.nodePortUrl)-2]
+		jobData.JobRealUri = deploy.nodePortUrl[:len(deploy.nodePortUrl)]
 		if err = submitJob(&jobData); err != nil {
 			logs.GetLogger().Errorf("failed to upload job result to MCS, jobUuid: %s, error: %v", jobData.UUID, err)
 			return

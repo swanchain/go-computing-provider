@@ -737,8 +737,8 @@ func (d *Deploy) DeployImageToK8s(containerResource models.DeployJobParam) error
 		}
 	}
 
-	d.nodePortUrl = fmt.Sprintf("ssh root@%s -p%d ; %s",
-		strings.Split(conf.GetConfig().API.MultiAddress, "/")[2], sshNodePort, strings.Join(portMap, ", "))
+	d.nodePortUrl = fmt.Sprintf("ssh root@%s -p%d ; %s ; %s  ",
+		strings.Split(conf.GetConfig().API.MultiAddress, "/")[2], sshNodePort, strings.Join(portMap, ", "), d.hostName)
 
 	if len(additionalPorts) > 0 {
 		_, err = k8sService.CreateIngress(context.TODO(), d.k8sNameSpace, d.jobUuid, d.hostName, additionalPorts[0], d.ipWhiteList)
