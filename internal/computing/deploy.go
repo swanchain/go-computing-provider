@@ -281,6 +281,28 @@ func (d *Deploy) YamlToK8s(nodePort int32) error {
 			}
 		}
 
+		const (
+			gigabyteInBytes = 1024 * 1024 * 1024
+		)
+		if cr.ShmSizeInGb == 0 {
+			// /dev/shm is used for inter-process communication (IPC) and shared memory segments, typically for CPU-bound tasks.
+			// 8GB would be a safe enough buffer since FCP require user to have minimum 64GB RAM
+			cr.ShmSizeInGb = 8
+		}
+		volumeMount = append(volumeMount, coreV1.VolumeMount{
+			Name:      "shm",
+			MountPath: "/dev/shm",
+		})
+		volumes = append(volumes, coreV1.Volume{
+			Name: "shm",
+			VolumeSource: coreV1.VolumeSource{
+				EmptyDir: &coreV1.EmptyDirVolumeSource{
+					Medium:    coreV1.StorageMediumMemory,
+					SizeLimit: resource.NewQuantity(cr.ShmSizeInGb*gigabyteInBytes, resource.BinarySI),
+				},
+			},
+		})
+
 		var containers []coreV1.Container
 		for _, depend := range cr.Depends {
 			var ports []coreV1.ContainerPort
