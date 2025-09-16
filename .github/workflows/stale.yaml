@@ -1,0 +1,19 @@
+name: Close inactive PRs
+
+on:
+  schedule:
+    - cron: "0 0 * * *" # runs once per day at midnight UTC
+  workflow_dispatch: # allows you to trigger manually too
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v10.0.0
+        with:
+          days-before-stale: 30   # PR is marked stale after 30 days of inactivity
+          days-before-close: 7    # PR is closed 7 days after being marked stale
+          stale-pr-message: "This PR has been inactive for 30 days. It will be closed if no further activity occurs."
+          close-pr-message: "Closing this PR due to prolonged inactivity."
+          stale-issue-message: "" # disable issues (empty = do nothing)
+
