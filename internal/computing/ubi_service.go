@@ -503,13 +503,11 @@ func doFilC2TaskForK8s(c *gin.Context, zkTask models.ZkTaskReq, taskEntity *mode
 			}
 
 			for _, p := range pods.Items {
-				for _, condition := range p.Status.Conditions {
-					if condition.Type != coreV1.PodReady && condition.Status != coreV1.ConditionTrue {
-						return false, nil
-					}
+				if p.Status.Phase != coreV1.PodRunning {
+					return false, nil // Pod not running yet, keep waiting
 				}
 			}
-			return true, nil
+			return true, nil // All pods are running
 		})
 		if err != nil {
 			logs.GetLogger().Errorf("Failed waiting pods create: %v", err)
@@ -943,13 +941,11 @@ func DoUbiTaskForK8s(c *gin.Context) {
 			}
 
 			for _, p := range pods.Items {
-				for _, condition := range p.Status.Conditions {
-					if condition.Type != coreV1.PodReady && condition.Status != coreV1.ConditionTrue {
-						return false, nil
-					}
+				if p.Status.Phase != coreV1.PodRunning {
+					return false, nil // Pod not running yet, keep waiting
 				}
 			}
-			return true, nil
+			return true, nil // All pods are running
 		})
 		if err != nil {
 			logs.GetLogger().Errorf("Failed waiting pods create: %v", err)
