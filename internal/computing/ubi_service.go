@@ -2566,6 +2566,8 @@ func RestartResourceExporter() error {
 		hostConfig.Resources = container.Resources{
 			DeviceRequests: []container.DeviceRequest{
 				{
+					Driver:       "nvidia",
+					Count:        -1, // -1 means all GPUs
 					Capabilities: [][]string{{"gpu"}},
 				},
 			},
