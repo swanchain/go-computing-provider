@@ -868,118 +868,146 @@ func (s *K8sService) GetUsedNodePorts() (map[int32]struct{}, error) {
 
 func generateVolume() ([]coreV1.VolumeMount, []coreV1.Volume) {
 	fileType := coreV1.HostPathFile
-	return []coreV1.VolumeMount{
-			{
-				Name:      "shm",
-				MountPath: "/dev/shm",
-			},
-			{
-				Name:      "lxcfs-proc-cpuinfo",
-				MountPath: "/proc/cpuinfo",
-				ReadOnly:  true,
-			},
-			{
-				Name:      "system-cpu-online",
-				MountPath: "/sys/devices/system/cpu/online",
-			},
-			{
-				Name:      "lxcfs-proc-diskstats",
-				MountPath: "/proc/diskstats",
-				ReadOnly:  true,
-			},
-			{
-				Name:      "lxcfs-proc-meminfo",
-				MountPath: "/proc/meminfo",
-				ReadOnly:  true,
-			},
-			{
-				Name:      "lxcfs-proc-stat",
-				MountPath: "/proc/stat",
-				ReadOnly:  true,
-			},
-			{
-				Name:      "lxcfs-proc-swaps",
-				MountPath: "/proc/swaps",
-				ReadOnly:  true,
-			},
-			{
-				Name:      "lxcfs-proc-uptime",
-				MountPath: "/proc/uptime",
-				ReadOnly:  true,
-			},
-		}, []coreV1.Volume{
-			{
-				Name: "shm",
-				VolumeSource: coreV1.VolumeSource{
-					EmptyDir: &coreV1.EmptyDirVolumeSource{
-						Medium: coreV1.StorageMediumMemory,
-					},
+	dirOrCreateType := coreV1.HostPathDirectoryOrCreate
+
+	volumeMounts := []coreV1.VolumeMount{
+		{
+			Name:      "shm",
+			MountPath: "/dev/shm",
+		},
+		{
+			Name:      "lxcfs-proc-cpuinfo",
+			MountPath: "/proc/cpuinfo",
+			ReadOnly:  true,
+		},
+		{
+			Name:      "system-cpu-online",
+			MountPath: "/sys/devices/system/cpu/online",
+		},
+		{
+			Name:      "lxcfs-proc-diskstats",
+			MountPath: "/proc/diskstats",
+			ReadOnly:  true,
+		},
+		{
+			Name:      "lxcfs-proc-meminfo",
+			MountPath: "/proc/meminfo",
+			ReadOnly:  true,
+		},
+		{
+			Name:      "lxcfs-proc-stat",
+			MountPath: "/proc/stat",
+			ReadOnly:  true,
+		},
+		{
+			Name:      "lxcfs-proc-swaps",
+			MountPath: "/proc/swaps",
+			ReadOnly:  true,
+		},
+		{
+			Name:      "lxcfs-proc-uptime",
+			MountPath: "/proc/uptime",
+			ReadOnly:  true,
+		},
+	}
+
+	volumes := []coreV1.Volume{
+		{
+			Name: "shm",
+			VolumeSource: coreV1.VolumeSource{
+				EmptyDir: &coreV1.EmptyDirVolumeSource{
+					Medium: coreV1.StorageMediumMemory,
 				},
 			},
-			{
-				Name: "lxcfs-proc-cpuinfo",
+		},
+		{
+			Name: "lxcfs-proc-cpuinfo",
+			VolumeSource: coreV1.VolumeSource{
+				HostPath: &coreV1.HostPathVolumeSource{
+					Path: "/var/lib/lxcfs/proc/cpuinfo",
+					Type: &fileType,
+				},
+			},
+		},
+		{
+			Name: "system-cpu-online",
+			VolumeSource: coreV1.VolumeSource{
+				HostPath: &coreV1.HostPathVolumeSource{
+					Path: "/var/lib/lxcfs/sys/devices/system/cpu/online",
+					Type: &fileType,
+				},
+			},
+		},
+		{
+			Name: "lxcfs-proc-diskstats",
+			VolumeSource: coreV1.VolumeSource{
+				HostPath: &coreV1.HostPathVolumeSource{
+					Path: "/var/lib/lxcfs/proc/diskstats",
+					Type: &fileType,
+				},
+			},
+		},
+		{
+			Name: "lxcfs-proc-meminfo",
+			VolumeSource: coreV1.VolumeSource{
+				HostPath: &coreV1.HostPathVolumeSource{
+					Path: "/var/lib/lxcfs/proc/meminfo",
+					Type: &fileType,
+				},
+			},
+		},
+		{
+			Name: "lxcfs-proc-stat",
+			VolumeSource: coreV1.VolumeSource{
+				HostPath: &coreV1.HostPathVolumeSource{
+					Path: "/var/lib/lxcfs/proc/stat",
+					Type: &fileType,
+				},
+			},
+		},
+		{
+			Name: "lxcfs-proc-swaps",
+			VolumeSource: coreV1.VolumeSource{
+				HostPath: &coreV1.HostPathVolumeSource{
+					Path: "/var/lib/lxcfs/proc/swaps",
+					Type: &fileType,
+				},
+			},
+		},
+		{
+			Name: "lxcfs-proc-uptime",
+			VolumeSource: coreV1.VolumeSource{
+				HostPath: &coreV1.HostPathVolumeSource{
+					Path: "/var/lib/lxcfs/proc/uptime",
+					Type: &fileType,
+				},
+			},
+		},
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		logs.GetLogger().Errorf("Failed to get user home directory: %v", err)
+	} else {
+		huggingfaceCachePath := filepath.Join(homeDir, ".cache", "huggingface")
+		if _, err := os.Stat(huggingfaceCachePath); err == nil {
+			volumeMounts = append(volumeMounts, coreV1.VolumeMount{
+				Name:      "huggingface-cache",
+				MountPath: "/root/.cache/huggingface",
+			})
+			volumes = append(volumes, coreV1.Volume{
+				Name: "huggingface-cache",
 				VolumeSource: coreV1.VolumeSource{
 					HostPath: &coreV1.HostPathVolumeSource{
-						Path: "/var/lib/lxcfs/proc/cpuinfo",
-						Type: &fileType,
+						Path: huggingfaceCachePath,
+						Type: &dirOrCreateType,
 					},
 				},
-			},
-			{
-				Name: "system-cpu-online",
-				VolumeSource: coreV1.VolumeSource{
-					HostPath: &coreV1.HostPathVolumeSource{
-						Path: "/var/lib/lxcfs/sys/devices/system/cpu/online",
-						Type: &fileType,
-					},
-				},
-			},
-			{
-				Name: "lxcfs-proc-diskstats",
-				VolumeSource: coreV1.VolumeSource{
-					HostPath: &coreV1.HostPathVolumeSource{
-						Path: "/var/lib/lxcfs/proc/diskstats",
-						Type: &fileType,
-					},
-				},
-			},
-			{
-				Name: "lxcfs-proc-meminfo",
-				VolumeSource: coreV1.VolumeSource{
-					HostPath: &coreV1.HostPathVolumeSource{
-						Path: "/var/lib/lxcfs/proc/meminfo",
-						Type: &fileType,
-					},
-				},
-			},
-			{
-				Name: "lxcfs-proc-stat",
-				VolumeSource: coreV1.VolumeSource{
-					HostPath: &coreV1.HostPathVolumeSource{
-						Path: "/var/lib/lxcfs/proc/stat",
-						Type: &fileType,
-					},
-				},
-			},
-			{
-				Name: "lxcfs-proc-swaps",
-				VolumeSource: coreV1.VolumeSource{
-					HostPath: &coreV1.HostPathVolumeSource{
-						Path: "/var/lib/lxcfs/proc/swaps",
-						Type: &fileType,
-					},
-				},
-			},
-			{
-				Name: "lxcfs-proc-uptime",
-				VolumeSource: coreV1.VolumeSource{
-					HostPath: &coreV1.HostPathVolumeSource{
-						Path: "/var/lib/lxcfs/proc/uptime",
-						Type: &fileType,
-					},
-				},
-			},
+			})
 		}
+	}
+
+	return volumeMounts, volumes
 }
 
 func (s *K8sService) GetClusterRuntime() (string, error) {
