@@ -4,6 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/swanchain/go-computing-provider/conf"
 	"github.com/swanchain/go-computing-provider/constants"
@@ -15,13 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"math/rand"
-	"os"
-	"path/filepath"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
 )
 
 type Deploy struct {
@@ -280,6 +281,28 @@ func (d *Deploy) YamlToK8s(nodePort int32) error {
 			}
 		}
 
+		const (
+			gigabyteInBytes = 1024 * 1024 * 1024
+		)
+		if cr.ShmSizeInGb == 0 {
+			// /dev/shm is used for inter-process communication (IPC) and shared memory segments, typically for CPU-bound tasks.
+			// 8GB would be a safe enough buffer since FCP require user to have minimum 64GB RAM
+			cr.ShmSizeInGb = 8
+		}
+		volumeMount = append(volumeMount, coreV1.VolumeMount{
+			Name:      "shm",
+			MountPath: "/dev/shm",
+		})
+		volumes = append(volumes, coreV1.Volume{
+			Name: "shm",
+			VolumeSource: coreV1.VolumeSource{
+				EmptyDir: &coreV1.EmptyDirVolumeSource{
+					Medium:    coreV1.StorageMediumMemory,
+					SizeLimit: resource.NewQuantity(cr.ShmSizeInGb*gigabyteInBytes, resource.BinarySI),
+				},
+			},
+		})
+
 		var containers []coreV1.Container
 		for _, depend := range cr.Depends {
 			var ports []coreV1.ContainerPort
@@ -501,6 +524,27 @@ func (d *Deploy) ModelInferenceToK8s() error {
 	return nil
 }
 
+func (d *Deploy) configureSshAccess(k8sService *K8sService, podName string) error {
+
+	sshkeyCmd := []string{"sh", "-c", fmt.Sprintf("echo '%s' > /root/.ssh/authorized_keys", d.sshKey)}
+	if err := k8sService.PodDoCommand(d.k8sNameSpace, podName, "", sshkeyCmd); err != nil {
+		return fmt.Errorf("failed to add sshkey, job_uuid: %s error: %v", d.jobUuid, err)
+	}
+
+	// randomPassword := generateRandomPassword(8)
+	// usernameAndPwdCmd := []string{"sh", "-c", fmt.Sprintf("useradd %s && echo \"%s:%s\" | chpasswd", d.userName, d.userName, randomPassword)}
+	// if err := k8sService.PodDoCommand(d.k8sNameSpace, podName, "", usernameAndPwdCmd); err != nil {
+	// 	return fmt.Errorf("failed to add user, job_uuid: %s error: %v", d.jobUuid, err)
+	// }
+
+	// userDir := fmt.Sprintf("/home/%s", d.userName)
+	// userDirCmd := []string{"sh", "-c", fmt.Sprintf("mkdir -p %s && chown %s:%s %s && chmod 755 %s", userDir, d.userName, d.userName, userDir, userDir)}
+	// if err := k8sService.PodDoCommand(d.k8sNameSpace, podName, "", userDirCmd); err != nil {
+	// 	return fmt.Errorf("failed to create user directory, job_uuid: %s error: %v", d.jobUuid, err)
+	// }
+	return nil
+}
+
 func (d *Deploy) DeploySshTaskToK8s(containerResource yaml.ContainerResource, nodePort int32) error {
 	k8sService := NewK8sService()
 	volumeMounts, volumes := generateVolume()
@@ -543,6 +587,8 @@ func (d *Deploy) DeploySshTaskToK8s(containerResource yaml.ContainerResource, no
 						{
 							Name:            constants.K8S_PRIVATE_CONTAINER_PREFIX + d.jobUuid,
 							Image:           d.image,
+							Command:         containerResource.Command,
+							Args:            containerResource.Args,
 							ImagePullPolicy: coreV1.PullIfNotPresent,
 							Ports:           containerResource.Ports,
 							Resources:       d.createResources(),
@@ -559,26 +605,13 @@ func (d *Deploy) DeploySshTaskToK8s(containerResource yaml.ContainerResource, no
 	}
 	updateJobStatus(d.originalJobUuid, models.DEPLOY_PULL_IMAGE)
 
-	podName, err := k8sService.WaitForPodRunningByTcp(d.k8sNameSpace, d.jobUuid)
+	podName, err := k8sService.WaitForPodRunningByTcp(d.k8sNameSpace, d.jobUuid, fmt.Sprintf("hub-private==%s", d.jobUuid))
 	if err != nil {
 		return fmt.Errorf("job_uuid: %s, %v", d.jobUuid, err)
 	}
 
-	sshkeyCmd := []string{"sh", "-c", fmt.Sprintf("echo '%s' > /root/.ssh/authorized_keys", d.sshKey)}
-	if err = k8sService.PodDoCommand(d.k8sNameSpace, podName, "", sshkeyCmd); err != nil {
-		return fmt.Errorf("failed to add sshkey, job_uuid: %s error: %v", d.jobUuid, err)
-	}
-
-	randomPassword := generateRandomPassword(8)
-	usernameAndPwdCmd := []string{"sh", "-c", fmt.Sprintf("useradd %s && echo \"%s:%s\" | chpasswd", d.userName, d.userName, randomPassword)}
-	if err = k8sService.PodDoCommand(d.k8sNameSpace, podName, "", usernameAndPwdCmd); err != nil {
-		return fmt.Errorf("failed to add user, job_uuid: %s error: %v", d.jobUuid, err)
-	}
-
-	userDir := fmt.Sprintf("/home/%s", d.userName)
-	userDirCmd := []string{"sh", "-c", fmt.Sprintf("mkdir -p %s && chown %s:%s %s && chmod 755 %s", userDir, d.userName, d.userName, userDir, userDir)}
-	if err = k8sService.PodDoCommand(d.k8sNameSpace, podName, "", userDirCmd); err != nil {
-		return fmt.Errorf("failed to create user directory, job_uuid: %s error: %v", d.jobUuid, err)
+	if err = d.configureSshAccess(k8sService, podName); err != nil {
+		return err
 	}
 
 	createService, err := k8sService.CreateServiceByNodePort(context.TODO(), d.k8sNameSpace, d.jobUuid, 22, nodePort, exclude22Port, "hub-private")
@@ -590,8 +623,8 @@ func (d *Deploy) DeploySshTaskToK8s(containerResource yaml.ContainerResource, no
 	for _, port := range createService.Spec.Ports {
 		portMap += fmt.Sprintf("%s:%d, ", port.TargetPort.String(), port.NodePort)
 	}
-	d.nodePortUrl = fmt.Sprintf("ssh root@%s -p%d、username: %s,password: %s; %s",
-		strings.Split(conf.GetConfig().API.MultiAddress, "/")[2], nodePort, d.userName, randomPassword, portMap)
+	d.nodePortUrl = fmt.Sprintf("ssh root@%s -p%d、username: %s, %s",
+		strings.Split(conf.GetConfig().API.MultiAddress, "/")[2], nodePort, d.userName, portMap)
 	d.watchContainerRunningTime()
 	return nil
 }
@@ -617,11 +650,18 @@ func (d *Deploy) DeployImageToK8s(containerResource models.DeployJobParam) error
 
 	var envs = d.createEnvForImage()
 	for _, v := range containerResource.Envs {
-		splits := strings.Split(v, "=")
+		envKey, envValue, foundSep := strings.Cut(v, "=")
+		if !foundSep {
+			logs.GetLogger().Warningf("Invalid envs from job: %s, env = %s", d.jobUuid, v)
+			continue
+		}
 		envs = append(envs, coreV1.EnvVar{
-			Name:  splits[0],
-			Value: splits[1],
+			Name:  envKey,
+			Value: envValue,
 		})
+		if envKey == "sshKey" {
+			d.WithSshKey(envValue)
+		}
 	}
 
 	deployment := &appV1.Deployment{
@@ -656,6 +696,7 @@ func (d *Deploy) DeployImageToK8s(containerResource models.DeployJobParam) error
 						{
 							Name:            constants.K8S_PRIVATE_CONTAINER_PREFIX + d.jobUuid,
 							Image:           d.image,
+							Args:            containerResource.Cmd,
 							ImagePullPolicy: coreV1.PullIfNotPresent,
 							Ports:           ports,
 							Resources:       d.createK8sResourcesForImage(containerResource.K8sResourceForImage),
@@ -672,23 +713,62 @@ func (d *Deploy) DeployImageToK8s(containerResource models.DeployJobParam) error
 	}
 	updateJobStatus(d.originalJobUuid, models.DEPLOY_PULL_IMAGE)
 
-	if len(portArray) > 1 {
-		createService, err := k8sService.CreateServiceByNodePort(context.TODO(), d.k8sNameSpace, d.jobUuid, portArray[0], 0, portArray, "lad_app")
-		if err != nil {
-			return fmt.Errorf("failed to create service, job_uuid: %s error: %v", d.jobUuid, err)
+	podName, err := k8sService.WaitForPodRunningByTcp(d.k8sNameSpace, d.jobUuid, fmt.Sprintf("lad_app==%s", d.jobUuid))
+	if err != nil {
+		return fmt.Errorf("error on waiting for pod running, job_uuid: %s, pod: %s, error: %v", d.jobUuid, podName, err)
+	}
+
+	err = d.configureSshAccess(k8sService, podName)
+	if err != nil {
+		return fmt.Errorf("error on configuring ssh access, job_uuid: %s, pod: %s, error: %v", d.jobUuid, podName, err)
+	}
+
+	// Ensure port 22 is publicly mapped to the k8s node
+	var portsExcluding22 []int32
+	for _, p := range portArray {
+		if p != 22 {
+			portsExcluding22 = append(portsExcluding22, p)
 		}
-		var portMap string
-		for _, port := range createService.Spec.Ports {
-			portMap += fmt.Sprintf("%s:%d, ", port.TargetPort.String(), port.NodePort)
-		}
-		d.nodePortUrl = fmt.Sprintf("http://%s; %s",
-			strings.Split(conf.GetConfig().API.MultiAddress, "/")[2], portMap)
+	}
+
+	// Construct the new array with 22 at the beginning, followed by other ports
+	// This ensures 22 is always the first port if portArray is not empty,
+	// or if it was empty, it will become [22].
+	var finalPortArray []int32
+	finalPortArray = append(finalPortArray, 22)                  // Always ensure 22 is first
+	finalPortArray = append(finalPortArray, portsExcluding22...) // Append all other ports
+
+	var containerPortForSpecialHandling int32
+	var additionalPorts []int32
+
+	containerPortForSpecialHandling = finalPortArray[0] // This will always be 22
+	if len(finalPortArray) > 1 {
+		additionalPorts = finalPortArray[1:]
 	} else {
-		if _, err := d.deployK8sResource(portArray[0]); err != nil {
-			logs.GetLogger().Error(err)
-			return fmt.Errorf("failed to create service, job_uuid: %s error: %v", d.jobUuid, err)
+		additionalPorts = []int32{}
+	}
+
+	createService, err := k8sService.CreateServiceByNodePort(context.TODO(), d.k8sNameSpace, d.jobUuid, containerPortForSpecialHandling, 0, additionalPorts, "lad_app")
+	if err != nil {
+		return fmt.Errorf("failed to create service, job_uuid: %s error: %v", d.jobUuid, err)
+	}
+	var portMap []string
+	var sshNodePort = 0
+	for _, port := range createService.Spec.Ports {
+		portMap = append(portMap, fmt.Sprintf("%s:%d", port.TargetPort.String(), port.NodePort))
+		if port.TargetPort.IntValue() == 22 {
+			sshNodePort = int(port.NodePort)
 		}
-		updateJobStatus(d.originalJobUuid, models.DEPLOY_TO_K8S, "https://"+d.hostName)
+	}
+
+	d.nodePortUrl = fmt.Sprintf("ssh root@%s -p%d ; %s ; %s  ",
+		strings.Split(conf.GetConfig().API.MultiAddress, "/")[2], sshNodePort, strings.Join(portMap, ", "), d.hostName)
+
+	if len(additionalPorts) > 0 {
+		_, err = k8sService.CreateIngress(context.TODO(), d.k8sNameSpace, d.jobUuid, d.hostName, additionalPorts[0], d.ipWhiteList)
+		if err != nil {
+			return fmt.Errorf("failed to create ingress for the non-ssh port, error: %w", err)
+		}
 	}
 	d.watchContainerRunningTime()
 	return nil

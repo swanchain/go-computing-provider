@@ -6,21 +6,22 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	calicov3 "github.com/projectcalico/api/pkg/apis/projectcalico/v3"
-	calicoclientset "github.com/projectcalico/api/pkg/client/clientset_generated/clientset"
-	"github.com/swanchain/go-computing-provider/constants"
-	"github.com/swanchain/go-computing-provider/internal/models"
 	"io"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/tools/remotecommand"
-	"k8s.io/client-go/util/retry"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	calicov3 "github.com/projectcalico/api/pkg/apis/projectcalico/v3"
+	calicoclientset "github.com/projectcalico/api/pkg/client/clientset_generated/clientset"
+	"github.com/swanchain/go-computing-provider/constants"
+	"github.com/swanchain/go-computing-provider/internal/models"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/client-go/util/retry"
 
 	appV1 "k8s.io/api/apps/v1"
 	coreV1 "k8s.io/api/core/v1"
@@ -548,7 +549,7 @@ func (s *K8sService) GetResourceExporterVersion() (string, error) {
 	var version string
 	if len(podList.Items) > 0 {
 		for _, c := range podList.Items[0].Spec.Containers {
-			if strings.Contains(c.Image, "filswan/resource-exporter") {
+			if strings.Contains(c.Image, "swanhub/resource-exporter") {
 				version = strings.Split(c.Image, ":")[1]
 			}
 		}
@@ -645,11 +646,11 @@ func (s *K8sService) WaitForPodRunningByHttp(namespace, jobUuid, serviceIp strin
 	return podName, nil
 }
 
-func (s *K8sService) WaitForPodRunningByTcp(namespace, jobUuid string) (string, error) {
+func (s *K8sService) WaitForPodRunningByTcp(namespace, jobUuid string, labelSelector string) (string, error) {
 	var podName string
 	err := wait.PollImmediate(time.Second*5, time.Minute*10, func() (done bool, err error) {
 		podList, err := s.k8sClient.CoreV1().Pods(namespace).List(context.TODO(), metaV1.ListOptions{
-			LabelSelector: fmt.Sprintf("hub-private==%s", jobUuid),
+			LabelSelector: labelSelector,
 		})
 		if err != nil {
 			logs.GetLogger().Error(err)

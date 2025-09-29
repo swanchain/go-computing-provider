@@ -1,8 +1,9 @@
 package models
 
 import (
-	"github.com/ethereum/go-ethereum/common"
 	"math/big"
+
+	"github.com/ethereum/go-ethereum/common"
 )
 
 type JobData struct {
@@ -228,14 +229,14 @@ type FcpDeployImageReq struct {
 }
 
 type YamlContent struct {
-	Version  string `json:"version"`
+	Version  string `yaml:"version"`
 	Services struct {
-		Image       string   `json:"image"`
-		Cmd         []string `json:"cmd"`
-		RunCommands []string `json:"run_commands"`
-		Envs        []string `json:"envs"`
-		ExposePort  []int    `json:"expose_port"`
-	} `json:"services"`
+		Image       string   `yaml:"image"`
+		Cmd         []string `yaml:"cmd"`
+		RunCommands []string `yaml:"run_commands"`
+		Envs        []string `yaml:"envs"`
+		ExposePort  []int    `yaml:"expose_port"`
+	} `yaml:"services"`
 }
 
 type DeployConfig struct {

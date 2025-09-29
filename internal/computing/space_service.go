@@ -6,11 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/swanchain/go-computing-provider/internal/contract/account"
-	"github.com/swanchain/go-computing-provider/internal/yaml"
 	"io"
-	coreV1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"math/rand"
 	"net/http"
 	"os"
@@ -20,6 +16,11 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/swanchain/go-computing-provider/internal/contract/account"
+	"github.com/swanchain/go-computing-provider/internal/yaml"
+	coreV1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -757,7 +758,7 @@ func DoProof(c *gin.Context) {
 					Containers: []v1.Container{
 						{
 							Name:  "worker-container-" + generateString(5),
-							Image: "filswan/worker-proof:v1.0",
+							Image: "swanhub/worker-proof:v1.0",
 							Env: []v1.EnvVar{
 								{
 									Name:  "METHOD",
@@ -900,6 +901,7 @@ func DeployImage(c *gin.Context) {
 	jobEntity.ContainerLog = jobData.ContainerLog
 	jobEntity.Duration = deployJob.Duration
 	jobEntity.JobUuid = deployJob.Uuid
+	jobEntity.TaskUuid = deployJob.Uuid
 	jobEntity.DeployStatus = models.DEPLOY_RECEIVE_JOB
 	jobEntity.CreateTime = time.Now().Unix()
 	jobEntity.ExpireTime = time.Now().Unix() + int64(deployJob.Duration)
@@ -1444,14 +1446,13 @@ func DeployImageSpaceTask(jobData models.JobData, job models.FcpDeployImageReq, 
 
 	var success bool
 	var jobUuid = strings.ToLower(job.Uuid)
-	var walletAddress string
 	defer func() {
 		for _, g := range job.Resource.Gpus {
 			deleteGpuCache(g.GpuModel, g.GPU)
 		}
 
 		if !success {
-			k8sNameSpace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(walletAddress)
+			k8sNameSpace := constants.K8S_NAMESPACE_NAME_PREFIX + strings.ToLower(job.WalletAddress)
 			DeleteJob(k8sNameSpace, jobUuid, "failed to deploy job")
 			NewJobService().DeleteJobEntityByJobUuId(job.Uuid, models.JOB_TERMINATED_STATUS)
 		}
@@ -1514,15 +1515,11 @@ func DeployImageSpaceTask(jobData models.JobData, job models.FcpDeployImageReq, 
 			return
 		}
 
-		var envs []string
-		deployJob.Image = job.DeployConfig.Image
-		deployJob.Cmd = job.DeployConfig.Cmd
+		deployJob.Image = yamlStruct.Services.Image
+		deployJob.Cmd = yamlStruct.Services.Cmd
 		deployJob.Ports = yamlStruct.Services.ExposePort
 
-		for k, v := range yamlStruct.Services.Envs {
-			envs = append(envs, fmt.Sprintf("%s=%s", k, v))
-		}
-		deployJob.Envs = envs
+		deployJob.Envs = yamlStruct.Services.Envs
 	}
 	deploy := NewDeploy(job.Uuid, jobUuid, hostName, job.WalletAddress, "", int64(job.Duration), constants.SPACE_TYPE_PUBLIC, models.SpaceHardware{}, 1)
 	deploy.WithIpWhiteList(job.IpWhiteList)
@@ -1537,7 +1534,7 @@ func DeployImageSpaceTask(jobData models.JobData, job models.FcpDeployImageReq, 
 		return
 	}
 	if deploy.nodePortUrl != "" {
-		jobData.JobRealUri = deploy.nodePortUrl[:len(deploy.nodePortUrl)-2]
+		jobData.JobRealUri = deploy.nodePortUrl[:len(deploy.nodePortUrl)]
 		if err = submitJob(&jobData); err != nil {
 			logs.GetLogger().Errorf("failed to upload job result to MCS, jobUuid: %s, error: %v", jobData.UUID, err)
 			return
@@ -1720,11 +1717,11 @@ func DeleteJob(namespace, jobUuid string, msg string) error {
 			logs.GetLogger().Infof(" deleted images, job_uuid: %s, image: %s", jobUuid, imageId)
 		}
 
-		if err := k8sService.DeleteDeployment(context.TODO(), namespace, deployName); err != nil && !errors.IsNotFound(err) {
+		logs.GetLogger().Infof("deleting deployment, namespace: %s, job_uuid: %s, deployName: %s", namespace, jobUuid, deployName)
+		if err := k8sService.DeleteDeployment(context.TODO(), namespace, deployName); err != nil {
 			logs.GetLogger().Errorf("Failed delete deployment, deployName: %s, error: %+v", deployName, err)
 			return err
 		}
-		logs.GetLogger().Infof("deleted deployment, job_uuid: %s, deployName: %s", jobUuid, deployName)
 		time.Sleep(6 * time.Second)
 
 		if err := k8sService.DeleteDeployRs(context.TODO(), namespace, jobUuid); err != nil && !errors.IsNotFound(err) {
