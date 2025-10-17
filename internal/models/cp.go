@@ -212,6 +212,7 @@ func JobOnChainStatus(status int) string {
 
 type FcpDeployImageReq struct {
 	Uuid          string              `json:"uuid"`
+	TaskUuid      string              `json:"task_uuid"`
 	Name          string              `json:"name"`
 	InstanceName  string              `json:"instance_name"`
 	Duration      int                 `json:"duration"`
