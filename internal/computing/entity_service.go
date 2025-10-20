@@ -2,11 +2,12 @@ package computing
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/google/wire"
 	"github.com/swanchain/go-computing-provider/internal/db"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"gorm.io/gorm"
-	"time"
 )
 
 type TaskService struct {
@@ -116,7 +117,7 @@ func (jobServ JobService) UpdateJobResultUrlByJobUuid(jobUuid string, resultUrl 
 
 func (jobServ JobService) GetJobEntityByTaskUuid(taskUuid string) (models.JobEntity, error) {
 	var job models.JobEntity
-	err := jobServ.Model(&models.JobEntity{}).Where("task_uuid=? and delete_at=?", taskUuid, models.UN_DELETEED_FLAG).Find(&job).Error
+	err := jobServ.Model(&models.JobEntity{}).Where("task_uuid=? and delete_at=?", taskUuid, models.UN_DELETEED_FLAG).First(&job).Error
 	return job, err
 }
 

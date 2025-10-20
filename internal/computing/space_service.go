@@ -901,7 +901,7 @@ func DeployImage(c *gin.Context) {
 	jobEntity.ContainerLog = jobData.ContainerLog
 	jobEntity.Duration = deployJob.Duration
 	jobEntity.JobUuid = deployJob.Uuid
-	jobEntity.TaskUuid = deployJob.Uuid
+	jobEntity.TaskUuid = deployJob.TaskUuid
 	jobEntity.DeployStatus = models.DEPLOY_RECEIVE_JOB
 	jobEntity.CreateTime = time.Now().Unix()
 	jobEntity.ExpireTime = time.Now().Unix() + int64(deployJob.Duration)
@@ -962,7 +962,7 @@ func DeployImage(c *gin.Context) {
 		}
 	}
 
-	if checkGpuUsage() >= conf.GetConfig().API.GpuUtilizationRejectThreshold {
+	if hardwareType == "GPU" && checkGpuUsage() >= conf.GetConfig().API.GpuUtilizationRejectThreshold {
 		NewJobService().UpdateJobEntityStatusByJobUuid(jobEntity.JobUuid, models.JOB_REJECTED_STATUS)
 		logs.GetLogger().Errorf("space job gpu occupancy rate exceeds the set threshold, rejecting the task. job_uuid: %s", jobData.UUID)
 		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.RejectTaskError))
