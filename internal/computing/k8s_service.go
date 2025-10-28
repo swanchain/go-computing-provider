@@ -2,6 +2,7 @@ package computing
 
 import "C"
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -556,6 +557,7 @@ func (s *K8sService) GetResourceExporterVersion() (string, error) {
 	}
 	return version, nil
 }
+
 func (s *K8sService) GetPodLogByPodName(namespace, podName string, podLogOptions *coreV1.PodLogOptions) (string, error) {
 	req := s.k8sClient.CoreV1().Pods(namespace).GetLogs(podName, podLogOptions)
 	buf, err := readLog(req)
@@ -675,8 +677,8 @@ func (s *K8sService) WaitForPodRunningByTcp(namespace, jobUuid string, labelSele
 	return podName, nil
 }
 
-func (s *K8sService) PodDoCommand(namespace, podName, containerName string, podCmd []string) error {
-	reader, writer := io.Pipe()
+func (s *K8sService) PodDoCommand(namespace, podName, containerName string, podCmd []string) (string, string, error) {
+	var stdout, stderr bytes.Buffer
 	req := s.k8sClient.CoreV1().RESTClient().
 		Post().
 		Resource("pods").
@@ -686,28 +688,30 @@ func (s *K8sService) PodDoCommand(namespace, podName, containerName string, podC
 		VersionedParams(&coreV1.PodExecOptions{
 			Container: containerName,
 			Command:   podCmd,
-			Stdin:     true,
+			Stdin:     false,
 			Stdout:    true,
 			Stderr:    true,
-			TTY:       true,
+			TTY:       false,
 		}, scheme.ParameterCodec)
 
 	executor, err := remotecommand.NewSPDYExecutor(s.config, "POST", req.URL())
 	if err != nil {
-		return fmt.Errorf("failed to create spdy client: %w", err)
+		logs.GetLogger().Errorf("Failed to create spdy client for pod %s: %v", podName, err)
+		return "", "", fmt.Errorf("failed to create spdy client: %w", err)
 	}
 
-	err = executor.Stream(remotecommand.StreamOptions{
-		Stdin:  reader,
-		Stdout: writer,
-		Stderr: writer,
-		Tty:    true,
+	err = executor.StreamWithContext(context.TODO(), remotecommand.StreamOptions{
+		Stdin:  nil,
+		Stdout: &stdout,
+		Stderr: &stderr,
+		Tty:    false,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to create stream: %w", err)
+		logs.GetLogger().Errorf("Failed to create stream for pod %s: %v", podName, err)
+		return "", "", fmt.Errorf("failed to create stream: %w", err)
 	}
 
-	return nil
+	return stdout.String(), stderr.String(), nil
 }
 
 type GpuData struct {

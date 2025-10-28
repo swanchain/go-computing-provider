@@ -527,7 +527,7 @@ func (d *Deploy) ModelInferenceToK8s() error {
 func (d *Deploy) configureSshAccess(k8sService *K8sService, podName string) error {
 
 	sshkeyCmd := []string{"sh", "-c", fmt.Sprintf("echo '%s' > /root/.ssh/authorized_keys", d.sshKey)}
-	if err := k8sService.PodDoCommand(d.k8sNameSpace, podName, "", sshkeyCmd); err != nil {
+	if _, _, err := k8sService.PodDoCommand(d.k8sNameSpace, podName, "", sshkeyCmd); err != nil {
 		return fmt.Errorf("failed to add sshkey, job_uuid: %s error: %v", d.jobUuid, err)
 	}
 

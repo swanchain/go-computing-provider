@@ -2,6 +2,7 @@ package computing
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -293,6 +294,75 @@ func ReceiveJob(c *gin.Context) {
 
 	jobData.NodeIdJobSourceUriSignature = ""
 	c.JSON(http.StatusOK, util.CreateSuccessResponse(jobData))
+}
+
+func GetResourceExporterMetrics(c *gin.Context) {
+	logs.GetLogger().Info("Starting GetResourceExporterMetrics function.")
+	k8sService := NewK8sService()
+	if k8sService == nil {
+		logs.GetLogger().Info("Failed to create k8s service client.")
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ServerError, "failed to create k8s service client"))
+		return
+	}
+	logs.GetLogger().Info("Successfully created k8s service client.")
+
+	logs.GetLogger().Info("Attempting to list resource-exporter pods in kube-system namespace.")
+	podList, err := k8sService.k8sClient.CoreV1().Pods("kube-system").List(context.Background(), metaV1.ListOptions{
+		LabelSelector: "app=resource-exporter",
+	})
+	if err != nil {
+		logs.GetLogger().Errorf("Failed to list resource-exporter pods, error: %v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ServerError, fmt.Sprintf("failed to list resource-exporter pods: %v", err)))
+		return
+	}
+	logs.GetLogger().Infof("Successfully listed %d resource-exporter pods.", len(podList.Items))
+
+	if len(podList.Items) == 0 {
+		logs.GetLogger().Info("No resource-exporter pods found.")
+		c.JSON(http.StatusNotFound, util.CreateErrorResponse(util.ServerError, "resource-exporter pod not found"))
+		return
+	}
+	logs.GetLogger().Info("Resource-exporter pod found.")
+
+	// Assuming we only need metrics from one resource-exporter pod, pick the first one
+	resourceExporterPodName := podList.Items[0].Name
+	if resourceExporterPodName == "" {
+		logs.GetLogger().Info("Resource-exporter pod name is empty.")
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ServerError, "resource-exporter pod name not found"))
+		return
+	}
+	logs.GetLogger().Infof("Resource-exporter pod name: %s", resourceExporterPodName)
+
+	var mergedMetrics bytes.Buffer
+
+	// Get /node/metrics using PodDoCommand
+	logs.GetLogger().Infof("Attempting to get /node/metrics from resource-exporter pod %s.", resourceExporterPodName)
+	// wget -q -O - localhost:9000/node/metrics
+	nodeMetricsCmd := []string{"wget", "-q", "-O", "-", "localhost:9000/node/metrics"}
+	nodeMetricsStdout, _, err := k8sService.PodDoCommand("kube-system", resourceExporterPodName, "", nodeMetricsCmd)
+	if err != nil {
+		logs.GetLogger().Errorf("Failed to get /node/metrics from resource-exporter pod %s: %v", resourceExporterPodName, err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ServerError, fmt.Sprintf("failed to get node metrics: %v", err)))
+		return
+	}
+	logs.GetLogger().Info("Successfully retrieved /node/metrics.")
+	mergedMetrics.WriteString(nodeMetricsStdout)
+	mergedMetrics.WriteString("\n")
+
+	// Get /dcgm/metrics using PodDoCommand
+	logs.GetLogger().Infof("Attempting to get /dcgm/metrics from resource-exporter pod %s.", resourceExporterPodName)
+	dcgmMetricsCmd := []string{"wget", "-q", "-O", "-", "localhost:9000/dcgm/metrics"}
+	dcgmMetricsStdout, _, err := k8sService.PodDoCommand("kube-system", resourceExporterPodName, "", dcgmMetricsCmd)
+	if err != nil {
+		logs.GetLogger().Errorf("Failed to get /dcgm/metrics from resource-exporter pod %s: %v", resourceExporterPodName, err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ServerError, fmt.Sprintf("failed to get dcgm metrics: %v", err)))
+		return
+	}
+	logs.GetLogger().Info("Successfully retrieved /dcgm/metrics.")
+	mergedMetrics.WriteString(dcgmMetricsStdout)
+
+	logs.GetLogger().Info("Returning merged resource-exporter metrics.")
+	c.String(http.StatusOK, mergedMetrics.String())
 }
 
 func submitJob(jobData *models.JobData) error {
@@ -1775,7 +1845,7 @@ func downloadModelUrl(namespace, jobUuid, serviceIp string, podCmd []string) {
 		return
 	}
 
-	if err = k8sService.PodDoCommand(namespace, podName, "", podCmd); err != nil {
+	if _, _, err = k8sService.PodDoCommand(namespace, podName, "", podCmd); err != nil {
 		logs.GetLogger().Error(err)
 		return
 	}
