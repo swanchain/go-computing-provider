@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"bytes"
+
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/go-connections/nat"
@@ -1987,6 +1989,64 @@ func GetCpResource(c *gin.Context) {
 	})
 }
 
+func GetUbiResourceExporterMetrics(c *gin.Context) {
+	dockerService := NewDockerService()
+	if dockerService == nil {
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ServerError, "failed to create docker service client"))
+		return
+	}
+
+	containers, err := dockerService.c.ContainerList(context.Background(), container.ListOptions{All: true})
+	if err != nil {
+		logs.GetLogger().Errorf("listing containers failed, error: %v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ServerError, fmt.Sprintf("failed to list docker containers: %v", err)))
+		return
+	}
+
+	var resourceExporterContainerID string
+	for _, ctr := range containers {
+		for _, name := range ctr.Names {
+			if name == "/resource-exporter" {
+				resourceExporterContainerID = ctr.ID
+				break
+			}
+		}
+		if resourceExporterContainerID != "" {
+			break
+		}
+	}
+
+	if resourceExporterContainerID == "" {
+		c.JSON(http.StatusNotFound, util.CreateErrorResponse(util.ServerError, "resource-exporter container not found"))
+		return
+	}
+
+	var mergedMetrics bytes.Buffer
+
+	// Get /node/metrics
+	nodeMetricsCmd := []string{"curl", "http://localhost:9000/node/metrics"}
+	nodeMetrics, err := dockerService.ContainerExec(resourceExporterContainerID, nodeMetricsCmd)
+	if err != nil {
+		logs.GetLogger().Errorf("failed to get /node/metrics from resource-exporter: %v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ServerError, fmt.Sprintf("failed to get node metrics: %v", err)))
+		return
+	}
+	mergedMetrics.WriteString(nodeMetrics)
+	mergedMetrics.WriteString("\n")
+
+	// Get /dcgm/metrics
+	dcgmMetricsCmd := []string{"curl", "http://localhost:9000/dcgm/metrics"}
+	dcgmMetrics, err := dockerService.ContainerExec(resourceExporterContainerID, dcgmMetricsCmd)
+	if err != nil {
+		logs.GetLogger().Errorf("failed to get /dcgm/metrics from resource-exporter: %v", err)
+		c.JSON(http.StatusInternalServerError, util.CreateErrorResponse(util.ServerError, fmt.Sprintf("failed to get dcgm metrics: %v", err)))
+		return
+	}
+	mergedMetrics.WriteString(dcgmMetrics)
+
+	c.String(http.StatusOK, mergedMetrics.String())
+}
+
 func submitUBIProof(c2Proof models.UbiC2Proof, task *models.TaskEntity) {
 	chainUrl, err := conf.GetRpcByNetWorkName()
 	if err != nil {
@@ -2554,7 +2614,11 @@ func RestartResourceExporter() error {
 	}
 
 	hostConfig := &container.HostConfig{
-		Binds: []string{"/etc/machine-id:/etc/machine-id"},
+		Binds: []string{
+			"/etc/machine-id:/etc/machine-id",
+			"/proc:/host/proc",
+			"/sys:/host/sys",
+		},
 		RestartPolicy: container.RestartPolicy{
 			Name:              container.RestartPolicyOnFailure,
 			MaximumRetryCount: 3,

@@ -3,6 +3,11 @@ package main
 import (
 	_ "embed"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
+	"time"
+
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
@@ -14,10 +19,6 @@ import (
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"github.com/swanchain/go-computing-provider/util"
 	"github.com/urfave/cli/v2"
-	"os"
-	"path/filepath"
-	"strconv"
-	"time"
 )
 
 var ubiTaskCmd = &cli.Command{
@@ -219,6 +220,7 @@ var daemonCmd = &cli.Command{
 
 		router := r.Group("/api/v1/computing")
 		router.GET("/cp", computing.GetCpResource)
+		router.GET("/cp/metrics", computing.GetUbiResourceExporterMetrics)
 		router.POST("/cp/ubi", computing.DoUbiTaskForDocker)
 		router.POST("/cp/docker/receive/ubi", computing.ReceiveUbiProof)
 

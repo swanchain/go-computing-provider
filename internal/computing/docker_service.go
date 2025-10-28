@@ -9,6 +9,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"time"
+
 	"github.com/containerd/containerd/namespaces"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -18,12 +25,6 @@ import (
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/swanchain/go-computing-provider/build"
 	"github.com/swanchain/go-computing-provider/constants"
-	"io"
-	"os"
-	"path/filepath"
-	"regexp"
-	"strings"
-	"time"
 
 	"github.com/swanchain/go-computing-provider/conf"
 
@@ -394,6 +395,41 @@ func (ds *DockerService) ContainerLogs(containerName string) (string, error) {
 	} else {
 		return result, nil
 	}
+}
+
+func (ds *DockerService) ContainerExec(containerID string, cmd []string) (string, error) {
+	ctx := context.Background()
+	execConfig := container.ExecOptions{
+		AttachStdout: true,
+		AttachStderr: true,
+		Cmd:          cmd,
+	}
+	execIDResponse, err := ds.c.ContainerExecCreate(ctx, containerID, execConfig)
+	if err != nil {
+		return "", fmt.Errorf("failed to create exec command: %w", err)
+	}
+
+	if execIDResponse.ID == "" {
+		return "", fmt.Errorf("exec ID is empty")
+	}
+
+	resp, err := ds.c.ContainerExecAttach(ctx, execIDResponse.ID, container.ExecAttachOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to attach to exec command: %w", err)
+	}
+	defer resp.Close()
+
+	var outBuf, errBuf bytes.Buffer
+	_, err = io.Copy(&outBuf, resp.Reader)
+	if err != nil {
+		return "", fmt.Errorf("failed to read exec output: %w", err)
+	}
+
+	if errBuf.Len() > 0 {
+		return "", fmt.Errorf("exec command stderr: %s", errBuf.String())
+	}
+
+	return outBuf.String(), nil
 }
 
 func (ds *DockerService) GetContainerLogStream(ctx context.Context, containerName string) (io.ReadCloser, error) {

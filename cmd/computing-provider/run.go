@@ -3,11 +3,18 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/filswan/go-mcs-sdk/mcs/api/common/logs"
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
-	"github.com/itsjamie/gin-cors"
+	cors "github.com/itsjamie/gin-cors"
 	"github.com/olekukonko/tablewriter"
 	"github.com/swanchain/go-computing-provider/build"
 	"github.com/swanchain/go-computing-provider/conf"
@@ -21,12 +28,6 @@ import (
 	"github.com/swanchain/go-computing-provider/util"
 	"github.com/swanchain/go-computing-provider/wallet"
 	"github.com/urfave/cli/v2"
-	"os"
-	"path/filepath"
-	"regexp"
-	"strconv"
-	"strings"
-	"time"
 )
 
 var runCmd = &cli.Command{
@@ -76,6 +77,7 @@ var runCmd = &cli.Command{
 func cpManager(router *gin.RouterGroup) {
 	router.GET("/cp", computing.StatisticalSources)
 	router.GET("/host/info", computing.GetServiceProviderInfo)
+	router.GET("/cp/metrics", computing.GetResourceExporterMetrics)
 	router.POST("/lagrange/jobs", computing.ReceiveJob)
 	router.DELETE("/lagrange/jobs", computing.CancelJob)
 	router.POST("/lagrange/jobs/renew", computing.ReNewJob)
