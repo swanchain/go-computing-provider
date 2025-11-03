@@ -20,6 +20,7 @@ import (
 	"github.com/swanchain/go-computing-provider/constants"
 	"github.com/swanchain/go-computing-provider/internal/models"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/retry"
@@ -1035,74 +1036,83 @@ func (s *K8sService) UpdateContainerLogToFile(jobUuid string) {
 		return
 	}
 
-	err = wait.PollUntilContextTimeout(context.Background(), 3*time.Second, 10*time.Minute, true, func(ctx context.Context) (done bool, err error) {
-		k8sService := NewK8sService()
-		pods, err := k8sService.k8sClient.CoreV1().Pods(jobEntity.NameSpace).List(context.TODO(), metaV1.ListOptions{
-			LabelSelector: fmt.Sprintf("lad_app=%s", jobUuid),
-		})
-		if err != nil {
-			logs.GetLogger().Errorf("Error listing Pods: %v", err)
-			return
-		}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	watcher, err := s.k8sClient.CoreV1().Pods(jobEntity.NameSpace).Watch(ctx, metaV1.ListOptions{
+		LabelSelector: fmt.Sprintf("lad_app=%s", jobUuid),
+	})
+	if err != nil {
+		logs.GetLogger().Errorf("Error starting watcher: %v", err)
+		return
+	}
+	defer watcher.Stop()
 
-		if len(pods.Items) > 0 {
-			for _, item := range pods.Items {
-				if item.Status.Phase == coreV1.PodRunning {
-					return true, nil
+	is_running := false
+	var pod *coreV1.Pod
+	for {
+		select {
+		case event, ok := <-watcher.ResultChan():
+			if !ok {
+				err = errors.New("watcher channel closed")
+				break
+			}
+			if event.Type == watch.Added || event.Type == watch.Modified {
+				pod, ok = event.Object.(*coreV1.Pod)
+				if !ok {
+					continue
+				}
+				if pod.Status.Phase == coreV1.PodRunning {
+					is_running = true
+					break
 				}
 			}
+		case <-ctx.Done():
+			err = ctx.Err()
 		}
-		return false, nil
-	})
+		if is_running || err != nil {
+			break
+		}
+	}
 	if err != nil {
 		logs.GetLogger().Errorf("failed to waiting for pod to be ready, job_uuid: %s, error: %v", jobUuid, err)
 		return
 	}
 
-	pods, err := s.k8sClient.CoreV1().Pods(jobEntity.NameSpace).List(context.TODO(), metaV1.ListOptions{
-		LabelSelector: fmt.Sprintf("lad_app=%s", jobUuid),
-	})
-	if err != nil {
+	line := int64(10000)
+	containerStatuses := pod.Status.ContainerStatuses
+	if len(containerStatuses) == 0 {
 		return
 	}
+	lastIndex := len(containerStatuses) - 1
+	req := s.k8sClient.CoreV1().Pods(jobEntity.NameSpace).GetLogs(pod.Name, &coreV1.PodLogOptions{
+		Container:  containerStatuses[lastIndex].Name,
+		Follow:     true,
+		Timestamps: true,
+		TailLines:  &line,
+	})
 
-	if len(pods.Items) > 0 {
-		line := int64(10000)
-		containerStatuses := pods.Items[0].Status.ContainerStatuses
-		if len(containerStatuses) == 0 {
-			return
-		}
-		lastIndex := len(containerStatuses) - 1
-		req := s.k8sClient.CoreV1().Pods(jobEntity.NameSpace).GetLogs(pods.Items[0].Name, &coreV1.PodLogOptions{
-			Container:  containerStatuses[lastIndex].Name,
-			Follow:     true,
-			Timestamps: true,
-			TailLines:  &line,
-		})
+	podLogs, err := req.Stream(context.Background())
+	if err != nil {
+		logs.GetLogger().Errorf("Error opening log stream: %v", err)
+		return
+	}
+	defer podLogs.Close()
 
-		podLogs, err := req.Stream(context.Background())
-		if err != nil {
-			logs.GetLogger().Errorf("Error opening log stream: %v", err)
-			return
-		}
-		defer podLogs.Close()
+	cpRepoPath, _ := os.LookupEnv("CP_PATH")
+	logDir := filepath.Join(cpRepoPath, constants.LOG_PATH_PREFIX, jobUuid)
+	os.MkdirAll(logDir, os.ModePerm)
 
-		cpRepoPath, _ := os.LookupEnv("CP_PATH")
-		logDir := filepath.Join(cpRepoPath, constants.LOG_PATH_PREFIX, jobUuid)
-		os.MkdirAll(logDir, os.ModePerm)
+	logFileName := filepath.Join(logDir, constants.Container_LOG_NAME)
+	logFile, err := os.OpenFile(logFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		logs.GetLogger().Errorf("failed to open container log file, error: %v", err)
+		return
+	}
+	defer logFile.Close()
 
-		logFileName := filepath.Join(logDir, constants.Container_LOG_NAME)
-		logFile, err := os.OpenFile(logFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			logs.GetLogger().Errorf("failed to open container log file, error: %v", err)
-			return
-		}
-		defer logFile.Close()
-
-		if _, err = io.Copy(logFile, podLogs); err != nil {
-			logs.GetLogger().Errorf("failed to write container log to file, error: %v", err)
-			return
-		}
+	if _, err = io.Copy(logFile, podLogs); err != nil {
+		logs.GetLogger().Errorf("failed to write container log to file, error: %v", err)
+		return
 	}
 }
 
